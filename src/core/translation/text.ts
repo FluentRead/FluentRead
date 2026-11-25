@@ -152,6 +152,7 @@ function collectReadableText(
     shouldStayOriginal?: (element: Element) => boolean,
     ignoredExtensionElement?: Element,
     protectionOptions?: TranslationTextProtectionOptions,
+    protectionCache = createTranslationTextProtectionCache(),
 ): string {
     const parts: string[] = [];
     const languageContext = protectionOptions?.includeInlineCodeForLanguage === true;
@@ -191,7 +192,6 @@ function collectReadableText(
         parts.push(node.nodeValue ?? '');
     };
     // 每个文本节点都要复核完整祖先链；长文章中相邻文本共享祖先，逐节点重算会随正文规模二次增长。
-    const protectionCache = createTranslationTextProtectionCache();
     const appendElementBoundary = (element: Element): void => {
         // 空块也会分开可见行；隐藏或保护的空元素没有可读布局，不制造新边界。
         if (isTranslationTextElementProtected(element, shouldStayOriginal, protectionCache, protectionOptions, ignoredExtensionElement)) return;
@@ -454,12 +454,14 @@ export function extractTranslationTextFromNodes(
     shouldStayOriginal?: (element: Element) => boolean,
     ignoredExtensionElement?: Element,
     protectionOptions?: TranslationTextProtectionOptions,
+    protectionCache?: TranslationTextProtectionCache,
 ): string {
     return collectReadableText(
         nodes,
         shouldStayOriginal,
         ignoredExtensionElement,
         protectionOptions,
+        protectionCache,
     );
 }
 
@@ -469,11 +471,13 @@ export function extractTranslationText(
     shouldStayOriginal?: (element: Element) => boolean,
     ignoredExtensionElement?: Element,
     protectionOptions?: TranslationTextProtectionOptions,
+    protectionCache?: TranslationTextProtectionCache,
 ): string {
     return collectReadableText(
         [element],
         shouldStayOriginal,
         ignoredExtensionElement,
         protectionOptions,
+        protectionCache,
     );
 }

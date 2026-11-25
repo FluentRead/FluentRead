@@ -21,8 +21,6 @@ import {scheduleTranslationLoadingIndicator} from './loadingIndicator';
 import {syncModalTranslationHint} from '../ui/modalProgressHint';
 import { styles } from "@/src/core/config/constants";
 import {
-    extractTranslationText,
-    extractTranslationTextFromNodes,
     applyTranslationsToSnapshot,
     collectLiveTranslationTextSlots,
     createTranslationSourceSnapshot,
@@ -127,6 +125,8 @@ import {
     mutationTouchesCurrentTranslationArtifact,
     normalizeComparableText,
     statefulSourceAndTextSlotsAreCurrent,
+    extractCandidateSourceText as candidateSourceText,
+    withCoreReadCache,
 } from '@/src/features/full-page-translation/content/translationStability';
 import {
     createTranslationRequest,
@@ -257,37 +257,6 @@ function scheduleFullPageProgressPublish(session: FullPageSession): void {
     });
 }
 
-function candidateSourceText(
-    candidate: TranslationCandidate,
-    core: ReturnType<typeof getCurrentTranslationCore>,
-    protectionOptions: ReturnType<typeof getCandidateTranslationTextProtectionOptions>,
-): string {
-    if (candidate.visualRange) {
-        if (candidate.visualSourceText) return candidate.visualSourceText;
-        try {
-            const range = candidate.element.ownerDocument.createRange();
-            range.setStart(candidate.visualRange.startContainer, candidate.visualRange.startOffset);
-            range.setEnd(candidate.visualRange.endContainer, candidate.visualRange.endOffset);
-            return range.toString();
-        } catch {
-            return '';
-        }
-    }
-    if (candidate.nodes?.length) {
-        return extractTranslationTextFromNodes(
-            candidate.nodes,
-            core.shouldStayOriginal,
-            undefined,
-            protectionOptions,
-        );
-    }
-    return extractTranslationText(
-        candidate.element,
-        core.shouldStayOriginal,
-        candidate.manualChunk ? candidate.element : undefined,
-        protectionOptions,
-    );
-}
 function transferEquivalentBilingualOwners(session: FullPageSession | undefined, mutations: readonly MutationRecord[]): RemovedTranslationOwnerResolver {
     const resolveRemovedOwners = createRemovedTranslationOwnerResolver();
     const sessionIdentity = session ? getTranslationInvocationIdentity(session.translationConfig) : undefined;
@@ -428,15 +397,18 @@ async function renderTranslation(
         if ((requestSession.renderCommitGeneration ?? 0) !== requestCommitGeneration) return staleOutcome();
         const spinner = state.spinner;
 
+        const core = getCurrentTranslationCore(candidate.scope);
         // 目标文本即使不变，class/role/可见性变化也可能把所有权移到另一语义块。
         // 提交前必须复验原 owner；行内段及纯文本 flex/grid 已物化到自有 owner，
         // 此时复核自有段的受保护来源和下方新骨架槽，不再把旧父元素当作同一候选。
         if (!node.isConnected) return staleOutcome(!owner);
-        if (!attemptSourceIsCurrent(node, state) ||
-            (node === candidate.element && !candidate.nodes?.length && !candidateIsCurrent(candidate))) return staleOutcome();
-
-        if (result.kind === 'snapshot' && (result.staleInlineCode ||
-            (result.inlineCodePacket && !result.inlineCodePacket.isCurrent()))) return staleOutcome();
+        const stillCurrent = withCoreReadCache(core, () =>
+            attemptSourceIsCurrent(node, state) &&
+            !(node === candidate.element && !candidate.nodes?.length && !candidateIsCurrent(candidate)) &&
+            !(result.kind === 'snapshot' && (result.staleInlineCode ||
+                (result.inlineCodePacket && !result.inlineCodePacket.isCurrent()))),
+        );
+        if (!stillCurrent) return staleOutcome();
 
         // 交互控件、仅译文正文和按钮属性共用替换式渲染；提交细节由渲染模块负责。
         if (result.kind === "control-value" || result.kind === "live-text") {
@@ -472,13 +444,12 @@ async function renderTranslation(
 
         // 在提交时才构建输出骨架，因此宿主属性和安全结构（例如链接 href 从 /a
         // 变为 /b）来自当前 DOM；provider 译文仍绑定请求创建时捕获的精确有序原文。
-        const core = getCurrentTranslationCore(candidate.scope);
-        const freshSnapshot = createTranslationSourceSnapshot(
+        const freshSnapshot = withCoreReadCache(core, () => createTranslationSourceSnapshot(
             node, core.shouldStayOriginal,
             getTranslationStateProtectionBoundary(node, state),
             getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node, state.scope),
             core.shouldOmitFromTranslation,
-        );
+        ));
         const freshSources = freshSnapshot.slots.map((slot) => slot.source);
         if (freshSources.length !== result.sources.length ||
             freshSources.some((source, index) => source !== result.sources[index])) {
@@ -804,32 +775,41 @@ export async function translateTarget(candidate: TranslationCandidate, displayMo
 
     const core = getCurrentTranslationCore(candidate.scope);
     const candidateProtectionOptions = getCandidateTranslationTextProtectionOptions(candidate);
-    const sourceText = candidateSourceText(candidate, core, candidateProtectionOptions);
-    if (!normalizeComparableText(sourceText)) {
+    const precheck = withCoreReadCache(core, () => {
+        const extracted = candidateSourceText(candidate, core, candidateProtectionOptions);
+        if (!normalizeComparableText(extracted)) return {kind: 'empty' as const};
+        // 安静窗口由自动全文 owner 负责重新派发；手动悬浮没有该队列，不能静默吞掉已明确请求的新来源。
+        if (owner?.active && translationSourceStability.blocks(candidate, extracted, owner)) {
+            return {kind: 'unchanged' as const, source: extracted};
+        }
+        if (slide && displayMode === 'bilingual' && blocksBilingualRemountCandidate(remountCapitulations, candidate.element, extracted,
+            candidate.allowTopLevelApplicationShell === true,
+            getTranslationInvocationIdentity(translationConfig), candidate.nodes, candidate.scope)) return {kind: 'owned' as const};
+        if (!slide) {
+            resetBilingualArtifactHostWriteBudget(candidate.element);
+            forgetBilingualRemountCandidate(remountCapitulations, candidate.element, extracted,
+                candidate.allowTopLevelApplicationShell === true, getTranslationInvocationIdentity(translationConfig),
+                candidate.nodes, candidate.scope);
+        }
+        // 同语言检测只是节流优化；不确定、短 Latin 与纯 Han 必须 fail-open，
+        // 否则日中混合标题或法德短文会在 provider 之前静默漏译。
+        if (shouldSkipTranslationForTarget(
+            candidateSourceText(candidate, core, {...candidateProtectionOptions, includeInlineCodeForLanguage: true}),
+            translationConfig.targetLanguage, translationConfig.excludedLanguages,
+        )) {
+            return {kind: 'unchanged' as const, source: extracted};
+        }
+        return {kind: 'proceed' as const, source: extracted};
+    });
+    if (precheck.kind === 'empty') {
         return {
             status: "empty",
             retryRoot: candidate.element.isConnected ? candidate.element : undefined,
         };
     }
-    // 安静窗口由自动全文 owner 负责重新派发；手动悬浮没有该队列，不能静默吞掉已明确请求的新来源。
-    if (owner?.active && translationSourceStability.blocks(candidate, sourceText, owner)) return {status: 'unchanged', source: sourceText};
-    if (slide && displayMode === 'bilingual' && blocksBilingualRemountCandidate(remountCapitulations, candidate.element, sourceText,
-        candidate.allowTopLevelApplicationShell === true,
-        getTranslationInvocationIdentity(translationConfig), candidate.nodes, candidate.scope)) return {status: 'owned'};
-    if (!slide) {
-        resetBilingualArtifactHostWriteBudget(candidate.element);
-        forgetBilingualRemountCandidate(remountCapitulations, candidate.element, sourceText,
-            candidate.allowTopLevelApplicationShell === true, getTranslationInvocationIdentity(translationConfig),
-            candidate.nodes, candidate.scope);
-    }
-
-    // 同语言检测只是节流优化；不确定、短 Latin 与纯 Han 必须 fail-open，
-    // 否则日中混合标题或法德短文会在 provider 之前静默漏译。
-    if (shouldSkipTranslationForTarget(
-            candidateSourceText(candidate, core, {...candidateProtectionOptions, includeInlineCodeForLanguage: true}),
-            translationConfig.targetLanguage, translationConfig.excludedLanguages)) {
-        return {status: "unchanged", source: sourceText};
-    }
+    if (precheck.kind === 'unchanged') return {status: 'unchanged', source: precheck.source};
+    if (precheck.kind === 'owned') return {status: 'owned'};
+    const sourceText = precheck.source;
 
     if (candidate.visualRange) {
         const visualCandidate = withFullPageViewportAnchor(
@@ -861,52 +841,57 @@ export async function translateTarget(candidate: TranslationCandidate, displayMo
     // 捕获每个候选中可翻译 Text 节点的精确身份。renderer 可能在提交后只替换受保护的
     // MathJax/KaTeX 子节点；仅比较原文无法区分这种无害事务与同文本宿主/链接替换，
     // 后者会使已渲染快照失效。
-    const sourceTextNodes = collectLiveTranslationTextSlots(
-        node,
-        core.shouldStayOriginal,
-        synthetic ? node : undefined,
-        getTranslationTextProtectionOptions(candidate.allowTopLevelApplicationShell, node, candidate.scope),
-    ).map((slot) => slot.node);
-    const attempt = beginTranslation(
-        node,
-        displayMode,
-        kind,
-        synthetic,
-        sourceText,
-        sourceTextNodes,
-        candidate.allowTopLevelApplicationShell === true,
-        getTranslationInvocationIdentity(translationConfig),
-        candidate.scope,
-        candidate.applicationShellPolicyId,
-    );
-    if (!attempt) {
+    const preparedRequest = withCoreReadCache(core, () => {
+        const sourceTextNodes = collectLiveTranslationTextSlots(
+            node,
+            core.shouldStayOriginal,
+            synthetic ? node : undefined,
+            getTranslationTextProtectionOptions(candidate.allowTopLevelApplicationShell, node, candidate.scope),
+        ).map((slot) => slot.node);
+        const attempt = beginTranslation(
+            node,
+            displayMode,
+            kind,
+            synthetic,
+            sourceText,
+            sourceTextNodes,
+            candidate.allowTopLevelApplicationShell === true,
+            getTranslationInvocationIdentity(translationConfig),
+            candidate.scope,
+            candidate.applicationShellPolicyId,
+        );
+        if (!attempt) return null;
+        // 请求必须在 spinner 插入前创建；微软 HTML 克隆和文本节点快照不能把
+        // 插件自己的 loading 元素送到服务端。
+        const requestProtectionOptions = getTranslationTextProtectionOptions(candidate.allowTopLevelApplicationShell, node, candidate.scope);
+        const queueSession = createTranslationQueueSession();
+        const signal = attempt.state.controller.signal;
+        const releaseRequestSession = bindFullPageRequestSessionAttempt(requestSession, attempt.state.controller);
+        const cancelQueuedRequest = () => cancelTranslationQueueSession(queueSession, createAbortError());
+        signal.addEventListener('abort', cancelQueuedRequest, {once: true});
+        const request = waitForCaller(createTranslationRequest(
+            node,
+            kind,
+            displayMode,
+            translationConfig,
+            signal,
+            queueSession,
+            requestSession,
+            requestProtectionOptions,
+            forceFailedRequest,
+            candidate.scope,
+            () => getTranslationState(node) === attempt.state ? attempt.state.spinner : undefined,
+        ), signal)
+            .finally(() => { signal.removeEventListener('abort', cancelQueuedRequest); });
+        return {attempt, releaseRequestSession, request};
+    });
+    if (!preparedRequest) {
         if (synthetic) {
             withFullPageViewportAnchor(() => node.replaceWith(...Array.from(node.childNodes)), [node]);
         }
         return {status: "owned"};
     }
-    // 请求必须在 spinner 插入前创建；微软 HTML 克隆和文本节点快照不能把
-    // 插件自己的 loading 元素送到服务端。
-    const requestProtectionOptions = getTranslationTextProtectionOptions(candidate.allowTopLevelApplicationShell, node, candidate.scope);
-    const queueSession = createTranslationQueueSession();
-    const signal = attempt.state.controller.signal;
-    const releaseRequestSession = bindFullPageRequestSessionAttempt(requestSession, attempt.state.controller);
-    const cancelQueuedRequest = () => cancelTranslationQueueSession(queueSession, createAbortError());
-    signal.addEventListener('abort', cancelQueuedRequest, {once: true});
-    const request = waitForCaller(createTranslationRequest(
-        node,
-        kind,
-        displayMode,
-        translationConfig,
-        signal,
-        queueSession,
-        requestSession,
-        requestProtectionOptions,
-        forceFailedRequest,
-        candidate.scope,
-        () => getTranslationState(node) === attempt.state ? attempt.state.spinner : undefined,
-    ), signal)
-        .finally(() => { signal.removeEventListener('abort', cancelQueuedRequest); });
+    const {attempt, releaseRequestSession, request} = preparedRequest;
     if (synthetic) node.setAttribute('data-fr-translation-segment', 'true');
     const cancelLoading = scheduleTranslationLoadingIndicator(node, attempt.state, Boolean(owner));
     registerSessionStatefulTarget(statefulSession, candidate.element, node);
@@ -1298,62 +1283,72 @@ function flushMutationRescans(session: FullPageSession): void {
     mutationRescanWakeTimes.delete(session);
     if (!session.active) return;
     const selection = createMutationRescanSelector(session, () => performance.now(), session.activeDiscovery !== null);
+    const sliceCore = getCurrentTranslationCore(session.scope);
 
-    while (session.activeDiscovery || session.dirtyRoots.size > 0) {
-        if (!session.activeDiscovery) {
-            const root = selection.take();
-            if (!root) break;
-            normalizeOrphanedTranslationArtifacts(root);
-            normalizeOrphanedSingleSlots(root);
-            if (!isConnectedMutationRoot(root)) continue;
-            const core = getCurrentTranslationCore(session.scope);
-            prepareManpageContent(root, core.url, core.adapters);
-            session.activeDiscovery = {
-                root,
-                steps: core.discoverSteps(root),
-            };
-        }
+    withCoreReadCache(sliceCore, (invalidateReadCache) => {
+        while (session.activeDiscovery || session.dirtyRoots.size > 0) {
+            if (!session.activeDiscovery) {
+                const root = selection.take();
+                if (!root) break;
+                normalizeOrphanedTranslationArtifacts(root);
+                normalizeOrphanedSingleSlots(root);
+                if (!isConnectedMutationRoot(root)) {
+                    invalidateReadCache();
+                    continue;
+                }
+                const core = getCurrentTranslationCore(session.scope);
+                prepareManpageContent(root, core.url, core.adapters);
+                invalidateReadCache();
+                session.activeDiscovery = {
+                    root,
+                    steps: core.discoverSteps(root),
+                };
+            }
 
-        const active = session.activeDiscovery;
-        if (!isConnectedMutationRoot(active.root)) {
-            session.activeDiscovery = null;
-            continue;
-        }
-        const step = active.steps.next();
-        if (step.done) {
-            if (active.root === document.documentElement && document.readyState !== 'loading'
-                && !sessionsWithDiscoveredContent.has(session) && session.statefulTargetsByAncestor.size === 0) {
-                notifyFullPageTranslationDiagnostic(diagnoseFailure(undefined, {reason: 'no-content'}));
+            const active = session.activeDiscovery;
+            if (!isConnectedMutationRoot(active.root)) {
+                session.activeDiscovery = null;
+                continue;
             }
-            if (session.broadRescanRoots.has(active.root)) {
-                session.broadRescanCooldowns.set(active.root, performance.now() + BROAD_RESCAN_COOLDOWN_MS);
+            const step = active.steps.next();
+            if (step.done) {
+                if (active.root === document.documentElement && document.readyState !== 'loading'
+                    && !sessionsWithDiscoveredContent.has(session) && session.statefulTargetsByAncestor.size === 0) {
+                    notifyFullPageTranslationDiagnostic(diagnoseFailure(undefined, {reason: 'no-content'}));
+                }
+                if (session.broadRescanRoots.has(active.root)) {
+                    session.broadRescanCooldowns.set(active.root, performance.now() + BROAD_RESCAN_COOLDOWN_MS);
+                }
+                session.activeDiscovery = null;
+                continue;
             }
-            session.activeDiscovery = null;
-            continue;
-        }
-        if (step.value.element.shadowRoot) observeFullPageRoot(session, step.value.element.shadowRoot);
-        if (step.value.phase === "enter") {
-            const statefulStepTarget = asHTMLElement(step.value.element);
-            const statefulStepState = statefulStepTarget
-                ? getTranslationState(statefulStepTarget)
-                : undefined;
-            if (statefulStepTarget && statefulStepState) {
-                if (upgradeFullPageTargetScope(session, statefulStepTarget, statefulStepState)) continue;
-                const candidateOwner = statefulStepState.syntheticSegment
-                    ? asHTMLElement(statefulStepTarget.parentElement) ?? statefulStepTarget
-                    : statefulStepTarget;
-                registerSessionStatefulTarget(session, candidateOwner, statefulStepTarget);
-                // 合成 owner 会被普通候选发现刻意硬剪枝；祖先 class/style 重扫时仍需
-                // 复验其实时原文，避免标签可见性变化后长期漏译。
-                scheduleStatefulAttributeReevaluation(session, statefulStepTarget);
+            if (step.value.element.shadowRoot) observeFullPageRoot(session, step.value.element.shadowRoot);
+            if (step.value.phase === "enter") {
+                const statefulStepTarget = asHTMLElement(step.value.element);
+                const statefulStepState = statefulStepTarget
+                    ? getTranslationState(statefulStepTarget)
+                    : undefined;
+                if (statefulStepTarget && statefulStepState) {
+                    if (upgradeFullPageTargetScope(session, statefulStepTarget, statefulStepState)) {
+                        invalidateReadCache();
+                        continue;
+                    }
+                    const candidateOwner = statefulStepState.syntheticSegment
+                        ? asHTMLElement(statefulStepTarget.parentElement) ?? statefulStepTarget
+                        : statefulStepTarget;
+                    registerSessionStatefulTarget(session, candidateOwner, statefulStepTarget);
+                    // 合成 owner 会被普通候选发现刻意硬剪枝；祖先 class/style 重扫时仍需
+                    // 复验其实时原文，避免标签可见性变化后长期漏译。
+                    scheduleStatefulAttributeReevaluation(session, statefulStepTarget);
+                }
             }
-        }
-        if (step.value.candidate) scheduleDiscoveredCandidate(session, step.value.candidate);
+            if (step.value.candidate) scheduleDiscoveredCandidate(session, step.value.candidate);
 
-        // 每一步最多代表一个已访问元素；即使脏根覆盖整个 Reddit/Wikipedia DOM，
-        // 也要在很小的帧预算后让出执行权。
-        if (selection.shouldYield()) break;
-    }
+            // 每一步最多代表一个已访问元素；即使脏根覆盖整个 Reddit/Wikipedia DOM，
+            // 也要在很小的帧预算后让出执行权。
+            if (selection.shouldYield()) break;
+        }
+    });
 
     if (session.activeDiscovery || session.dirtyRoots.size > 0) {
         scheduleMutationRescan(session, selection.delay());
@@ -1835,6 +1830,7 @@ function processFullPageMutations(session: FullPageSession, mutations: readonly 
     // Preview <-> staging-span 记录反复遍历很长的 P。
     const shouldCheckAttribute = createTranslationAttributeMutationFilter();
     const resolveRemovedOwners = transferEquivalentBilingualOwners(session, mutations);
+    withCoreReadCache(core, (invalidateReadCache) => {
     const stabilityReads = createTranslationMutationStabilityChecks();
     const attributeBatch = createAttributeMutationBatch({
         resolveTargets: root => resolveStatefulMutationTargets(session, root),
@@ -1856,6 +1852,7 @@ function processFullPageMutations(session: FullPageSession, mutations: readonly 
     const reads = {
         ...stabilityReads,
         invalidate: () => {
+            invalidateReadCache();
             stabilityReads.invalidate();
             attributeBatch.invalidate();
         },
@@ -1888,8 +1885,9 @@ function processFullPageMutations(session: FullPageSession, mutations: readonly 
             ? discardOwnersRemovedByHost(session, Array.from(mutation.removedNodes), resolveRemovedOwners, reads.invalidate)
             : {removedAny: false, shouldRescan: false};
         if (removedOwners.shouldRescan && mutationElement) enqueueFullPageRescan(session, mutationElement);
-        if (mutationElement && core.shouldIgnoreMutation(mutationElement) &&
-            !siteAttributeMutation && !resolveStatefulMutationTarget(mutationElement)) continue;
+        if (!siteAttributeMutation && mutationElement &&
+            !resolveStatefulMutationTarget(mutationElement) &&
+            core.shouldIgnoreMutation(mutationElement)) continue;
         if (!preservesContext) invalidateContextSensitiveRequestCache(session);
         if (mutation.type === "childList") {
             for (const adapter of siteChildListAdapters) {
@@ -1983,6 +1981,7 @@ function processFullPageMutations(session: FullPageSession, mutations: readonly 
     }
     refreshFullPageModal(session);
     attributeBatch.flush();
+    });
 }
 
 function createFullPageSession(

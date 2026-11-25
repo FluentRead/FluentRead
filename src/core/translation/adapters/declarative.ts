@@ -58,7 +58,7 @@ const combinedSelectorsByDocument = new WeakMap<Document, Map<string, string | n
 function combinedSelector(element: Element, value: SelectorList): string | null {
     const document = element.ownerDocument;
     if (!document) return null;
-    const items = selectors(value);
+    const items = [...new Set(selectors(value))];
     const cacheKey = items.join('\u0000');
     let documentCache = combinedSelectorsByDocument.get(document);
     if (!documentCache) {
@@ -93,12 +93,33 @@ function closestSelector(
     if (misses?.get(element)?.has(selector)) return null;
     const combined = combinedSelector(element, selector);
     if (!combined) return null;
-    let closest: Element | null;
+    let closest: Element | null = null;
+    let cachedAncestor = false;
+    const unchecked: Element[] = [];
+    if (misses) {
+        let current: Element | null = element;
+        for (let depth = 0; current && depth < maxComposedAncestorDepth; depth += 1) {
+            if (misses.get(current)?.has(selector)) {
+                cachedAncestor = true;
+                break;
+            }
+            unchecked.push(current);
+            current = current.parentElement;
+        }
+    }
     try {
-        // 父级的成功 miss 已排除所有祖先；仍检查当前节点，不能漏掉新命中。
-        closest = element.parentElement && misses?.get(element.parentElement)?.has(selector)
-            ? element.matches(combined) ? element : null
-            : element.closest(combined);
+        if (cachedAncestor) {
+            // 已证实的祖先 miss 已排除其上全部 light-DOM 祖先；仅逐层检查未缓存节点，
+            // 避免重复对顶层大型容器执行 closest() 与 :has() 选择器匹配。
+            for (const node of unchecked) {
+                if (node.matches(combined)) {
+                    closest = node;
+                    break;
+                }
+            }
+        } else {
+            closest = element.closest(combined);
+        }
     } catch {
         // 失败不是已证实的 miss；不能据此跳过祖先上的查询。
         return null;
@@ -106,16 +127,13 @@ function closestSelector(
     if (closest || !misses || combined.includes('\\') || combined.includes('&') || /:scope\b/iu.test(combined)) return closest;
     // 对固定 scope 的成功 miss 已覆盖整条 light-DOM 祖先链。只复用 miss，
     // 保留命中 target 的身份与优先级；:scope/转义语法不作这种推断。
-    let current: Element | null = element;
-    for (let depth = 0; current && depth < maxComposedAncestorDepth; depth += 1) {
+    for (const current of unchecked) {
         let selectors = misses.get(current);
-        if (selectors?.has(selector)) break;
         if (!selectors) {
             selectors = new Set();
             misses.set(current, selectors);
         }
         selectors.add(selector);
-        current = current.parentElement;
     }
     return null;
 }

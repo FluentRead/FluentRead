@@ -2,7 +2,7 @@
  * @file src/core/translation/engine.ts
  *
  * 文件职责：实现 DOM 节点到 TranslationCandidate 的核心解析引擎，协调安全守卫、站点适配器、布局边界和文本有效性；为显式非原子行内容器保留直属正文与独立子段落的一致发现和悬浮边界。
- * 主要内容：按正文/全部节点范围协调候选，统一发现、悬浮与请求取词的精确禁译覆盖；定义 TranslationCandidateCore、候选优选与键值函数，记录发现步骤和原因，按站点规则把显式换行拆为两种入口一致的内联候选，处理编辑器坐标命中屏障、hover 屏障、适配优先级、快照省略、缓存及坐标命中；局部脏内联子树仅在完整保护检查通过后回到最近显式非原子祖先重扫，不把每个正文子节点重定向成重复整段请求；发现强制目标时仅在当前 enter 的同步检查中复用既有决策和祖先选择器 miss，不跨生成器让出缓存；同步只读批量解析复用全部范围及无站点适配/应用外壳例外的普通正文祖先守卫和文本保护，涉及显式外壳权限或站点重定向目标时独立解析；无元素子节点的非文档表面不重复探测不可能成立的内联分段，仍由完整候选分类复验文本和保护；悬浮命中独立后代的包裹层时禁止回退吞并整个容器，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
+ * 主要内容：按正文/全部节点范围协调候选，统一发现、悬浮与请求取词的精确禁译覆盖；定义 TranslationCandidateCore、候选优选与键值函数，提供同步只读祖先 miss 缓存作用域（退出或显式失效后立即释放），记录发现步骤和原因，按站点规则把显式换行拆为两种入口一致的内联候选，处理编辑器坐标命中屏障、hover 屏障、适配优先级、快照省略、缓存及坐标命中；局部脏内联子树仅在完整保护检查通过后回到最近显式非原子祖先重扫，不把每个正文子节点重定向成重复整段请求；发现强制目标时仅在当前 enter 的同步检查中复用既有决策和祖先选择器 miss，不跨生成器让出缓存；同步只读批量解析复用全部范围及无站点适配/应用外壳例外的普通正文祖先守卫和文本保护，涉及显式外壳权限或站点重定向目标时独立解析；无元素子节点的非文档表面不重复探测不可能成立的内联分段，仍由完整候选分类复验文本和保护；悬浮命中独立后代的包裹层时禁止回退吞并整个容器，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
  * 模块边界：本文件属于可独立测试的 core 候选领域；内置站点提供的应用外壳正文入口仍须经过显式目标、局部保护与去重检查，不改变通用发现守卫；可以读取传入 DOM 以计算结果，坐标命中栈与祖先守卫只在单次同步解析中复用，不跨手势缓存；不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
@@ -178,6 +178,12 @@ export function selectPreferredTranslationCandidate(
     return existing;
 }
 
+/** 仅在无 DOM 写入的同步只读批次中复用的祖先守卫、文本保护与声明式 miss 缓存。 */
+interface SynchronousReadOnlyEpoch {
+    adapterContext: AdapterContext;
+    defaultInspectionContext: ResolutionEvaluationContext;
+}
+
 /** 候选发现门面；翻译调度与渲染仍留在 runtime 端口。 */
 export class TranslationCandidateCore {
     readonly url: URL;
@@ -186,6 +192,7 @@ export class TranslationCandidateCore {
     readonly includeSidebarRegions: boolean;
     readonly adapters: readonly TranslationSiteAdapter[];
     private readonly context: AdapterContext;
+    private readOnlyEpoch: SynchronousReadOnlyEpoch | null = null;
     private readonly discoveredCandidateChildBarriers = new WeakMap<Element, ReadonlySet<Element>>();
 
     constructor(options: TranslationCoreOptions = {}) {
@@ -281,11 +288,38 @@ export class TranslationCandidateCore {
         return !this.adapters.some((adapter) => adapter.genericCandidatePolicy === 'targets-only');
     }
 
-    private adapterContextForResolution(evaluationContext?: ResolutionEvaluationContext): AdapterContext {
-        return evaluationContext?.adapterContext ?? this.context;
+    /** 仅在无 DOM 写入的同步只读阶段复用祖先守卫、文本保护与声明式 miss；写入前须调用 invalidate，退出作用域自动释放。 */
+    withSynchronousReadCache<T>(callback: (invalidate: () => void) => T): T {
+        const inherited = this.readOnlyEpoch !== null;
+        const previous = this.readOnlyEpoch;
+        const reset = () => {
+            const adapterContext: AdapterContext = {url: this.url, closestSelectorMisses: new WeakMap()};
+            const defaultInspectionContext = this.newContext();
+            defaultInspectionContext.adapterContext = adapterContext;
+            this.readOnlyEpoch = {adapterContext, defaultInspectionContext};
+        };
+        if (!inherited) reset();
+        try {
+            return callback(reset);
+        } finally {
+            if (!inherited) this.readOnlyEpoch = previous;
+        }
     }
 
-    shouldStayOriginal = (element: Element): boolean => this.shouldStayOriginalWithContext(element, this.context);
+    /** 仅在活动同步只读批次内返回默认保护参数的共享文本保护缓存。 */
+    getSynchronousTextProtectionCache(): TranslationTextProtectionCache | undefined {
+        return this.readOnlyEpoch?.defaultInspectionContext.textProtectionCache;
+    }
+
+    private currentAdapterContext(): AdapterContext {
+        return this.readOnlyEpoch?.adapterContext ?? this.context;
+    }
+
+    private adapterContextForResolution(evaluationContext?: ResolutionEvaluationContext): AdapterContext {
+        return evaluationContext?.adapterContext ?? this.currentAdapterContext();
+    }
+
+    shouldStayOriginal = (element: Element): boolean => this.shouldStayOriginalWithContext(element, this.currentAdapterContext());
 
     private shouldStayOriginalWithContext(element: Element, context: AdapterContext): boolean {
         return this.adapters.some((adapter) => {
@@ -300,7 +334,7 @@ export class TranslationCandidateCore {
     /** 双语快照省略宿主元数据；原文保护仍由 shouldStayOriginal 独立负责。 */
     shouldOmitFromTranslation = (element: Element): boolean => this.adapters.some((adapter) => {
         try {
-            return adapter.shouldOmitFromTranslation?.(element, this.context) === true;
+            return adapter.shouldOmitFromTranslation?.(element, this.currentAdapterContext()) === true;
         } catch {
             return false;
         }
@@ -308,7 +342,7 @@ export class TranslationCandidateCore {
 
     shouldIgnoreMutation = (element: Element): boolean => this.adapters.some((adapter) => {
         try {
-            return adapter.shouldIgnoreMutation?.(element, this.context) === true;
+            return adapter.shouldIgnoreMutation?.(element, this.currentAdapterContext()) === true;
         } catch {
             return false;
         }
@@ -449,9 +483,17 @@ export class TranslationCandidateCore {
     }
 
     inspect(element: Element, textProtectionOptions?: TranslationTextProtectionOptions): TranslationCoreInspection {
+        const epoch = this.readOnlyEpoch;
+        if (!textProtectionOptions && epoch) {
+            return this.inspectWithTextProtectionCache(
+                element,
+                epoch.defaultInspectionContext.textProtectionCache,
+                epoch.defaultInspectionContext,
+            );
+        }
         const evaluationContext = this.newContext(textProtectionOptions);
-        // 只在此同步只读 inspect 生效；resolve/discover 与不同 owner 不共享。
-        evaluationContext.adapterContext = {...this.context, closestSelectorMisses: new WeakMap()};
+        // 只在此同步只读 inspect 或外层同步只读批次生效；不同步跨让出或 DOM 写入复用。
+        evaluationContext.adapterContext = epoch?.adapterContext ?? {...this.context, closestSelectorMisses: new WeakMap()};
         return this.inspectWithTextProtectionCache(
             element,
             evaluationContext.textProtectionCache,
@@ -988,8 +1030,10 @@ export class TranslationCandidateCore {
                     if (ownAdapter.decision.kind === 'force-target' && !hardGuard.prune) {
                         // 本段检查在 enter 的 yield 之前完成；不把缓存放入 frame，
                         // 后续节点仍读取让出后可能变化的宿主属性和站点决策。
-                        const forceContext = this.newContext();
-                        forceContext.adapterContext = {...this.context, closestSelectorMisses: new WeakMap()};
+                        const forceContext = this.readOnlyEpoch?.defaultInspectionContext ?? this.newContext();
+                        if (!this.readOnlyEpoch) {
+                            forceContext.adapterContext = {...this.context, closestSelectorMisses: new WeakMap()};
+                        }
                         forceContext.adapterDecisions.set(frame.element, ownAdapter);
                         frame.forcedCandidate = this.inspectWithTextProtectionCache(
                             frame.element,
@@ -1121,17 +1165,20 @@ export class TranslationCandidateCore {
     }
 
     discover(root: Node): TranslationCandidate[] {
-        const unique = new Map<Node, TranslationCandidate>();
-        for (const {candidate} of this.discoverSteps(root)) {
-            if (!candidate) continue;
-            const key = getTranslationCandidateKey(candidate);
-            const existing = unique.get(key);
-            unique.set(key, selectPreferredTranslationCandidate(existing, candidate));
-        }
-        return [...unique.values()];
+        return this.withSynchronousReadCache(() => {
+            const unique = new Map<Node, TranslationCandidate>();
+            for (const {candidate} of this.discoverSteps(root)) {
+                if (!candidate) continue;
+                const key = getTranslationCandidateKey(candidate);
+                const existing = unique.get(key);
+                unique.set(key, selectPreferredTranslationCandidate(existing, candidate));
+            }
+            return [...unique.values()];
+        });
     }
 
     resolveAtPoint(root: Document | ShadowRoot, x: number, y: number): TranslationCandidate | null {
+        return this.withSynchronousReadCache(() => {
         // 一次坐标解析是同步只读阶段：每个 root 的原生命中栈只读取一次，
         // 普通正文的祖先守卫也可复用；下一次手势重新读取，避免缓存动态页面。
         const hitStacks = new Map<Document | ShadowRoot, Element[]>();
@@ -1185,6 +1232,7 @@ export class TranslationCandidateCore {
         };
 
         return resolveInRoot(root, 0);
+        });
     }
 
     private refineHoverCandidate(

@@ -550,6 +550,35 @@ describe('full page site attribute boundary lifecycle', () => {
             expect(owner.textContent).toBe(nextSource);
         } finally { inspect.mockRestore(); nextSourceReads.mockRestore(); fixture.config.display = 1; }
     });
+
+    it('preserves translated owners when unrelated data-* or aria-* attributes mutate on an ancestor under :has broad observation', async () => {
+        fixture.config.display = 1;
+        const {owners} = epochFixture(
+            `<main id="host"><i data-epoch-flag data-ready="yes"></i><i data-epoch-flag></i><i data-epoch-flag></i>`
+            + `<p id="owner-0">${source}</p><p id="owner-1">Second translated paragraph under the same ancestor container.</p></main>`,
+            ['main:has([data-ready="yes"]) > p'],
+        );
+        const host = document.querySelector<HTMLElement>('#host')!;
+        const previous = await settleEpochOwners(owners);
+        const providerCalls = fixture.requests.mock.calls.length;
+        const observer = FixtureMutationObserver.instances.at(-1)!;
+        observer.emit([
+            epochAttribute(host, 'data-catalyst', ''),
+            epochAttribute(host, 'aria-expanded', 'true'),
+        ]);
+        for (let index = 0; index < owners.length; index += 1) {
+            expect(getTranslationState(owners[index]!)).toBe(previous[index]);
+            expect(previous[index]!.controller.signal.aborted).toBe(false);
+            expect(owners[index]!.querySelectorAll('.fluent-read-bilingual-content')).toHaveLength(1);
+        }
+        expect(fixture.requests).toHaveBeenCalledTimes(providerCalls);
+        // Real scope loss on the ancestor still restores all translated owners immediately.
+        observer.emit([epochAttribute(document.querySelector('[data-ready]')!, 'data-ready', 'no')]);
+        for (const owner of owners) {
+            expect(getTranslationState(owner)).toBeUndefined();
+            expect(owner.querySelector('.fluent-read-bilingual-content')).toBeNull();
+        }
+    });
 });
 
 describe('属性检查点排时与硬门禁的 ports 契约', () => {
@@ -704,5 +733,27 @@ describe('属性检查点排时与硬门禁的 ports 契约', () => {
         expect(ports.refreshSkeleton).not.toHaveBeenCalled();
         expect(ports.restart).toHaveBeenCalledTimes(1);
         expect(ports.restart).toHaveBeenCalledWith(owner);
+    });
+
+    it('全属性观察下祖先无关展示属性保留来源与范围均稳定的普通 owner，但核心标记和合成段仍即时重启', () => {
+        const {root, owner, state, ports, batch} = batchFixture();
+        // 普通 owner 在祖先发生 data-catalyst / aria-expanded 变更时保持稳定，不触发重启。
+        batch.process(root, root, root, 'data-catalyst', true);
+        expect(ports.restoreOutsideScope).toHaveBeenCalledWith(owner);
+        expect(ports.sourceIsCurrent).toHaveBeenCalledWith(owner, state);
+        expect(ports.restart).not.toHaveBeenCalled();
+
+        // 核心受关注属性（如 data-fr-translation-segment）、null 属性、合成段与工件变更仍立即重启。
+        batch.process(root, owner, owner, 'data-fr-translation-segment', true);
+        expect(ports.restart).toHaveBeenCalledTimes(1);
+        batch.process(root, owner, owner, null, true);
+        expect(ports.restart).toHaveBeenCalledTimes(2);
+        state.syntheticSegment = true;
+        batch.process(root, root, root, 'data-catalyst', true);
+        expect(ports.restart).toHaveBeenCalledTimes(3);
+        state.syntheticSegment = false;
+        vi.mocked(ports.isArtifact).mockReturnValue(true);
+        batch.process(root, owner, owner, 'data-catalyst', true);
+        expect(ports.restart).toHaveBeenCalledTimes(4);
     });
 });

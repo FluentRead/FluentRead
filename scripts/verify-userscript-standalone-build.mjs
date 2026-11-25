@@ -52,6 +52,8 @@ const bytes = Buffer.byteLength(source);
 // #1356's media controls and feedback exceed the existing cap by less than 3 kB on abdbbcc88.
 // Register only that rounded text/UI increment; dependencies, metadata checks and compact/Greasy Fork limits stay unchanged.
 // JSON 合批与共享退避增加代码，按 1 kB 步长利用原余量后追加 4 kB。
-const maxBytes = 3_707_000;
+// 接入混元 Hy-MT3 1.8B（目录、七语设置文案与条件保留逻辑，叠加当前 main 基线）在 CI 实测 3,722,959 字节；
+// 无新增依赖、模型资源或紧凑版/Greasy Fork 预算变更，按 1 kB 步长上调至 3,724,000 字节。
+const maxBytes = 3_724_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

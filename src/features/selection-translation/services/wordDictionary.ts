@@ -47,6 +47,7 @@ export interface WordCardData {
     phonetics: WordPronunciation[];
     meanings: WordMeaning[];
     origin?: string;
+    inflections?: string;
     sources: WordDictionarySource[];
 }
 
@@ -63,6 +64,9 @@ interface WiktApiEntry {
     word?: unknown;
     lang_code?: unknown;
     pos?: unknown;
+    etymology_text?: unknown;
+    etymology?: unknown;
+    forms?: unknown;
     senses?: unknown;
     sounds?: unknown;
 }
@@ -125,6 +129,14 @@ const CHINA_PROVIDER_TIMEOUT_MS = 1_800;
 const WIKTAPI_TIMEOUT_MS = 1_200;
 const MAX_DEFINITIONS_PER_MEANING = 6;
 const MAX_MEANINGS = 6;
+const MAX_INFLECTIONS = 8;
+const IGNORED_WIKTAPI_FORM_TAGS = new Set([
+    'table-tags',
+    'inflection-template',
+    'class',
+    'canonical',
+    'romanization',
+]);
 
 const SOURCE_INFO: Record<WordDictionaryProviderId, WordDictionarySource> = {
     'ecdict-local': {
@@ -349,11 +361,51 @@ function hasEnglishDefinition(definition: WordDefinition): boolean {
     return /[A-Za-z]/u.test(definition.definition);
 }
 
+function mergeInflections(current: string | undefined, addition: string): string {
+    const merged: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of current ? [current, addition] : [addition]) {
+        for (const part of raw.split(';')) {
+            const value = part.trim();
+            const key = value.toLocaleLowerCase();
+            if (value && !seen.has(key)) {
+                seen.add(key);
+                merged.push(value);
+                if (merged.length >= MAX_INFLECTIONS) return merged.join('; ');
+            }
+        }
+    }
+    return merged.join('; ');
+}
+
+function formatWiktApiInflections(forms: unknown, normalizedWord: string): string {
+    if (!Array.isArray(forms)) return '';
+    const items: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of forms) {
+        if (!raw || typeof raw !== 'object') continue;
+        const value = raw as Record<string, unknown>;
+        const form = textValue(value.form);
+        if (!form || form === '-') continue;
+        const tags = Array.isArray(value.tags) ? value.tags.map(textValue).filter(Boolean) : [];
+        if (tags.some(tag => IGNORED_WIKTAPI_FORM_TAGS.has(tag.toLowerCase()))) continue;
+        if (tags.length === 0 && form.toLowerCase() === normalizedWord) continue;
+        const formatted = tags.length > 0 ? `${form} (${tags.slice(0, 3).join(', ')})` : form;
+        const key = formatted.toLocaleLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        items.push(formatted);
+        if (items.length >= MAX_INFLECTIONS) break;
+    }
+    return items.join('; ');
+}
+
 export function mergeWordCardData(base: WordCardData | null, addition: WordCardData): WordCardData {
     const card = base || createPartialCard(addition.normalizedWord, addition.sources[0] || SOURCE_INFO['free-dictionary']);
     card.word = card.word || addition.word;
     card.normalizedWord = addition.normalizedWord || card.normalizedWord;
     if (!card.origin && addition.origin) card.origin = addition.origin;
+    if (addition.inflections) card.inflections = mergeInflections(card.inflections, addition.inflections);
     addPronunciations(card, addition.phonetics);
     for (const meaning of addition.meanings) addMeaning(card, meaning.partOfSpeech, meaning.definitions);
     for (const source of addition.sources) addSource(card, source);
@@ -578,6 +630,10 @@ export function parseWiktApiEntry(entry: WiktApiEntry, normalizedWord: string): 
         const label = /received-pronunciation|british|uk/i.test(tags) ? '英式' : /general-american|american|us/i.test(tags) ? '美式' : undefined;
         return [{ text, audio, label }];
     }));
+    const origin = stripHtml(entry.etymology_text) || stripHtml(entry.etymology);
+    if (origin) card.origin = origin;
+    const inflections = formatWiktApiInflections(entry.forms, normalizedWord);
+    if (inflections) card.inflections = inflections;
     return card;
 }
 
@@ -745,7 +801,7 @@ async function lookupYoudao(normalizedWord: string, signal?: AbortSignal): Promi
 }
 
 async function lookupWiktApi(normalizedWord: string, signal?: AbortSignal): Promise<WordCardData | null> {
-    const payload = await fetchJson(`https://api.wiktapi.dev/v1/en/word/${encodeURIComponent(normalizedWord)}`, WIKTAPI_TIMEOUT_MS, signal);
+    const payload = await fetchJson(`https://api.wiktapi.dev/v1/en/word/${encodeURIComponent(normalizedWord)}?lang=en`, WIKTAPI_TIMEOUT_MS, signal);
     if (!payload || typeof payload !== 'object') return null;
     const rawEntries = (payload as WiktApiResponse).entries;
     const entries: unknown[] = Array.isArray(rawEntries) ? rawEntries : [];

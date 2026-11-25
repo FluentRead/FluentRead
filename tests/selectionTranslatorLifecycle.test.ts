@@ -1303,6 +1303,12 @@ describe('SelectionTranslator lifecycle after extension reload', () => {
         release({success: true, data: {...card('read'), origin: 'old source'}});await previous;
         expect(fixture.state.wordCard.origin).toBe('selected source');
         expect(fixture.state.isWordCardSupportLoading).toBe(false);
+        fixture.state.wordCard = {...card('read'), origin: 'Old English rǣdan', inflections: 'reads (plural); reading (present participle)'};
+        await Vue.nextTick();
+        expect(fixture.state.dictionaryToolEntry).toMatchObject({
+            etymology: 'Old English rǣdan',
+            inflections: 'reads (plural); reading (present participle)',
+        });
         fixture.state.showTooltip = false;
         const messageCount = fixture.browser.runtime.sendMessage.mock.calls.length;
         fixture.config.selectionDictionarySource = 'wiktionary-rest';fixture.notifyConfig();

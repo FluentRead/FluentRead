@@ -138,7 +138,7 @@ describe('FluentRead Design System tokens & editorial guardrails', () => {
     expect(selectionTranslator).not.toContain('linear-gradient(135deg, #f35482')
     expect(popupPreview).not.toContain('radial-gradient(')
     expect(floatingBall).toContain('--fr-surface: #171b24;')
-    expect(progressPanel).toContain('rgba(23, 27, 36, 0.92)')
+    expect(progressPanel).toContain('rgba(23, 27, 36, 0.86)')
   })
 
   it('ships PRODUCT.md, DESIGN.md, and the .agents/skills/fluentread-ui skill bundle', () => {

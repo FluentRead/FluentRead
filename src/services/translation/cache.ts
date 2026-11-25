@@ -321,7 +321,6 @@ class TranslationCache {
   }
 
   private async removeExpiredMany(keys: readonly string[], now: number, epoch: number): Promise<void> {
-    if (keys.length === 0) return;
     await translationCacheDb.transaction('rw', translationCacheDb.entries, translationCacheDb.totals, async () => {
       if (epoch !== this.clearEpoch) return;
       const records = await translationCacheDb.entries.bulkGet([...keys]);

@@ -1242,7 +1242,6 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
     }
 
     function readCacheBatchWithPendingValues(generation: number, keys: readonly string[]): Promise<Array<string | null>> {
-        if (keys.length === 0) return Promise.resolve([]);
         if (!deps.cache.getMany) {
             const reads = new Map<string, Promise<string | null>>();
             return Promise.all(keys.map(itemKey => {
@@ -1287,7 +1286,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         generation: number,
         entries: readonly {key: string; value: string}[],
     ): Promise<void> {
-        if (generation !== cacheGeneration || entries.length === 0) return;
+        if (generation !== cacheGeneration) return;
         const pendingEntries = entries.map(({key, value}) => ({key, pendingValue: {generation, value} as PendingCacheValue}));
         const write = Promise.resolve().then(() => deps.cache.setMany!(entries));
         for (const {key, pendingValue} of pendingEntries) {
@@ -1308,8 +1307,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         generation: number,
         entries: readonly {key: string; value: string}[],
     ): Promise<void> {
-        if (entries.length === 0) return;
-        if (entries.length === 1 || !deps.cache.setMany) {
+        if (entries.length <= 1 || !deps.cache.setMany) {
             await Promise.all(entries.map(({key, value}) => persistCacheWrite(generation, key, value)));
             return;
         }

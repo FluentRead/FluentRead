@@ -211,7 +211,7 @@ onBeforeUnmount(() => {
   padding: 8px 8px 8px 10px;
   border: 1px solid rgba(22, 27, 38, 0.12);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 4px 16px rgba(17, 24, 39, 0.1);
   color: #161b26;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -370,7 +370,7 @@ onBeforeUnmount(() => {
 
 .fr-dark {
   border-color: #272e3d;
-  background: rgba(23, 27, 36, 0.92);
+  background: rgba(23, 27, 36, 0.86);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
   color: #f0f3f8;
 }

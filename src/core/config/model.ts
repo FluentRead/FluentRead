@@ -129,6 +129,7 @@ import {
 } from './quickTranslation';
 import {
     DEFAULT_INPUT_BOX_TRANSLATION_INTERVAL,
+    normalizeCustomInputBoxTranslationHotkey,
     normalizeInputBoxTranslationInterval,
     normalizeInputBoxTranslationModel,
     normalizeInputBoxTranslationOutputMode,
@@ -603,6 +604,7 @@ export class Config {
     translationLoadingStyle: TranslationLoadingStyle; // 网页段落翻译加载指示器样式
     translationProgressPanelEnabled: boolean; // 是否显示全文翻译进度面板
     inputBoxTranslationTrigger: string; // 输入框翻译触发方式
+    customInputBoxTranslationHotkey: string; // 自定义输入框翻译快捷键
     inputBoxTranslationTarget: string; // 输入框翻译目标语言
     inputBoxTranslationOutputMode: InputBoxTranslationOutputMode; // 替换原文或双语输出顺序
     inputBoxTranslationInterval: number; // 输入框翻译相邻触发的最大间隔（毫秒）
@@ -835,6 +837,7 @@ export class Config {
         this.translationLoadingStyle = DEFAULT_TRANSLATION_LOADING_STYLE; // 默认使用柔和圆环，缺失配置也回到该样式
         this.translationProgressPanelEnabled = false; // 默认关闭全文翻译进度面板
         this.inputBoxTranslationTrigger = 'disabled'; // 默认关闭输入框翻译
+        this.customInputBoxTranslationHotkey = ''; // 自定义输入框翻译快捷键为空
         this.inputBoxTranslationTarget = 'en'; // 默认翻译成英文
         this.inputBoxTranslationOutputMode = 'replace';
         this.inputBoxTranslationInterval = DEFAULT_INPUT_BOX_TRANSLATION_INTERVAL;
@@ -1297,6 +1300,12 @@ export function normalizeConfig(value: unknown): Config {
     normalized.from = normalizeConfigLanguage(source.from) || defaultOption.from;
     normalized.to = normalizeConfigLanguage(source.to) || defaultOption.to;
     normalized.excludedLanguages = normalizeExcludedLanguages(source.excludedLanguages);
+    normalized.customInputBoxTranslationHotkey = normalizeCustomInputBoxTranslationHotkey(
+        source.customInputBoxTranslationHotkey,
+    );
+    if (normalized.inputBoxTranslationTrigger === 'custom' && !normalized.customInputBoxTranslationHotkey) {
+        normalized.inputBoxTranslationTrigger = 'disabled';
+    }
     normalized.inputBoxTranslationTarget = normalizeConfigLanguage(source.inputBoxTranslationTarget)
         || defaultOption.inputBoxTranslationTarget;
     normalized.inputBoxTranslationOutputMode = normalizeInputBoxTranslationOutputMode(source.inputBoxTranslationOutputMode);
@@ -1753,7 +1762,10 @@ export function normalizeConfig(value: unknown): Config {
                 ...(normalized.sectionTranslationHotkeyEnabled
                     ? [resolveSectionTranslationHotkey(normalized.sectionTranslationHotkey, normalized.customSectionTranslationHotkey)]
                     : []),
-                inputBoxTranslationTriggerHotkey(normalized.inputBoxTranslationTrigger),
+                inputBoxTranslationTriggerHotkey(
+                    normalized.inputBoxTranslationTrigger,
+                    normalized.customInputBoxTranslationHotkey,
+                ),
             ],
         },
     );

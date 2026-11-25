@@ -94,7 +94,7 @@ function hotkeyConflict(hotkey: string, enabled = props.config.informationHighli
     config.sectionTranslationHotkeyEnabled ? resolveSectionTranslationHotkey(config.sectionTranslationHotkey, config.customSectionTranslationHotkey) : '',
     config.paragraphCopyEnabled ? resolveParagraphCopyHotkey(config.paragraphCopyHotkey, config.customParagraphCopyHotkey) : '',
     config.selectionAreaEnabled ? resolveAreaTranslationHotkey(config.selectionAreaHotkey, config.customSelectionAreaHotkey) : '',
-    inputBoxTranslationTriggerHotkey(config.inputBoxTranslationTrigger), resolveReservedClickSelectionHotkey(config)]
+    inputBoxTranslationTriggerHotkey(config.inputBoxTranslationTrigger, config.customInputBoxTranslationHotkey), resolveReservedClickSelectionHotkey(config)]
   return taken.some(item => canonicalizeHotkey(item || '').toLocaleLowerCase() === identity) || findEnabledQuickTranslationHotkeyConflict(config.quickTranslationProfiles ?? [], hotkey)
     ? t('informationHighlight.hotkey.conflict') : ''
 }

@@ -619,6 +619,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     selectionTtsMode: {group: 'translation', label: '朗读合成策略', format: (value) => formatEnum(value, LOCAL_TTS_MODE_LABELS)},
     selectionTtsLocalVoice: {group: 'translation', label: '本地朗读音色'},
     inputBoxTranslationTrigger: {group: 'translation', label: '输入框翻译触发方式', format: (value) => formatEnum(value, INPUT_TRIGGER_LABELS)},
+    customInputBoxTranslationHotkey: {group: 'translation', label: '自定义输入框翻译快捷键'},
     inputBoxTranslationTarget: {group: 'translation', label: '输入框翻译目标语言', format: (value) => formatEnum(value, LANGUAGE_LABELS)},
     inputBoxTranslationOutputMode: {group: 'translation', label: '输入框翻译输出方式', format: (value) => formatEnum(value, INPUT_OUTPUT_LABELS)},
     inputBoxTranslationInterval: {group: 'translation', label: '输入框翻译触发间隔', format: (value) => formatNumber(value, ' ms')},

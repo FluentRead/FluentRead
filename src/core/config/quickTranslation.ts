@@ -7,6 +7,7 @@
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import {canonicalizeHotkey} from '@/src/core/hotkey';
 import {MAX_CUSTOM_OPENAI_MODEL_LENGTH} from '@/src/core/config/customOpenAI';
+import {normalizeCustomInputBoxTranslationHotkey} from '@/src/core/config/inputTranslation';
 import {normalizeGlossaryIds, type GlossaryLibrary} from '@/src/core/glossary';
 
 /** 每种动作可保存的快捷翻译方案上限；悬浮、全文与局部分别计数。 */
@@ -54,8 +55,9 @@ export interface QuickTranslationNormalizationContext {
     glossaryLibraries?: readonly Pick<GlossaryLibrary, 'id'>[];
 }
 
-/** 返回会被输入框翻译消费的首个按键，用于配置和设置 UI 的双向冲突保护。 */
-export function inputBoxTranslationTriggerHotkey(trigger: unknown): string {
+/** 返回会被输入框翻译消费的快捷键或首个按键，用于配置和设置 UI 的双向冲突保护。 */
+export function inputBoxTranslationTriggerHotkey(trigger: unknown, customHotkey?: unknown): string {
+    if (trigger === 'custom') return normalizeCustomInputBoxTranslationHotkey(customHotkey);
     return typeof trigger === 'string' ? INPUT_BOX_TRANSLATION_TRIGGER_HOTKEYS[trigger] ?? '' : '';
 }
 

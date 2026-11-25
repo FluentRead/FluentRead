@@ -14,6 +14,10 @@ import {
     completeInputBoxTranslationPrompt,
     INPUT_BOX_TRANSLATION_INTERVAL_MAX,
     INPUT_BOX_TRANSLATION_INTERVAL_MIN,
+    inputBoxTranslationHotkeyDisplayName,
+    isSupportedCustomInputBoxTranslationHotkey,
+    matchesCustomInputBoxTranslationHotkey,
+    normalizeCustomInputBoxTranslationHotkey,
     normalizeInputBoxTranslationInterval,
     normalizeInputBoxTranslationModel,
     normalizeInputBoxTranslationOutputMode,
@@ -99,5 +103,55 @@ describe('输入框翻译配置', () => {
         expect(supportsInputBoxTranslationPrompt(services.deepseek, 'deepseek-chat')).toBe(true);
         expect(supportsInputBoxTranslationPrompt(services.tongyi, 'qwen-mt-plus')).toBe(false);
         expect(supportsInputBoxTranslationPrompt(services.microsoft)).toBe(false);
+    });
+
+    it('自定义快捷键只接受修饰键组合或功能键，规范化并参与快捷方案冲突保留', () => {
+        expect(new Config().customInputBoxTranslationHotkey).toBe('');
+        expect(isSupportedCustomInputBoxTranslationHotkey('Option+Enter')).toBe(true);
+        expect(isSupportedCustomInputBoxTranslationHotkey('Ctrl+Shift+T')).toBe(true);
+        expect(isSupportedCustomInputBoxTranslationHotkey('f9')).toBe(true);
+        expect(isSupportedCustomInputBoxTranslationHotkey('Space')).toBe(false);
+        expect(isSupportedCustomInputBoxTranslationHotkey('Enter')).toBe(false);
+        expect(isSupportedCustomInputBoxTranslationHotkey('1')).toBe(false);
+        expect(isSupportedCustomInputBoxTranslationHotkey('a')).toBe(false);
+        expect(isSupportedCustomInputBoxTranslationHotkey('Meta+Enter')).toBe(false);
+        expect(isSupportedCustomInputBoxTranslationHotkey(null)).toBe(false);
+
+        expect(normalizeCustomInputBoxTranslationHotkey('Option+Enter')).toBe('Alt+Enter');
+        expect(normalizeCustomInputBoxTranslationHotkey('f9')).toBe('F9');
+        expect(normalizeCustomInputBoxTranslationHotkey('Space')).toBe('');
+        expect(normalizeCustomInputBoxTranslationHotkey(undefined)).toBe('');
+
+        expect(inputBoxTranslationHotkeyDisplayName('Alt+Enter')).toMatch(/^(Alt|Option)\+Enter$/u);
+        expect(inputBoxTranslationHotkeyDisplayName('')).toBe('');
+
+        expect(matchesCustomInputBoxTranslationHotkey({
+            key: 'Enter', code: 'Enter', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false,
+        } as KeyboardEvent, 'Alt+Enter')).toBe(true);
+        expect(matchesCustomInputBoxTranslationHotkey({
+            key: 'Enter', code: 'Enter', altKey: false, ctrlKey: false, shiftKey: false, metaKey: false,
+        } as KeyboardEvent, 'Alt+Enter')).toBe(false);
+        expect(matchesCustomInputBoxTranslationHotkey({
+            key: 'Enter', code: 'Enter', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false,
+        } as KeyboardEvent, '')).toBe(false);
+
+        const valid = normalizeConfig({
+            inputBoxTranslationTrigger: 'custom',
+            customInputBoxTranslationHotkey: 'Option+Enter',
+            quickTranslationProfiles: [{
+                id: 'quick-1', enabled: true, action: 'full-page', hotkey: 'Alt+Enter',
+                service: '', model: '', targetLanguage: '', displayMode: 'inherit', fullPageMode: 'inherit',
+            }],
+        });
+        expect(valid.inputBoxTranslationTrigger).toBe('custom');
+        expect(valid.customInputBoxTranslationHotkey).toBe('Alt+Enter');
+        expect(valid.quickTranslationProfiles[0]?.enabled).toBe(false);
+
+        const fallback = normalizeConfig({
+            inputBoxTranslationTrigger: 'custom',
+            customInputBoxTranslationHotkey: 'Space',
+        });
+        expect(fallback.inputBoxTranslationTrigger).toBe('disabled');
+        expect(fallback.customInputBoxTranslationHotkey).toBe('');
     });
 });

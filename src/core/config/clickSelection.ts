@@ -34,6 +34,7 @@ interface ClickSelectionConfig {
     sectionTranslationHotkey?: string;
     customSectionTranslationHotkey?: string;
     inputBoxTranslationTrigger?: string;
+    customInputBoxTranslationHotkey?: string;
     quickTranslationProfiles?: readonly QuickTranslationProfile[];
     informationHighlight?: {hotkeyEnabled?: boolean; hotkey?: string};
 }
@@ -68,7 +69,7 @@ export function findClickSelectionHotkeyConflict(config: ClickSelectionConfig, h
         {hotkey: config.selectionAreaEnabled ? resolveAreaTranslationHotkey(config.selectionAreaHotkey, config.customSelectionAreaHotkey) : '', feature: '圈选翻译'},
         {hotkey: config.paragraphCopyEnabled ? resolveParagraphCopyHotkey(config.paragraphCopyHotkey, config.customParagraphCopyHotkey) : '', feature: '段落复制'},
         {hotkey: config.sectionTranslationHotkeyEnabled ? resolveSectionTranslationHotkey(config.sectionTranslationHotkey, config.customSectionTranslationHotkey) : '', feature: '局部翻译'},
-        {hotkey: inputBoxTranslationTriggerHotkey(config.inputBoxTranslationTrigger), feature: '输入框翻译'},
+        {hotkey: inputBoxTranslationTriggerHotkey(config.inputBoxTranslationTrigger, config.customInputBoxTranslationHotkey), feature: '输入框翻译'},
         {hotkey: config.informationHighlight?.hotkeyEnabled === true ? config.informationHighlight.hotkey ?? '' : '', feature: '智能高亮'},
     ];
     const owner = owners.find(item => canonicalizeHotkey(item.hotkey).toLowerCase() === identity);

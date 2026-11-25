@@ -35,14 +35,26 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
     let disposed = false;
     const available = (kind: ShortcutKind): boolean => !disposed && isActive(kind);
 
-    function quickTranslationConflictMessage(hotkey: string): string {
+    function quickTranslationConflictMessage(hotkey: string, excludeInputBox = false): string {
+        const canonical = canonicalizeHotkey(hotkey).toLowerCase();
         const reserved = resolveReservedClickSelectionHotkey(config.value);
-        if (reserved && canonicalizeHotkey(hotkey).toLowerCase() === reserved.toLowerCase()) {
+        if (reserved && canonical === reserved.toLowerCase()) {
             return t('quickTranslation.legacyConflictEdit', {feature: translateLegacy('两点选取')});
         }
         const conflict = findEnabledQuickTranslationHotkeyConflict(config.value.quickTranslationProfiles, hotkey);
-        if (!conflict) return '';
-        return t('quickTranslation.conflictProfile', {group: t(`quickTranslation.heading.${quickTranslationActionKey(conflict.action)}`)});
+        if (conflict) {
+            return t('quickTranslation.conflictProfile', {group: t(`quickTranslation.heading.${quickTranslationActionKey(conflict.action)}`)});
+        }
+        const reservedInput = excludeInputBox
+            ? ''
+            : inputBoxTranslationTriggerHotkey(
+                config.value.inputBoxTranslationTrigger,
+                config.value.customInputBoxTranslationHotkey,
+            );
+        if (reservedInput && canonical === canonicalizeHotkey(reservedInput).toLowerCase()) {
+            return t('quickTranslation.legacyConflictEdit', {feature: translateLegacy('输入框翻译')});
+        }
+        return '';
     }
     function clearTimer(kind: ShortcutKind): void {
         if (timers[kind] !== null) clearTimeout(timers[kind]!);
@@ -140,8 +152,9 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
 
     function handleInputBoxTranslationTriggerChange(value: string): void {
         if (!available('page')) return;
-        const hotkey = inputBoxTranslationTriggerHotkey(value);
-        const conflictMessage = hotkey ? quickTranslationConflictMessage(hotkey) : '';
+        const hotkey = inputBoxTranslationTriggerHotkey(value, config.value.customInputBoxTranslationHotkey);
+        if (value === 'custom' && !hotkey) return;
+        const conflictMessage = hotkey ? quickTranslationConflictMessage(hotkey, true) : '';
         if (conflictMessage) {ElMessage.warning(conflictMessage); return;}
         config.value.inputBoxTranslationTrigger = value;
     }

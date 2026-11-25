@@ -120,6 +120,10 @@
           <p class="hint">独立设置输入框的触发方式和翻译偏好。普通文本输入框可用，密码框和富文本编辑器不参与。</p>
           <label><span>触发方式</span><UiSelect v-model="draft.inputBoxTranslationTrigger" :append-to="menuContainer" aria-label="输入框翻译触发方式"><ElOption v-for="item in options.inputBoxTranslationTrigger" :key="item.value" :value="item.value" :label="item.label" /></UiSelect></label>
           <template v-if="draft.inputBoxTranslationTrigger !== 'disabled'">
+            <template v-if="draft.inputBoxTranslationTrigger === 'custom'">
+              <label><span>自定义快捷键</span><input v-model.trim="draft.customInputBoxTranslationHotkey" placeholder="例如 Alt+Enter、Ctrl+Shift+T、F9" /></label>
+              <p class="hint">填写组合键或功能键（如 Alt+Enter、Ctrl+Shift+T、F9）；不支持 CMD 键，留空会关闭输入框翻译。</p>
+            </template>
             <template v-if="draft.inputBoxTranslationTrigger.startsWith('triple_')">
               <label><span>三击间隔（毫秒）</span><input v-model.number="draft.inputBoxTranslationInterval" type="number" min="200" max="2000" step="1" /></label>
               <p class="hint">相邻两次按键最多等待此时长；默认 1000 毫秒。</p>

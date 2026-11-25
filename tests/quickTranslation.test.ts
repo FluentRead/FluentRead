@@ -117,6 +117,10 @@ describe('快捷翻译调用解析', () => {
         expect(inputBoxTranslationTriggerHotkey('triple_space')).toBe('Space');
         expect(inputBoxTranslationTriggerHotkey('triple_equal')).toBe('=');
         expect(inputBoxTranslationTriggerHotkey('triple_dash')).toBe('-');
+        expect(inputBoxTranslationTriggerHotkey('custom', 'Option+Enter')).toBe('Alt+Enter');
+        expect(inputBoxTranslationTriggerHotkey('custom', 'F9')).toBe('F9');
+        expect(inputBoxTranslationTriggerHotkey('custom', 'Space')).toBe('');
+        expect(inputBoxTranslationTriggerHotkey('custom')).toBe('');
         expect(inputBoxTranslationTriggerHotkey('disabled')).toBe('');
         expect(inputBoxTranslationTriggerHotkey(null)).toBe('');
     });

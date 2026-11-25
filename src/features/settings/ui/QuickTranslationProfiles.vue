@@ -414,7 +414,7 @@ function legacyHotkeyEntries(): Array<{hotkey: string; label: string}> {
   if (props.config.selectionAreaEnabled) entries.push({hotkey: resolveAreaTranslationHotkey(props.config.selectionAreaHotkey, props.config.customSelectionAreaHotkey), label: translateLegacy('圈选翻译')})
   if (props.config.paragraphCopyEnabled) entries.push({hotkey: resolveParagraphCopyHotkey(props.config.paragraphCopyHotkey, props.config.customParagraphCopyHotkey), label: t('paragraphCopy.settings.title')})
   if (props.config.sectionTranslationHotkeyEnabled) entries.push({hotkey: resolveSectionTranslationHotkey(props.config.sectionTranslationHotkey, props.config.customSectionTranslationHotkey), label: t('sectionTranslation.settings.title')})
-  const input = inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger)
+  const input = inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger, props.config.customInputBoxTranslationHotkey)
   if (input) entries.push({hotkey: input, label: translateLegacy('输入框翻译')})
   return entries.filter(entry => Boolean(canonicalizeHotkey(entry.hotkey)))
 }

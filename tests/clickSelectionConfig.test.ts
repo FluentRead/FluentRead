@@ -105,6 +105,11 @@ describe('两点选取配置与快捷键归属', () => {
         expect(findClickSelectionHotkeyConflict(config, DEFAULT_CLICK_SELECTION_HOTKEY)).toBe('');
         expect(findClickSelectionHotkeyConflict({...config, selectionTranslatorMode: 'bilingual'}, DEFAULT_CLICK_SELECTION_HOTKEY)).toBe('');
         expect(findClickSelectionHotkeyConflict({...enabled(), inputBoxTranslationTrigger: 'ctrl_enter'}, 'Ctrl+Enter')).toBe('输入框翻译');
+        expect(findClickSelectionHotkeyConflict({
+            ...enabled(),
+            inputBoxTranslationTrigger: 'custom',
+            customInputBoxTranslationHotkey: DEFAULT_CLICK_SELECTION_HOTKEY,
+        }, DEFAULT_CLICK_SELECTION_HOTKEY)).toBe('输入框翻译');
         expect(findClickSelectionHotkeyConflict({}, DEFAULT_CLICK_SELECTION_HOTKEY)).toBe('');
     });
 });

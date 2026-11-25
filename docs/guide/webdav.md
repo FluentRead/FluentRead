@@ -31,6 +31,10 @@
 
 点击**测试连接**，成功后**测试并保存**。这两个操作都不上传文件；测试只检查目录能否访问，不保证写入权限。保存的连接仅在当前设备使用。
 
+## Koofr
+
+目录地址填 `https://app.koofr.net/dav/Koofr/`，用户名填 Koofr 账号邮箱，密码填为 FluentRead 生成的应用密码。`/dav/` 只列出挂载点，不能直接写备份。新连接使用默认子目录或留空时会自动选择个人目录。已保存但无法写入的连接，可改用上述完整地址后重新测试。 [Koofr 官方连接说明](https://koofr.eu/help/koofr_with_webdav/how-do-i-connect-a-service-to-koofr-through-webdav/)
+
 ## 群晖 NAS 与自定义目录
 
 在群晖启用 WebDAV Server，并给账号授予目标共享文件夹的读写权限。填写 WebDAV 服务的最终目录地址，例如 `https://nas.example.com:5006/共享文件夹/`；使用实际配置的端口和反向代理路径，不要填写 DSM 登录页或分享链接。

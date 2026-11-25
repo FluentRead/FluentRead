@@ -1,7 +1,7 @@
 /**
  * @file src/platform/webdav/connection.ts
  * 文件职责：规范化 WebDAV 连接并把应用密码保存在后台专属加密配置仓库。
- * 主要内容：校验已有目录地址、相对备份子目录、用户名与密码；旧连接保留 FluentRead 子目录；通过修订号防止多页覆盖，只返回无密码摘要。
+ * 主要内容：校验目录、备份子目录和凭据；为新设置的 Koofr 挂载列表选择可写的个人目录；保留已有连接，按修订号防止多页覆盖。
  * 模块边界：不访问服务器，不导出完整配置；记录独立于配置快照，因此连接凭据不会进入云备份。
  */
 import {CloudSyncError, type CloudSyncSession} from '@/src/core/config/cloudSync';
@@ -61,7 +61,13 @@ function normalizeWebDavConnection(input: WebDavConnectionInput, previous: WebDa
     return {url, backupPath, username, password, allowInsecure};
 }
 export function parseWebDavConnection(input: WebDavConnectionInput, previous: WebDavConnection | null): WebDavConnection {
-    return {...normalizeWebDavConnection(input, previous), revision: crypto.randomUUID()};
+    const connection = normalizeWebDavConnection(input, previous);
+    // Koofr 的 /dav/ 只列出挂载点。新设置的默认路径从个人目录开始，旧连接和自定义挂载仍使用原路径。
+    if (connection.url === 'https://app.koofr.net/dav/' && connection.url !== previous?.url
+        && (!connection.backupPath || connection.backupPath === WEBDAV_DEFAULT_BACKUP_PATH)) {
+        connection.url = 'https://app.koofr.net/dav/Koofr/';
+    }
+    return {...connection, revision: crypto.randomUUID()};
 }
 export function webDavConnectionSummary(value: WebDavConnection | null): WebDavConnectionSummary | null {
     return value ? {url: value.url, backupPath: value.backupPath ?? WEBDAV_DEFAULT_BACKUP_PATH, username: value.username, allowInsecure: value.allowInsecure, hasPassword: Boolean(value.password), revision: value.revision} : null;

@@ -63,7 +63,7 @@ import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 // 唯一 runtime import：移入 repo 后默认消费真实源码；私有 runner 可 alias 两份完整字节快照做同一测试对照。
 import {mountVideoSubtitleTranslation} from '@/src/features/video-subtitle/public';
 import {
-  VIDEO_AI_CAPTION_CONTAINER_ID, VIDEO_NORMALIZED_CAPTION_OVERLAY_ID,
+  VIDEO_AI_CAPTION_CONTAINER_ID, VIDEO_NATIVE_CUE_HIDDEN_CLASS, VIDEO_NORMALIZED_CAPTION_OVERLAY_ID,
   VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS, VIDEO_SUBTITLE_PANEL_ID,
   VIDEO_TRANSLATION_ACTIVE_CLASS, VIDEO_TRANSLATION_BUTTON_ID, VIDEO_TRANSLATION_LAYER_ID, VIDEO_TRANSLATION_MENU_ID,
   VIDEO_TRANSLATION_OVERLAY_ID, X_SUBTITLE_RESOURCE_MESSAGE,
@@ -1490,6 +1490,77 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
     expect(f.displayed()).toMatchObject({source: 'A different captured sidecar sentence.', translated: translation('A different captured sidecar sentence.'), kind: 'sidecar'});
   });
 
+  it('issue #1415: X video subtitles follow the native CC toggle without leaking sidecar captions or disabling FluentRead', async () => {
+    const f = fixture('Native caption controlled by X CC.');
+    f.native!.mode = 'disabled';
+    const ccButton = f.document.createElement('button');
+    ccButton.setAttribute('aria-label', 'Closed captions');
+    ccButton.setAttribute('aria-pressed', 'false');
+    ccButton.addEventListener('click', () => {
+      const nextOn = ccButton.getAttribute('aria-pressed') !== 'true';
+      ccButton.setAttribute('aria-pressed', String(nextOn));
+      f.native!.mode = nextOn ? 'showing' : 'disabled';
+      f.changeTracks();
+    });
+    f.player.querySelector('div')!.appendChild(ccButton);
+
+    f.start(); await settle();
+    f.emitCue('sidecar-while-off', 'Sidecar caption must stay hidden when CC is off.');
+    await settle();
+
+    expect(f.native!.mode).toBe('disabled');
+    expect(f.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(false);
+    expect(f.displayed()).toMatchObject({active: false, kind: 'none'});
+    expect(ports.translate).not.toHaveBeenCalled();
+
+    // 点击原生 CC 开启字幕：保留 showing 状态以同步原生按钮，同时隐藏原生绘制并显示双语字幕。
+    ccButton.dispatchEvent(new f.window.Event('click', {bubbles: true}));
+    await settle();
+    expect(f.native!.mode).toBe('showing');
+    expect(f.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(true);
+    expect(f.displayed()).toMatchObject({
+      source: 'Native caption controlled by X CC.',
+      translated: translation('Native caption controlled by X CC.'),
+      active: true,
+      kind: 'native',
+    });
+
+    // 即使开启了手动校时，点击原生 CC 关闭字幕后原文和译文都必须立即隐藏，且不回退到 sidecar。
+    f.changeConfig({videoSubtitleOffsetMs: 500});
+    await settle();
+    ccButton.dispatchEvent(new f.window.Event('click', {bubbles: true}));
+    await settle();
+    expect(f.native!.mode).toBe('disabled');
+    expect(f.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(false);
+    expect(f.displayed()).toMatchObject({active: false, kind: 'none'});
+    expect(f.displayed().source || '').toBe('');
+    expect(f.displayed().translated || '').toBe('');
+    expect(ports.config.on).toBe(true);
+    expect(ports.config.videoTranslationEnabled).toBe(true);
+
+    // 控制栏在鼠标移出后卸载且轨道移除时，仍保持 CC 关闭记忆，不让已捕获的 sidecar 重新冒出。
+    const controls = ccButton.parentElement!;
+    controls.remove();
+    f.tracks.splice(0); f.changeTracks();
+    f.emitVideo('timeupdate'); await settle();
+    expect(f.displayed()).toMatchObject({active: false, kind: 'none'});
+    expect(f.callsFor('Sidecar caption must stay hidden when CC is off.')).toBe(0);
+
+    // 重新挂载控制栏并再次点击原生 CC 开启，立即恢复字幕显示。
+    f.player.appendChild(controls);
+    f.tracks.push(f.native!);
+    ccButton.dispatchEvent(new f.window.Event('click', {bubbles: true}));
+    await settle();
+    expect(f.native!.mode).toBe('showing');
+    expect(f.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(true);
+    expect(f.displayed()).toMatchObject({
+      source: 'Native caption controlled by X CC.',
+      translated: translation('Native caption controlled by X CC.'),
+      active: true,
+      kind: 'native',
+    });
+  });
+
   it('RT1: does not translate the same native cue again after sidecar/polling alternation', async () => {
     const f = fixture(nativeSource); f.start(); await settle();
     for (let index = 0; index < 3; index++) {
@@ -1591,12 +1662,13 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
     const f = fixture(); const dispose = f.start(); await settle();
     expect(ports.send.mock.calls.some(([message]) => message.type === 'fluentReadGetVideoAiSubtitleCache')).toBe(true);
     const oldTrack = f.makeTrack('Old mounted native cue.'); f.tracks.push(oldTrack); f.changeTracks(); await settle();
-    expect(oldTrack.mode).toBe('hidden');
+    expect(oldTrack.mode).toBe('showing');
+    expect(f.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(true);
     f.emitResource('dispose-master.m3u8', '#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,LANGUAGE="en",URI="dispose-late.vtt"'); await settle();
     expect(ports.fetch).toHaveBeenCalledTimes(1);
     dispose(); await settle();
     expect(translateSignal.aborted).toBe(true); expect(resourceSignal.aborted).toBe(true);
-    expect(oldTrack.mode).toBe('showing'); expect(ports.subscribers.size).toBe(0); expect(vi.getTimerCount()).toBe(0);
+    expect(oldTrack.mode).toBe('showing'); expect(f.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(false); expect(ports.subscribers.size).toBe(0); expect(vi.getTimerCount()).toBe(0);
     for (const id of [VIDEO_AI_CAPTION_CONTAINER_ID, VIDEO_TRANSLATION_LAYER_ID, VIDEO_TRANSLATION_BUTTON_ID, VIDEO_TRANSLATION_MENU_ID]) expect(f.document.getElementById(id)).toBeNull();
     const requests = ports.translate.mock.calls.length;
     f.emitCue('after-dispose', 'No runtime is mounted.'); f.emitVideo('seeked'); oldTrack.dispatchEvent(new f.window.Event('cuechange')); await settle();

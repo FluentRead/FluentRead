@@ -705,13 +705,31 @@ function wrappedTextLines(lines: readonly string[]): boolean[] {
     // 取九成位的行长当作折行宽度，个别没有折行的超长行不影响判断。
     const width = lengths[Math.floor((lengths.length - 1) * 0.9)] ?? 0;
     const indent = (line: string) => line.length - line.trimStart().length;
-    return lines.map((line, index) => {
+    const nextBlocked = (next: string) => /^(?:[-*+•·▪◦]|\(?\w{1,3}[.)）]|（\w{1,3}）|[=_~#>|]|-{3,})(?:\s|$)/u.test(next);
+    const eligible = lines.map((line, index) => {
         const text = line.trim(), next = lines[index + 1]?.trim();
         const wide = UNSPACED_SCRIPT.test(text);
         if (!next || text.length < Math.max(wide ? 16 : 40, width * 0.7)) return false;
-        if (/[.!?:;。！？：；…][)\]"'’”）】》]*$/u.test(text) || (/\p{Lu}/u.test(text) && !/\p{Ll}/u.test(text))) return false;
-        return indent(line) === indent(lines[index + 1]) && !/^(?:[-*+•·▪◦]|\(?\w{1,3}[.)）]|（\w{1,3}）|[=_~#>|]|-{3,})(?:\s|$)/u.test(next);
+        if (/\p{Lu}/u.test(text) && !/\p{Ll}/u.test(text)) return false;
+        return indent(line) === indent(lines[index + 1]) && !nextBlocked(next);
     });
+    const joined = eligible.map((ok, index) => ok && !/[.!?:;。！？：；…][)\]"'’”）】》]*$/u.test(lines[index].trim()));
+    // 同一连续折行段中若已有明确的句中折行，则在折行宽度附近且下一词放不下的句末/冒号行也属于同一段。
+    for (let start = 0; start < lines.length; start += 1) {
+        if (!lines[start].trim()) continue;
+        let end = start;
+        while (end + 1 < lines.length && lines[end + 1].trim() && indent(lines[end + 1]) === indent(lines[start])) end += 1;
+        if (joined.slice(start, end).some(Boolean)) {
+            for (let index = start; index < end; index += 1) {
+                if (joined[index] || !eligible[index]) continue;
+                const next = lines[index + 1].trim();
+                const firstWordLength = UNSPACED_WRAP_START.test(next) ? 1 : next.match(/^\S+/u)![0].length;
+                if (lines[index].trim().length + 1 + firstWordLength > width) joined[index] = true;
+            }
+        }
+        start = end;
+    }
+    return joined;
 }
 
 function addMarkdownTableRow(parts: DocumentPart[], segments: DocumentSegment[], line: string, body: string, columnCount: number): void {

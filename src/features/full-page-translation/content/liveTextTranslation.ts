@@ -11,6 +11,7 @@ import {
     createTranslationSourceSnapshot,
     getCurrentTranslationCore,
     getTranslatableControlValueAttribute,
+    normalizeParagraphTranslationSource,
     normalizeTranslationText,
 } from '@/src/core/translation/public';
 import type {InlineCodePacket, TranslationScope, TranslationTextProtectionOptions} from '@/src/core/translation/public';
@@ -144,8 +145,10 @@ export async function translateLiveText(
     };
 
     const origins = parts.map((part) => part.source);
+    const preserveNewlines = preservesSourceNewlines(node);
+    const requestOrigins = origins.map((origin) => normalizeParagraphTranslationSource(origin, preserveNewlines));
     const translations = await translateTextSlots(
-        origins,
+        requestOrigins,
         snapshot,
         signal,
         queueSession,
@@ -154,7 +157,7 @@ export async function translateLiveText(
         ...(snapshot.enableAIContext || (fullPageSession && snapshot.enableAIMultiSegment) ? [node] : []),
     );
     const changed = translations.some((translation, index) =>
-        hasDistinctTranslation(origins[index]!, translation, snapshot.targetLanguage),
+        hasDistinctTranslation(requestOrigins[index]!, translation, snapshot.targetLanguage),
     );
 
     return {
@@ -208,6 +211,8 @@ export async function createTranslationRequest(
         undefined, protectionOptions);
     const origins = parts.map((part) => part.source);
     if (origins.length === 0) return {kind: 'snapshot', sources: [], translations: []};
+    const preserveNewlines = preservesSourceNewlines(node);
+    const requestOrigins = origins.map((origin) => normalizeParagraphTranslationSource(origin, preserveNewlines));
     let source: string | null = null;
     let inlineCodePacket: InlineCodePacket | null = null;
     if (origins.length > 1 || (import.meta.env.BROWSER !== 'userscript' && isPersonalCorrectionEnabled())) {
@@ -215,8 +220,8 @@ export async function createTranslationRequest(
         const skeleton = createTranslationSourceSnapshot(node, core.shouldStayOriginal, undefined,
             protectionOptions, core.shouldOmitFromTranslation);
         source = skeleton.slots.length === origins.length && skeleton.slots.every((slot, index) => slot.source === origins[index])
-            ? origins.length === 1 && !skeleton.clone.firstElementChild ? origins[0]!
-                : buildWholeBlockTranslationSource(skeleton, {preserveNewlines: preservesSourceNewlines(node)}) : null;
+            ? origins.length === 1 && !skeleton.clone.firstElementChild ? requestOrigins[0]!
+                : buildWholeBlockTranslationSource(skeleton, {preserveNewlines}) : null;
         if (!source && skeleton.slots.length === origins.length && skeleton.slots.every((slot, index) => slot.source === origins[index])) {
             inlineCodePacket = createInlineCodePacket(node, skeleton, core.shouldStayOriginal, {
                 targetLanguage: snapshot.targetLanguage, protectionOptions, getIgnoredArtifact,
@@ -245,7 +250,7 @@ export async function createTranslationRequest(
             return {kind: 'snapshot', sources: origins, translations: translated, inlineCodePacket};
         }
     }
-    const translations = await translateTextSlots(origins, snapshot, signal, queueSession,
+    const translations = await translateTextSlots(requestOrigins, snapshot, signal, queueSession,
         fullPageSession, forceFailedRequest,
         ...(snapshot.enableAIContext || (fullPageSession && snapshot.enableAIMultiSegment) ? [node] : []));
     return finish(translations);

@@ -5,6 +5,7 @@
  * 模块边界：本模块不监听 document selection、不发消息、不渲染 Vue 或播放音频；组件负责连接 DOM，词典和 TTS 由 services/background 提供，函数保持确定性以供单元测试。DOM 安全判断直接复用 translation/dom 的同一实现，不初始化翻译候选或站点规则 registry。
  */
 import {getElementTagName, isDocumentSurfaceNoTranslateShell, isTopLevelApplicationShell} from '@/src/core/translation/dom';
+import {unwrapSoftLineBreaks, unwrapWrappedParagraphs} from '@/src/core/translation/wrappedParagraphs';
 import {translationLanguageOptions} from '@/src/core/language/catalog';
 import {getChineseScript, normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import {isLanguageCodeMatch, normalizeDetectedLanguageCode} from '@/src/core/language/codes';
@@ -211,10 +212,9 @@ export function isSameLanguage(detectedLanguage: string | undefined, targetLangu
 const DEFAULT_PADDING = 12;
 const DEFAULT_GAP = 10;
 
-/** 规范化浏览器选区文本，同时保留对阅读有意义的换行。 */
+/** 规范化浏览器选区文本，自动合并折行段落，同时保留对阅读有意义的换行。 */
 export function normalizeSelectionText(value: string): string {
-    return value
-        .replace(/\u00a0/g, ' ')
+    return unwrapWrappedParagraphs(value.replace(/\u00a0/g, ' ').replace(/\r\n?|\n/gu, '\n'))
         .replace(/[ \t]+/g, ' ')
         .replace(/\n[ \t]+/g, '\n')
         .trim();
@@ -293,7 +293,7 @@ export function readSelectionParts(range: Range, browserText: string): Selection
         else parts.push({kind: 'text', text});
     };
     const visit = (node: Node) => {
-        if (node.nodeType === 3) { appendText(node.textContent!); return; }
+        if (node.nodeType === 3) { appendText(unwrapSoftLineBreaks(node.textContent!)); return; }
         const tag = getElementTagName(node as Element);
         if (tag === 'code') { parts.push({kind: 'code', text: node.textContent!}); return; }
         const lineBreak = /^(br|p|div|li|h[1-6]|blockquote)$/.test(tag);
@@ -304,7 +304,9 @@ export function readSelectionParts(range: Range, browserText: string): Selection
     fragment.childNodes.forEach(visit);
     parts.forEach((part, index) => {
         if (part.kind !== 'text') return;
-        part.text = part.text.replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n[ \t]+/g, '\n');
+        part.text = unwrapWrappedParagraphs(
+            part.text.replace(/\u00a0/g, ' ').replace(/\r\n?|\n/gu, '\n').replace(/\n[ \t]+/g, '\n'),
+        ).replace(/[ \t]+/g, ' ').replace(/\n[ \t]+/g, '\n');
         if (index === 0) part.text = part.text.trimStart();
         if (index === parts.length - 1) part.text = part.text.trimEnd();
     });

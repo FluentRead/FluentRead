@@ -918,6 +918,31 @@ describe('selection translator text and speech language normalization', () => {
         expect(normalizeSelectionText('  hello\u00a0  world\n   again  ')).toBe('hello world\nagain');
     });
 
+    it('unwraps hard-wrapped markdown and git commit message paragraphs while preserving paragraph breaks', () => {
+        const commit = [
+            'The opaque rect that we report to the compositor is derived from the',
+            'opaque rectangle of the render node, shrunk to whole surface pixels.',
+            'The surface contents are rendered into a buffer that is scaled by the',
+            'ratio between the buffer and the surface, so that ratio is often',
+            'fractional, and the edges of the rect then land within buffer pixels:',
+            'the outermost buffer pixel is only partially covered even though the',
+            'rect claims that it is opaque. A compositor that disables blending for',
+            'the opaque region then shows that partial coverage as a line along the',
+            'window edges.',
+            '',
+            'Keep the edges that cannot be proven opaque out of the region in',
+            '`gdk_surface_set_opaque_rect()`, using the exact buffer to surface',
+            'ratio. Only the misaligned edges are affected, so a window that fills',
+            'its buffer exactly - such as a maximized window - keeps reporting its',
+            'full opaque area, and compositors can still cull windows that it covers.',
+        ].join('\n');
+        expect(normalizeSelectionText(commit)).toBe([
+            'The opaque rect that we report to the compositor is derived from the opaque rectangle of the render node, shrunk to whole surface pixels. The surface contents are rendered into a buffer that is scaled by the ratio between the buffer and the surface, so that ratio is often fractional, and the edges of the rect then land within buffer pixels: the outermost buffer pixel is only partially covered even though the rect claims that it is opaque. A compositor that disables blending for the opaque region then shows that partial coverage as a line along the window edges.',
+            '',
+            'Keep the edges that cannot be proven opaque out of the region in `gdk_surface_set_opaque_rect()`, using the exact buffer to surface ratio. Only the misaligned edges are affected, so a window that fills its buffer exactly - such as a maximized window - keeps reporting its full opaque area, and compositors can still cull windows that it covers.',
+        ].join('\n'));
+    });
+
     it('keeps a bounded context centered on the selected word', () => {
         expect(summarizeSelectionContext('', 'common')).toBe('');
         expect(summarizeSelectionContext('common text', '')).toBe('');

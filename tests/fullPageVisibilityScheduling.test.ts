@@ -259,6 +259,7 @@ vi.mock("@/src/core/translation/public", async (importOriginal) => {
     return {
         // 属性型按钮标签的安全边界由 core 唯一定义，测试替身不复制其判定规则。
         getTranslatableControlValueAttribute: actual.getTranslatableControlValueAttribute,
+        normalizeParagraphTranslationSource: actual.normalizeParagraphTranslationSource,
         normalizeTranslationText: actual.normalizeTranslationText,
         createCurrentTranslationResolverBatch: () => (start: Node, scope = 'content') => runtime.realCore
             ? runtime.realCore.resolve(start) : resolveCandidate(scope)(start),

@@ -566,4 +566,26 @@ describe('translation center product workflow', () => {
     state.sourceText = 'A newer source';
     expect(state.successfulCards).toEqual([]);
   });
+
+  it('翻译中心送翻前自动展开手动折行的多行段落，同时保持编辑器原文不变', async () => {
+    const wrapped = [
+      'The opaque rect that we report to the compositor is derived from the',
+      'opaque rectangle of the render node, shrunk to whole surface pixels.',
+      '',
+      'Keep the edges that cannot be proven opaque out of the region in',
+      '`gdk_surface_set_opaque_rect()`, using the exact buffer to surface',
+      'ratio.',
+    ].join('\n');
+    state.sourceText = wrapped;
+    translateText.mockResolvedValue('译文段落');
+    state.runTranslation();
+    await vi.waitFor(() => expect(state.cards.every((card: any) => card.status === 'success')).toBe(true));
+    expect(translateText).toHaveBeenCalledWith(
+      'The opaque rect that we report to the compositor is derived from the opaque rectangle of the render node, shrunk to whole surface pixels.\n\nKeep the edges that cannot be proven opaque out of the region in `gdk_surface_set_opaque_rect()`, using the exact buffer to surface ratio.',
+      'FluentRead 翻译中心',
+      expect.any(Object),
+    );
+    expect(state.sourceText).toBe(wrapped);
+    expect(state.staleCount).toBe(0);
+  });
 });

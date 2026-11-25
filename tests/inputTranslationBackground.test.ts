@@ -89,6 +89,18 @@ describe('输入框翻译后台配置绑定', () => {
         expect(translate.mock.calls[0][0].origin).toBe(text);
     });
 
+    it('输入框翻译请求自动展开手动折行的多行段落', () => {
+        const config = new Config();
+        const wrapped = [
+            'The opaque rect that we report to the compositor is derived from the',
+            'opaque rectangle of the render node, shrunk to whole surface pixels.',
+        ].join('\n');
+        const request = createInputBoxTranslationRequest(config, wrapped, 'zh-Hans');
+        expect(request.origin).toBe(
+            'The opaque rect that we report to the compositor is derived from the opaque rectangle of the render node, shrunk to whole surface pixels.',
+        );
+    });
+
     it('水合完成后才读取配置，期间网页修改消息不会更换已解析的目标', async () => {
         const config = new Config();
         let hydrate!: () => void;

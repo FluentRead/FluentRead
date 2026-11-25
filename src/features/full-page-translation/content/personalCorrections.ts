@@ -7,7 +7,7 @@
 import {createMaterialId, type CorrectionQuery} from '@/src/core/personal-corrections/public';
 import {personalCorrections} from '@/src/services/personal-corrections/public';
 import {config} from '@/src/services/config/store';
-import {buildWholeBlockTranslationSource, createTranslationSourceSnapshot, getCurrentTranslationCore} from '@/src/core/translation/public';
+import {buildWholeBlockTranslationSource, createTranslationSourceSnapshot, getCurrentTranslationCore, normalizeParagraphTranslationSource} from '@/src/core/translation/public';
 import {getTranslationOwnersForIndexedNode, getTranslationOwnersWithin, getTranslationState, setBilingualContent, restoreTranslation, subscribeTranslationStateChanges, type TranslationState} from './state';
 import {statefulSourceAndTextSlotsAreCurrent, isTranslationArtifactCurrent} from './translationStability';
 import {refreshTranslationPresentation} from './displayMode';
@@ -238,9 +238,11 @@ export function readPersonalCorrectionPair(element: Element): PersonalCorrection
         const skeleton = createTranslationSourceSnapshot(node, core.shouldStayOriginal, state.syntheticSegment ? node : undefined,
             {protectedElement: node, ...(state.allowTopLevelApplicationShell ? {allowTopLevelApplicationShell: true} : {})}, core.shouldOmitFromTranslation);
         const replay = state.bilingualReplay;
+        const preserveNewlines = typeof getComputedStyle === 'function' && /^(?:pre|break-spaces)/u.test(getComputedStyle(node).whiteSpace);
         const source = skeleton.slots.length === replay.sources.length && skeleton.slots.every((slot, index) => slot.source === replay.sources[index])
-            ? replay.sources.length === 1 && !skeleton.clone.firstElementChild ? replay.sources[0]
-                : buildWholeBlockTranslationSource(skeleton, {preserveNewlines: typeof getComputedStyle === 'function' && /^(?:pre|break-spaces)/u.test(getComputedStyle(node).whiteSpace)}) : null;
+            ? replay.sources.length === 1 && !skeleton.clone.firstElementChild
+                ? normalizeParagraphTranslationSource(replay.sources[0]!, preserveNewlines)
+                : buildWholeBlockTranslationSource(skeleton, {preserveNewlines}) : null;
         if (source) {
             snapshot = {query: {source, sourceLanguage: replay.sourceLanguage!, targetLanguage: replay.targetLanguage,
                 context: readPersonalCorrectionContext(node), materialId: createMaterialId(globalThis.location.href)},

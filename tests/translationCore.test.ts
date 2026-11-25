@@ -5244,9 +5244,12 @@ describe('整块请求的整段原文重建', () => {
         expect(source('<p><br>one <b>two</b><br></p>')).toBe('one two');
     });
 
-    it('宿主保留换行时文本内的换行也作为断行保留', () => {
+    it('宿主保留换行时文本内的换行也作为断行保留，手动折行的长段落自动合并', () => {
         expect(source('<p>one\n<a href="/x">two</a> three\nfour</p>', true)).toBe('one\ntwo three\nfour');
         expect(source('<p>one\n<a href="/x">two</a> three\nfour</p>', false)).toBe('one two three four');
+        expect(source(
+            '<p>The opaque rect that we report to the compositor is derived from the<br><a href="/x">opaque rectangle</a> of the render node, shrunk to whole surface pixels.</p>',
+        )).toBe('The opaque rect that we report to the compositor is derived from the opaque rectangle of the render node, shrunk to whole surface pixels.');
     });
 
     it('只有 [1] 这类脚注标记的上下标可以并入整段', () => {

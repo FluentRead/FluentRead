@@ -6,8 +6,10 @@
  * 模块边界：仅做保守的纯文本判定；不读取配置或缓存、不请求服务，也不改写原文与译文。
  */
 import {getChineseScript} from '@/src/core/language/chinese';
+import {classifyChineseHan, hasSimplifiedChineseEvidence, hasTraditionalChineseEvidence} from '@/src/core/language/chineseText';
 import {isLanguageCodeMatch} from '@/src/core/language/codes';
 import {identifyTextLanguage} from '@/src/core/language/identify';
+import {segmentScriptWords} from '@/src/core/language/scripts';
 import {createLanguageDetectionCopy} from '@/src/core/language/technicalTokens';
 
 /** 网址、版本、模型编号和纯符号保持原文；旁边有正文的整行仍参与翻译。 */
@@ -73,6 +75,25 @@ function isLatinOperatorLabel(value: string): boolean {
     return /^(?:addition|subtraction|multiplication|division|remainder|(?:logical|bitwise) (?:not|and|or|xor))(?:\s+\(\s*\)?)?$/iu.test(value);
 }
 
+/** 含假名、谚文或其他非拉丁/非汉字正文且无中文证据时，原样回显到中文目标一定属于未翻译。 */
+function hasUntranslatedForeignScriptForChinese(value: string): boolean {
+    const copy = createLanguageDetectionCopy(value).text;
+    const words = segmentScriptWords(copy);
+    let foreignLetters = 0;
+    let han = '';
+    for (const word of words) {
+        if (word.script === 'Han') {
+            han += word.text;
+        } else if (word.script !== 'Latin' && !(word.script === 'Greek' && word.letters === 1)) {
+            foreignLetters += word.letters;
+        }
+    }
+    if (foreignLetters < 2) return false;
+    if (hasSimplifiedChineseEvidence(han) || hasTraditionalChineseEvidence(han)) return false;
+    return !copy.split(/[^\p{Script=Han}\p{P}\p{Z}\p{N}\s]+/u)
+        .some(passage => classifyChineseHan(passage) !== undefined);
+}
+
 /** 拒绝外语正文及英文标题的原文回显；缩写、代码与部分专名保持保守判定。 */
 export function isLikelyUntranslatedResponse(origin: string, result: string, targetLanguage: string): boolean {
     // 受保护的 inline code 不进入 provider 槽，标签经常以开括号结尾。
@@ -90,6 +111,7 @@ export function isLikelyUntranslatedResponse(origin: string, result: string, tar
     if (identification.status === 'identified') {
         return !identification.languages.some(language => isLanguageCodeMatch(language, targetLanguage));
     }
+    if (getChineseScript(targetLanguage) && hasUntranslatedForeignScriptForChinese(origin)) return true;
     return Boolean(getChineseScript(targetLanguage)) && !/[\u3400-\u9fff]/u.test(result) && (
         isLatinKeywordList(origin) || isLatinShortHeading(origin) ||
         (createLanguageDetectionCopy(origin).text.match(/\b[a-z]{3,}\b/gu) ?? []).length >= 3
@@ -171,10 +193,14 @@ export function isClearlyWrongLanguageResponse(origin: string, result: string, t
     if (!origin.trim() || !result.trim() || !getChineseScript(targetLanguage)) return false;
     if (isClearlyForeignLatinProse(origin, result, targetLanguage)) return true;
     if (hasDominantForeignResidue(origin, result, targetLanguage)) return true;
-    const kanaCount = (result.match(/[\p{Script=Hiragana}\p{Script=Katakana}ーｰ]/gu) ?? []).length;
+    const unquoted = outsideQuotedText(result);
+    const kanaCount = (unquoted.match(/[\p{Script=Hiragana}\p{Script=Katakana}ーｰ]/gu) ?? []).length;
     if (kanaCount < 16) return false;
-    const hanCount = (result.match(/\p{Script=Han}/gu) ?? []).length;
+    const hanCount = (unquoted.match(/\p{Script=Han}/gu) ?? []).length;
     if (kanaCount * 2 < hanCount) return false;
-    const identification = identifyTextLanguage(result);
-    return identification.status === 'identified' && identification.languages.includes('ja');
+    const identification = identifyTextLanguage(unquoted);
+    if (identification.status === 'identified' && identification.languages.includes('ja')) return true;
+    // 夹带英文或个别被简化的汉字时，大量未引用平假名文法词仍明确属于未译日文正文。
+    const hiraganaCount = (unquoted.match(/\p{Script=Hiragana}/gu) ?? []).length;
+    return hiraganaCount >= 12;
 }

@@ -825,7 +825,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             && !isClearlyWrongLanguageResponse(message.origin, result, execution.targetLanguage)) return result;
         const retried = requireSingleResult(await callProviderWithinDeadline(
             execution,
-            applyRemainingDeadline({...message, context, pageContext: '', subtitleContext: undefined}, requestDeadline),
+            applyRemainingDeadline({...message, context, pageContext: '', subtitleContext: undefined, enableNativeBatch: false}, requestDeadline),
         ));
         if (isDefiniteRecoveryPageContextLeak(
             execution, message.origin, retried, validationPageContext, message.modelOverride,

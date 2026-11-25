@@ -61,20 +61,20 @@ describe('translation configuration guard', () => {
         expect(checkConfig()).toBe(true);
     });
 
-    it('谷歌翻译在仅译文模式下拒绝并说明原因', () => {
+    it('谷歌翻译支持双语与仅译文模式，不再被配置预检拦截', () => {
         mocks.config.service = 'google';
         mocks.config.display = 0;
 
-        expect(checkConfig()).toBe(false);
-        expect(mocks.sendErrorMessage).toHaveBeenCalledWith('「谷歌翻译」仅支持双语模式，请切换翻译服务');
+        expect(checkConfig()).toBe(true);
+        expect(mocks.sendErrorMessage).not.toHaveBeenCalled();
     });
 
     it.each([
-        {savedDisplay: 0, displayMode: undefined, expected: {allowed: false, reason: 'unsupported-display'}},
+        {savedDisplay: 0, displayMode: undefined, expected: {allowed: true}},
         {savedDisplay: 1, displayMode: undefined, expected: {allowed: true}},
         {savedDisplay: 0, displayMode: 'bilingual', expected: {allowed: true}},
-        {savedDisplay: 1, displayMode: 'single', expected: {allowed: false, reason: 'unsupported-display'}},
-    ] as const)('纯预检按保存模式 $savedDisplay 和本次覆盖 $displayMode 判断谷歌支持范围', ({savedDisplay, displayMode, expected}) => {
+        {savedDisplay: 1, displayMode: 'single', expected: {allowed: true}},
+    ] as const)('纯预检允许谷歌在保存模式 $savedDisplay 和本次覆盖 $displayMode 下启动', ({savedDisplay, displayMode, expected}) => {
         mocks.config.service = 'google';
         mocks.config.display = savedDisplay;
 
@@ -83,18 +83,18 @@ describe('translation configuration guard', () => {
         expect(mocks.sendErrorMessage).not.toHaveBeenCalled();
     });
 
-    it('网站仅译文在请求前执行相同服务限制，显式单次显示方案仍优先', () => {
+    it('网站仅译文偏好允许谷歌与其他服务正常启动且不修改全局保存值', () => {
         vi.stubGlobal('location', {href: 'https://docs.example.com/a'});
         try {
             mocks.config.translationOnlyDomains = ['example.com']; mocks.config.service = 'google';
-            expect(checkConfig()).toBe(false);
+            expect(checkConfig()).toBe(true);
             expect(checkConfig({displayMode: 'bilingual'})).toBe(true);
             mocks.config.service = 'plain'; expect(checkConfig()).toBe(true);
             expect(mocks.config.display).toBe(1);
         } finally {vi.unstubAllGlobals();}
     });
 
-    it('快捷方案按本次服务、模型和显示方式校验，不被全局默认值误拦截', () => {
+    it('快捷方案按本次服务和模型校验，不被全局默认值误拦截', () => {
         mocks.config.service = 'ai-default';
         mocks.config.display = 0;
 
@@ -104,7 +104,7 @@ describe('translation configuration guard', () => {
 
         mocks.config.service = 'plain';
         mocks.config.display = 1;
-        expect(checkConfig({service: 'google', displayMode: 'single'})).toBe(false);
+        expect(checkConfig({service: 'google', displayMode: 'single'})).toBe(true);
         expect(checkConfig({service: 'google', displayMode: 'bilingual'})).toBe(true);
     });
 
@@ -114,14 +114,13 @@ describe('translation configuration guard', () => {
 
         expect(checkConfig()).toBe(true);
     });
-    it('仅显式全文入口记录模型和显示配置拒绝，关闭时清除，不把悬浮错误写入全文状态', () => {
+    it('仅显式全文入口记录模型配置拒绝，关闭时清除，不把悬浮错误写入全文状态', () => {
         mocks.config.service = 'ai-demo';
         expect(checkConfig()).toBe(false); expect(getFullPageTranslationDiagnostic()).toBeUndefined();
         expect(checkConfig({}, true)).toBe(false);
         expect(getFullPageTranslationDiagnostic()?.code).toBe('model-configuration');
         mocks.config.service = 'google'; mocks.config.display = 0;
-        expect(checkConfig({}, true)).toBe(false);
-        expect(getFullPageTranslationDiagnostic()?.code).toBe('configuration');
+        expect(checkConfig({}, true)).toBe(true);
         mocks.config.on = false;
         expect(checkConfig({}, true)).toBe(false); expect(getFullPageTranslationDiagnostic()).toBeUndefined();
     });

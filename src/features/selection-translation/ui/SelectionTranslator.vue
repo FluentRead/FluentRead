@@ -9,7 +9,7 @@
  * 通知布局：收藏与语音设置通知沿用安全可见视口订阅，触摸动作保留完整命中区；通知不增加独立监听或请求。
  * 极矮视口：同一卡片改为整卡滚动并收紧顶栏间距，保留输入与请求、手动几何和语音状态；Safari 键盘视口变化后仅在当前有限窗口内滚动卡片自身显露原聚焦输入，主动操作取消待处理显露；恢复尺寸后沿用原定位，不增加监听或计时器。
  * 文件职责：实现划词翻译的主要页面组件，覆盖选区捕获、触摸原生句柄稳定等待、避开原生菜单上下区域的行侧入口、可见视口与安全区定位、后台及宿主恢复来源校验、图标/小点/悬停/快捷键/仅右键菜单/直接弹出、原生菜单可信选区恢复与重复请求复用、翻译与词卡展示、免费 AI 讲解的显式启用、朗读、收藏选中的单词/表达/句子、双语分享卡片、鉴权服务配置入口、重试和关闭。
- * 主要内容：相同译文保留原文且不重复展示；Firefox 触摸入口为原生手柄保留独立侧距，以绑定来源快照的可信触摸处理缺少 click 的情况并取消拖动；Safari/Firefox 触摸入口成功开卡后保留当前快照并清空同一原生选区，异步空选区不误关卡片；组件管理可信手势、已关闭选区与选择丢失宽限、继续阅读或复制原文时自动收起、请求 token、按既有错误种类显示有限提示并仅为当前鉴权失败提供通用设置入口、行内代码保护与纯文本安全渲染、按标签页页面缩放补偿的弹窗定位、空白拖动、边角缩放、主题及可换行的多语言标题；双语卡片先展示原文再展示译文；导航标签按卡片宽度换行，极矮视口使用单行滚动，保留分享、收藏、关闭和学习入口；指针移动按帧合并并在结束时提交最后位置，已定位卡片不重复读取选区几何；富文本 UTF-16 跟读偏移一次计算并复用；默认过滤同语言选区，按配置开放中英反向入口，翻译方向始终按现有语言配置判断；统一卡片默认显示翻译并以同一导航进入学习；首次定位后保持弹窗锚点，手动尺寸下内容与播放状态变化只影响内部布局；闲置语音栏不占空间，自动卡生成与播放期间按底栏实际高度自然增高，达到视口上限后正文独立滚动；学习短回答自然收拢、长回答受高度上限约束，完整原文和译文按需对照并允许翻译继续完成；单词先展示原文与可用词卡，再补充辅助释义，以紧凑状态提示等待、未命中与网络失败；关闭或更换选区取消等待并阻止旧响应覆盖新结果；区分语音生成和播放，按实际音频时钟或浏览器词边界显示完整词高亮，并提供真实音频时间与前后 5 秒跳转。
+ * 主要内容：相同译文保留原文且不重复展示；Firefox 触摸入口为原生手柄保留独立侧距，以绑定来源快照的可信触摸处理缺少 click 的情况并取消拖动；Safari/Firefox 触摸入口成功开卡后保留当前快照并清空同一原生选区，异步空选区不误关卡片；组件管理可信手势、已关闭选区与选择丢失宽限、继续阅读或复制原文时自动收起、请求 token、按既有错误种类显示有限提示并仅为当前鉴权失败提供通用设置入口、行内代码保护与纯文本安全渲染、按标签页页面缩放补偿的弹窗定位、空白拖动、边角缩放、主题及可换行的多语言标题；双语卡片先展示原文再展示译文；导航标签按卡片宽度换行，极矮视口使用单行滚动，保留分享、收藏、关闭和学习入口；指针移动按帧合并并在结束时提交最后位置，已定位卡片不重复读取选区几何；富文本 UTF-16 跟读偏移一次计算并复用；默认过滤同语言选区，按配置开放中英反向入口，并在卡片顶栏提供仅对本次划词生效的译文语言切换，不修改默认设置；统一卡片默认显示翻译并以同一导航进入学习；首次定位后保持弹窗锚点，手动尺寸下内容与播放状态变化只影响内部布局；闲置语音栏不占空间，自动卡生成与播放期间按底栏实际高度自然增高，达到视口上限后正文独立滚动；学习短回答自然收拢、长回答受高度上限约束，完整原文和译文按需对照并允许翻译继续完成；单词先展示原文与可用词卡，再补充辅助释义，以紧凑状态提示等待、未命中与网络失败；关闭或更换选区取消等待并阻止旧响应覆盖新结果；区分语音生成和播放，按实际音频时钟或浏览器词边界显示完整词高亮，并提供真实音频时间与前后 5 秒跳转。
  * 原生标注：PDF 专用控件仅在扩展构建中保留，脚本构建不包含其按钮和动作。
  * 材料关联：主动收藏与阅读时捕获当前选区的稳定来源和文本位置，词书真实保存后才关联材料引用，隐私窗口不采集。
  * 词典来源：配置切换时只撤销并重查词卡，保留普通译文与学习会话，旧来源的迟到结果不能覆盖新来源。
@@ -35,6 +35,28 @@
           <button v-else-if="canEnableFreeReading || freeReadingPending" type="button" :disabled="freeReadingPending" title="B站免费基础读懂/用法，无需 API Key；完整语法、练习和追问可切换 AI 服务" @click="enableFreeReading">{{ freeReadingPending ? '正在启用…' : '免费 AI 讲解' }}</button>
           <button v-else type="button" @click="openSelectionSettings">配置 AI 讲解</button>
         </div>
+        <span v-if="!readingMode" class="fr-selection-target" :class="{ 'is-overridden': selectionTargetOverride !== null }" :title="t('selection.targetLanguageHint')">
+          <span class="fr-selection-target-label" data-i18n-ignore aria-hidden="true">
+            <span class="fr-selection-target-arrow">→</span>
+            <span class="fr-selection-target-text">{{ effectiveTargetLabel }}</span>
+            <UiIcon name="chevron-down" :size="12" />
+          </span>
+          <select
+            class="fr-selection-target-select"
+            data-i18n-ignore
+            :value="effectiveTargetLanguage"
+            :aria-label="t('selection.targetLanguage')"
+            @focus="suppressSelectionRead()"
+            @change="handleSelectionTargetChange"
+          >
+            <option
+              v-for="option in selectionTargetOptions"
+              :key="option.value"
+              :value="option.value"
+              data-i18n-ignore
+            >{{ option.label }}</option>
+          </select>
+        </span>
         <div ref="reading-tools-target" v-show="readingMode && !readingHistoryOnly" class="fr-study-reading-tools" />
         <div class="fr-tooltip-actions">
           <template v-if="DOCUMENT_ANNOTATIONS && canMarkDocumentSelection">
@@ -220,7 +242,7 @@ import DictionaryCardTools from './DictionaryCardTools.vue';
 import {EMPTY_DICTIONARY_FIELDS} from '@/src/core/config/dictionaryWorkspace';
 import {normalizeDictionaryWord} from '../dictionary/model';
 import { isSingleEnglishWord, normalizeEnglishWord } from '@/src/features/selection-translation/services/wordNormalization';
-import { calculateSelectionPopupPosition, chooseSelectionRect, getSelectionPopupAnchor, getEditableSelectionRoot, getSelectionPresentationDelayRemaining, readSelectionParts, translateSelectionParts, normalizeSpeechLanguage, reconcileSelectionPresentation, resolveSelectionDictionaryFallback, resolveSelectionVocabularyAnswer, selectionReverseTarget, SelectionRequestTokenGate, shouldIgnoreSelection, summarizeSelectionContext, type SelectionAnswerCandidate, type SelectionContentRequest, type SelectionRect, type SelectionTextPart } from '@/src/features/selection-translation/core';
+import { buildSelectionTargetOptions, calculateSelectionPopupPosition, chooseSelectionRect, getSelectionPopupAnchor, getEditableSelectionRoot, getSelectionPresentationDelayRemaining, readSelectionParts, resolveSelectionDirection, translateSelectionParts, normalizeSpeechLanguage, reconcileSelectionPresentation, resolveSelectionDictionaryFallback, resolveSelectionVocabularyAnswer, selectionReverseTarget, selectionTargetShortLabel, SelectionRequestTokenGate, shouldIgnoreSelection, summarizeSelectionContext, type SelectionAnswerCandidate, type SelectionContentRequest, type SelectionRect, type SelectionTextPart } from '@/src/features/selection-translation/core';
 import {
   createSelectionTtsClientRequestId,
 } from '@/src/features/selection-translation/protocol';
@@ -268,6 +290,7 @@ const readingPanelRef = useTemplateRef<InstanceType<typeof ReadingPanel>>('readi
 const readingToolsTarget = useTemplateRef<HTMLElement>('reading-tools-target');
 const selectionTranslatorIconUrl = browser.runtime.getURL('/icon/128.png');
 const selectedText = ref('');
+const selectionTargetOverride = ref<string | null>(null);
 const manuallyRequestedSelection = ref(false);
 const activeContentRequest = ref<SelectionContentRequest | null>(null);
 const translationAnswer = ref<SelectionAnswerCandidate | null>(null);
@@ -585,15 +608,20 @@ const dictionaryToolEntry = extensionDictionaryWorkspace ? computed(() => wordCa
   word: wordCard.value.word, phonetic: wordCard.value.phonetics[0]?.text || '', audio: wordCard.value.phonetics[0]?.audio || '',
   definition: wordCard.value.meanings.flatMap(item => item.definitions.map(definition => definition.definition)).join('\n'),
   example: wordCard.value.meanings.flatMap(item => item.definitions.map(definition => definition.example || '')).filter(Boolean).join('\n'),
-  etymology: wordCard.value.origin || '', source: wordCard.value.sources.map(item => item.label).join(', '), sourceUrl: wordCard.value.sources[0]?.url || ''} : null) : null;
+  etymology: wordCard.value.origin || '', inflections: wordCard.value.inflections || '', source: wordCard.value.sources.map(item => item.label).join(', '), sourceUrl: wordCard.value.sources[0]?.url || ''} : null) : null;
 const hasDistinctTranslationResult = computed(() => hasDistinctTranslation(selectedText.value, translationResult.value));
-const reverseTargetLanguage = computed(() => selectionReverseTarget(selectedText.value, selectionSettings.value.to, selectionSettings.value.from));
-const effectiveTargetLanguage = computed(() => (selectionSettings.value.bidirectional || manuallyRequestedSelection.value) && reverseTargetLanguage.value
-  ? reverseTargetLanguage.value : selectionSettings.value.to);
-const effectiveSourceLanguage = computed(() => {
-  return reverseTargetLanguage.value && effectiveTargetLanguage.value === reverseTargetLanguage.value
-    ? selectionSettings.value.to : selectionSettings.value.from;
-});
+const selectionDirection = computed(() => resolveSelectionDirection({
+  text: selectedText.value,
+  configuredFrom: selectionSettings.value.from,
+  configuredTo: selectionSettings.value.to,
+  bidirectional: selectionSettings.value.bidirectional,
+  manuallyRequested: manuallyRequestedSelection.value,
+  targetOverride: selectionTargetOverride.value,
+}));
+const effectiveTargetLanguage = computed(() => selectionDirection.value.targetLanguage);
+const effectiveSourceLanguage = computed(() => selectionDirection.value.sourceLanguage);
+const selectionTargetOptions = computed(() => buildSelectionTargetOptions(effectiveTargetLanguage.value, selectionSettings.value.to));
+const effectiveTargetLabel = computed(() => selectionTargetShortLabel(effectiveTargetLanguage.value));
 const isWordSelection = computed(() => Boolean(selectedWord.value) && (Boolean(selectionSettings.value.dictionaryRecipe) || effectiveTargetLanguage.value !== 'en'
   && (effectiveSourceLanguage.value === 'auto' || /^en(?:-|$)/i.test(effectiveSourceLanguage.value))));
 const isWordCardVisible = computed(() => isWordSelection.value && wordCard.value !== null);
@@ -869,6 +897,7 @@ function applySelection(next: SelectionSnapshot | null, shortcutTriggered = fals
   selectionSettledAt = performance.now();
   touchOpenedSelection = null;
   resetSelectionContentState();
+  selectionTargetOverride.value = null;
   manuallyRequestedSelection.value = forced;
   readingMode.value = false;
   readingSelection.value = null;
@@ -1174,7 +1203,7 @@ function handleViewportResize(): void {
 
 function openTooltip(forced = false): void {
   if (selectionSettings.value.mode === 'disabled') { hideAll(); return; }
-  if (!snapshot.value || (!forced && isSelectionInTargetLanguage(snapshot.value.text))) { hideAll(); return; }
+  if (!snapshot.value || (!forced && !selectionTargetOverride.value && !manuallyRequestedSelection.value && isSelectionInTargetLanguage(snapshot.value.text))) { hideAll(); return; }
   if (forced) manuallyRequestedSelection.value = true;
   cancelSelectionPresentation();
   const wasVisible = showTooltip.value;
@@ -1598,6 +1627,20 @@ async function requestTranslation(request: SelectionContentRequest): Promise<voi
 function retryTranslation(): void {
   if (!snapshot.value) return;
   requestSelectionContent(snapshot.value.text);
+}
+
+function chooseSelectionTarget(targetLanguage: string): void {
+  const nextTarget = targetLanguage.trim();
+  if (!snapshot.value || !nextTarget || nextTarget === effectiveTargetLanguage.value) return;
+  suppressSelectionRead();
+  selectionTargetOverride.value = nextTarget;
+  void requestSelectionContent(snapshot.value.text);
+}
+
+function handleSelectionTargetChange(event: Event): void {
+  const target = event.target as {value?: unknown} | null;
+  if (typeof target?.value !== 'string') return;
+  chooseSelectionTarget(target.value);
 }
 
 async function sendWordCardRequest(word: string, targetLanguage: string, translateFields: boolean, signal: AbortSignal): Promise<{success?: boolean; data?: WordCardData | null}> {
@@ -2205,6 +2248,7 @@ function hideAll(): void {
   cancelSelectionPresentation();
   selectionSettledAt = 0;
   resetSelectionContentState(true);
+  selectionTargetOverride.value = null;
   manuallyRequestedSelection.value = false;
   readingMode.value = false;
   readingSelection.value = null;
@@ -2351,7 +2395,7 @@ function handlePageCopy(event: ClipboardEvent): void {
 }
 function handleSelectionChange(event: Event): void {
   if (clickSelection.active) return;
-  if (readingMode.value && isInsideUi(document.activeElement)) return;
+  if (showTooltip.value && isInsideUi(document.activeElement)) return;
   if (!event.isTrusted) return;
   if (import.meta.env.BROWSER !== 'userscript' && (contextMenuSelection || contextMenuSourceRejected)) return;
   // 新的拖选/双击可以再次选中同一段；单纯点击保留旧选区的按钮不能解除关闭状态。
@@ -2842,7 +2886,12 @@ onMounted(() => {
     const dictionarySourceChanged = previousSettings && nextSettings[11] !== previousSettings[11];
     if (themeChanged) updateTheme();
     if (!snapshot.value) return;
-    if (languageChanged) manuallyRequestedSelection.value = false;
+    if (languageChanged) {
+      selectionTargetOverride.value = null;
+      manuallyRequestedSelection.value = false;
+    } else if (directionEntryChanged) {
+      selectionTargetOverride.value = null;
+    }
     if (languageChanged && readingMode.value) { hideAll(); return; }
     if ((languageChanged || directionEntryChanged) && !manuallyRequestedSelection.value && !selectionSettings.value.dictionaryRecipe
       && (shouldSkipChineseSelection(snapshot.value.text, config.to)
@@ -3007,6 +3056,69 @@ onBeforeUnmount(() => {
   gap: 2px;
 }
 .fr-study-reading-tools { flex: none; cursor: default; }
+.fr-selection-target {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  max-width: 108px;
+  min-height: 28px;
+  border: 1px solid var(--fr-card-line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--fr-card-muted);
+  font-size: 11.5px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.fr-selection-target:hover {
+  border-color: color-mix(in srgb, var(--fr-card-active-ink) 38%, var(--fr-card-line));
+  background: color-mix(in srgb, var(--fr-card-active-bg) 55%, #fff);
+  color: var(--fr-card-active-ink);
+}
+.fr-selection-target.is-overridden {
+  border-color: color-mix(in srgb, var(--fr-card-active-ink) 32%, transparent);
+  background: var(--fr-card-active-bg);
+  color: var(--fr-card-active-ink);
+}
+.fr-selection-target:has(.fr-selection-target-select:focus-visible) {
+  outline: 2px solid var(--fr-card-focus);
+  outline-offset: -2px;
+}
+.fr-selection-target-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  padding: 0 6px;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.fr-selection-target-arrow {
+  flex: none;
+  color: var(--fr-card-active-ink);
+  font-weight: 600;
+}
+.fr-selection-target-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fr-selection-target-select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+}
 .fr-study-toolbar button {
   max-width: 100%;
   min-height: 28px;
@@ -3167,6 +3279,10 @@ onBeforeUnmount(() => {
   color: #f0f3f8;
   box-shadow: 0 8px 28px rgba(0, 0, 0, .42);
 }
+.fr-dark-theme .fr-selection-target { background: #1e2430; }
+.fr-dark-theme .fr-selection-target:hover { background: color-mix(in srgb, var(--fr-card-active-bg) 60%, #1e2430); }
+.fr-dark-theme .fr-selection-target.is-overridden { background: var(--fr-card-active-bg); }
+.fr-dark-theme .fr-selection-target-select option { background: #1e2430; color: #f0f3f8; }
 .fr-dark-theme :is(.fr-text-copy-btn, .fr-text-audio-btn) { border-color:transparent; background:transparent; color:#9aa4b5; }
 .fr-dark-theme :is(.fr-text-copy-btn, .fr-text-audio-btn):is(:hover, :focus-visible) { border-color: rgba(255, 127, 163, .36); background: rgba(239, 71, 118, .18); color: #ff7fa3; }
 .fr-dark-theme .fr-text-copy-btn.fr-copied { border-color: rgba(255, 127, 163, .28); background: rgba(239, 71, 118, .18); color: #ff7fa3; }
@@ -3191,7 +3307,7 @@ onBeforeUnmount(() => {
 .fr-touch-selection .fr-selection-indicator { width:44px; height:44px; border-radius:12px; touch-action:manipulation; }
 .fr-touch-selection .fr-selection-indicator--dot { background:transparent; box-shadow:none; }
 .fr-touch-selection .fr-selection-indicator--dot::after { content:''; position:absolute; inset:18px; border-radius:50%; background:#ef4b86; }
-.fr-touch-selection .fr-translation-tooltip button, .fr-touch-selection .fr-action-toast button { min-width:44px; min-height:44px; touch-action:manipulation; }
+.fr-touch-selection .fr-translation-tooltip button, .fr-touch-selection .fr-action-toast button, .fr-touch-selection .fr-selection-target { min-width:44px; min-height:44px; touch-action:manipulation; }
 .fr-touch-selection .fr-study-navigation { touch-action:none; }
 .fr-touch-selection .fr-tooltip-brand-icon { margin-block-start: 13px; }
 .fr-touch-selection .fr-popup-resize-handle { display:none; }
@@ -3199,7 +3315,7 @@ onBeforeUnmount(() => {
 .fr-touch-selection .fr-tooltip-content { -webkit-overflow-scrolling:touch; }
 .fr-touch-selection .fr-copy-success-toast { right:max(12px, env(safe-area-inset-right)); bottom:max(12px, env(safe-area-inset-bottom)); }
 @media (any-pointer: coarse) {
-  .fr-translation-tooltip button, .fr-action-toast button { min-width:44px; min-height:44px; touch-action:manipulation; }
+  .fr-translation-tooltip button, .fr-action-toast button, .fr-selection-target { min-width:44px; min-height:44px; touch-action:manipulation; }
   .fr-tooltip-brand-icon { margin-block-start: 13px; }
   .fr-playing-status { height:auto; min-height:52px; flex-wrap:wrap; }
 }

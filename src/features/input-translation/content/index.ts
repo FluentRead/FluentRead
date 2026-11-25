@@ -15,7 +15,12 @@ import {parseApiKeyRequirementKey} from '@/src/core/config/validation';
 import {getCompositeTranslationConfigFingerprint} from '@/src/core/config/compositeTranslation';
 import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
 import {clampToVisualViewport, getSafeVisualViewportRect} from '@/src/platform/dom/visualViewport';
-import {normalizeInputBoxTranslationOutputMode, type InputBoxTranslationOutputMode} from '@/src/core/config/inputTranslation';
+import {
+    matchesCustomInputBoxTranslationHotkey,
+    normalizeCustomInputBoxTranslationHotkey,
+    normalizeInputBoxTranslationOutputMode,
+    type InputBoxTranslationOutputMode,
+} from '@/src/core/config/inputTranslation';
 import {
     canCommitInputBoxTranslation,
     getDeepActiveElement,
@@ -45,6 +50,7 @@ export interface InputTranslationContentConfig {
     service?: string;
     aiRequestTimeoutMs?: number;
     inputBoxTranslationTrigger: string;
+    customInputBoxTranslationHotkey?: string;
     inputBoxTranslationTarget: string;
     inputBoxTranslationOutputMode?: string;
     inputBoxTranslationInterval?: number;
@@ -174,18 +180,24 @@ export function inputBoxTranslationConfigKey(value: InputTranslationContentConfi
         value.inputBoxTranslationPrompt ?? '',
         value.inputBoxTranslationSystemPrompt ?? '',
     ];
+    const customHotkey = value.inputBoxTranslationTrigger === 'custom'
+        ? normalizeCustomInputBoxTranslationHotkey(value.customInputBoxTranslationHotkey)
+        : '';
+    if (customHotkey) key.push(`hotkey:${customHotkey}`);
     const connectionKey = inputBoxTranslationConnectionKey(value);
     if (connectionKey) key.push(connectionKey);
     return JSON.stringify(key);
 }
 
 export function isInputBoxTranslationEnabled(
-    config: Pick<InputTranslationContentConfig, 'on' | 'inputBoxTranslationTrigger'>,
+    config: Pick<InputTranslationContentConfig, 'on' | 'inputBoxTranslationTrigger' | 'customInputBoxTranslationHotkey'>,
     isSiteDisabled = false,
 ): boolean {
     return !isSiteDisabled
         && config.on !== false
-        && config.inputBoxTranslationTrigger !== 'disabled';
+        && config.inputBoxTranslationTrigger !== 'disabled'
+        && (config.inputBoxTranslationTrigger !== 'custom'
+            || Boolean(normalizeCustomInputBoxTranslationHotkey(config.customInputBoxTranslationHotkey)));
 }
 
 /**
@@ -935,13 +947,17 @@ export function createInputTranslationContentFeature(
                 resetKeyPresses();
                 return;
             }
+            const isDirectTrigger = deps.config.inputBoxTranslationTrigger === 'custom'
+                ? matchesCustomInputBoxTranslationHotkey(event, deps.config.customInputBoxTranslationHotkey)
+                : deps.config.inputBoxTranslationTrigger === 'ctrl_enter'
+                    && Boolean(event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key === 'Enter');
             // 编辑器同步模型选区时可能临时选中全文；先取消并同步还原旧光标，
             // 再把用户的新按键交给宿主，避免默认输入直接覆盖整篇草稿。
             if (internalWriteElement === activeInputTranslationElement && activeRequestController
                 && !['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)
-                && !(deps.config.inputBoxTranslationTrigger === 'ctrl_enter' && event.ctrlKey && event.key === 'Enter')
+                && !isDirectTrigger
                 && event.key !== 'Escape') invalidate();
-            if (event.key === 'Escape') {
+            if (event.key === 'Escape' && !isDirectTrigger) {
                 if (activeRequestController && getDeepActiveElement(rootDocument) === activeInputTranslationElement) {
                     event.preventDefault();
                     event.stopPropagation();
@@ -952,8 +968,7 @@ export function createInputTranslationContentFeature(
             }
             // IME 的选词/确认和长按属于宿主编辑会话；不能吞键或把此前的三连计数
             // 带到组合输入结束后。229 兼容部分浏览器的首尾组合事件。
-            if (event.isComposing || event.keyCode === 229 || event.repeat
-                || event.altKey || event.metaKey || event.shiftKey) {
+            if (event.isComposing || event.keyCode === 229 || event.repeat) {
                 resetKeyPresses();
                 return;
             }
@@ -965,10 +980,22 @@ export function createInputTranslationContentFeature(
             }
 
             const triggerType = deps.config.inputBoxTranslationTrigger;
+            if (triggerType === 'custom') {
+                if (isDirectTrigger) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    await handleInputBoxTranslation(activeElement, signal);
+                }
+                return;
+            }
+            if (event.altKey || event.metaKey || event.shiftKey) {
+                resetKeyPresses();
+                return;
+            }
             // 步骤 1：保留 Ctrl+Enter 兼容触发；三连击把 Ctrl 视为中断修饰键。
             // 已消费的触发键不再传给页面，避免聊天和评论编辑器把 Ctrl+Enter 当作发送。
             if (triggerType === 'ctrl_enter') {
-                if (event.ctrlKey && event.key === 'Enter') {
+                if (isDirectTrigger) {
                     event.preventDefault();
                     event.stopPropagation();
                     await handleInputBoxTranslation(activeElement, signal);

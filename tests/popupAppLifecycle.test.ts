@@ -972,13 +972,11 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     expect(state.config.display).toBe(1);expect(records.get('local:config')).toMatchObject({display:1});expect(toggle().getAttribute('aria-label')).toBe('显示原文和译文')
     expect(commands()).toHaveLength(0);expect(state.drawerVisible).toBe(false);expect(close).not.toHaveBeenCalled()
   })
-  it('Google 双语模式禁用切换为仅译文，已有仅译文偏好仍可一键修复为双语',async()=>{
+  it('Google 服务支持在双语与仅译文之间直接双向切换',async()=>{
     config.display=1;localized=true;await mount();const toggle=()=>button('popup-display-mode')
-    expect(toggle().hasAttribute('disabled')).toBe(true);expect(toggle().getAttribute('aria-description')).toBe('Google 翻译仅支持双语显示')
-    eventOf(toggle())();await drain();expect(state.config.display).toBe(1);expect(patches).not.toHaveBeenCalled()
-    state.config.service='bing';state.config.display=0;await drain();expect(toggle().getAttribute('aria-label')).toBe('显示原文和译文')
-    state.config.service='google';await drain();expect(state.config.display).toBe(0);expect(toggle().hasAttribute('disabled')).toBe(false);expect(toggle().getAttribute('aria-label')).toBe('显示原文和译文')
-    eventOf(toggle())();await drain();expect(state.config.display).toBe(1);expect(toggle().hasAttribute('disabled')).toBe(true)
+    expect(toggle().hasAttribute('disabled')).toBe(false);expect(toggle().getAttribute('aria-description')).toBeNull();expect(toggle().getAttribute('aria-label')).toBe('显示原文和译文')
+    eventOf(toggle())();await drain();expect(state.config.display).toBe(0);expect(toggle().hasAttribute('disabled')).toBe(false);expect(toggle().getAttribute('aria-label')).toBe('显示原文和译文')
+    eventOf(toggle())();await drain();expect(state.config.display).toBe(1);expect(toggle().hasAttribute('disabled')).toBe(false)
   })
   it.each(['display','service','paused','cached','pagehide','unmount'] as const)('%s 变化后缓存的模式按钮回调失效，不借用新会话',async reason=>{
     config.service='bing';config.display=1;await mount();const stale=eventOf(button('popup-display-mode'))
@@ -1002,8 +1000,8 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     app.unmount();await drain();expect(batches).toHaveLength(1);first.resolve();await persistenceStore!.waitForConfigPersistenceQueue();await drain()
     expect(records.get('local:config')).toMatchObject({to:'ja',display:0})
   })
-  it('实际显示模式保留 Google 保存偏好，并阻止旧服务和旧划词模式按钮',async()=>{
-    config.display=0;config.popupQuickFeatureVisibility.appearance=true;config.selectionTranslatorMode='bilingual';config.disableSelectionTranslator=false;await mount();await openFeature('appearance');const translated=()=>document.querySelector('[aria-label="翻译模式"] button')!;expect(translated().getAttribute('aria-pressed')).toBe('true');expect(translated().hasAttribute('disabled')).toBe(true);state.config.display=1;await drain();eventOf(translated())();expect(state.config.display).toBe(1);state.config.service='bing';await drain();const enabled=eventOf(translated());state.config.service='google';state.config.service='bing';await drain();enabled();expect(state.config.display).toBe(1);eventOf(translated())();expect(state.config.display).toBe(0)
+  it('外观抽屉支持 Google 仅译文切换，并阻止旧服务和旧划词模式按钮',async()=>{
+    config.display=0;config.popupQuickFeatureVisibility.appearance=true;config.selectionTranslatorMode='bilingual';config.disableSelectionTranslator=false;await mount();await openFeature('appearance');const translated=()=>document.querySelector('[aria-label="翻译模式"] button')!;expect(translated().getAttribute('aria-pressed')).toBe('true');expect(translated().hasAttribute('disabled')).toBe(false);state.config.display=1;await drain();const stale=eventOf(translated());state.config.service='bing';state.config.service='google';await drain();stale();expect(state.config.display).toBe(1);eventOf(translated())();expect(state.config.display).toBe(0)
     eventOf(document.querySelector('[data-popup-quick-feature="selection"]')!)();await drain();const mode=eventOf(document.querySelector('.chips.two button')!);eventOf(button('selection-enable'))();await drain();mode();expect(state.config.selectionTranslatorMode).toBe('disabled');expect(state.config.disableSelectionTranslator).toBe(true);eventOf(button('selection-enable'))();await drain();expect(state.config.selectionTranslatorMode).toBe(state.config.selectionTranslatorModeBeforeDisable)
   })
   it('图片抽屉复验平台能力，旧能力回调失效，恢复后新按钮生效',async()=>{

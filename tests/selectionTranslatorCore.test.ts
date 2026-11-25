@@ -1,6 +1,7 @@
 import {parseHTML} from 'linkedom';
 import { describe, expect, it, vi } from 'vitest';
 import {
+    buildSelectionTargetOptions,
     canUseBundledDictionaryFallback,
     calculateSelectionPopupPosition,
     chooseSelectionRect,
@@ -12,11 +13,13 @@ import {
     normalizeSelectionText,
     readSelectionText,
     readSelectionParts,
+    resolveSelectionDirection,
     translateSelectionParts,
     normalizeSpeechLanguage,
     reconcileSelectionPresentation,
     resolveSelectionDictionaryFallback,
     selectionReverseTarget,
+    selectionTargetShortLabel,
     resolveSelectionVocabularyAnswer,
     SelectionRequestTokenGate,
     shouldIgnoreSelection,
@@ -40,6 +43,89 @@ describe('中英划词方向', () => {
         expect(selectionReverseTarget('This is an English sentence.', 'zh-Hans', 'auto')).toBeNull();
         expect(selectionReverseTarget('你好，世界！', 'ja', 'auto')).toBeNull();
         expect(selectionReverseTarget('API', 'en', 'auto')).toBeNull();
+    });
+
+    it('生成去重且默认目标置顶的划词目标语言列表和紧凑标签', () => {
+        expect(selectionTargetShortLabel('de')).toBe('Deutsch');
+        expect(selectionTargetShortLabel('zh-Hans')).toBe('简体中文');
+        expect(selectionTargetShortLabel('en')).toBe('English');
+        expect(selectionTargetShortLabel('custom-lang')).toBe('custom-lang');
+        expect(selectionTargetShortLabel('de', '   ')).toBe('de');
+
+        const options = buildSelectionTargetOptions('en', 'de');
+        expect(options[0]).toEqual({value: 'de', label: 'Deutsch / German / 德语', shortLabel: 'Deutsch'});
+        expect(options[1]).toEqual({value: 'en', label: 'English', shortLabel: 'English'});
+        expect(options.filter(item => item.value === 'de')).toHaveLength(1);
+        expect(options.filter(item => item.value === 'en')).toHaveLength(1);
+
+        const custom = buildSelectionTargetOptions('pt-PT', '  ');
+        expect(custom[0]).toEqual({value: 'pt-PT', label: 'pt-PT', shortLabel: 'pt-PT'});
+        expect(buildSelectionTargetOptions('', '')[0]?.value).toBe('zh-Hans');
+    });
+
+    it('在单次目标语言覆盖与配置方向之间正确解析源语言和目标语言', () => {
+        expect(resolveSelectionDirection({
+            text: '我使用 markedit 的 file explorer 打开文件。',
+            configuredFrom: 'auto',
+            configuredTo: 'zh-Hans',
+            bidirectional: false,
+            manuallyRequested: false,
+            targetOverride: 'en',
+        })).toEqual({sourceLanguage: 'auto', targetLanguage: 'en'});
+
+        expect(resolveSelectionDirection({
+            text: 'Hello world',
+            configuredFrom: 'en',
+            configuredTo: 'zh-Hans',
+            bidirectional: false,
+            manuallyRequested: false,
+            targetOverride: 'en',
+        })).toEqual({sourceLanguage: 'auto', targetLanguage: 'en'});
+
+        expect(resolveSelectionDirection({
+            text: 'Hello world',
+            configuredFrom: 'en',
+            configuredTo: 'zh-Hans',
+            bidirectional: false,
+            manuallyRequested: false,
+            targetOverride: 'zh-Hans',
+        })).toEqual({sourceLanguage: 'en', targetLanguage: 'zh-Hans'});
+
+        expect(resolveSelectionDirection({
+            text: '你好，世界！',
+            configuredFrom: 'zh-Hans',
+            configuredTo: 'zh-Hans',
+            bidirectional: false,
+            manuallyRequested: false,
+            targetOverride: 'zh-Hans',
+        })).toEqual({sourceLanguage: 'auto', targetLanguage: 'zh-Hans'});
+
+        expect(resolveSelectionDirection({
+            text: '你好，世界！',
+            configuredFrom: 'auto',
+            configuredTo: 'zh-Hans',
+            bidirectional: true,
+            manuallyRequested: false,
+            targetOverride: '   ',
+        })).toEqual({sourceLanguage: 'zh-Hans', targetLanguage: 'en'});
+
+        expect(resolveSelectionDirection({
+            text: 'Bonjour tout le monde.',
+            configuredFrom: 'fr',
+            configuredTo: 'de',
+            bidirectional: false,
+            manuallyRequested: false,
+            targetOverride: null,
+        })).toEqual({sourceLanguage: 'fr', targetLanguage: 'de'});
+
+        expect(resolveSelectionDirection({
+            text: '你好，世界！',
+            configuredFrom: 'auto',
+            configuredTo: 'zh-Hans',
+            bidirectional: false,
+            manuallyRequested: true,
+            targetOverride: null,
+        })).toEqual({sourceLanguage: 'zh-Hans', targetLanguage: 'en'});
     });
 });
 
@@ -830,6 +916,31 @@ describe('selection translator text and speech language normalization', () => {
 
     it('normalizes browser whitespace without changing words', () => {
         expect(normalizeSelectionText('  hello\u00a0  world\n   again  ')).toBe('hello world\nagain');
+    });
+
+    it('unwraps hard-wrapped markdown and git commit message paragraphs while preserving paragraph breaks', () => {
+        const commit = [
+            'The opaque rect that we report to the compositor is derived from the',
+            'opaque rectangle of the render node, shrunk to whole surface pixels.',
+            'The surface contents are rendered into a buffer that is scaled by the',
+            'ratio between the buffer and the surface, so that ratio is often',
+            'fractional, and the edges of the rect then land within buffer pixels:',
+            'the outermost buffer pixel is only partially covered even though the',
+            'rect claims that it is opaque. A compositor that disables blending for',
+            'the opaque region then shows that partial coverage as a line along the',
+            'window edges.',
+            '',
+            'Keep the edges that cannot be proven opaque out of the region in',
+            '`gdk_surface_set_opaque_rect()`, using the exact buffer to surface',
+            'ratio. Only the misaligned edges are affected, so a window that fills',
+            'its buffer exactly - such as a maximized window - keeps reporting its',
+            'full opaque area, and compositors can still cull windows that it covers.',
+        ].join('\n');
+        expect(normalizeSelectionText(commit)).toBe([
+            'The opaque rect that we report to the compositor is derived from the opaque rectangle of the render node, shrunk to whole surface pixels. The surface contents are rendered into a buffer that is scaled by the ratio between the buffer and the surface, so that ratio is often fractional, and the edges of the rect then land within buffer pixels: the outermost buffer pixel is only partially covered even though the rect claims that it is opaque. A compositor that disables blending for the opaque region then shows that partial coverage as a line along the window edges.',
+            '',
+            'Keep the edges that cannot be proven opaque out of the region in `gdk_surface_set_opaque_rect()`, using the exact buffer to surface ratio. Only the misaligned edges are affected, so a window that fills its buffer exactly - such as a maximized window - keeps reporting its full opaque area, and compositors can still cull windows that it covers.',
+        ].join('\n'));
     });
 
     it('keeps a bounded context centered on the selected word', () => {

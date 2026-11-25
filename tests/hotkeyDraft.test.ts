@@ -61,14 +61,18 @@ describe('快捷键草稿所有权与提交边界', () => {
         expect(draft.isCurrentDraft()).toBe(true);app.unmount();expect(draft.showCustomHotkeyDialog.value).toBe(false);
         draft.openCustomHotkeyDialog();expect(draft.isCurrentDraft()).toBe(false);
     });
-    it('三个明确字段组合各自提交，圈选功能停用偏好仍可以编辑', () => {
-        const scopes = reactive({config: new Config(), enabled: false});let area!: ReturnType<typeof useHotkeyDraft>, copy!: ReturnType<typeof useHotkeyDraft>;
+    it('四个明确字段组合各自提交，圈选功能停用偏好仍可以编辑', () => {
+        const scopes = reactive({config: new Config(), enabled: false});
+        let area!: ReturnType<typeof useHotkeyDraft>, copy!: ReturnType<typeof useHotkeyDraft>, input!: ReturnType<typeof useHotkeyDraft>;
         app = renderer.createApp({setup() {
             area = useHotkeyDraft(() => scopes.config, {mode: 'selectionAreaHotkey', custom: 'customSelectionAreaHotkey'}, () => true, () => scopes.enabled);
             copy = useHotkeyDraft(() => scopes.config, {mode: 'paragraphCopyHotkey', custom: 'customParagraphCopyHotkey'}, () => true);
+            input = useHotkeyDraft(() => scopes.config, {mode: 'inputBoxTranslationTrigger', custom: 'customInputBoxTranslationHotkey'}, () => true);
             return () => null;
-        }});app.mount({});area.openCustomHotkeyDialog();copy.openCustomHotkeyDialog();
+        }});app.mount({});area.openCustomHotkeyDialog();copy.openCustomHotkeyDialog();input.openCustomHotkeyDialog();
         expect(area.commitHotkeyDraft('custom', 'Shift+K')).toBe(true);expect(copy.commitHotkeyDraft('custom', 'Alt+K')).toBe(true);
+        expect(input.commitHotkeyDraft('custom', 'Alt+Enter')).toBe(true);
         expect(scopes.config.customSelectionAreaHotkey).toBe('Shift+K');expect(scopes.config.customParagraphCopyHotkey).toBe('Alt+K');
+        expect(scopes.config.inputBoxTranslationTrigger).toBe('custom');expect(scopes.config.customInputBoxTranslationHotkey).toBe('Alt+Enter');
     });
 });

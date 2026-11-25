@@ -8,6 +8,7 @@ import {servicesType, resolveConfiguredModel} from '@/src/core/config/catalog';
 import {Config} from '@/src/core/config/model';
 import {MAX_AI_REQUEST_TIMEOUT_MS, normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
+import {unwrapWrappedParagraphs} from '@/src/core/translation/wrappedParagraphs';
 import {
     DEFAULT_INPUT_BOX_TRANSLATION_SYSTEM_PROMPT,
     completeInputBoxTranslationPrompt,
@@ -164,7 +165,7 @@ export function createInputBoxTranslationRequest(
     const snapshot = createTranslationProviderConfigSnapshot(snapshotSource);
     const configuredTimeoutMs = servicesType.isAI(service) ? normalizeAiRequestTimeoutMs(snapshot.aiRequestTimeoutMs) : 45_000;
     return attachTranslationProviderConfig({
-        origin: text,
+        origin: unwrapWrappedParagraphs(text),
         sourceLanguage: 'auto',
         targetLanguage,
         enableAIContext: false,

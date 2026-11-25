@@ -973,6 +973,72 @@ describe('input translation content feature', () => {
         expect(isInputBoxTranslationEnabled({on: false, inputBoxTranslationTrigger: 'ctrl_enter'}, false)).toBe(false);
         expect(isInputBoxTranslationEnabled({on: true, inputBoxTranslationTrigger: 'disabled'}, false)).toBe(false);
         expect(isInputBoxTranslationEnabled({on: true, inputBoxTranslationTrigger: 'ctrl_enter'}, true)).toBe(false);
+        expect(isInputBoxTranslationEnabled({on: true, inputBoxTranslationTrigger: 'custom', customInputBoxTranslationHotkey: ''}, false)).toBe(false);
+        expect(isInputBoxTranslationEnabled({on: true, inputBoxTranslationTrigger: 'custom', customInputBoxTranslationHotkey: 'Alt+Enter'}, false)).toBe(true);
+        expect(inputBoxTranslationConfigKey({
+            on: true,
+            inputBoxTranslationTrigger: 'custom',
+            customInputBoxTranslationHotkey: 'Alt+Enter',
+            inputBoxTranslationTarget: 'en',
+        })).not.toBe(inputBoxTranslationConfigKey({
+            on: true,
+            inputBoxTranslationTrigger: 'custom',
+            customInputBoxTranslationHotkey: 'Ctrl+Shift+T',
+            inputBoxTranslationTarget: 'en',
+        }));
+    });
+
+    it('支持自定义组合键与功能键触发输入框翻译，并兼容 Alt+Escape 与防重入', async () => {
+        const harness = mountHarness({
+            config: {
+                inputBoxTranslationTrigger: 'custom',
+                customInputBoxTranslationHotkey: 'Alt+Enter',
+            },
+            sendMessage: async () => ({success: true, translatedText: 'Translated'}),
+        });
+        const textarea = fakeElement('textarea');
+        textarea.value = 'Hello world';
+        harness.fakeDocument.activeElement = textarea;
+
+        // 不匹配的按键和组合输入期间不触发
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', code: 'Enter'}));
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', code: 'Enter', altKey: true, isComposing: true}));
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', code: 'Enter', altKey: true, repeat: true}));
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        // 匹配 Alt+Enter 时阻止默认行为并翻译
+        const altEnter = trustedKey({key: 'Enter', code: 'Enter', altKey: true});
+        await harness.fakeDocument.emit('keydown', altEnter);
+        expect(altEnter.preventDefault).toHaveBeenCalledOnce();
+        expect(altEnter.stopPropagation).toHaveBeenCalledOnce();
+        expect(textarea.value).toBe('Translated');
+
+        // 支持 Ctrl+Shift+T 等带 Shift 的多修饰键组合
+        harness.config.customInputBoxTranslationHotkey = 'Ctrl+Shift+T';
+        textarea.value = 'Second draft';
+        const combo = trustedKey({key: 'T', code: 'KeyT', ctrlKey: true, shiftKey: true});
+        await harness.fakeDocument.emit('keydown', combo);
+        expect(combo.preventDefault).toHaveBeenCalledOnce();
+        expect(textarea.value).toBe('Translated');
+
+        // 支持 F9 单功能键与 Alt+Escape（不被纯 Escape 取消逻辑拦截）
+        harness.config.customInputBoxTranslationHotkey = 'F9';
+        textarea.value = 'Third draft';
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'F9', code: 'F9'}));
+        expect(textarea.value).toBe('Translated');
+
+        harness.config.customInputBoxTranslationHotkey = 'Alt+Escape';
+        textarea.value = 'Fourth draft';
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Escape', code: 'Escape', altKey: true}));
+        expect(textarea.value).toBe('Translated');
+
+        // 兼容旧 ctrl_enter 时，额外修饰键不会误触发
+        harness.config.inputBoxTranslationTrigger = 'ctrl_enter';
+        textarea.value = 'Keep untouched';
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', code: 'Enter', ctrlKey: true, altKey: true}));
+        expect(textarea.value).toBe('Keep untouched');
+
+        harness.controller.abort();
     });
 
     it('组合成员连接更新使输入事务失效，成员凭据只进入安全摘要', () => {

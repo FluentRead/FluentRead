@@ -12,7 +12,7 @@ Translate an article or selected section, compare both languages, and return to 
 
 While choosing a translation service in the popup, press **Esc** to return to the service overview. Press it again to return to the popup home screen.
 
-Display mode is saved and updates existing translations without another request. Google Translate supports bilingual display only; switch back to bilingual before using it.
+Display mode is saved and updates existing translations without another request.
 
 For translation-only display on selected websites, enable **Translation only** under **Tools & learning → Website rules → Site preferences**. Other websites keep the global mode. See [Website reading area](/en/config/site-adaptation).
 

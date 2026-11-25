@@ -5,10 +5,12 @@
  * 模块边界：这里只编排 content 生命周期，不实现输入触发算法、段落解析、区域选择或配置持久化；具体行为分别属于 input-translation、paragraph-copy、section-translation 与 config store。
  */
 import type {InputTranslationContentFeature} from '@/src/features/input-translation/content';
+import {normalizeCustomInputBoxTranslationHotkey} from '@/src/core/config/inputTranslation';
 
 export interface OptionalContentFeatureConfig {
     on?: boolean;
     inputBoxTranslationTrigger?: string;
+    customInputBoxTranslationHotkey?: string;
     paragraphCopyEnabled?: boolean;
 }
 
@@ -53,7 +55,9 @@ export function createOptionalContentFeatureRuntime(
 
     const inputFeatureEnabled = (): boolean => dependencies.config.on !== false
         && !dependencies.isSiteDisabled()
-        && dependencies.config.inputBoxTranslationTrigger !== 'disabled';
+        && dependencies.config.inputBoxTranslationTrigger !== 'disabled'
+        && (dependencies.config.inputBoxTranslationTrigger !== 'custom'
+            || Boolean(normalizeCustomInputBoxTranslationHotkey(dependencies.config.customInputBoxTranslationHotkey)));
     const paragraphCopyFeatureEnabled = (): boolean => dependencies.config.on === true
         && !dependencies.isSiteDisabled()
         && dependencies.config.paragraphCopyEnabled === true;

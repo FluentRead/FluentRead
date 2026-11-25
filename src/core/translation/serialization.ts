@@ -7,6 +7,7 @@
  */
 
 import {createTranslationTextProtectionCache, isIdentifierLikeText, isTranslationTextNodeProtected, normalizeTranslationText} from './text';
+import {unwrapWrappedParagraphs} from './wrappedParagraphs';
 import type {TranslationTextProtectionCache} from './text';
 import type {TranslationLayoutMeasurements, TranslationLayoutStyle} from './layoutMeasurements';
 import {
@@ -375,7 +376,8 @@ export function buildWholeBlockTranslationSource(
             options.preserveNewlines && whitespace.includes('\n') ? '\n' : ' '));
         addGap(slot.suffix);
     }
-    return parts.join('');
+    const joined = parts.join('');
+    return joined.includes('\n') ? unwrapWrappedParagraphs(joined) : joined;
 }
 
 /**

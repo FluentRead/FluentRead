@@ -871,7 +871,7 @@ describe('explicit free selection explanation', () => {
     });
 });
 
-describe('selection card language configuration without header switches', () => {
+describe('selection card language configuration and quick header switch', () => {
     it.each([
         ['Ceci est une phrase française complète.', 'fr', 'de', false, false, 'fr', 'de'],
         ['这是完整的中文选文。', 'auto', 'zh-Hans', true, false, 'zh-Hans', 'en'],
@@ -915,6 +915,90 @@ describe('selection card language configuration without header switches', () => 
         await Vue.nextTick();
         expect(fixture.state.translationResult).toBe('A fresh English answer.');
         expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+    });
+
+    it('switches the active card target language from the header without mutating global config and rejects stale responses', async () => {
+        const fixture = mountSelection(false, undefined, {}, true);
+        fixture.config.harness = {...fixture.config.harness, enabled: true};
+        fixture.state.selectionConfigVersion += 1;
+        await Vue.nextTick();
+        const text = '我使用 markedit 的 file explorer 打开文件列表，希望以 tab 方式打开。';
+        let resolveChinese!: (value: string) => void;
+        fixture.translateText.mockImplementationOnce(() => new Promise<string>(resolve => {resolveChinese = resolve;}));
+        fixture.translateText.mockResolvedValueOnce('I use the file explorer extension in markedit to open the file list in tabs.');
+        fixture.translateText.mockResolvedValueOnce('我使用 markedit 的文件浏览器以标签页方式打开文件列表。');
+        fixture.state.snapshot = fixture.selectedSnapshot(text);
+        fixture.state.selectedText = text;
+        fixture.state.openTooltip();
+        await Vue.nextTick();
+
+        const select = fixture.renderPort!.root.querySelector<HTMLSelectElement>('.fr-selection-target-select')!;
+        expect(select).not.toBeNull();
+        expect(select.getAttribute('aria-label')).toBe('selection.targetLanguage');
+        expect(select.getAttribute('value')).toBe('zh-Hans');
+        expect(Array.from(select.querySelectorAll('option')).slice(0, 3).map(option => option.getAttribute('value'))).toEqual(['zh-Hans', 'zh-Hant', 'en']);
+        expect(fixture.renderPort!.root.querySelector('.fr-selection-target-text')?.textContent).toBe('简体中文');
+        const firstOptions = fixture.translateText.mock.calls[0][2];
+        expect(firstOptions.targetLanguage).toBe('zh-Hans');
+
+        const selectValue = (value: string) => {
+            Object.defineProperty(select, 'value', {configurable: true, value});
+            select.dispatchEvent(new fixture.renderPort!.domWindow.Event('change', {bubbles: true}));
+        };
+
+        // 切换到英文：中止旧请求、不改全局默认配置，并用 auto -> en 重译
+        selectValue('en');
+        await Promise.resolve();
+        await Vue.nextTick();
+
+        expect(firstOptions.signal.aborted).toBe(true);
+        expect(fixture.config.to).toBe('zh-Hans');
+        expect(fixture.state.effectiveSourceLanguage).toBe('auto');
+        expect(fixture.state.effectiveTargetLanguage).toBe('en');
+        expect(fixture.translateText).toHaveBeenLastCalledWith(text, '', expect.objectContaining({sourceLanguage: 'auto', targetLanguage: 'en'}));
+        expect(fixture.state.translationResult).toBe('I use the file explorer extension in markedit to open the file list in tabs.');
+        expect(fixture.renderPort!.root.querySelector('.fr-selection-target')?.classList.contains('is-overridden')).toBe(true);
+        expect(fixture.renderPort!.root.querySelector('.fr-selection-target-text')?.textContent).toBe('English');
+
+        // 旧方向的迟到响应不得覆盖新译文
+        resolveChinese('过期的中文结果');
+        await Promise.resolve();
+        await Vue.nextTick();
+        expect(fixture.state.translationResult).toBe('I use the file explorer extension in markedit to open the file list in tabs.');
+
+        // 选择相同目标语言不重复请求
+        const callCount = fixture.translateText.mock.calls.length;
+        fixture.state.chooseSelectionTarget('en');
+        expect(fixture.translateText).toHaveBeenCalledTimes(callCount);
+
+        // 在弹窗控件聚焦期间收到 selectionchange 不得误关卡片
+        const host = fixture.renderPort!.root;
+        Object.assign(fixture.document, {activeElement: host, getElementById: vi.fn(() => host)});
+        fixture.state.lastTrustedSelectionInteractionAt = Date.now();
+        fixture.state.handleSelectionChange({isTrusted: true});
+        vi.advanceTimersByTime(300);
+        expect(fixture.state.showTooltip).toBe(true);
+
+        // 切回中文目标语言后重新翻译，关闭或切换新选区后恢复默认方向
+        selectValue('zh-Hans');
+        await Promise.resolve();
+        await Vue.nextTick();
+        expect(fixture.state.effectiveTargetLanguage).toBe('zh-Hans');
+        expect(fixture.state.translationResult).toBe('我使用 markedit 的文件浏览器以标签页方式打开文件列表。');
+
+        // 进入阅读模式隐藏语言切换，点回翻译标签不因覆盖/手动请求误关卡片
+        fixture.state.selectionTargetOverride = 'en';
+        fixture.state.readingMode = true;
+        await Vue.nextTick();
+        expect(fixture.renderPort!.root.querySelector('.fr-selection-target-select')).toBeNull();
+        fixture.state.openTooltip();
+        await Vue.nextTick();
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.state.readingMode).toBe(false);
+
+        fixture.state.hideAll();
+        expect(fixture.state.selectionTargetOverride).toBeNull();
         expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
     });
 });
@@ -1303,6 +1387,12 @@ describe('SelectionTranslator lifecycle after extension reload', () => {
         release({success: true, data: {...card('read'), origin: 'old source'}});await previous;
         expect(fixture.state.wordCard.origin).toBe('selected source');
         expect(fixture.state.isWordCardSupportLoading).toBe(false);
+        fixture.state.wordCard = {...card('read'), origin: 'Old English rǣdan', inflections: 'reads (plural); reading (present participle)'};
+        await Vue.nextTick();
+        expect(fixture.state.dictionaryToolEntry).toMatchObject({
+            etymology: 'Old English rǣdan',
+            inflections: 'reads (plural); reading (present participle)',
+        });
         fixture.state.showTooltip = false;
         const messageCount = fixture.browser.runtime.sendMessage.mock.calls.length;
         fixture.config.selectionDictionarySource = 'wiktionary-rest';fixture.notifyConfig();

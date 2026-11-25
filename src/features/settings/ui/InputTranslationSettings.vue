@@ -1,8 +1,8 @@
 <!--
  * @file src/features/settings/ui/InputTranslationSettings.vue
- * 文件职责：承载输入框翻译的一组独立设置，说明触发与输出方式，再按需编辑翻译配置与连按速度。
- * 主要内容：按当前配置、服务与模型限定回调归属，关闭过期面板并保护提示词原文；编辑替换/双语输出顺序模式、三击间隔、输入框翻译服务、AI 模型及独立提示词；机器翻译隐藏不适用的模型与提示词。
- * 模块边界：组件只编排设置页状态并写入父级配置副本，触发方式交由父级处理快捷键冲突，服务能力与持久化仍由外层设置链路负责。
+ * 文件职责：承载输入框翻译的一组独立设置，说明触发与输出方式，支持三连击与自定义快捷键录制，再按需编辑翻译配置与连按速度。
+ * 主要内容：按当前配置、服务与模型限定回调归属，关闭过期面板并保护提示词原文；支持自定义快捷键录制、冲突校验与清除；编辑替换/双语输出顺序模式、三击间隔、输入框翻译服务、AI 模型及独立提示词；机器翻译隐藏不适用的模型与提示词。
+ * 模块边界：组件只编排设置页状态并写入父级配置副本，预设触发切换交由父级处理快捷键冲突，快捷键归一化归 core/config/inputTranslation，服务能力与持久化仍由外层设置链路负责。
  -->
 <template>
   <section class="input-translation-settings" data-testid="input-translation-settings">
@@ -36,9 +36,18 @@
             </div>
           </ElPopover>
         </template>
-        <el-select :model-value="props.config.inputBoxTranslationTrigger" data-testid="input-translation-trigger" :aria-label="t('inputTranslation.trigger')" :onChange="actions.trigger">
-          <el-option v-for="item in triggerOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </el-select>
+        <div class="hotkey-config">
+          <el-select :model-value="props.config.inputBoxTranslationTrigger" data-testid="input-translation-trigger" :aria-label="t('inputTranslation.trigger')" :onChange="actions.trigger">
+            <el-option v-for="item in triggerOptions" :key="item.value" :label="item.value === 'custom' ? t('inputTranslation.hotkeyCustom') : item.label" :value="item.value" />
+          </el-select>
+          <div v-if="inputConfig.inputBoxTranslationTrigger === 'custom'" class="input-translation-hotkey-custom" data-testid="input-translation-custom-hotkey">
+            <span v-if="customHotkeyDisplayName" class="input-translation-hotkey-text" data-i18n-ignore>{{ customHotkeyDisplayName }}</span>
+            <span v-else class="input-translation-hotkey-text input-translation-hotkey-placeholder">{{ t('inputTranslation.hotkeyCustomEmpty') }}</span>
+            <el-button size="small" text data-testid="input-translation-hotkey-edit" :aria-label="t('inputTranslation.hotkeyEdit')" :title="t('inputTranslation.hotkeyEdit')" :onClick="actions.editHotkey">
+              <el-icon><Edit /></el-icon>
+            </el-button>
+          </div>
+        </div>
       </SettingsItem>
 
       <SettingsItem :label="t('inputTranslation.target')">
@@ -130,17 +139,30 @@
         </div>
       </div>
     </SettingsGroup>
+    <CustomHotkeyInput
+      v-model="showCustomHotkeyDialog"
+      :current-value="props.config.customInputBoxTranslationHotkey"
+      :validate="findHotkeyConflict"
+      @confirm="handleCustomHotkeyConfirm"
+      @cancel="handleCustomHotkeyCancel"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { ElPopover } from 'element-plus'
-import { ArrowDown, WarningFilled } from '@element-plus/icons-vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { ElMessage, ElPopover } from 'element-plus'
+import { ArrowDown, Edit, WarningFilled } from '@element-plus/icons-vue'
 import { customModelString, getMultilingualTargetLanguageLabel, models, options, resolveConfiguredModel, servicesType } from '@/src/core/config/catalog'
 import { getMissingCredentialMessage } from '@/src/core/config/validation'
 import type { Config } from '@/src/core/config/model'
 import { getCustomOpenAIProviderModels, isCustomOpenAIProviderId } from '@/src/core/config/customOpenAI'
+import { resolveAreaTranslationHotkey } from '@/src/core/config/areaTranslation'
+import { resolveReservedClickSelectionHotkey } from '@/src/core/config/clickSelection'
+import { resolveParagraphCopyHotkey } from '@/src/core/config/paragraphCopy'
+import { findEnabledQuickTranslationHotkeyConflict, quickTranslationActionKey } from '@/src/core/config/quickTranslation'
+import { resolveSectionTranslationHotkey } from '@/src/core/config/sectionTranslation'
+import { canonicalizeHotkey, resolveConfiguredHotkey } from '@/src/core/hotkey'
 import {
   DEFAULT_INPUT_BOX_TRANSLATION_INTERVAL,
   DEFAULT_INPUT_BOX_TRANSLATION_PROMPT,
@@ -148,6 +170,9 @@ import {
   INPUT_BOX_TRANSLATION_INTERVAL_MAX,
   INPUT_BOX_TRANSLATION_INTERVAL_MIN,
   INPUT_BOX_TRANSLATION_INTERVAL_STEP,
+  inputBoxTranslationHotkeyDisplayName,
+  isSupportedCustomInputBoxTranslationHotkey,
+  normalizeCustomInputBoxTranslationHotkey,
   normalizeInputBoxTranslationInterval,
   normalizeInputBoxTranslationOutputMode,
   type InputBoxTranslationOutputMode,
@@ -159,7 +184,10 @@ import SettingsItem from './components/SettingsItem.vue'
 import FieldHelp from './components/FieldHelp.vue'
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue'
 import PromptTemplateEditor from './services/PromptTemplateEditor.vue'
+import { useHotkeyDraft } from './useHotkeyDraft'
 import {useSettingsActionContext} from '../model/useSettingsActionContext'
+
+const CustomHotkeyInput = defineAsyncComponent(() => import('@/src/ui/components/CustomHotkeyInput.vue'))
 
 const MAX_PROMPT_LENGTH = 8192
 
@@ -254,13 +282,91 @@ const userPrompt = computed({
 })
 
 const isMachineService = computed(() => servicesType.isMachine(effectiveTranslationService.value))
-const isInputTranslationEnabled = computed(() => inputConfig.value.inputBoxTranslationTrigger !== 'disabled')
+const customHotkeyDisplayName = computed(() => inputBoxTranslationHotkeyDisplayName(inputConfig.value.customInputBoxTranslationHotkey))
+const isInputTranslationEnabled = computed(() => inputConfig.value.inputBoxTranslationTrigger !== 'disabled'
+  && (inputConfig.value.inputBoxTranslationTrigger !== 'custom' || Boolean(customHotkeyDisplayName.value)))
 const effectiveModel = computed(() => translationModel.value || resolveConfiguredModel(
   inputConfig.value.model[effectiveTranslationService.value],
   inputConfig.value.customModel[effectiveTranslationService.value],
 ))
 const {active, capture, revision} = useSettingsActionContext(() => props.active, () => [props.config, effectiveTranslationService.value, effectiveModel.value])
+const {showCustomHotkeyDialog, isCurrentDraft, openCustomHotkeyDialog, closeCustomHotkeyDialog, commitHotkeyDraft} = useHotkeyDraft(
+  () => props.config,
+  {mode: 'inputBoxTranslationTrigger', custom: 'customInputBoxTranslationHotkey'},
+  () => active.value,
+)
 watch(revision, () => {promptsExpanded.value = false; timingOpen.value = false}, {flush: 'sync'})
+
+/** 列出已被其他功能占用的快捷键，避免在输入框中按键同时触发多个动作。 */
+function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
+  return [
+    {hotkey: resolveReservedClickSelectionHotkey(props.config), feature: translateLegacy('两点选取')},
+    {hotkey: resolveConfiguredHotkey(props.config.hotkey, props.config.customHotkey), feature: t('popup.hoverTranslation')},
+    {hotkey: resolveConfiguredHotkey(props.config.floatingBallHotkey, props.config.customFloatingBallHotkey), feature: t('quickTranslation.commonFullPageShortcut')},
+    {
+      hotkey: props.config.selectionTranslatorMode === 'disabled' || props.config.disableSelectionTranslator === true
+        ? ''
+        : resolveConfiguredHotkey(props.config.selectionTranslatorTrigger, props.config.customSelectionTranslatorHotkey),
+      feature: t('popup.selectionTranslation'),
+    },
+    {
+      hotkey: props.config.selectionAreaEnabled
+        ? resolveAreaTranslationHotkey(props.config.selectionAreaHotkey, props.config.customSelectionAreaHotkey)
+        : '',
+      feature: t('popup.areaTranslation'),
+    },
+    {
+      hotkey: props.config.paragraphCopyEnabled
+        ? resolveParagraphCopyHotkey(props.config.paragraphCopyHotkey, props.config.customParagraphCopyHotkey)
+        : '',
+      feature: t('paragraphCopy.settings.title'),
+    },
+    {
+      hotkey: props.config.sectionTranslationHotkeyEnabled
+        ? resolveSectionTranslationHotkey(props.config.sectionTranslationHotkey, props.config.customSectionTranslationHotkey)
+        : '',
+      feature: t('sectionTranslation.settings.title'),
+    },
+    {
+      hotkey: props.config.informationHighlight?.hotkeyEnabled === true
+        ? props.config.informationHighlight.hotkey ?? ''
+        : '',
+      feature: translateLegacy('智能高亮'),
+    },
+  ]
+}
+
+/** 供自定义录制对话框与触发切换实时校验；返回空字符串表示可以使用。 */
+function findHotkeyConflict(hotkey: string): string {
+  if (hotkey === 'none') return ''
+  if (!isSupportedCustomInputBoxTranslationHotkey(hotkey)) return t('inputTranslation.hotkeyRequireModifier')
+  const resolved = normalizeCustomInputBoxTranslationHotkey(hotkey)
+  const identity = resolved.toLocaleLowerCase()
+  const owner = reservedHotkeyOwners().find(item => canonicalizeHotkey(item.hotkey).toLocaleLowerCase() === identity)
+  if (owner) return t('inputTranslation.hotkeyConflict', {feature: owner.feature})
+  const profile = findEnabledQuickTranslationHotkeyConflict(props.config.quickTranslationProfiles ?? [], resolved)
+  if (!profile) return ''
+  return t('quickTranslation.conflictProfile', {
+    group: t(`quickTranslation.heading.${quickTranslationActionKey(profile.action)}`),
+  })
+}
+
+function handleCustomHotkeyConfirm(hotkey: string): void {
+  if (!isCurrentDraft()) { closeCustomHotkeyDialog(); return }
+  if (hotkey === 'none') {
+    if (!commitHotkeyDraft('disabled', '')) return
+    ElMessage({message: t('inputTranslation.hotkeyCleared'), type: 'success', duration: 2000})
+    return
+  }
+  const canonical = normalizeCustomInputBoxTranslationHotkey(hotkey)
+  if (!canonical || findHotkeyConflict(canonical)) return
+  if (!commitHotkeyDraft('custom', canonical)) return
+  ElMessage({message: t('inputTranslation.hotkeySet', {shortcut: customHotkeyDisplayName.value}), type: 'success', duration: 2000})
+}
+
+function handleCustomHotkeyCancel(): void {
+  closeCustomHotkeyDialog()
+}
 const isAiService = computed(() => !isMachineService.value && (
   isCustomOpenAIProviderId(effectiveTranslationService.value) || servicesType.isAI(effectiveTranslationService.value)
 ))
@@ -328,7 +434,18 @@ const actions = computed(() => {
     model: (value: string | undefined) => {if (current()) translationModel.value = value},
     interval: (value: number | undefined) => {if (current()) setIntervalValue(value)},
     resetInterval: () => {if (current()) resetInterval()},
-    trigger: (value: string) => {if (current() && triggerOptions.value.some(item => item.value === value)) emit('trigger-change', value)},
+    editHotkey: () => {if (current()) openCustomHotkeyDialog()},
+    trigger: (value: string) => {
+      if (!current() || !triggerOptions.value.some(item => item.value === value)) return
+      if (value === 'custom') {
+        const saved = normalizeCustomInputBoxTranslationHotkey(props.config.customInputBoxTranslationHotkey)
+        if (!saved) { openCustomHotkeyDialog(); return }
+        const conflict = findHotkeyConflict(saved)
+        if (conflict) { ElMessage.warning(conflict); return }
+      }
+      closeCustomHotkeyDialog()
+      emit('trigger-change', value)
+    },
     timing: (value: boolean) => {if (current()) timingOpen.value = value},
     togglePrompts: () => {if (current() && showPrompt.value) promptsExpanded.value = !promptsExpanded.value},
     systemPrompt: (value: string) => {if (promptCurrent()) systemPrompt.value = value},
@@ -342,19 +459,25 @@ const actions = computed(() => {
 
 const workflowDescription = computed(() => {
   if (!isInputTranslationEnabled.value) return t('inputTranslation.workflowDisabled')
-  const trigger = triggerOptions.value.find(item => item.value === inputConfig.value.inputBoxTranslationTrigger)?.label || inputConfig.value.inputBoxTranslationTrigger
+  const trigger = inputConfig.value.inputBoxTranslationTrigger === 'custom'
+    ? customHotkeyDisplayName.value
+    : translateLegacy(triggerOptions.value.find(item => item.value === inputConfig.value.inputBoxTranslationTrigger)?.label || inputConfig.value.inputBoxTranslationTrigger)
   let target = targetOptions.value.find(item => item.value === targetLanguage.value)?.label || targetLanguage.value
   try {
     target = new Intl.DisplayNames([language.value], {type: 'language'}).of(targetLanguage.value) || target
   } catch { /* 无法识别的语言标识继续显示目录名称。 */ }
   const workflowKey = outputMode.value === 'replace' ? 'inputTranslation.workflowEnabled'
     : outputMode.value === 'prepend' ? 'inputTranslation.workflowPrepend' : 'inputTranslation.workflowAppend'
-  return t(workflowKey, {trigger: translateLegacy(trigger), language: target})
+  return t(workflowKey, {trigger, language: target})
 })
 </script>
 
 <style scoped>
 .input-translation-settings { min-width: 0; }
+.hotkey-config { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.input-translation-hotkey-custom { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border: 1px dashed var(--line, #e7e9f0); border-radius: 8px; }
+.input-translation-hotkey-text { font-size: 12px; color: var(--ink, #172033); overflow-wrap: anywhere; }
+.input-translation-hotkey-placeholder { color: var(--muted, #737c8f); }
 .input-translation-text-button { display: inline-flex; align-items: center; min-height: 22px; padding: 0; border: 0; color: var(--brand-strong); background: transparent; cursor: pointer; font: inherit; font-size: 11px; line-height: 1.5; text-align: left; }
 .input-translation-text-button:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
 .input-translation-text-button:disabled { color: var(--muted); cursor: default; }

@@ -1,10 +1,12 @@
 /**
  * @file src/features/selection-translation/core.ts
- * 文件职责：集中划词翻译的纯交互与内容算法，包括请求代次、词典回退、触发展示状态、选区过滤、上下文摘要、弹窗锚点和语音语言规范化。
- * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、按实际 Range 边界遍历的敏感区域排除、无文本装饰图标放行及单遍祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
+ * 文件职责：集中划词翻译的纯交互与内容算法，包括请求代次、词典回退、触发展示状态、选区过滤、上下文摘要、弹窗锚点、临时译文语言选项与方向解析及语音语言规范化。
+ * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、单次卡片目标语言选项与方向解析、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、按实际 Range 边界遍历的敏感区域排除、无文本装饰图标放行及单遍祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
  * 模块边界：本模块不监听 document selection、不发消息、不渲染 Vue 或播放音频；组件负责连接 DOM，词典和 TTS 由 services/background 提供，函数保持确定性以供单元测试。DOM 安全判断直接复用 translation/dom 的同一实现，不初始化翻译候选或站点规则 registry。
  */
 import {getElementTagName, isDocumentSurfaceNoTranslateShell, isTopLevelApplicationShell} from '@/src/core/translation/dom';
+import {unwrapSoftLineBreaks, unwrapWrappedParagraphs} from '@/src/core/translation/wrappedParagraphs';
+import {translationLanguageOptions} from '@/src/core/language/catalog';
 import {getChineseScript, normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import {isLanguageCodeMatch, normalizeDetectedLanguageCode} from '@/src/core/language/codes';
 import {isTextInLanguage, shouldSkipChineseSelection} from '@/src/core/language/detect';
@@ -52,6 +54,68 @@ export function selectionReverseTarget(text: string, targetLanguage: string, sou
         return getChineseScript(sourceLanguage) ? normalizeChineseLanguageCode(sourceLanguage) : 'zh-Hans';
     }
     return null;
+}
+
+export interface SelectionTargetLanguageOption {
+    value: string;
+    label: string;
+    shortLabel: string;
+}
+
+export interface SelectionDirectionInput {
+    text: string;
+    configuredFrom: string;
+    configuredTo: string;
+    bidirectional: boolean;
+    manuallyRequested: boolean;
+    targetOverride: string | null;
+}
+
+export interface SelectionDirection {
+    sourceLanguage: string;
+    targetLanguage: string;
+}
+
+/** 顶栏紧凑标签只展示首选原生名称，完整名称保留在原生下拉列表中。 */
+export function selectionTargetShortLabel(value: string, label?: string): string {
+    const raw = (label ?? translationLanguageOptions.find(item => item.value === value)?.label ?? value).trim();
+    return raw.split(' / ')[0]?.trim() || value;
+}
+
+/** 生成本次划词弹窗的目标语言列表，把默认目标和当前生效目标置顶并去重。 */
+export function buildSelectionTargetOptions(currentTarget: string, configuredTarget?: string): SelectionTargetLanguageOption[] {
+    const options: SelectionTargetLanguageOption[] = [];
+    const seen = new Set<string>();
+    const append = (value: string, label?: string) => {
+        const normalized = value.trim();
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        const catalogEntry = translationLanguageOptions.find(item => item.value === normalized);
+        const fullLabel = (label ?? catalogEntry?.label ?? normalized).trim();
+        options.push({value: normalized, label: fullLabel, shortLabel: selectionTargetShortLabel(normalized, fullLabel)});
+    };
+    if (configuredTarget) append(configuredTarget);
+    if (currentTarget) append(currentTarget);
+    for (const item of translationLanguageOptions) append(item.value, item.label);
+    return options;
+}
+
+/** 统一解析划词卡片的源/目标语言：临时覆盖优先且不形成同语种自译，否则沿用配置与显式反向规则。 */
+export function resolveSelectionDirection(input: SelectionDirectionInput): SelectionDirection {
+    const override = input.targetOverride?.trim() || null;
+    if (override) {
+        const matchesConfiguredTarget = isLanguageCodeMatch(override, input.configuredTo);
+        const sourceLanguage = matchesConfiguredTarget && !isLanguageCodeMatch(input.configuredFrom, override)
+            ? input.configuredFrom
+            : 'auto';
+        return {sourceLanguage, targetLanguage: override};
+    }
+    const reverseTarget = input.bidirectional || input.manuallyRequested
+        ? selectionReverseTarget(input.text, input.configuredTo, input.configuredFrom)
+        : null;
+    return reverseTarget
+        ? {sourceLanguage: input.configuredTo, targetLanguage: reverseTarget}
+        : {sourceLanguage: input.configuredFrom, targetLanguage: input.configuredTo};
 }
 
 export interface SelectionAnswerCandidate extends SelectionContentRequest {
@@ -148,10 +212,9 @@ export function isSameLanguage(detectedLanguage: string | undefined, targetLangu
 const DEFAULT_PADDING = 12;
 const DEFAULT_GAP = 10;
 
-/** 规范化浏览器选区文本，同时保留对阅读有意义的换行。 */
+/** 规范化浏览器选区文本，自动合并折行段落，同时保留对阅读有意义的换行。 */
 export function normalizeSelectionText(value: string): string {
-    return value
-        .replace(/\u00a0/g, ' ')
+    return unwrapWrappedParagraphs(value.replace(/\u00a0/g, ' ').replace(/\r\n?|\n/gu, '\n'))
         .replace(/[ \t]+/g, ' ')
         .replace(/\n[ \t]+/g, '\n')
         .trim();
@@ -230,7 +293,7 @@ export function readSelectionParts(range: Range, browserText: string): Selection
         else parts.push({kind: 'text', text});
     };
     const visit = (node: Node) => {
-        if (node.nodeType === 3) { appendText(node.textContent!); return; }
+        if (node.nodeType === 3) { appendText(unwrapSoftLineBreaks(node.textContent!)); return; }
         const tag = getElementTagName(node as Element);
         if (tag === 'code') { parts.push({kind: 'code', text: node.textContent!}); return; }
         const lineBreak = /^(br|p|div|li|h[1-6]|blockquote)$/.test(tag);
@@ -241,7 +304,9 @@ export function readSelectionParts(range: Range, browserText: string): Selection
     fragment.childNodes.forEach(visit);
     parts.forEach((part, index) => {
         if (part.kind !== 'text') return;
-        part.text = part.text.replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n[ \t]+/g, '\n');
+        part.text = unwrapWrappedParagraphs(
+            part.text.replace(/\u00a0/g, ' ').replace(/\r\n?|\n/gu, '\n').replace(/\n[ \t]+/g, '\n'),
+        ).replace(/[ \t]+/g, ' ').replace(/\n[ \t]+/g, '\n');
         if (index === 0) part.text = part.text.trimStart();
         if (index === parts.length - 1) part.text = part.text.trimEnd();
     });

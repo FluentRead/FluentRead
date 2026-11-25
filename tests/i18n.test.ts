@@ -528,7 +528,6 @@ describe('界面 i18n 契约', () => {
       {key: 'quickTranslation.defaultModel'},
       {key: 'quickTranslation.followServiceDefault'},
       {key: 'quickTranslation.followServiceDefaultModel', params: {model: 'Model'}},
-      {key: 'quickTranslation.serviceRestriction'},
       {key: 'quickTranslation.useDefaults'},
       {key: 'quickTranslation.profileUnavailable', params: {detail: 'English · Bilingual'}},
       {key: 'quickTranslation.profilePaused', params: {detail: 'English · Bilingual'}},
@@ -548,8 +547,6 @@ describe('界面 i18n 契约', () => {
       {key: 'quickTranslation.recordFirst'},
       {key: 'quickTranslation.setFirst'},
       {key: 'quickTranslation.selectionPrecedence'},
-      {key: 'quickTranslation.googleNotice'},
-      {key: 'quickTranslation.googleOnly'},
       {key: 'quickTranslation.conflictProfile', params: {group: 'Extra hover shortcuts'}},
       {key: 'quickTranslation.conflictProfilePopup', params: {group: 'Extra hover shortcuts'}},
       {key: 'quickTranslation.shortcutDisabled'},
@@ -587,9 +584,6 @@ describe('界面 i18n 契约', () => {
     expect(translate('quickTranslation.heading.hover', 'en-US')).toBe('More hover shortcuts');
     expect(translate('popup.quickTranslation.profileCount', 'ja-JP', {count: 3})).toContain('3');
 
-    for (const language of languages) {
-      expect(translate('quickTranslation.serviceRestriction', language)).not.toContain(' · ');
-    }
     const chineseProfileName = translate('quickTranslation.profileName', 'zh-CN', {
       action: translate('quickTranslation.action.hover', 'zh-CN'), index: 1, hotkey: 'Ctrl+T',
     });

@@ -117,6 +117,10 @@ describe('快捷翻译调用解析', () => {
         expect(inputBoxTranslationTriggerHotkey('triple_space')).toBe('Space');
         expect(inputBoxTranslationTriggerHotkey('triple_equal')).toBe('=');
         expect(inputBoxTranslationTriggerHotkey('triple_dash')).toBe('-');
+        expect(inputBoxTranslationTriggerHotkey('custom', 'Option+Enter')).toBe('Alt+Enter');
+        expect(inputBoxTranslationTriggerHotkey('custom', 'F9')).toBe('F9');
+        expect(inputBoxTranslationTriggerHotkey('custom', 'Space')).toBe('');
+        expect(inputBoxTranslationTriggerHotkey('custom')).toBe('');
         expect(inputBoxTranslationTriggerHotkey('disabled')).toBe('');
         expect(inputBoxTranslationTriggerHotkey(null)).toBe('');
     });
@@ -261,12 +265,16 @@ describe('快捷翻译调用解析', () => {
         expect(resolveQuickTranslationInvocation(profile(), config).scope).toBe('content');
     });
 
-    it.each(['inherit', 'translation-only', 'bilingual'] as const)('Google 的 %s 方案只在当次执行时限制为双语，不覆盖保存偏好', displayMode => {
+    it.each([
+        ['inherit', undefined],
+        ['translation-only', 'single'],
+        ['bilingual', 'bilingual'],
+    ] as const)('Google 的 %s 方案按所选显示方式解析，不强制覆盖为双语', (displayMode, expectedMode) => {
         const selected = profile({
             service: services.google,
             displayMode,
         });
-        expect(resolveQuickTranslationInvocation(selected, {
+        const invocation = resolveQuickTranslationInvocation(selected, {
             service: services.openai,
             model: {},
             customModel: {},
@@ -274,10 +282,10 @@ describe('快捷翻译调用解析', () => {
             display: 0,
             fullPageTranslationMode: 'viewport',
             translationScope: 'content',
-        })).toMatchObject({
-            service: services.google,
-            displayMode: 'bilingual',
         });
+        expect(invocation.service).toBe(services.google);
+        if (expectedMode) expect(invocation.displayMode).toBe(expectedMode);
+        else expect(invocation).not.toHaveProperty('displayMode');
         expect(selected.displayMode).toBe(displayMode);
     });
 });

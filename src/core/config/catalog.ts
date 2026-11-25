@@ -710,6 +710,7 @@ export const options = {
         {value: "triple_space", label: "连按三下空格"},
         {value: "triple_equal", label: "连按三下等号(=)"},
         {value: "triple_dash", label: "连按三下短横线(-)"},
+        {value: "custom", label: "自定义快捷键"},
     ],
 };
 

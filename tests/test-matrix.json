@@ -51,6 +51,7 @@
     ],
     "unit": [
       "tests/userscriptBuildCache.test.ts",
+      "tests/wrappedParagraphs.test.ts",
       "tests/downloadTextFile.test.ts",
       "tests/safariTabBroadcast.test.ts",
       "tests/safariTabBroadcastIntegration.test.ts",

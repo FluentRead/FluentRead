@@ -22,10 +22,17 @@ const updates = vi.fn(), focus = vi.fn(), selectionRange = vi.fn()
 const promptPath = 'src/features/settings/ui/services/PromptTemplateEditor.vue', inputPath = 'src/features/settings/ui/InputTranslationSettings.vue'
 const harnessPath = 'src/features/settings/ui/HarnessSettings.vue'
 const writingPath = 'src/features/settings/ui/WritingSettings.vue'
+const message = vi.hoisted(() => Object.assign(vi.fn(), {warning: vi.fn()}))
 vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({language: runtime.ref('zh-CN'), t: (key: string) => key, translateLegacy: (text: string) => text})}))
 vi.mock('@/src/features/reading-assistant/public', () => ({ReadingAnswer: {render: () => runtime.h('div')}}))
-vi.mock('element-plus', () => ({ElPopover: {setup(_: unknown, {attrs, slots}: any) {const instance = runtime.getCurrentInstance()!;return () => runtime.h('div', {...attrs, 'data-timing-port-key': instance.vnode.key}, [slots.reference?.(), slots.default?.()])}}}))
-vi.mock('@element-plus/icons-vue', () => ({ArrowDown: {}, WarningFilled: {}}))
+vi.mock('element-plus', () => ({
+  ElMessage: message,
+  ElPopover: {setup(_: unknown, {attrs, slots}: any) {const instance = runtime.getCurrentInstance()!;return () => runtime.h('div', {...attrs, 'data-timing-port-key': instance.vnode.key}, [slots.reference?.(), slots.default?.()])}},
+}))
+vi.mock('@element-plus/icons-vue', () => ({ArrowDown: {}, Edit: {}, WarningFilled: {}}))
+vi.mock('@/src/ui/components/CustomHotkeyInput.vue', () => ({__esModule: true, default: {setup(_: unknown, {attrs}: any) {
+  return () => runtime.h('div', {...attrs, 'data-testid': 'input-custom-hotkey-dialog'})
+}}}))
 vi.mock('@/src/features/settings/ui/components/SettingsGroup.vue', () => ({default: {setup(_: unknown, {slots}: any) {return () => runtime.h('div', null, [slots.copy?.(), slots.default?.()])}}}))
 vi.mock('@/src/features/settings/ui/components/SettingsItem.vue', () => ({default: {setup(_: unknown, {slots}: any) {return () => runtime.h('div', null, [slots.copy?.(), slots.description?.(), slots.default?.()])}}}))
 vi.mock('@/src/features/settings/ui/components/FieldHelp.vue', () => ({default: {setup(_: unknown, {slots}: any) {return () => runtime.h('div', null, [slots.copy?.(), slots.default?.()])}}}))
@@ -70,6 +77,7 @@ async function mount(path: typeof promptPath | typeof inputPath | typeof harness
   const control = {setup(_props: unknown, {attrs, slots}: any) {return () => runtime.h('div', null, [runtime.h('input', attrs), slots.default?.()])}}
   app.component('el-input-number', control);app.component('el-select', control);app.component('el-option', {render: () => null})
   app.component('el-input', control);app.component('el-switch', control)
+  app.component('el-button', {setup(_props: unknown, {attrs, slots}: any) {return () => runtime.h('button', attrs, slots.default?.())}})
   app.component('el-icon', {render: () => null})
   app.provide(runtime.ssrContextKey, {modules: new Set<string>()});app.config.warnHandler = () => {};app.mount(document.getElementById('app')!);await settle()
 }
@@ -340,5 +348,53 @@ describe('输入框设置实际组件与缓存事件归属', () => {
     config.inputBoxTranslationTrigger = 'ctrl_enter';await settle();expect(state.triggerOptions.some((item: {value: string}) => item.value === 'ctrl_enter')).toBe(true)
     eventOf(control('input-translation-trigger'), 'onChange')('ctrl_enter');expect(updates).toHaveBeenCalledWith('ctrl_enter');state.setIntervalValue(700);expect(config.inputBoxTranslationInterval).toBe(1000)
     config.inputBoxTranslationTrigger = 'triple_space';await settle();state.setIntervalValue(700);expect(config.inputBoxTranslationInterval).toBe(700);state.resetInterval();expect(config.inputBoxTranslationInterval).toBe(1000)
+  })
+  it('输入框自定义快捷键支持录制、冲突校验、编辑、清除与切回保护', async () => {
+    const config = profile();config.floatingBallHotkey = 'Alt+T';config.selectionAreaEnabled = true;config.selectionAreaHotkey = 'Shift+Z'
+    config.paragraphCopyEnabled = true;config.paragraphCopyHotkey = 'Alt+C';config.sectionTranslationHotkeyEnabled = true;config.sectionTranslationHotkey = 'Alt+R'
+    config.informationHighlight.hotkeyEnabled = true;config.informationHighlight.hotkey = 'Alt+H'
+    config.quickTranslationProfiles = [{id: 'q1', enabled: true, action: 'hover', hotkey: 'F8', service: '', model: '', targetLanguage: '', displayMode: 'inherit', fullPageMode: 'inherit'}]
+    await mountInput(config)
+
+    // 尚未保存自定义键时选择 custom 打开录制弹窗，不提前改写触发方式
+    eventOf(control('input-translation-trigger'), 'onChange')('custom');await settle()
+    expect(updates).not.toHaveBeenCalled();expect(config.inputBoxTranslationTrigger).toBe('triple_space')
+    expect(state.showCustomHotkeyDialog).toBe(true)
+
+    // 校验裸键和与其他功能的冲突
+    expect(state.findHotkeyConflict('Space')).toBe('inputTranslation.hotkeyRequireModifier')
+    expect(state.findHotkeyConflict('Alt+T')).toBe('inputTranslation.hotkeyConflict')
+    expect(state.findHotkeyConflict('Shift+Z')).toBe('inputTranslation.hotkeyConflict')
+    expect(state.findHotkeyConflict('Alt+C')).toBe('inputTranslation.hotkeyConflict')
+    expect(state.findHotkeyConflict('Alt+R')).toBe('inputTranslation.hotkeyConflict')
+    expect(state.findHotkeyConflict('Alt+H')).toBe('inputTranslation.hotkeyConflict')
+    expect(state.findHotkeyConflict('F8')).toBe('quickTranslation.conflictProfile')
+    expect(state.findHotkeyConflict('none')).toBe('')
+    expect(state.findHotkeyConflict('Alt+Enter')).toBe('')
+
+    // 冲突值不提交，合法值提交并展示自定义键编辑行
+    state.handleCustomHotkeyConfirm('Alt+T');expect(config.customInputBoxTranslationHotkey).toBe('')
+    state.handleCustomHotkeyConfirm('Alt+Enter');await settle()
+    expect(config.inputBoxTranslationTrigger).toBe('custom');expect(config.customInputBoxTranslationHotkey).toBe('Alt+Enter')
+    expect(state.showCustomHotkeyDialog).toBe(false)
+    expect(control('input-translation-custom-hotkey').textContent).toMatch(/(Alt|Option)\+Enter/u)
+
+    // 点击编辑按钮可重新录制、取消保留原值、清除会关闭输入框翻译
+    control('input-translation-hotkey-edit').dispatchEvent(new win.Event('click'));await settle()
+    expect(state.showCustomHotkeyDialog).toBe(true)
+    state.handleCustomHotkeyCancel();await settle()
+    expect(state.showCustomHotkeyDialog).toBe(false);expect(config.customInputBoxTranslationHotkey).toBe('Alt+Enter')
+
+    control('input-translation-hotkey-edit').dispatchEvent(new win.Event('click'));await settle()
+    state.handleCustomHotkeyConfirm('none');await settle()
+    expect(config.inputBoxTranslationTrigger).toBe('disabled');expect(config.customInputBoxTranslationHotkey).toBe('')
+
+    // 切回已有自定义键时若已被其他功能占用则拦截警告，不冲突时发出 trigger-change
+    config.customInputBoxTranslationHotkey = 'Alt+T';await settle()
+    eventOf(control('input-translation-trigger'), 'onChange')('custom')
+    expect(updates).not.toHaveBeenCalled();expect(message.warning).toHaveBeenCalled()
+    config.customInputBoxTranslationHotkey = 'F9';await settle()
+    eventOf(control('input-translation-trigger'), 'onChange')('custom')
+    expect(updates).toHaveBeenCalledWith('custom')
   })
 })

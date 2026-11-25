@@ -28,7 +28,7 @@
             <label><input type="checkbox" :checked="row.alwaysTranslate" :disabled="saving" :aria-label="`${tr('始终翻译')} ${row.domain}`" @change="change(row, 'alwaysTranslate', $event)" />{{ tr('始终翻译') }}</label>
             <label :title="tr('禁用扩展优先于自动翻译；关闭插件后所有偏好仍保留')"><input type="checkbox" :checked="row.extensionDisabled" :disabled="saving" :aria-label="`${tr('禁用扩展')} ${row.domain}`" @change="change(row, 'extensionDisabled', $event)" />{{ tr('禁用扩展') }}</label>
             <label :title="tr('只隐藏悬浮球时，其他功能仍可用')"><input type="checkbox" :checked="row.floatingBallHidden" :disabled="saving" :aria-label="`${tr('隐藏悬浮球')} ${row.domain}`" @change="change(row, 'floatingBallHidden', $event)" />{{ tr('隐藏悬浮球') }}</label>
-            <label :title="tr('仅此网站使用仅译文，其他网站沿用全局显示模式；谷歌翻译仅支持双语')"><input type="checkbox" :checked="row.translationOnly" :disabled="saving" :aria-label="`${tr('仅显示译文')} ${row.domain}`" @change="change(row, 'translationOnly', $event)" />{{ tr('仅显示译文') }}</label>
+            <label :title="tr('仅此网站使用仅译文，其他网站沿用全局显示模式')"><input type="checkbox" :checked="row.translationOnly" :disabled="saving" :aria-label="`${tr('仅显示译文')} ${row.domain}`" @change="change(row, 'translationOnly', $event)" />{{ tr('仅显示译文') }}</label>
             <button type="button" :disabled="saving" :aria-label="`${tr('移除网站偏好')} ${row.domain}`" @click="remove(row)">{{ tr('移除') }}</button>
           </div>
         </article>

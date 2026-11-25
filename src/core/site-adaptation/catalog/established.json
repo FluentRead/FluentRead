@@ -405,7 +405,10 @@
     "priority": 410,
     "mode": "augment",
     "omit": [
-      "main article [data-testid=\"tweet-text-show-more-link\"]"
+      "article [data-testid=\"tweet-text-show-more-link\"]",
+      "article div[dir=\"auto\"] button",
+      "article div[dir=\"auto\"] [role=\"button\"]",
+      "article div[dir=\"auto\"] + button.text-brand"
     ]
   },
   {

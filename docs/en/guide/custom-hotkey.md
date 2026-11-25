@@ -61,7 +61,7 @@ Selection translation supports an icon, dot, direct popup, hover-over-icon, shor
 <details class="guide-details">
 <summary>Providers and models in extra profiles</summary>
 
-Choosing a model while following the default provider also pins the current provider. Clearing the model restores that provider's default model; select **Follow default** to follow the webpage provider again. Changing providers clears the old model. Google Translate uses bilingual display; switching back restores the saved display preference.
+Choosing a model while following the default provider also pins the current provider. Clearing the model restores that provider's default model; select **Follow default** to follow the webpage provider again. Changing providers clears the old model.
 
 </details>
 

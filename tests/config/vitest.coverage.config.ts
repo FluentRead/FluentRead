@@ -1098,6 +1098,7 @@ export default defineConfig({
                 'src/ui/view-model/aiContext.ts',
                 'src/ui/translationLoadingIndicator.ts',
                 'src/ui/popupQuickFeatureIcons.ts',
+                'src/core/translation/wrappedParagraphs.ts',
             ],
             exclude: ['**/*.d.ts'],
             thresholds: {

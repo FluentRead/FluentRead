@@ -68,6 +68,40 @@ describe('hard-wrapped plain-text paragraphs', () => {
         expect(sources(`${first}\n${second}`)).toEqual([`${first} ${second}`]);
     });
 
+    it('keeps multi-sentence hard-wrapped commit message paragraphs together while preserving blank-line splits', () => {
+        const commit = [
+            'The opaque rect that we report to the compositor is derived from the',
+            'opaque rectangle of the render node, shrunk to whole surface pixels.',
+            'The surface contents are rendered into a buffer that is scaled by the',
+            'ratio between the buffer and the surface, so that ratio is often',
+            'fractional, and the edges of the rect then land within buffer pixels:',
+            'the outermost buffer pixel is only partially covered even though the',
+            'rect claims that it is opaque. A compositor that disables blending for',
+            'the opaque region then shows that partial coverage as a line along the',
+            'window edges.',
+            '',
+            'Keep the edges that cannot be proven opaque out of the region in',
+            '`gdk_surface_set_opaque_rect()`, using the exact buffer to surface',
+            'ratio. Only the misaligned edges are affected, so a window that fills',
+            'its buffer exactly - such as a maximized window - keeps reporting its',
+            'full opaque area, and compositors can still cull windows that it covers.',
+        ].join('\n');
+        const result = sources(commit);
+        expect(result).toHaveLength(2);
+        expect(result[0]).toContain('whole surface pixels. The surface contents');
+        expect(result[0]).toContain('buffer pixels: the outermost buffer pixel');
+        expect(result[1]).toContain('`gdk_surface_set_opaque_rect()`, using the exact buffer to surface ratio.');
+
+        // 中文按固定宽度折行的多句段落也合并为一段。
+        const cjkCommit = [
+            '合成器使用的不透明区域来源于渲染节点的矩形范围，并按整像素',
+            '边界向内收缩。当表面内容绘制到缩放后的缓冲区时，边缘可能落',
+            '在缓冲区像素内部。因此只排除无法证明完全不透明的边缘区域，',
+            '从而保留窗口的完整裁剪能力。',
+        ].join('\n');
+        expect(sources(cjkCommit)).toEqual([cjkCommit.replaceAll('\n', '')]);
+    });
+
     it('does not merge lines that end a sentence, numbered items or anything in Markdown', () => {
         expect(sources('This line is long enough and ends its sentence here.\nThis one starts another sentence of similar length')).toHaveLength(2);
         expect(sources('The first numbered step is long enough to look wrapped\n2) the second step follows on the next line here')).toHaveLength(2);

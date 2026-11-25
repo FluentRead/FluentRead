@@ -213,7 +213,9 @@ export interface TranslationLanguages {
 
 export interface TranslationCachePort {
     get: (key: string) => Promise<string | null>;
+    getMany?: (keys: readonly string[]) => Promise<Array<string | null>>;
     set: (key: string, value: string) => Promise<boolean>;
+    setMany?: (entries: readonly {key: string; value: string}[]) => Promise<number>;
     clear: () => Promise<void>;
     cleanup: () => Promise<void>;
 }

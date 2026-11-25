@@ -109,22 +109,22 @@ defineExpose({
   --el-fill-color-blank: var(--surface, #fff);
 }
 .fluentread-select .el-select__wrapper {
-  min-height: 38px;
+  min-height: var(--fr-control-min-height, 38px);
   padding: 6px 12px;
-  border: 1px solid var(--line, #e5e8ef);
-  border-radius: 12px;
-  background: var(--surface-soft, #f7f8fb);
+  border: 1px solid var(--line, #e3e6ed);
+  border-radius: var(--fr-control-radius, 8px);
+  background: var(--surface-soft, #f6f7f9);
   box-shadow: none;
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  transition: border-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), box-shadow var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease);
 }
 .fluentread-select .el-select__wrapper:not(.is-disabled):hover {
-  border-color: color-mix(in srgb, var(--muted, #737c8f) 48%, var(--line, #e5e8ef));
+  border-color: var(--fr-color-line-strong, var(--line));
   background: var(--surface, #fff);
 }
 .fluentread-select .el-select__wrapper.is-focused:not(.is-disabled) {
-  border-color: color-mix(in srgb, var(--brand, #ef4776) 65%, var(--line, #e5e8ef));
+  border-color: var(--brand-strong, #cc2655);
   background: var(--surface, #fff);
-  box-shadow: 0 0 0 2px var(--brand-soft, #fff0f4);
+  box-shadow: var(--fr-focus-ring);
 }
 .fluentread-select .el-select__wrapper.is-disabled { opacity: .6; cursor: not-allowed; }
 .fluentread-select .el-select__selected-item,

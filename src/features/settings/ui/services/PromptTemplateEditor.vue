@@ -356,16 +356,16 @@ const actions = computed(() => {
 }
 
 .prompt-template-textarea:hover {
-  border-color: #ef9ab1;
+  border-color: var(--fr-color-line-strong, var(--line));
 }
 
 .prompt-template-textarea:focus {
   border-color: var(--brand);
   background: var(--surface);
-  box-shadow: 0 0 0 4px rgba(239, 71, 118, .1);
+  box-shadow: var(--fr-focus-ring, 0 0 0 3px rgba(239, 71, 118, .12));
 }
 
-.prompt-template-textarea::placeholder { color: #8992a5; }
+.prompt-template-textarea::placeholder { color: var(--muted); opacity: .82; }
 
 .prompt-template-footer {
   display: flex;
@@ -388,38 +388,41 @@ const actions = computed(() => {
   gap: 5px;
   min-height: 29px;
   padding: 4px 8px;
-  border: 1px solid #e4d3da;
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--fr-control-radius, 8px);
   color: var(--ink);
   background: var(--surface);
   cursor: pointer;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+  transition: border-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), transform var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease);
 }
 
 .prompt-token:disabled { opacity: .55; cursor: default; }
 
 .prompt-token:hover:not(:disabled) {
-  border-color: #ef9ab1;
+  border-color: color-mix(in srgb, var(--brand) 38%, var(--line));
   color: var(--brand-strong);
   background: var(--brand-soft);
-  transform: translateY(-1px);
+}
+
+.prompt-token:active:not(:disabled) {
+  transform: scale(.97);
 }
 
 .prompt-token:focus-visible {
-  outline: 3px solid rgba(239, 71, 118, .18);
+  outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand-strong));
   outline-offset: 2px;
 }
 
 .prompt-token code {
   color: var(--brand-strong);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  font-weight: 750;
+  font-size: var(--fr-text-xs, 11px);
+  font-weight: 700;
 }
 
 .prompt-token span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--fr-text-xs, 11px);
 }
 
 :root.dark .prompt-template-field:hover { border-color: rgba(255, 138, 171, .42); }

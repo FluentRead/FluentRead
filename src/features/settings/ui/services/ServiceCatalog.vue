@@ -552,8 +552,8 @@ watch(() => props.service, (service) => {
 .rail-heading { flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 0 6px 10px; }
 .rail-heading > div { display: flex; flex: none; align-items: baseline; gap: 5px; min-width: 0; }
 .rail-heading strong { color: var(--ink, #172033); font-size: 13px; font-weight: 700; }
-.service-add-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 34px; padding: 7px 11px; border: 1.5px solid color-mix(in srgb, var(--brand) 65%, var(--line)); border-radius: 10px; color: var(--brand-strong); background: var(--surface); font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
-.service-add-button:hover, .service-add-button:focus-visible { border-color: var(--brand); background: var(--brand-soft); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 10%, transparent); }
+.service-add-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 32px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--fr-control-radius, 8px); color: var(--ink); background: var(--surface); font-size: var(--fr-text-sm, 12px); font-weight: 500; white-space: nowrap; cursor: pointer; transition: border-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease); }
+.service-add-button:hover, .service-add-button:focus-visible { border-color: color-mix(in srgb, var(--brand) 42%, var(--line)); color: var(--brand-strong); background: var(--brand-soft); }
 
 .service-count { margin-left: 4px; font-variant-numeric: tabular-nums; }
 .service-groups { overflow-y: auto; min-height: 0; flex: 1; margin-top: 12px; overscroll-behavior: contain; }
@@ -604,21 +604,21 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--brand-strong, #
 .credential-guide-summary { display: flex; align-items: center; gap: 9px; min-height: 40px; padding: 10px 12px; cursor: pointer; list-style: none; }
 .credential-guide-summary::-webkit-details-marker { display: none; }
 .credential-guide-summary-copy { display: flex; min-width: 0; align-items: center; gap: 8px; }
-.credential-guide-summary-copy strong { min-width: 0; overflow-wrap: anywhere; color: #172033; font-size: 13px; }
-.credential-guide-summary-action { margin-left: auto; color: var(--brand-strong, #bd2853); font-size: 11px; white-space: nowrap; }
-.credential-guide-chevron { margin-left: auto; width: 16px; height: 16px; flex: none; color: var(--muted, #8991a2); transition: transform 150ms ease; }
+.credential-guide-summary-copy strong { min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-size: var(--fr-text-base, 13px); }
+.credential-guide-summary-action { margin-left: auto; color: var(--brand-strong); font-size: var(--fr-text-xs, 11px); white-space: nowrap; }
+.credential-guide-chevron { margin-left: auto; width: 16px; height: 16px; flex: none; color: var(--muted); transition: transform var(--fr-duration-fast, 160ms) var(--fr-ease-out, ease); }
 .credential-guide[open] .credential-guide-chevron { transform: rotate(180deg); }
 .credential-guide-body { display: grid; gap: 12px; padding: 14px 16px 16px; border-top: 1px solid var(--line); }
-.credential-guide-body > small { color: var(--muted); font-size: 12px; line-height: 1.5; }
-.credential-guide-badge { flex-shrink: 0; padding: 3px 8px; border-radius: 999px; color: var(--brand-strong); background: var(--brand-soft); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
-.credential-guide-steps { display: grid; gap: 6px; margin: 0; padding-left: 20px; color: var(--ink); font-size: 12px; line-height: 1.6; }
-.credential-guide-steps li::marker { color: #c72a56; font-weight: 800; }
+.credential-guide-body > small { color: var(--muted); font-size: var(--fr-text-sm, 12px); line-height: 1.5; }
+.credential-guide-badge { flex-shrink: 0; padding: 3px 8px; border-radius: var(--fr-radius-full, 9999px); color: var(--brand-strong); background: var(--brand-soft); font-size: var(--fr-text-xs, 11px); font-weight: 600; letter-spacing: .04em; }
+.credential-guide-steps { display: grid; gap: 6px; margin: 0; padding-left: 20px; color: var(--ink); font-size: var(--fr-text-sm, 12px); line-height: 1.6; }
+.credential-guide-steps li::marker { color: var(--brand-strong); font-weight: 700; }
 .credential-guide-links { display: flex; flex-wrap: wrap; gap: 8px; }
-.credential-guide-link { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 12px; border: 1px solid #e2e5ec; border-radius: 9px; color: #46526a; background: #fff; font-size: 12px; font-weight: 650; text-decoration: none; transition: 150ms ease; }
-.credential-guide-link:hover { border-color: #f3c4d1; color: var(--brand-strong, #bd2853); background: var(--brand-soft, #fff0f4); }
-.credential-guide-link.is-primary { border-color: var(--brand-border, #f3c0ce); color: var(--brand-strong); background: var(--brand-soft); }
-.credential-guide-link.is-primary:hover { color: #fff; background: var(--brand-strong, #bd2853); filter: brightness(.92); box-shadow: 0 6px 16px rgba(214, 50, 96, .18); }
-.credential-guide-link:focus-visible { outline: 2px solid var(--brand-strong, #bd2853); outline-offset: 2px; }
+.credential-guide-link { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 12px; border: 1px solid var(--line); border-radius: var(--fr-control-radius, 8px); color: var(--ink); background: var(--surface); font-size: var(--fr-text-sm, 12px); font-weight: 500; text-decoration: none; transition: border-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease); }
+.credential-guide-link:hover { border-color: color-mix(in srgb, var(--brand) 38%, var(--line)); color: var(--brand-strong); background: var(--brand-soft); }
+.credential-guide-link.is-primary { border-color: color-mix(in srgb, var(--brand) 36%, var(--line)); color: var(--brand-strong); background: var(--brand-soft); }
+.credential-guide-link.is-primary:hover { border-color: var(--fr-color-brand-action, var(--brand-strong)); color: #fff; background: var(--fr-color-brand-action, var(--brand-strong)); }
+.credential-guide-link:focus-visible { outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand-strong)); outline-offset: 2px; }
 
 :global(:root.dark .credential-guide) { border-color: var(--line); background: var(--surface-soft); }
 :global(:root.dark .credential-guide-summary-copy strong), :global(:root.dark .credential-guide-steps) { color: var(--ink); }

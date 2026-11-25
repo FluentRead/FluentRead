@@ -438,8 +438,17 @@ export async function translateTextBatch(
   let pendingIndexes = origins.flatMap((origin, index) =>
     skipLanguageDetection || !shouldSkipTranslationForTarget(origin, targetLanguage, excludedLanguages) ? [index] : []);
   if (!skipLanguageDetection && pendingIndexes.length > 0) {
-    const skipped = await Promise.all(pendingIndexes.map(index =>
-      shouldSkipTranslationWithEvidence(origins[index]!, targetLanguage, excludedLanguages, signal)));
+    // 同一批次中的重复文本只需执行一次语言预检，避免重复触发本地统计或浏览器检测。
+    const evidenceByText = new Map<string, Promise<boolean>>();
+    const skipped = await Promise.all(pendingIndexes.map(index => {
+      const origin = origins[index]!;
+      let check = evidenceByText.get(origin);
+      if (!check) {
+        check = shouldSkipTranslationWithEvidence(origin, targetLanguage, excludedLanguages, signal);
+        evidenceByText.set(origin, check);
+      }
+      return check;
+    }));
     throwIfAborted(signal);
     pendingIndexes = pendingIndexes.filter((_index, resultIndex) => !skipped[resultIndex]);
   }

@@ -287,7 +287,7 @@ onUnmounted(() => {mounted.value = false;stopObserving?.()})
 .local-model-choice { display: inline-flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
 .local-model-choice input { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--brand); }
 .local-model-choice strong { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
-.local-model-tag { font-size: 10px; padding: 2px 6px; color: var(--brand-strong); background: var(--brand-soft); border-radius: 4px; }
+.local-model-tag { font-size: var(--fr-text-xs, 11px); padding: 2px 6px; color: var(--brand-strong); background: var(--brand-soft); border-radius: var(--fr-radius-xs, 6px); }
 .local-model-tag.quality { color: #19755a; background: #e9f6ef; }
 .local-model-info { margin-left: auto; }
 .local-model-languages { margin: 0; font-size: 12px; color: var(--ink); line-height: 1.6; }
@@ -302,7 +302,7 @@ onUnmounted(() => {mounted.value = false;stopObserving?.()})
 .local-model-status { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; line-height: 1.6; color: var(--muted); }
 .local-model-status.is-ready { color: #19755a; }
 :global(:root.dark) .local-model-status.is-ready { color: #79c9a8; }
-.local-model-progress-detail { font-size: 10px; color: var(--muted); }
+.local-model-progress-detail { font-size: var(--fr-text-xs, 11px); color: var(--muted); }
 .local-model progress { width: 100%; height: 6px; border: 0; border-radius: 3px; overflow: hidden; background: var(--surface-soft); accent-color: var(--brand); }
 .local-model progress::-webkit-progress-bar { background: var(--surface-soft); }
 .local-model progress::-webkit-progress-value { background: var(--brand); }

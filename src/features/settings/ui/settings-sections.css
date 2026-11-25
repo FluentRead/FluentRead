@@ -146,27 +146,27 @@
 .disabled-section {
   margin: 18px 12px 8px;
   padding: 28px;
-  border: 1px dashed #d8dce6;
-  border-radius: 16px;
-  color: #677084;
-  background: #f8f9fb;
+  border: 1px dashed var(--line);
+  border-radius: var(--fr-card-radius, 12px);
+  color: var(--muted);
+  background: var(--surface-soft);
   text-align: center;
 }
 
 .disabled-section strong {
-  color: #263044;
-  font-size: 15px;
+  color: var(--ink);
+  font-size: var(--fr-text-lg, 15px);
 }
 
 .disabled-section p {
   margin: 7px 0 0;
-  font-size: 11px;
+  font-size: var(--fr-text-sm, 12px);
 }
 
 .service-connection-section {
   margin-top: 22px;
   padding-top: 22px;
-  border-top: 1px solid #e8eaf0;
+  border-top: 1px solid var(--line);
 }
 
 .subsection-heading {
@@ -183,22 +183,22 @@
 }
 
 .subsection-heading span {
-  color: #dc315f;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .08em;
+  color: var(--brand-strong);
+  font-size: var(--fr-text-xs, 11px);
+  font-weight: 600;
+  letter-spacing: .06em;
 }
 
 .subsection-heading strong {
   margin-top: 4px;
-  color: #172033;
-  font-size: 17px;
+  color: var(--ink);
+  font-size: var(--fr-text-xl, 18px);
 }
 
 .subsection-heading p {
   margin: 0;
-  color: #7c8495;
-  font-size: 10px;
+  color: var(--muted);
+  font-size: var(--fr-text-sm, 12px);
 }
 
 .data-section {
@@ -322,9 +322,9 @@
   gap: 10px;
   min-width: 0;
   padding: 11px 13px;
-  border: 1px solid rgba(239, 71, 118, .18);
-  border-radius: 13px;
-  background: linear-gradient(135deg, var(--brand-soft), var(--surface));
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, var(--line));
+  border-radius: var(--fr-radius-md, 10px);
+  background: var(--brand-soft);
 }
 
 .scheduler-effect-label {

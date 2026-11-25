@@ -3000,14 +3000,14 @@ onBeforeUnmount(() => {
 .fr-selection-indicator:hover, .fr-selection-indicator:focus-visible { transform: translate(-50%, -50%) scale(1.1); color:#b8416b; border-color:#d889a5; box-shadow:0 2px 7px rgba(40, 35, 43, .18); outline:2px solid #f0cede; outline-offset:2px; }
 .fr-selection-indicator-glyph { font-size: 12px; font-weight: 700; line-height: 1; }
 .fr-translation-tooltip, .fr-translation-tooltip * { box-sizing: border-box; }
-.fr-translation-tooltip { position: fixed; display: flex; flex-direction: column; width: min(388px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 20px)); overflow: hidden; border: 1px solid rgba(35, 35, 43, .12); border-radius: 11px; background: #fff; box-shadow: 0 5px 20px rgba(35, 33, 43, .12); -webkit-user-select: none; user-select: none; }
+.fr-translation-tooltip { position: fixed; display: flex; flex-direction: column; width: min(388px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 20px)); overflow: hidden; border: 1px solid rgba(22, 27, 38, .12); border-radius: 12px; background: #fff; box-shadow: 0 6px 20px rgba(17, 24, 39, .12); -webkit-user-select: none; user-select: none; }
 .fr-translation-tooltip {
-  --fr-card-toolbar: #f7f8fb;
-  --fr-card-line: #e7e8ee;
-  --fr-card-muted: #625f6d;
-  --fr-card-active-ink: #9e3158;
-  --fr-card-active-bg: #faeaf1;
-  --fr-card-focus: #b34169;
+  --fr-card-toolbar: #f6f7f9;
+  --fr-card-line: #e3e6ed;
+  --fr-card-muted: #5b6476;
+  --fr-card-active-ink: #cc2655;
+  --fr-card-active-bg: #fff1f5;
+  --fr-card-focus: #cc2655;
 }
 .fr-popup-manipulating, .fr-popup-manipulating * { cursor: grabbing !important; user-select: none !important; }
 .fr-popup-resize-handle { position: absolute; z-index: 2; touch-action: none; }
@@ -3169,10 +3169,12 @@ onBeforeUnmount(() => {
 .fr-error-state h3 { margin: 0; font-size: 15px; font-weight: 650; line-height: 1.5; }
 .fr-error-state p { margin: 9px 0 0; color: #788196; font-size: 13px; line-height: 1.7; }
 .fr-recovery-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin-top: 20px; }
-.fr-error-state button { min-height: 36px; border: 0; border-radius: 9px; padding: 8px 14px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
-.fr-error-state .fr-recovery-primary { color: #fff; background: linear-gradient(135deg, #f35482, #e93267); font-weight: 600; }
+.fr-error-state button { min-height: 36px; border: 0; border-radius: 8px; padding: 8px 14px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; transition: background-color 120ms cubic-bezier(.22, 1, .36, 1), transform 120ms cubic-bezier(.22, 1, .36, 1); }
+.fr-error-state .fr-recovery-primary { color: #fff; background: #d62d5e; font-weight: 600; }
+.fr-error-state .fr-recovery-primary:hover:not(:disabled) { background: #bf2352; }
+.fr-error-state .fr-recovery-primary:active:not(:disabled) { transform: scale(.985); }
 .fr-error-state .fr-recovery-primary:disabled { opacity: .55; cursor: default; }
-.fr-recovery-more > summary { display: flex; align-items: center; gap: 6px; min-height: 36px; color: #788196; font-size: 12px; list-style: none; cursor: pointer; }
+.fr-recovery-more > summary { display: flex; align-items: center; gap: 6px; min-height: 36px; color: #5b6476; font-size: 12px; list-style: none; cursor: pointer; }
 .fr-recovery-more > summary::-webkit-details-marker { display: none; }
 .fr-recovery-more[open] > summary .fr-ui-icon { transform: rotate(180deg); }
 .fr-recovery-more > button { margin-top: 6px; }
@@ -3192,35 +3194,35 @@ onBeforeUnmount(() => {
 .fr-word-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 0; }
 .fr-word-heading > div:first-child { min-width: 0; }
 .fr-word-heading h3 { margin: 0; color: #292832; font-size: 27px; font-weight: 700; letter-spacing: -.035em; line-height: 1.08; overflow-wrap: anywhere; user-select: text; }
-.fr-word-normalized { display: block; margin-top: 5px; color: #aaa1a6; font-size: 10px; }
+.fr-word-normalized { display: block; margin-top: 5px; color: #5b6476; font-size: 11px; }
 .fr-word-heading-actions { display: flex; flex: none; align-items: center; gap: 4px; }
-.fr-word-heading-audio { background: #f8f5f6; color: #9b8d94; }
-.fr-word-pronunciations { display: flex; flex-wrap:wrap; gap: 4px 14px; margin-top: 7px; padding-bottom: 8px; border-bottom: 1px solid #eeecee; }
+.fr-word-heading-audio { background: #f6f7f9; color: #5b6476; }
+.fr-word-pronunciations { display: flex; flex-wrap:wrap; gap: 4px 14px; margin-top: 7px; padding-bottom: 8px; border-bottom: 1px solid #e3e6ed; }
 .fr-word-pronunciation { display: flex; align-items: center; gap: 5px; min-height: 26px; padding: 0; }
 .fr-word-pronunciation:last-child { border-bottom: 0; }
-.fr-word-pronunciation-label { color: #8d7a83; font-size: 10px; font-weight: 500; }
-.fr-word-ipa { color: #4a454c; font-family: Georgia, "Times New Roman", serif; font-size: 14px; }
+.fr-word-pronunciation-label { color: #5b6476; font-size: 11px; font-weight: 500; }
+.fr-word-ipa { color: #3b4252; font-family: Georgia, "Times New Roman", serif; font-size: 14px; }
 .fr-word-pronunciation .fr-text-audio-btn { width:24px; height:24px; }
-.fr-word-translation { display:flow-root; margin-top: 9px; padding: 0 0 10px; border-bottom: 1px solid #eeecee; color: #3a363d; }
+.fr-word-translation { display:flow-root; margin-top: 9px; padding: 0 0 10px; border-bottom: 1px solid #e3e6ed; color: #161b26; }
 .fr-word-translation-header { float:inline-end; margin-inline-start:8px; }
 .fr-word-translation .fr-text-label { margin: 0; }
 .fr-word-translation pre { overflow-wrap: anywhere; margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 16px; font-weight: 600; line-height: 1.6; user-select: text; }
-.fr-word-translation-loading, .fr-word-empty { margin-top: 12px; color: #9a9298; font-size: 12px; }
-.fr-word-meaning-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: #9a9298; font-size: 11px; font-weight: 700; }
-.fr-word-meaning-toolbar button { border: 0; padding: 3px 0; background: transparent; color: #9e5d71; cursor: pointer; font: inherit; font-weight: 600; }
-.fr-word-meaning-toolbar button:hover, .fr-word-meaning-toolbar button:focus-visible { color: #7f4156; text-decoration: underline; outline: none; }
+.fr-word-translation-loading, .fr-word-empty { margin-top: 12px; color: #5b6476; font-size: 12px; }
+.fr-word-meaning-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: #5b6476; font-size: 11px; font-weight: 600; }
+.fr-word-meaning-toolbar button { border: 0; padding: 3px 0; background: transparent; color: #cc2655; cursor: pointer; font: inherit; font-weight: 600; }
+.fr-word-meaning-toolbar button:hover, .fr-word-meaning-toolbar button:focus-visible { color: #a61e45; text-decoration: underline; outline: none; }
 .fr-word-meanings { display: grid; gap: 16px; margin-top: 14px; }
 .fr-word-meaning-toolbar + .fr-word-meanings { margin-top: 8px; }
-.fr-word-meaning { color: #454149; font-size: 12.5px; line-height: 1.52; }
-.fr-word-meaning > strong { display: inline-flex; padding: 3px 7px; border: 1px solid #ead8de; border-radius: 6px; background: #fbf5f6; color: #9e5d71; font-size: 10px; font-weight: 700; }
+.fr-word-meaning { color: #161b26; font-size: 12.5px; line-height: 1.55; }
+.fr-word-meaning > strong { display: inline-flex; padding: 2px 7px; border: 1px solid #e3e6ed; border-radius: 6px; background: #f6f7f9; color: #cc2655; font-size: 11px; font-weight: 600; }
 .fr-word-meaning ol { margin: 7px 0 0; padding: 0; list-style: none; counter-reset: definition; }
 .fr-word-meaning li { position: relative; padding-left: 21px; }
-.fr-word-meaning li::before { position: absolute; top: 0; left: 0; width: 14px; color: #b5adb2; content: counter(definition); counter-increment: definition; font-size: 11px; text-align: right; }
+.fr-word-meaning li::before { position: absolute; top: 0; left: 0; width: 14px; color: #5b6476; content: counter(definition); counter-increment: definition; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
 .fr-word-meaning li + li { margin-top: 9px; }
 .fr-word-definition-en, .fr-word-example-en { display: block; }
-.fr-word-definition-zh, .fr-word-example-zh { display: block; margin-top: 3px; color: #9a7f89; font-size: 11.5px; }
-.fr-word-meaning em { display: block; margin-top: 4px; padding-left: 8px; border-left: 2px solid #ead8de; color: #74676d; font-size: 11px; font-style: normal; line-height: 1.45; }
-.fr-word-card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; margin-top: 16px; padding-top: 10px; border-top: 1px solid #eeecee; color: #aaa1a6; font-size: 10px; }
+.fr-word-definition-zh, .fr-word-example-zh { display: block; margin-top: 3px; color: #5b6476; font-size: 12px; }
+.fr-word-meaning em { display: block; margin-top: 4px; padding-left: 8px; border-left: 2px solid #e3e6ed; color: #5b6476; font-size: 11.5px; font-style: normal; line-height: 1.5; }
+.fr-word-card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; margin-top: 16px; padding-top: 10px; border-top: 1px solid #e3e6ed; color: #5b6476; font-size: 11px; }
 .fr-word-card-footer a { color: #9e5d71; text-decoration: none; }
 .fr-word-card-footer a:hover, .fr-word-card-footer a:focus-visible { text-decoration: underline; }
 .fr-word-fallback-note, .fr-inline-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: #a56578; font-size: 11px; }
@@ -3240,20 +3242,20 @@ onBeforeUnmount(() => {
 .fr-text-copy-btn { display: inline-flex; align-items: center; justify-content: center; width:26px; height:26px; padding:0; border:1px solid transparent; border-radius:5px; background:transparent; color:#85858e; cursor:pointer; font:inherit; line-height:1; }
 .fr-text-copy-btn span, .fr-word-translation-header > .fr-text-label { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .fr-text-copy-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.fr-text-copy-btn:hover, .fr-text-copy-btn:focus-visible { border-color: rgba(214, 63, 118, .35); background: #fff; color: #d63f76; outline: none; transform: translateY(-1px); }
-.fr-text-copy-btn.fr-copied { border-color: rgba(214, 63, 118, .2); background: rgba(255, 255, 255, .72); color: #b85c7b; }
-.fr-text-copy-btn:disabled { cursor: not-allowed; opacity: .42; transform: none; }
-.fr-text-audio-btn { position: static; display: grid; flex: none; width:26px; height:26px; padding:0; place-items:center; border:1px solid transparent; border-radius:5px; background:transparent; color:#85858e; }
+.fr-text-copy-btn:hover, .fr-text-copy-btn:focus-visible { border-color: rgba(204, 38, 85, .32); background: #fff1f5; color: #cc2655; outline: none; }
+.fr-text-copy-btn.fr-copied { border-color: rgba(204, 38, 85, .24); background: #fff1f5; color: #cc2655; }
+.fr-text-copy-btn:disabled { cursor: not-allowed; opacity: .42; }
+.fr-text-audio-btn { position: static; display: grid; flex: none; width:26px; height:26px; padding:0; place-items:center; border:1px solid transparent; border-radius:6px; background:transparent; color:#5b6476; }
 .fr-text-audio-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.fr-text-audio-btn:hover, .fr-text-audio-btn:focus-visible { border-color: rgba(214, 63, 118, .25); background: rgba(255, 255, 255, .72); color: #d63f76; outline: none; transform: translateY(-1px); }
+.fr-text-audio-btn:hover, .fr-text-audio-btn:focus-visible { border-color: rgba(204, 38, 85, .28); background: #fff1f5; color: #cc2655; outline: none; }
 .fr-text-block pre { overflow-wrap:anywhere; margin:0; white-space:pre-wrap; word-break:break-word; font:inherit; font-size:14px; line-height:1.7; user-select:text; }
 .fr-original-text pre { font-size: 13px; }
-.fr-playing-status { flex: none; box-sizing: border-box; min-height: 38px; padding: 5px 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap:6px 8px; border-top: 1px solid #eeedf0; background: inherit; color: #777780; font-size: 12px; line-height: 1.4; }
+.fr-playing-status { flex: none; box-sizing: border-box; min-height: 38px; padding: 5px 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap:6px 8px; border-top: 1px solid var(--fr-card-line); background: inherit; color: var(--fr-card-muted); font-size: 12px; line-height: 1.4; }
 .fr-playing-status.is-idle { display: none; }
-.fr-playing-status button { flex: none; min-height: 27px; border: 1px solid #e8a4bc; border-radius: 7px; padding: 3px 8px; color: #d83e70; font: inherit; line-height: 1.2; }
+.fr-playing-status button { flex: none; min-height: 27px; border: 1px solid #e8a4bc; border-radius: 7px; padding: 3px 8px; color: #cc2655; font: inherit; line-height: 1.2; }
 .fr-playing-label { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .fr-playback-controls { display:flex; flex-wrap:wrap; flex:0 1 auto; max-width:100%; margin-inline-start:auto; align-items:center; justify-content:flex-end; gap:5px; }
-.fr-playback-time { font-size:10px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.fr-playback-time { font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .fr-playing-status .fr-seek-btn { display:grid; place-items:center; width:27px; height:27px; padding:0; border-color:transparent; color:inherit; }
 .fr-seek-btn svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
 .fr-seek-btn text { fill:currentColor; stroke:none; font:10px system-ui; text-anchor:middle; }
@@ -3266,39 +3268,41 @@ onBeforeUnmount(() => {
 .fr-action-toast button { flex: none; padding: 0; border: 0; color: #ffc2d5; background: transparent; cursor: pointer; font: inherit; font-weight: 700; }
 .fr-action-toast button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 .fr-dark-theme {
-  --fr-card-toolbar: #2c2d36;
-  --fr-card-line: #484852;
-  --fr-card-muted: #c1bfca;
-  --fr-card-active-ink: #ffc4d9;
-  --fr-card-active-bg: #523443;
-  --fr-card-focus: #f493b8;
-  border-color: #44444e;
-  background: #282830;
-  color: #f1f1f4;
+  --fr-card-toolbar: #1e2430;
+  --fr-card-line: #272e3d;
+  --fr-card-muted: #9aa4b5;
+  --fr-card-active-ink: #ff7fa3;
+  --fr-card-active-bg: rgba(239, 71, 118, .18);
+  --fr-card-focus: #ff7fa3;
+  border-color: #272e3d;
+  background: #171b24;
+  color: #f0f3f8;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .42);
 }
-.fr-dark-theme .fr-selection-target { background: #34343f; }
-.fr-dark-theme .fr-selection-target:hover { background: color-mix(in srgb, var(--fr-card-active-bg) 60%, #34343f); }
+.fr-dark-theme .fr-selection-target { background: #1e2430; }
+.fr-dark-theme .fr-selection-target:hover { background: color-mix(in srgb, var(--fr-card-active-bg) 60%, #1e2430); }
 .fr-dark-theme .fr-selection-target.is-overridden { background: var(--fr-card-active-bg); }
-.fr-dark-theme .fr-selection-target-select option { background: #2c2d36; color: #f1f1f4; }
-.fr-dark-theme :is(.fr-text-copy-btn, .fr-text-audio-btn) { border-color:transparent; background:transparent; color:#b4aab3; }
-.fr-dark-theme :is(.fr-text-copy-btn, .fr-text-audio-btn):is(:hover, :focus-visible) { border-color: #c96a8b; background: #553846; color: #ffd9e7; }
-.fr-dark-theme .fr-text-copy-btn.fr-copied { border-color: #98617a; background: rgba(93, 52, 71, .62); color: #f2bdcd; }
-.fr-dark-theme .fr-playing-status { border-color:#4d404a; color:#c8bdc6; }
-.fr-dark-theme .fr-original-text { color: #d0d0d7; }
-.fr-dark-theme .fr-translation-result { color: #f1ecef; }
+.fr-dark-theme .fr-selection-target-select option { background: #1e2430; color: #f0f3f8; }
+.fr-dark-theme :is(.fr-text-copy-btn, .fr-text-audio-btn) { border-color:transparent; background:transparent; color:#9aa4b5; }
+.fr-dark-theme :is(.fr-text-copy-btn, .fr-text-audio-btn):is(:hover, :focus-visible) { border-color: rgba(255, 127, 163, .36); background: rgba(239, 71, 118, .18); color: #ff7fa3; }
+.fr-dark-theme .fr-text-copy-btn.fr-copied { border-color: rgba(255, 127, 163, .28); background: rgba(239, 71, 118, .18); color: #ff7fa3; }
+.fr-dark-theme .fr-playing-status { border-color:#272e3d; color:#9aa4b5; }
+.fr-dark-theme .fr-original-text { color: #cbd2df; }
+.fr-dark-theme .fr-translation-result { color: #f0f3f8; }
 .fr-dark-theme .fr-word-learning-card { background: transparent; }
-.fr-dark-theme :is(.fr-word-heading, .fr-word-pronunciations, .fr-word-translation, .fr-word-card-footer) { border-color: #4b4148; }
-.fr-dark-theme .fr-word-heading h3, .fr-dark-theme .fr-word-meaning, .fr-dark-theme .fr-word-translation { color: #f2e8ed; }
-.fr-dark-theme .fr-word-meaning-toolbar { color: #c8aab5; }
-.fr-dark-theme .fr-word-meaning-toolbar button { color: #f0b9cb; }
-.fr-dark-theme .fr-word-heading-audio { background: #4a454b; color: #d5c4cb; }
-.fr-dark-theme .fr-word-pronunciation { border-color: #443a42; }
-.fr-dark-theme .fr-word-pronunciation-label { color: #e0a7b9; }
-.fr-dark-theme .fr-word-ipa { color: #f0dce4; }
-.fr-dark-theme .fr-word-meaning > strong { border-color: #684b58; background: #493842; color: #ffd9e7; }
-.fr-dark-theme .fr-word-meaning em { border-color: #684b58; }
-.fr-dark-theme .fr-word-meaning em, .fr-dark-theme :is(.fr-word-definition-zh, .fr-word-example-zh, .fr-word-translation-loading, .fr-word-empty) { color: #c8aab5; }
-.fr-dark-theme .fr-word-fallback-note { background: #4a303b; }
+.fr-dark-theme :is(.fr-word-heading, .fr-word-pronunciations, .fr-word-translation, .fr-word-card-footer) { border-color: #272e3d; }
+.fr-dark-theme .fr-word-heading h3, .fr-dark-theme .fr-word-meaning, .fr-dark-theme .fr-word-translation { color: #f0f3f8; }
+.fr-dark-theme .fr-word-normalized, .fr-dark-theme .fr-word-card-footer { color: #9aa4b5; }
+.fr-dark-theme .fr-word-meaning-toolbar { color: #9aa4b5; }
+.fr-dark-theme .fr-word-meaning-toolbar button { color: #ff7fa3; }
+.fr-dark-theme .fr-word-heading-audio { background: #1e2430; color: #cbd2df; }
+.fr-dark-theme .fr-word-pronunciation { border-color: #272e3d; }
+.fr-dark-theme .fr-word-pronunciation-label { color: #9aa4b5; }
+.fr-dark-theme .fr-word-ipa { color: #e2e7f0; }
+.fr-dark-theme .fr-word-meaning > strong { border-color: #363f52; background: #1e2430; color: #ff7fa3; }
+.fr-dark-theme .fr-word-meaning em { border-color: #363f52; }
+.fr-dark-theme .fr-word-meaning em, .fr-dark-theme :is(.fr-word-definition-zh, .fr-word-example-zh, .fr-word-translation-loading, .fr-word-empty) { color: #9aa4b5; }
+.fr-dark-theme .fr-word-fallback-note { background: rgba(239, 71, 118, .14); }
 /* 保持桌面紧凑；触摸操作用完整命中区，点模式仍只显示小点，不挤占正文。 */
 .fr-touch-selection .fr-selection-indicator { width:44px; height:44px; border-radius:12px; touch-action:manipulation; }
 .fr-touch-selection .fr-selection-indicator--dot { background:transparent; box-shadow:none; }

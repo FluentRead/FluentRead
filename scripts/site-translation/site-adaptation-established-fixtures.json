@@ -18,7 +18,34 @@
           "sourceExcludes": ["Show more"]
         }
       ]
-    }
+    },
+    "variants": [
+      {
+        "name": "modern-inline-expand-button",
+        "url": "https://x.com/home",
+        "html": "<nav id=\"navigation\">Home timeline controls</nav><main><article id=\"post\"><div id=\"initial-post\" class=\"max-w-full text-body font-normal text-primary line-clamp-5 whitespace-pre-wrap wrap-break-word\" dir=\"auto\"><span>The first part of a modern English timeline post appears before its inline expansion button.</span> <button id=\"show-more\" class=\"max-w-full text-[length:inherit] font-normal text-brand hover:underline\" type=\"button\">Show more</button></div></article></main>",
+        "modes": ["full"],
+        "required": ["#initial-post"],
+        "forbidden": ["#navigation", "#show-more"],
+        "restoreSelectors": ["#post"],
+        "sourceAssertions": {
+          "required": ["The first part of a modern English timeline post"],
+          "forbidden": ["Home timeline controls", "Show more"]
+        },
+        "dynamic": {
+          "appendHtml": [
+            {
+              "selector": "#post",
+              "click": "#show-more",
+              "html": "<div id=\"expanded-post\" class=\"max-w-full text-body font-normal text-primary whitespace-pre-wrap wrap-break-word\" dir=\"auto\"><span>The expanded modern timeline post reveals more readable source material without removing the card.</span></div>",
+              "required": ["#expanded-post"],
+              "sourceIncludes": ["The expanded modern timeline post reveals more readable source material"],
+              "sourceExcludes": ["Show more"]
+            }
+          ]
+        }
+      }
+    ]
   },
   {
     "id": "twitch-live-chat",

@@ -773,12 +773,12 @@ watch(() => presentation.value.toolsDisplay, () => {
 
 <style scoped>
 .fr-floating-ball {
-  --fr-surface: #fffdfd;
-  --fr-border: #28203324;
-  --fr-ink: #514b59;
-  --fr-accent: #b8275e;
-  --fr-active: #fbeaf1;
-  --fr-shadow: 0 2px 7px #25182c21;
+  --fr-surface: #ffffff;
+  --fr-border: rgba(22, 27, 38, 0.14);
+  --fr-ink: #161b26;
+  --fr-accent: #cc2655;
+  --fr-active: #fff1f5;
+  --fr-shadow: 0 2px 8px rgba(17, 24, 39, 0.1);
   --fr-face-inset: 0px;
   color: var(--fr-ink);
   position: fixed;
@@ -787,30 +787,30 @@ watch(() => presentation.value.toolsDisplay, () => {
   left: 0;
   width: var(--fr-ball-size);
   height: var(--fr-ball-size);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   user-select: none;
   pointer-events: none;
   transform: translate3d(var(--fr-drag-x, var(--fr-ball-x)), var(--fr-drag-y, var(--fr-ball-y)), 0);
-  transition: transform 180ms cubic-bezier(.2, .75, .25, 1);
+  transition: transform 180ms cubic-bezier(.22, 1, .36, 1);
 }
 
 .fr-floating-ball[data-theme="dark"] {
-  --fr-surface: #28252c;
-  --fr-border: #efcfe53d;
-  --fr-ink: #eee4ee;
-  --fr-accent: #ff9cc0;
-  --fr-active: #493044;
-  --fr-shadow: 0 2px 9px #0005;
+  --fr-surface: #171b24;
+  --fr-border: rgba(240, 243, 248, 0.14);
+  --fr-ink: #f0f3f8;
+  --fr-accent: #ff7fa3;
+  --fr-active: rgba(239, 71, 118, 0.18);
+  --fr-shadow: 0 4px 12px rgba(0, 0, 0, 0.36);
 }
 
 @media (prefers-color-scheme: dark) {
   .fr-floating-ball:not([data-theme="light"]) {
-    --fr-surface: #28252c;
-    --fr-border: #efcfe53d;
-    --fr-ink: #eee4ee;
-    --fr-accent: #ff9cc0;
-    --fr-active: #493044;
-    --fr-shadow: 0 2px 9px #0005;
+    --fr-surface: #171b24;
+    --fr-border: rgba(240, 243, 248, 0.14);
+    --fr-ink: #f0f3f8;
+    --fr-accent: #ff7fa3;
+    --fr-active: rgba(239, 71, 118, 0.18);
+    --fr-shadow: 0 4px 12px rgba(0, 0, 0, 0.36);
   }
 }
 
@@ -962,12 +962,12 @@ watch(() => presentation.value.toolsDisplay, () => {
   right: 2px;
   bottom: 2px;
   display: grid;
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   place-items: center;
   border: 1px solid var(--fr-surface);
   border-radius: 50%;
-  background: #26764b;
+  background: #15803d;
   color: #fff;
   font: 700 9px/1 system-ui, sans-serif;
   pointer-events: none;
@@ -979,7 +979,7 @@ watch(() => presentation.value.toolsDisplay, () => {
   right: auto;
 }
 
-.translation-indicator[data-status="error"] { background: #9a5711; }
+.translation-indicator[data-status="error"] { background: #b45309; }
 .translation-indicator[data-status="translating"] { background: var(--fr-accent); color: var(--fr-surface); }
 
 .manga-progress {

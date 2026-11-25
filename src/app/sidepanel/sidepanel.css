@@ -7,8 +7,8 @@
 @import '../../ui/styles/tokens.css';
 
 /* Edge 原生侧栏可自动反转页面颜色；only 让浅色与深色都遵守扩展自己的主题。 */
-:root { color-scheme: only light; font-family: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; font-synthesis: none; color: var(--ink); background: var(--surface-soft); --el-color-primary: var(--brand); }
-:root.dark { color-scheme: only dark; --brand: #ff6f9a; --brand-strong: #ff8aab; --brand-soft: #ef477629; --ink: #f4f5f8; --muted: #b7bdc9; --line: #363a45; --surface: #252830; --surface-soft: #20232a; }
+:root { color-scheme: only light; font-family: var(--interface-font-family, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif); font-synthesis: none; color: var(--ink); background: var(--fr-color-canvas); --el-color-primary: var(--brand); }
+:root.dark { color-scheme: only dark; background: var(--fr-color-canvas); }
 :root { --el-text-color-primary: var(--ink); --el-text-color-regular: var(--ink); --el-text-color-placeholder: var(--muted); --el-bg-color: var(--surface); --el-bg-color-overlay: var(--surface); --el-fill-color-blank: var(--surface); --el-fill-color-light: var(--surface-soft); --el-border-color: var(--line); --el-border-color-light: var(--line); }
 * { box-sizing: border-box; }
 html, body, #app { width: 100%; height: 100%; min-width: 0; margin: 0; }

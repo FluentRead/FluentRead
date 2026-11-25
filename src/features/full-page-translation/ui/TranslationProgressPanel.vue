@@ -205,21 +205,21 @@ onBeforeUnmount(() => {
   overflow: auto;
   overscroll-behavior: contain;
   grid-template-columns: 22px minmax(0, 1fr) auto;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
-  width: min(240px, calc(100vw - 32px));
-  padding: 6px 6px 6px 9px;
-  border: 1px solid rgba(229, 88, 139, 0.24);
+  width: min(244px, calc(100vw - 32px));
+  padding: 8px 8px 8px 10px;
+  border: 1px solid rgba(22, 27, 38, 0.12);
   border-radius: 12px;
-  background: rgba(255, 252, 253, 0.88);
-  box-shadow: 0 4px 16px rgba(68, 38, 52, 0.12);
-  color: #3f3540;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 4px 16px rgba(17, 24, 39, 0.1);
+  color: #161b26;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.4;
   pointer-events: auto;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .fr-progress-indicator {
@@ -229,7 +229,7 @@ onBeforeUnmount(() => {
   gap: 2px;
   width: 22px;
   height: 22px;
-  color: #e84f87;
+  color: #cc2655;
 }
 
 .fr-translation-progress.fr-compact {
@@ -240,10 +240,10 @@ onBeforeUnmount(() => {
   grid-template-columns: 1fr;
   gap: 0;
   place-items: center;
-  border-color: rgba(34, 197, 94, 0.2);
+  border-color: rgba(21, 128, 61, 0.22);
   border-radius: 50%;
-  background: rgba(240, 253, 244, 0.68);
-  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.1);
+  background: rgba(240, 253, 244, 0.88);
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.08);
   pointer-events: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -257,12 +257,12 @@ onBeforeUnmount(() => {
 }
 
 .fr-progress-compact-check circle {
-  fill: rgba(34, 197, 94, 0.66);
+  fill: #15803d;
 }
 
 .fr-progress-compact-check path {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.9);
+  stroke: #ffffff;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
@@ -270,7 +270,7 @@ onBeforeUnmount(() => {
 
 .fr-progress-indicator i {
   display: block;
-  width: 4px;
+  width: 3px;
   height: 8px;
   border-radius: 999px;
   background: currentColor;
@@ -296,10 +296,10 @@ onBeforeUnmount(() => {
 }
 
 .fr-progress-copy strong {
-  color: #342b35;
+  color: #161b26;
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .fr-progress-counts {
@@ -307,17 +307,17 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 0 8px;
-  color: #746875;
+  color: #5b6476;
 }
 
 .fr-progress-counts b {
-  color: #bd2f62;
+  color: #cc2655;
   font-variant-numeric: tabular-nums;
-  font-weight: 750;
+  font-weight: 650;
 }
 
 .fr-progress-copy small {
-  color: #70636e;
+  color: #5b6476;
   font-size: 11px;
 }
 
@@ -333,19 +333,21 @@ onBeforeUnmount(() => {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #988b95;
+  color: #5b6476;
   cursor: pointer;
+  transition: background-color 120ms cubic-bezier(.22, 1, .36, 1), color 120ms cubic-bezier(.22, 1, .36, 1);
 }
 
 .fr-progress-dismiss:hover,
 .fr-progress-dismiss:focus-visible {
-  background: #f8e9ef;
-  color: #cf3e73;
+  background: #f6f7f9;
+  color: #161b26;
   outline: none;
 }
 
 .fr-progress-dismiss:focus-visible {
-  box-shadow: 0 0 0 2px rgba(232, 79, 135, 0.28);
+  outline: 2px solid #cc2655;
+  outline-offset: -2px;
 }
 
 .fr-progress-dismiss svg {
@@ -357,55 +359,57 @@ onBeforeUnmount(() => {
   stroke-width: 1.6;
 }
 
-.fr-progress-warning { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #fff1d6; color: #9a5800; font-size: 15px; font-weight: 700; }
+.fr-progress-warning { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #fef3c7; color: #92400e; font-size: 14px; font-weight: 700; }
 .fr-progress-actions { display: grid; grid-area: 2 / 1 / auto / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.fr-progress-action { min-height: 32px; border: 1px solid rgba(116, 104, 117, 0.32); border-radius: 6px; padding: 3px 6px; background: transparent; color: inherit; cursor: pointer; font: inherit; overflow-wrap: anywhere; }
-.fr-progress-action:first-child { border-color: transparent; background: #fae9ef; color: #a62751; font-weight: 650; }
+.fr-progress-action { min-height: 32px; border: 1px solid #d5dbe6; border-radius: 8px; padding: 3px 8px; background: #ffffff; color: #161b26; cursor: pointer; font: inherit; font-weight: 500; overflow-wrap: anywhere; transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease; }
+.fr-progress-action:active:not(:disabled) { transform: scale(.98); }
+.fr-progress-action:first-child { border-color: transparent; background: #fff1f5; color: #cc2655; font-weight: 600; }
 .fr-progress-action:disabled { opacity: .45; cursor: default; }
-.fr-progress-action:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.fr-progress-action:focus-visible { outline: 2px solid #cc2655; outline-offset: 2px; }
 .fr-idle .fr-progress-indicator i { animation: none; }
 
 .fr-dark {
-  border-color: rgba(242, 116, 162, 0.3);
-  background: rgba(38, 31, 39, 0.84);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28), 0 2px 7px rgba(0, 0, 0, 0.16);
-  color: #f7edf1;
+  border-color: #272e3d;
+  background: rgba(23, 27, 36, 0.92);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+  color: #f0f3f8;
 }
 
 .fr-dark.fr-compact {
   border-color: rgba(74, 222, 128, 0.24);
-  background: rgba(20, 45, 30, 0.68);
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.2);
+  background: rgba(20, 45, 30, 0.85);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
 }
 
 .fr-dark .fr-progress-indicator {
-  color: #ff80ae;
+  color: #ff7fa3;
 }
 
 .fr-dark .fr-progress-copy strong {
-  color: #fff7fa;
+  color: #f0f3f8;
 }
 
 .fr-dark .fr-progress-counts {
-  color: #d1c2c9;
+  color: #9aa4b5;
 }
 
 .fr-dark .fr-progress-counts b {
-  color: #ff80ae;
+  color: #ff7fa3;
 }
 
-.fr-dark .fr-progress-warning { background: #493620; color: #ffd18c; }
-.fr-dark .fr-progress-action:first-child { background: #5b3044; color: #ffd0e1; }
+.fr-dark .fr-progress-warning { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
+.fr-dark .fr-progress-action { border-color: #272e3d; background: #1e2430; color: #f0f3f8; }
+.fr-dark .fr-progress-action:first-child { border-color: transparent; background: rgba(239, 71, 118, 0.18); color: #ff7fa3; }
 
 .fr-dark .fr-progress-copy small,
 .fr-dark .fr-progress-dismiss {
-  color: #bfaeb7;
+  color: #9aa4b5;
 }
 
 .fr-dark .fr-progress-dismiss:hover,
 .fr-dark .fr-progress-dismiss:focus-visible {
-  background: #523242;
-  color: #ff91b8;
+  background: #252c3b;
+  color: #f0f3f8;
 }
 
 .fr-progress-panel-enter-active,

@@ -11,12 +11,12 @@
   min-height: 20px;
   min-width: 0;
   max-width: 100%;
-  padding: 1px 5px;
-  border: 1px solid var(--line, #e4e7ef);
-  border-radius: 4px;
-  color: var(--muted, #737c8f);
-  background: var(--surface-soft, #f5f6fa);
-  font-size: 10px;
+  padding: 1px 6px;
+  border: 1px solid var(--line, #e3e6ed);
+  border-radius: var(--fr-radius-xs, 6px);
+  color: var(--muted, #5b6476);
+  background: var(--surface-soft, #f6f7f9);
+  font-size: var(--fr-text-xs, 11px);
   font-weight: 500;
   line-height: 16px;
   white-space: nowrap;
@@ -25,7 +25,7 @@
 }
 .service-badge--default {
   flex-shrink: 0;
-  border-color: color-mix(in srgb, var(--brand, #ef4776) 35%, var(--line, #e4e7ef));
-  color: var(--brand-strong, #bd2853);
-  background: var(--brand-soft, #fff0f4);
+  border-color: color-mix(in srgb, var(--brand, #ef4776) 35%, var(--line, #e3e6ed));
+  color: var(--brand-strong, #cc2655);
+  background: var(--brand-soft, #fff1f5);
 }

@@ -11,7 +11,7 @@ const fake = vi.hoisted(() => ({
 vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: () => fake.supported}));
 vi.mock('@/src/features/local-translation/offscreen/artifactStore', () => ({
   LOCAL_MODEL_CACHE: 'download-test-cache',
-  getTranslationArtifacts: (model: string) => [ids.opusZhEn, ids.opusJaEn, ids.hunyuan].includes(model as any)
+  getTranslationArtifacts: (model: string) => [ids.opusZhEn, ids.opusJaEn, ids.hunyuanMt3, ids.hunyuan].includes(model as any)
     ? [{repo: model, path: 'weights', size: 12, revision: 'fixed', sha256: 'hash'}] : [],
   artifactComplete: (file: {repo: string}) => fake.check(file),
   artifactDownloadedBytes: async (file: {repo: string}) => fake.bytes.get(file.repo) || 0,
@@ -328,12 +328,18 @@ describe('page-independent local model jobs', () => {
   });
   it('restores completed models and keeps legacy models removable but not downloadable', async () => {
     fake.complete.add(ids.opusZhEn);
+    fake.complete.add(ids.hunyuan);
     fake.legacyCached = true;
     const manager = createLocalTranslationDownloadManager({onChange: async () => { throw new Error('page closed'); }});
     expect(await phase(manager)).toBe('ready');
+    expect(await phase(manager, ids.hunyuan)).toBe('ready');
     expect(await phase(manager, ids.m2m100)).toBe('ready');
+    await expect(manager.start(ids.hunyuan)).rejects.toThrow('LEGACY_MODEL');
     await expect(manager.start(ids.m2m100)).rejects.toThrow('LEGACY_MODEL');
     await expect(manager.start('unknown')).rejects.toThrow('INVALID_MODEL');
+    await manager.remove(ids.hunyuan);
+    expect(fake.remove).toHaveBeenCalledWith(expect.objectContaining({repo: ids.hunyuan}));
+    expect(await phase(manager, ids.hunyuan)).toBe('idle');
     await manager.remove(ids.m2m100);
     expect(await phase(manager, ids.m2m100)).toBe('idle');
     await manager.pause(ids.opusZhEn);
@@ -406,7 +412,7 @@ describe('page-independent local model jobs', () => {
   });
   it('rejects an unsupported Hunyuan runtime before transferring model files', async () => {
     fake.supported = false;
-    await expect(createLocalTranslationDownloadManager().start(ids.hunyuan)).rejects.toThrow('BROWSER_UNSUPPORTED');
+    await expect(createLocalTranslationDownloadManager().start(ids.hunyuanMt3)).rejects.toThrow('BROWSER_UNSUPPORTED');
     expect(fake.download).not.toHaveBeenCalled();
   });
   it('returns immediately and keeps one job while settings pages detach and reattach', async () => {
@@ -444,15 +450,15 @@ describe('page-independent local model jobs', () => {
 
   it('can delete a queued model without waiting for another large download', async () => {
     const manager = createLocalTranslationDownloadManager();
-    await manager.start(ids.hunyuan);
+    await manager.start(ids.hunyuanMt3);
     await vi.waitFor(() => expect(fake.download).toHaveBeenCalledOnce());
     await manager.start(ids.opusZhEn);
     expect(await phase(manager)).toBe('queued');
     await manager.remove(ids.opusZhEn);
     expect(await phase(manager)).toBe('idle');
     expect(fake.remove).toHaveBeenCalledOnce();
-    fake.gates.get(ids.hunyuan)!();
-    await vi.waitFor(async () => expect(await phase(manager, ids.hunyuan)).toBe('ready'));
+    fake.gates.get(ids.hunyuanMt3)!();
+    await vi.waitFor(async () => expect(await phase(manager, ids.hunyuanMt3)).toBe('ready'));
     expect(fake.download).toHaveBeenCalledOnce();
   });
 
@@ -472,13 +478,13 @@ describe('page-independent local model jobs', () => {
 
   it('continues a paused queued job only after an explicit resume, without duplicate execution', async () => {
     const manager = createLocalTranslationDownloadManager();
-    await manager.start(ids.hunyuan);
+    await manager.start(ids.hunyuanMt3);
     await vi.waitFor(() => expect(fake.download).toHaveBeenCalledOnce());
     await manager.start(ids.opusZhEn);
     await manager.pause(ids.opusZhEn);
     expect(await phase(manager)).toBe('paused');
     await manager.start(ids.opusZhEn);
-    fake.gates.get(ids.hunyuan)!();
+    fake.gates.get(ids.hunyuanMt3)!();
     await vi.waitFor(() => expect(fake.download).toHaveBeenCalledTimes(2));
     fake.gates.get(ids.opusZhEn)!();
     await vi.waitFor(async () => expect(await phase(manager)).toBe('ready'));

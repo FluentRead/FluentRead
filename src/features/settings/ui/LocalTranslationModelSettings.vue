@@ -2,7 +2,7 @@
  * @file src/features/settings/ui/LocalTranslationModelSettings.vue
  *
  * 文件职责：呈现本地翻译模型选择、持续下载进度、删除确认和短文本试译。
- * 主要内容：活跃页面订阅后台持久快照，索引模型状态以复用默认值；停用、缓存切页或上下文替换时退订并取消所属试译，返回后独立刷新下载状态；通过悬停或焦点提示展示模型用途和许可，主卡片保留语言与资源估算，试译输入区合并操作栏。
+ * 主要内容：活跃页面订阅后台持久快照，索引模型状态以复用默认值；默认优先展示第三代混元 Hy-MT3，仅在已下载第二代 Hy-MT2 时保留展示并在未下载选中旧版时切到 Hy-MT3；停用、缓存切页或上下文替换时退订并取消所属试译，返回后独立刷新下载状态；通过悬停或焦点提示展示模型用途和许可，主卡片保留语言与资源估算，试译输入区合并操作栏。
  * 模块边界：通过 runtime 消息操作下载任务，配置交给既有设置持久化；所有操作、确认和迟到回包限定当前页面归属，不因页面离开中止后台下载，不获取模型文件、不创建推理引擎。
  -->
 <template>
@@ -22,7 +22,7 @@
             <strong>{{ modelName(item) }}</strong>
           </label>
           <span v-if="item.value === defaultModel" class="local-model-tag">{{ t('settings.localTranslation.recommended') }}</span>
-          <span v-else-if="item.engine === 'hunyuan'" class="local-model-tag quality">{{ t('settings.localTranslation.quality') }}</span>
+          <span v-else-if="item.value === preferredHunyuanModel" class="local-model-tag quality">{{ t('settings.localTranslation.quality') }}</span>
           <FieldHelp button-class="local-model-info" :content="t(item.descriptionKey)" :label="`${modelName(item)}: ${t('settings.localTranslation.license')}`">
             <template #content>
               <div class="local-model-description">
@@ -97,7 +97,8 @@ import {ElMessageBox} from 'element-plus'
 import {Check, Close, Cpu, Delete, Download, Promotion, Refresh, TopRight, VideoPause} from '@element-plus/icons-vue'
 import type {Config} from '@/src/core/config/model'
 import {
-  DEFAULT_LOCAL_TRANSLATION_MODEL, LOCAL_TRANSLATION_DOWNLOAD_STATE_KEY, LOCAL_TRANSLATION_MODELS,
+  DEFAULT_LOCAL_TRANSLATION_MODEL, LOCAL_TRANSLATION_DOWNLOAD_STATE_KEY, LOCAL_TRANSLATION_MODEL_IDS, LOCAL_TRANSLATION_MODELS,
+  PREFERRED_HUNYUAN_LOCAL_TRANSLATION_MODEL,
   getLocalTranslationModel, normalizeLocalTranslationModel, normalizeLocalTranslationDownloadSnapshot, localTranslationErrorKey,
   type LocalTranslationModel, type LocalTranslationModelId, type LocalTranslationDownloadState,
 } from '@/src/core/config/localTranslation'
@@ -114,6 +115,8 @@ const supported = browserCapabilities.extensionDom
 const hunyuanSupported = supportsHunyuanTranslation()
 function modelSupported(model: LocalTranslationModel): boolean { return supported && (model.engine !== 'hunyuan' || hunyuanSupported) }
 const defaultModel = DEFAULT_LOCAL_TRANSLATION_MODEL
+const preferredHunyuanModel = PREFERRED_HUNYUAN_LOCAL_TRANSLATION_MODEL
+const legacyHunyuanModel = LOCAL_TRANSLATION_MODEL_IDS.hunyuan
 const tasks = ref<LocalTranslationDownloadState[]>([])
 const loaded = ref(false)
 const loadError = ref(false)
@@ -129,7 +132,13 @@ const idleStates = new Map<LocalTranslationModelId, LocalTranslationDownloadStat
   {model: model.value, phase: 'idle', downloadedBytes: 0, totalBytes: model.downloadSizeMb * 1_000_000, bytesPerSecond: 0, updatedAt: 0},
 ]))
 const taskIndex = computed(() => new Map(tasks.value.map(task => [task.model, task])))
-const visibleModels = computed(() => LOCAL_TRANSLATION_MODELS.filter((model) => !model.legacy || selectedModel.value === model.value || state(model.value).downloadedBytes > 0))
+function hasLocalModelData(model: LocalTranslationModelId): boolean {
+  const task = state(model)
+  return task.downloadedBytes > 0 || task.phase === 'ready'
+}
+const visibleModels = computed(() => LOCAL_TRANSLATION_MODELS.filter((model) => !model.legacy
+  || hasLocalModelData(model.value)
+  || (selectedModel.value === model.value && model.value !== legacyHunyuanModel)))
 const selectedReady = computed(() => loaded.value && modelSupported(getLocalTranslationModel(selectedModel.value)) && state(selectedModel.value).phase === 'ready')
 function modelName(model: LocalTranslationModel): string { return model.nameKey ? t(model.nameKey) : model.label }
 function state(model: LocalTranslationModelId): LocalTranslationDownloadState {
@@ -228,6 +237,15 @@ async function tryTranslation(current = capture()): Promise<void> {
   } catch (error) { if (current() && trialId === id) trialError.value = t(localTranslationErrorKey(error)) }
   finally { if (trialId === id) { trialBusy.value = false; trialId = undefined } }
 }
+watch(
+  () => [loaded.value, active.value, selectedModel.value, state(legacyHunyuanModel).phase, state(legacyHunyuanModel).downloadedBytes] as const,
+  ([isLoaded, isActive, currentModel, legacyPhase, legacyBytes]) => {
+    if (isLoaded && isActive && supported && currentModel === legacyHunyuanModel && legacyPhase === 'idle' && legacyBytes === 0) {
+      props.config.model[props.service] = preferredHunyuanModel
+    }
+  },
+  {flush: 'sync'},
+)
 watch(selectedModel, () => {
   cancelTrial()
   trialResult.value = ''

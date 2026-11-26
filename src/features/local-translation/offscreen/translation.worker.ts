@@ -1,8 +1,8 @@
 /**
  * @file src/features/local-translation/offscreen/translation.worker.ts
  *
- * 文件职责：在隔离 Worker 中运行轻量 OPUS 翻译和混元 Hy-MT2 翻译。
- * 主要内容：只读取已校验的离线模型；混元优先使用 WebGPU，OPUS 保持 CPU；复用有界线程与计算间歇，失败重建单线程 Worker，分句推理和重复保护约束资源与输出。
+ * 文件职责：在隔离 Worker 中运行轻量 OPUS 翻译和混元 Hy-MT3 / Hy-MT2 翻译。
+ * 主要内容：只读取已校验的离线模型；混元优先使用 WebGPU，OPUS 保持 CPU；切换不同混元世代模型时释放旧会话；复用有界线程与计算间歇，失败重建单线程 Worker，分句推理和重复保护约束资源与输出。
  * 模块边界：入站先经 feature 公共协议校验，不下载模型、不读取页面配置；空闲释放、请求取消和最终超时由外层 Worker 生命周期控制。
  */
 import {forceSingleThreadInference, localWasmThreads, paceLocalInference, paceLocalInitialization} from '@/src/shared/onnx/resources';
@@ -24,6 +24,7 @@ const MAX_INFERENCE_MS = 90_000;
 let translator: Translator | undefined;
 let translatorRepository = '';
 let hunyuan: Wllama | undefined;
+let hunyuanModel = '';
 let backend: WorkerResponse['backend'];
 let taskQueue = Promise.resolve();
 
@@ -64,6 +65,7 @@ async function dispose(): Promise<void> {
     translator = undefined;
     translatorRepository = '';
     hunyuan = undefined;
+    hunyuanModel = '';
     // 释放失败也不能让损坏会话继续占用缓存；下一条队列请求应能够创建新实例。
     try { await previousTranslator?.dispose?.(); }
     finally { await previousHunyuan?.exit(); }
@@ -96,7 +98,7 @@ async function getTranslator(request: Extract<WorkerRequest, {type: 'translate'}
 
 async function getHunyuan(model: string): Promise<Wllama> {
     if (!supportsHunyuanTranslation()) throw new Error('LOCAL_TRANSLATION_BROWSER_UNSUPPORTED');
-    if (hunyuan) return hunyuan;
+    if (hunyuan && hunyuanModel === model) return hunyuan;
     await dispose();
     const file = getTranslationArtifacts(model)[0];
     if (!file) throw new Error('LOCAL_TRANSLATION_INVALID_MODEL');
@@ -128,6 +130,7 @@ async function getHunyuan(model: string): Promise<Wllama> {
         backend = 'wasm';
     }
     hunyuan = engine;
+    hunyuanModel = model;
     return engine;
 }
 
@@ -146,7 +149,7 @@ async function translate(request: Extract<WorkerRequest, {type: 'translate'}>): 
             let translated: string;
             if (isHunyuan) {
                 const response = await paceLocalInference(() => (engine as Wllama).createChatCompletion({
-                    messages: [{role: 'user', content: hunyuanTranslationPrompt(chunk.trim(), request.sourceLanguage!, request.targetLanguage!)}],
+                    messages: [{role: 'user', content: hunyuanTranslationPrompt(chunk.trim(), request.sourceLanguage!, request.targetLanguage!, request.model)}],
                     max_tokens: 768, temperature: 0.7, top_p: 0.6, top_k: 20,
                     penalty_repeat: 1.05, seed: 42, cache_prompt: false, abortSignal: abort.signal,
                 }));

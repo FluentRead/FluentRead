@@ -38,8 +38,14 @@ describe('local model language routes and bounded generation', () => {
     expect(resolveOpusTranslationRepository(ids.opusJaEn, 'ja', 'en')).toBe('Xenova/opus-mt-ja-en');
     expect(resolveOpusTranslationRepository(ids.opusJaEn, 'en', 'ja')).toBe('Xenova/opus-mt-en-jap');
     expect(() => resolveOpusTranslationRepository(ids.opusZhEn, 'ja', 'zh')).toThrow('LANGUAGE_UNSUPPORTED');
+    expect(resolveLocalTranslationLanguageCode(ids.hunyuanMt3, 'zh-Hant')).toBe('zh-Hant');
+    expect(resolveLocalTranslationLanguageCode(ids.hunyuanMt3, 'el')).toBe('el');
+    expect(resolveLocalTranslationLanguageCode(ids.hunyuanMt3, 'nb-NO')).toBe('nb');
     expect(resolveLocalTranslationLanguageCode(ids.hunyuan, 'zh-Hant')).toBe('zh-Hant');
     expect(resolveLocalTranslationLanguageCode(ids.hunyuan, 'ja-JP')).toBe('ja');
+    expect(() => resolveLocalTranslationLanguageCode(ids.hunyuan, 'el')).toThrow('LANGUAGE_UNSUPPORTED');
+    expect(() => resolveLocalTranslationLanguageCode(ids.hunyuan, 'nb-NO')).toThrow('LANGUAGE_UNSUPPORTED');
+    expect(() => resolveLocalTranslationLanguageCode(ids.hunyuanMt3, 'xx')).toThrow('LANGUAGE_UNSUPPORTED');
     expect(() => resolveLocalTranslationLanguageCode(ids.opusJaEn, 'zh')).toThrow('LANGUAGE_UNSUPPORTED');
   });
 
@@ -57,6 +63,10 @@ describe('local model language routes and bounded generation', () => {
   it('uses the translation-specific Hunyuan prompt and preserves the original source literally', () => {
     expect(hunyuanTranslationPrompt('材料 <x>', 'zh', 'en')).toContain('材料 <x>');
     expect(hunyuanTranslationPrompt('print', 'en', 'ja')).toContain('Japanese');
+    expect(hunyuanTranslationPrompt('print', 'en', 'el', ids.hunyuanMt3)).toContain('Greek');
+    expect(hunyuanTranslationPrompt('print', 'en', 'nb', ids.hunyuanMt3)).toContain('Norwegian');
+    expect(hunyuanTranslationPrompt('print', 'en', 'kk-Cyrl', ids.hunyuanMt3)).toContain('Cyrillic Kazakh');
+    expect(() => hunyuanTranslationPrompt('print', 'en', 'el', ids.hunyuan)).toThrow('LANGUAGE_UNSUPPORTED');
     expect(() => hunyuanTranslationPrompt('print', 'en', 'invalid')).toThrow('LANGUAGE_UNSUPPORTED');
   });
 

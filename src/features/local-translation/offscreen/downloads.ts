@@ -63,7 +63,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
                     downloadedBytes += verified ? file.size : await artifactDownloadedBytes(file);
                     complete &&= verified;
                 }
-                if (model.legacy) {
+                if (model.engine === 'legacy') {
                     complete = await isLocalTranslationModelCached(model.value);
                     downloadedBytes = complete ? model.downloadSizeMb * 1_000_000 : 0;
                 }
@@ -240,7 +240,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
                 if (job?.started) await job.done;
                 else if (job) jobs.delete(model);
                 dependencies.beforeRemove?.(model);
-                if (getLocalTranslationModel(model).legacy) await removeLocalTranslationModelFiles(model);
+                if (getLocalTranslationModel(model).engine === 'legacy') await removeLocalTranslationModelFiles(model);
                 else for (const file of getTranslationArtifacts(model)) await removeTranslationArtifact(file);
                 update(model, {phase: 'idle', downloadedBytes: 0, error: undefined, needsReverification: undefined});
             } catch (error) {

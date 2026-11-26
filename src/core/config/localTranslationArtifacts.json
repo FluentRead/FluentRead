@@ -159,6 +159,16 @@
       }
     ]
   },
+  "tencent/Hy-MT3-1.8B-GGUF": {
+    "revision": "4c4370b31f13ccac4ac71133e3a0967c88cc792c",
+    "files": [
+      {
+        "path": "Hy-MT3-1.8B-Q4_K_M.gguf",
+        "size": 1348432160,
+        "sha256": "bae6e591103654ff43ef0de7d1492f6e6df1f955505f6bb2cc52e86fc399a942"
+      }
+    ]
+  },
   "tencent/Hy-MT2-1.8B-GGUF": {
     "revision": "a0c709d9fac510f2c807aa3af52872340dc37a4a",
     "files": [

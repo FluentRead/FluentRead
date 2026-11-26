@@ -54,6 +54,7 @@ const bytes = Buffer.byteLength(source);
 // JSON 合批与共享退避增加代码，按 1 kB 步长利用原余量后追加 4 kB。
 // 合入最新 main（含 #1383/#1387/#1422/#1425/#1429/#1431）与 Calm Reading 统一令牌、批量缓存事务及紧凑批量协议后，
 // 独立油猴脚本 CI 实测为 3,730,373 字节，无新增依赖或模型资源，Greasy Fork 与精简版上限不变，追加 26 kB。
-const maxBytes = 3_733_000;
+// 接入混元 Hy-MT3 1.8B（目录、七语设置文案与条件保留逻辑），按 1 kB 步长追加 8 kB；无新增依赖或模型资源。
+const maxBytes = 3_741_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

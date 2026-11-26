@@ -288,6 +288,54 @@ describe('local translation actual mounted page ownership', () => {
         expect(current.signal.aborted).toBe(false);expect(h.host.querySelector('.local-model-trial-result')).toBeNull();
         current.done.resolve('CURRENT_RESULT');await settle();expect(h.host.querySelector('.local-model-trial-result')?.textContent).toContain('CURRENT_RESULT');
     });
+    it('shows only Hy-MT3 when Hy-MT2 is not downloaded and replaces an undownloaded Hy-MT2 selection with Hy-MT3', async () => {
+        const h = await mount();
+        const cards = () => [...h.host.querySelectorAll('.local-model')].map(node => node.getAttribute('data-model'));
+        expect(cards()).toEqual([
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusZhEn,
+            models.LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3,
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusJaEn,
+        ]);
+        expect(h.host.querySelector(`[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3}"] .local-model-tag.quality`)).not.toBeNull();
+        expect(h.host.querySelector(`[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan}"]`)).toBeNull();
+        h.state.config = normalizeConfig({model: {localTranslation: models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan}});
+        await settle();
+        expect(h.state.config.model.localTranslation).toBe(models.LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3);
+        expect(cards()).toEqual([
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusZhEn,
+            models.LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3,
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusJaEn,
+        ]);
+    });
+    it('keeps a previously downloaded Hy-MT2 visible after Hy-MT3 and switches to Hy-MT3 once removed', async () => {
+        const h = await mount();
+        const hyMt3 = models.LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3;
+        const hyMt2 = models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan;
+        await h.backend.emit([task('ready', 800_000, 200, hyMt2)]);
+        h.state.config = normalizeConfig({model: {localTranslation: hyMt2}});
+        await settle();
+        const cards = () => [...h.host.querySelectorAll('.local-model')].map(node => node.getAttribute('data-model'));
+        expect(cards()).toEqual([
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusZhEn,
+            hyMt3,
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusJaEn,
+            hyMt2,
+        ]);
+        expect(h.state.config.model.localTranslation).toBe(hyMt2);
+        expect(h.host.querySelector(`[data-model="${hyMt3}"] .local-model-tag.quality`)).not.toBeNull();
+        expect(h.host.querySelector(`[data-model="${hyMt2}"] .local-model-tag.quality`)).toBeNull();
+        expect(h.host.querySelector(`[data-model="${hyMt2}"] .local-model-download-control`)).toBeNull();
+        ports.confirm.mockResolvedValueOnce('confirm');
+        findButton(h.host, `[data-model="${hyMt2}"] button`, '').click();
+        await settle();
+        expect(h.backend.offscreen.remove).toHaveBeenCalledWith(hyMt2);
+        expect(h.state.config.model.localTranslation).toBe(hyMt3);
+        expect(cards()).toEqual([
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusZhEn,
+            hyMt3,
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusJaEn,
+        ]);
+    });
     it('cancels trial and removes subscriptions on unmount', async () => {
         const h = await mount();await h.backend.ready();trialButton(h.host).click();await settle();const trial = [...h.backend.trials.values()][0];
         h.stop();await settle();expect(ports.listeners.size).toBe(0);expect(trial.signal.aborted).toBe(true);

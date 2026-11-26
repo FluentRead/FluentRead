@@ -134,10 +134,10 @@ Under **Translation services → Local model translation**, choose and download 
 | Model | Approximate download | Use |
 | --- | --- | --- |
 | Lightweight Chinese–English pack | 239 MB | Simple Chinese–English sentences |
-| Hunyuan Hy-MT2 1.8B | 1.13 GB | More languages and complex expressions, with higher memory needs |
+| Hunyuan Hy-MT3 1.8B | 1.35 GB | Third-generation Hunyuan with 102 languages and complex expressions, recommended over Hy-MT2, with higher memory needs |
 | Lightweight Japanese–English pack | 214 MB | Japanese-to-English; limited English-to-Japanese quality |
 
-Pause, resume, or retry downloads; leaving settings does not stop background downloading. Files must finish verification before use. If a source fails, another source supplies the same fixed, verified version.
+Pause, resume, or retry downloads; leaving settings does not stop background downloading. Files must finish verification before use. If a source fails, another source supplies the same fixed, verified version. Browsers set to Simplified Chinese try Tencent's ModelScope mirror first for Hunyuan Hy-MT3. Existing Hunyuan Hy-MT2 1.8B downloads remain visible so you can continue using or delete them; otherwise only Hy-MT3 is shown.
 
 Models stay in this browser and are excluded from configuration backups. Deletion requires confirmation and affects only the chosen model. Download size is not runtime memory use: loading can noticeably increase CPU, RAM, or GPU use, and idle resources are released. See the [local-model FAQ](/en/guide/faq#do-local-models-reload-on-every-request-or-stay-in-memory-forever).
 

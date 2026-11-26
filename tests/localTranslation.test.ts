@@ -3,8 +3,11 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import * as detection from '@/src/core/language/detect';
 import {
   DEFAULT_LOCAL_TRANSLATION_MODEL,
+  HUNYUAN_LANGUAGE_NAMES,
+  HUNYUAN_MT3_LANGUAGE_NAMES,
   LOCAL_TRANSLATION_MODEL_IDS,
   LOCAL_TRANSLATION_MODELS,
+  PREFERRED_HUNYUAN_LOCAL_TRANSLATION_MODEL,
   normalizeLocalTranslationModel,
 } from '@/src/core/config/localTranslation';
 import {
@@ -22,10 +25,23 @@ afterEach(() => {
 });
 
 describe('local translation model catalog', () => {
-  it('normalizes the built-in model catalog', () => {
+  it('normalizes the built-in model catalog and prioritizes Hy-MT3 over legacy Hy-MT2', () => {
     expect(DEFAULT_LOCAL_TRANSLATION_MODEL).toBe(LOCAL_TRANSLATION_MODEL_IDS.opusZhEn);
+    expect(PREFERRED_HUNYUAN_LOCAL_TRANSLATION_MODEL).toBe(LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3);
     expect(normalizeLocalTranslationModel('missing')).toBe(DEFAULT_LOCAL_TRANSLATION_MODEL);
-    expect(LOCAL_TRANSLATION_MODELS.filter((item) => !item.legacy)).toHaveLength(3);
+    const active = LOCAL_TRANSLATION_MODELS.filter((item) => !item.legacy);
+    expect(active.map((item) => item.value)).toEqual([
+      LOCAL_TRANSLATION_MODEL_IDS.opusZhEn,
+      LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3,
+      LOCAL_TRANSLATION_MODEL_IDS.opusJaEn,
+    ]);
+    const mt3Index = LOCAL_TRANSLATION_MODELS.findIndex((item) => item.value === LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3);
+    const mt2Index = LOCAL_TRANSLATION_MODELS.findIndex((item) => item.value === LOCAL_TRANSLATION_MODEL_IDS.hunyuan);
+    expect(mt3Index).toBeGreaterThan(-1);
+    expect(mt3Index).toBeLessThan(mt2Index);
+    expect(LOCAL_TRANSLATION_MODELS[mt2Index]?.legacy).toBe(true);
+    expect(Object.keys(HUNYUAN_LANGUAGE_NAMES)).toHaveLength(38);
+    expect(Object.keys(HUNYUAN_MT3_LANGUAGE_NAMES)).toHaveLength(102);
   });
 
   it('maps product language codes for M2M100 and NLLB and rejects unsupported pairs', () => {
@@ -54,8 +70,16 @@ describe('local translation model catalog', () => {
     for (const [model, language, expected] of [
       [LOCAL_TRANSLATION_MODEL_IDS.opusZhEn, 'zh-TW', 'zh'],
       [LOCAL_TRANSLATION_MODEL_IDS.opusJaEn, 'ja-JP', 'ja'],
+      [LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3, 'fil', 'tl'],
+      [LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3, 'zh-TW', 'zh-Hant'],
+      [LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3, 'nb-NO', 'nb'],
+      [LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3, 'no', 'nb'],
+      [LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3, 'el-GR', 'el'],
+      [LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3, 'kk-Cyrl', 'kk-Cyrl'],
+      [LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3, 'mn-cyrl', 'mn-Cyrl'],
       [LOCAL_TRANSLATION_MODEL_IDS.hunyuan, 'fil', 'tl'],
       [LOCAL_TRANSLATION_MODEL_IDS.hunyuan, 'zh-TW', 'zh-Hant'],
+      [LOCAL_TRANSLATION_MODEL_IDS.hunyuan, 'kk-Cyrl', 'kk'],
       [LOCAL_TRANSLATION_MODEL_IDS.m2m100, ' nb-NO ', 'no'],
       [LOCAL_TRANSLATION_MODEL_IDS.nllb, 'nb-NO', 'nno_Latn'],
       [LOCAL_TRANSLATION_MODEL_IDS.nllb, 'zh-Hans', 'zho_Hans'],

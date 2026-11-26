@@ -29,6 +29,7 @@ import {createCourseSubtitleTools} from './courseSubtitleTools';
 import type {SubtitleExportFormat} from './subtitleExport';
 import type {VideoSubtitleCue} from './youtubeSubtitleData';
 import type {BilibiliAiSource} from './bilibiliAiSource';
+import {clearVideoSubtitleModeNotice, handleVideoSubtitleModeShortcutKeydown, notifyVideoSubtitleModeSwitch} from './modeShortcut';
 
 interface PlatformCaptionPorts {
     document: Document;
@@ -712,16 +713,45 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
     document.addEventListener('click', releaseUserControls, true);
     const closeCourseOutside = (event: Event) => { if (courseMenu && !courseMenu.hidden && !event.composedPath().includes(controlsHost!)) setCourseMenuOpen(false); };
     document.addEventListener('pointerdown', closeCourseOutside, true);
+    const handlePlatformKeydown = (event: KeyboardEvent) => {
+        handleVideoSubtitleModeShortcutKeydown(event, {
+            document,
+            config,
+            isActive: () => !disposed && getCaptionPlatform(window.location) === platform
+                && config.on && config.videoTranslationEnabled && (meeting || Boolean(video)),
+            isVisible: () => captionsEnabled(),
+            applyMode: (nextMode) => {
+                if (course) {
+                    manualEnabled = nextMode !== 'off';
+                    if (manualEnabled) ports.patch({videoSubtitleVisible: true, videoSubtitleDisplayMode: nextMode});
+                    else ports.patch({videoSubtitleVisible: false});
+                } else if (nextMode === 'off') {
+                    ports.patch({videoSubtitleVisible: false});
+                } else {
+                    ports.patch({videoSubtitleVisible: true, videoSubtitleDisplayMode: nextMode});
+                }
+                sync();
+            },
+            notify: (nextMode) => {
+                if (typeof globalThis.document === 'undefined' || globalThis.document !== document) return;
+                notifyVideoSubtitleModeSwitch(nextMode, (key, params) => translate(key, config.uiLanguage, params));
+            },
+        });
+    };
+    document.addEventListener('keydown', handlePlatformKeydown, true);
     window.addEventListener('resize', invalidateLayout);
     document.fonts?.addEventListener('loadingdone', invalidateLayout);
     sync();
     return () => {
-        disposed = true; courseTools?.destroy(); ai?.destroy(); clear(); cache.clear(); readings.destroy(); restoreCaptions(); restoreAutoButton(); timeline.clear(); removeCourseControls();
+        disposed = true;
+        if (typeof globalThis.document !== 'undefined' && globalThis.document === document) clearVideoSubtitleModeNotice();
+        courseTools?.destroy(); ai?.destroy(); clear(); cache.clear(); readings.destroy(); restoreCaptions(); restoreAutoButton(); timeline.clear(); removeCourseControls();
         if (sourceLine?.parentElement) resetSubtitlePanelLayout(sourceLine.parentElement, true);
         observer.disconnect(); clearInterval(timer); if (pendingTimer !== undefined) clearTimeout(pendingTimer);
         unsubscribe(); document.removeEventListener('fullscreenchange', invalidateLayout); document.removeEventListener('seeking', schedule, true);
         document.removeEventListener('click', releaseUserControls, true);
         document.removeEventListener('pointerdown', closeCourseOutside, true);
+        document.removeEventListener('keydown', handlePlatformKeydown, true);
         document.removeEventListener('play', played, true);
         document.removeEventListener('pause', paused, true);
         window.removeEventListener('resize', invalidateLayout); document.fonts?.removeEventListener('loadingdone', invalidateLayout);

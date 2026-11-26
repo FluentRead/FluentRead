@@ -75,6 +75,7 @@ import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslat
 import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy'
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection'
 import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation'
+import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut'
 import {findEnabledQuickTranslationHotkeyConflict, inputBoxTranslationTriggerHotkey} from '@/src/core/config/quickTranslation'
 const CustomHotkeyInput = defineAsyncComponent(() => import('@/src/ui/components/CustomHotkeyInput.vue'))
 const props = withDefaults(defineProps<{config: Config; active?: boolean; compact?: boolean; showMode?: boolean; showDensity?: boolean; showAppearance?: boolean}>(), {active: true, compact: false, showMode: true, showDensity: true, showAppearance: true})
@@ -99,6 +100,7 @@ function hotkeyConflict(hotkey: string, enabled = props.config.informationHighli
     config.sectionTranslationHotkeyEnabled ? resolveSectionTranslationHotkey(config.sectionTranslationHotkey, config.customSectionTranslationHotkey) : '',
     config.paragraphCopyEnabled ? resolveParagraphCopyHotkey(config.paragraphCopyHotkey, config.customParagraphCopyHotkey) : '',
     config.selectionAreaEnabled ? resolveAreaTranslationHotkey(config.selectionAreaHotkey, config.customSelectionAreaHotkey) : '',
+    config.videoSubtitleModeHotkeyEnabled ? resolveVideoSubtitleModeHotkey(config.videoSubtitleModeHotkey, config.customVideoSubtitleModeHotkey) : '',
     inputBoxTranslationTriggerHotkey(config.inputBoxTranslationTrigger, config.customInputBoxTranslationHotkey), resolveReservedClickSelectionHotkey(config)]
   return taken.some(item => canonicalizeHotkey(item || '').toLocaleLowerCase() === identity) || findEnabledQuickTranslationHotkeyConflict(config.quickTranslationProfiles ?? [], hotkey)
     ? t('informationHighlight.hotkey.conflict') : ''

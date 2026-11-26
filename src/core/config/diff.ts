@@ -274,6 +274,11 @@ const VIDEO_DISPLAY_MODE_LABELS = new Map<unknown, string>([
     ['translation-only', '只显示译文'],
     ['original-only', '只显示原文'],
 ]);
+const VIDEO_SUBTITLE_MODE_HOTKEY_ACTION_LABELS = new Map<unknown, string>([
+    ['bilingual-original', '双语 ↔ 原文'],
+    ['cycle-display', '双语 → 译文 → 原文'],
+    ['cycle-all', '双语 → 译文 → 原文 → 关闭'],
+]);
 const SIDE_LABELS = new Map<unknown, string>([
     ['left', '左侧'],
     ['right', '右侧'],
@@ -681,6 +686,10 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     videoGlossaryIds: {group: 'videoSubtitles', label: '字幕术语库', format: formatGlossarySelection},
     videoSubtitleVisible: {group: 'videoSubtitles', label: '显示视频字幕', format: formatBoolean},
     videoSubtitleDisplayMode: {group: 'videoSubtitles', label: '视频字幕显示模式', format: (value) => formatEnum(value, VIDEO_DISPLAY_MODE_LABELS)},
+    videoSubtitleModeHotkeyEnabled: {group: 'videoSubtitles', label: '视频字幕显示模式快捷键', format: formatBoolean},
+    videoSubtitleModeHotkey: {group: 'videoSubtitles', label: '视频字幕模式切换组合键', format: value => value === 'custom' ? '自定义快捷键' : formatValue(value)},
+    customVideoSubtitleModeHotkey: {group: 'videoSubtitles', label: '自定义视频字幕模式快捷键', format: formatValue},
+    videoSubtitleModeHotkeyAction: {group: 'videoSubtitles', label: '视频字幕快捷键切换方式', format: value => formatEnum(value, VIDEO_SUBTITLE_MODE_HOTKEY_ACTION_LABELS)},
     videoSubtitleFontSize: {group: 'videoSubtitles', label: '视频字幕字号', format: (value) => formatNumber(value, '%')},
     videoSubtitleOffsetMs: {group: 'videoSubtitles', label: '字幕时间偏移', format: (value) => formatNumber(value, 'ms')},
     videoSubtitleAppearance: {group: 'videoSubtitles', label: '视频字幕外观'},

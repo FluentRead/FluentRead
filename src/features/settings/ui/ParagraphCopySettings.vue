@@ -53,6 +53,7 @@ import {
 import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation';
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
 import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation';
+import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
 import {canonicalizeHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
 import {
     findEnabledQuickTranslationHotkeyConflict,
@@ -100,6 +101,12 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
                 ? resolveSectionTranslationHotkey(props.config.sectionTranslationHotkey, props.config.customSectionTranslationHotkey)
                 : '',
             feature: t('sectionTranslation.settings.title'),
+        },
+        {
+            hotkey: props.config.videoSubtitleModeHotkeyEnabled
+                ? resolveVideoSubtitleModeHotkey(props.config.videoSubtitleModeHotkey, props.config.customVideoSubtitleModeHotkey)
+                : '',
+            feature: t('video.modeShortcut.title'),
         },
         {hotkey: inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger, props.config.customInputBoxTranslationHotkey), feature: translateLegacy('输入框翻译')},
     ];

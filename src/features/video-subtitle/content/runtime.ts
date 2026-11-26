@@ -124,6 +124,7 @@ import {TimedTextTrackCache} from './timedTextTrackCache';
 import {createVideoSubtitleDownloads} from './downloads';
 import {confirmVideoSubtitleExport} from './exportPrompt';
 import {createSubtitleLayoutObserver} from './subtitleLayoutObserver';
+import {clearVideoSubtitleModeNotice, handleVideoSubtitleModeShortcutKeydown, notifyVideoSubtitleModeSwitch} from './modeShortcut';
 
 type VideoConfigPatch = Partial<Pick<Config, 'videoTranslationEnabled' | 'videoSubtitleVisible' | 'videoSubtitleDisplayMode' | 'videoSubtitleFontSize' | 'videoSubtitleOffsetMs' | 'videoLocalModel' | 'videoSubtitleAppearance'>>;
 
@@ -1341,6 +1342,7 @@ function mountVideoSubtitleRuntime(): () => void {
 
   const handleDocumentKeydown = (event: KeyboardEvent) => {
     if (!event.isTrusted) return;
+    if (handleVideoSubtitleModeShortcutKeydown(event, {document, config, isActive: () => !destroyed && config.on && config.videoTranslationEnabled && isSupportedVideoPage() && Boolean(observedVideo || playerLocator.getTarget()), isVisible: () => config.videoSubtitleVisible !== false, applyMode: selectMenuMode, notify: mode => notifyVideoSubtitleModeSwitch(mode, videoUi)})) return;
     if (event.key !== 'Escape' || !menuElement || menuElement.hidden) return;
     // 全屏 Escape 属于浏览器；菜单可以同时收尾，但不能阻止退出全屏。
     if (!document.fullscreenElement) event.preventDefault();
@@ -1831,7 +1833,7 @@ function mountVideoSubtitleRuntime(): () => void {
   });
 
   return () => {
-    destroyed = true;
+    destroyed = true; clearVideoSubtitleModeNotice();
     reading.destroy();
     learning.destroy();
     learningPlacement.dispose();

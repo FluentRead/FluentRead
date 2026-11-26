@@ -376,6 +376,13 @@
       ],
       "scenario": "真实模板自动贴底、手动偏移联动、位置显隐、七语标签/ARIA、字号与皮肤预览、重置及草稿替换"
     },
+    "src/features/settings/ui/VideoSubtitleShortcutSettings.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/videoSubtitleShortcutSettingsLifecycle.test.ts"
+      ],
+      "scenario": "开关启停、预设与自定义快捷键录制草稿、KeepAlive/分区切换/总开关关闭生命周期及跨功能冲突校验"
+    },
     "src/features/settings/ui/WebDavBackup.vue": {
       "kind": "behavior",
       "tests": [

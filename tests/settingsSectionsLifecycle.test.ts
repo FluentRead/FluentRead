@@ -74,6 +74,7 @@ function configureSectionPorts(data: Record<string, any>, {template = false, req
         '@/src/features/settings/ui/SiteAdaptationSettings.vue', '@/src/features/settings/ui/SitePreferencesSettings.vue',
         '@/src/features/settings/ui/SiteRulePreview.vue', '@/src/features/settings/ui/VideoLocalModelSettings.vue',
         '@/src/features/settings/ui/LocalTtsSettings.vue', '@/src/features/settings/ui/VideoSubtitleAppearanceSettings.vue',
+        '@/src/features/settings/ui/VideoSubtitleShortcutSettings.vue',
         '@/src/features/settings/ui/InterfaceSettings.vue', '@/src/features/settings/ui/AreaTranslationSettings.vue',
         '@/src/features/settings/ui/InputTranslationSettings.vue', '@/src/features/settings/ui/ParagraphCopySettings.vue',
         '@/src/features/settings/ui/SectionTranslationSettings.vue', '@/src/features/settings/ui/ParagraphHandlingSettings.vue',

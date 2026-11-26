@@ -155,7 +155,7 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
   })
   it('侧边栏原生调用失败保留重试入口，关闭后的旧点击与迟到失败不再反馈',async()=>{
     fixture.capabilities.sidepanel=true;await mount();openSidepanel.mockRejectedValueOnce(new Error('gesture failed'))
-    await eventOf(button('sidebar-translation'))();await drain();expect(close).not.toHaveBeenCalled();expect(document.querySelector('.notice.error')?.textContent).toBe('sidepanel.openError')
+    await eventOf(button('sidebar-translation'))();await drain();expect(close).not.toHaveBeenCalled();expect(document.querySelector('.notice')).toBeNull();expect(button('sidebar-translation').hasAttribute('disabled')).toBe(false)
     const pending=deferred<void>();openSidepanel.mockReturnValueOnce(pending.promise);const old=eventOf(button('sidebar-translation'));old();shown.value=false;await drain()
     const calls=openSidepanel.mock.calls.length;old();expect(openSidepanel).toHaveBeenCalledTimes(calls);pending.reject(new Error('late failure'));await drain();expect(close).not.toHaveBeenCalled()
   })
@@ -760,11 +760,11 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     const publish=async(code:string)=>{runtimeEvent({type:'fullPageTranslationState',isTranslated:false,toolbarStatus:'error',documentToken:'popup-fixture-document',diagnostic:{code}},sender);await drain();expectCollapsedDiagnostic();await openDiagnosticDetails()}
     const action=(id:string)=>{const node=document.querySelector(`[data-diagnostic-action="${id}"]`);expect(node).not.toBeNull();return eventOf(node!)}
     await publish('authentication');createTab.mockRejectedValueOnce(Error('PRIVATE service tab error'));action('services')();await drain()
-    expect(document.querySelector('.notice')!.getAttribute('role')).toBe('alert');expect(document.querySelector('.notice')!.textContent).toContain('无法打开设置');expect(document.querySelector('[data-diagnostic-code="authentication"]')).not.toBeNull();expect(close).not.toHaveBeenCalled()
+    expect(document.querySelector('.notice')).toBeNull();expect(document.querySelector('[data-diagnostic-code="authentication"]')).not.toBeNull();expect(close).not.toHaveBeenCalled()
     await publish('context-invalid');getTab.mockRejectedValueOnce(Error('PRIVATE query error'));action('refresh')();await drain()
-    expect(document.querySelector('.notice')!.textContent).toContain('原网页已关闭');expect(document.querySelector('[data-diagnostic-code="context-invalid"]')).not.toBeNull();expect(reloadTab).not.toHaveBeenCalled()
+    expect(document.querySelector('.notice')).toBeNull();expect(document.querySelector('[data-diagnostic-code="context-invalid"]')).not.toBeNull();expect(reloadTab).not.toHaveBeenCalled()
     reloadTab.mockRejectedValueOnce(Error('PRIVATE reload error'));action('refresh')();await drain()
-    expect(document.querySelector('.notice')!.textContent).toContain('无法刷新网页');expect(close).not.toHaveBeenCalled()
+    expect(document.querySelector('.notice')).toBeNull();expect(close).not.toHaveBeenCalled()
     await publish('timeout');send.mockRejectedValueOnce(Error('Failed to fetch PRIVATE provider body'));action('retry')();await drain()
     expect(document.querySelector('[data-diagnostic-code="network"]')).not.toBeNull();expect(document.querySelector('.fluentread-diagnostic')!.textContent).toContain('服务连接失败');expect(document.body.textContent).not.toContain('PRIVATE');expect(button('page-translation').hasAttribute('disabled')).toBe(false)
     expectCollapsedDiagnostic();await openDiagnosticDetails();eventOf(document.querySelector('[data-diagnostic-dismiss]')!)();await drain();expect(document.querySelector('.fluentread-diagnostic')).toBeNull();expect(focused).toBe(button('page-translation'))
@@ -952,19 +952,19 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     expect(always.getAttribute('aria-checked')).toBe('false');expect(always.textContent).toContain('自动翻译已暂停');expect(always.getAttribute('title')).toContain('恢复扩展后继续自动翻译');expect(always.getAttribute('aria-description')).toContain('子域名');expect(disabled.getAttribute('title')).toContain('禁用优先于自动翻译')
     eventOf(disabled)();await drain();expect(state.config.alwaysTranslateDomains).toEqual(['example.com']);expect(state.config.disabledExtensionDomains).toEqual([]);expect(document.querySelector('[data-setting="always-translate-site"]')!.getAttribute('aria-checked')).toBe('true')
   })
-  it('禁用按钮可中断在途翻译，规则保存期间锁定两个开关并等待真实反馈',async()=>{
+  it('禁用按钮可中断在途翻译，规则保存期间锁定两个开关并在完成后不展示卡片底部提示行',async()=>{
     await mount();const reply=deferred(),commit=deferred();send.mockReturnValueOnce(reply.promise);const pending=eventOf(button('page-translation'))();await drain()
     const disabled=document.querySelector('[data-setting="disable-extension-site"]')!;expect(disabled.hasAttribute('disabled')).toBe(false);patches.mockReturnValueOnce(commit.promise);eventOf(disabled)();await drain()
     expect(state.pageState.busy).toBe(false);expect(state.pageState.savingRule).toBe(true);expect(document.querySelectorAll('.site-rule-saving')).toHaveLength(2);expect(state.notice).toBe('');expect(patches).toHaveBeenCalledWith(expect.objectContaining({disabledExtensionDomains:['example.com']}))
     for(const element of document.querySelectorAll('.site-rule-button')) {expect(element.hasAttribute('disabled')).toBe(true);expect(element.getAttribute('aria-busy')).toBe('true')}
     reply.resolve({status:'success',isTranslated:true});await pending;await drain();expect(state.pageTranslated).toBe(false);commit.resolve(undefined);await drain()
-    expect(state.pageState.savingRule).toBe(false);expect(state.notice).toBe('已在 example.com 禁用扩展');expect(document.querySelector('.notice')?.getAttribute('role')).toBe('status')
+    expect(state.pageState.savingRule).toBe(false);expect(state.notice).toBe('');expect(document.querySelector('.notice')).toBeNull();expect(document.querySelector('[data-setting="disable-extension-site"]')?.textContent).toContain('已禁用扩展')
   })
-  it('站点保存失败显示可访问错误并回读权威配置，不能声称保存或启动翻译',async()=>{
+  it('站点保存失败回读权威配置且不展示卡片底部提示行，不能声称保存或启动翻译',async()=>{
     await mount();const commit=deferred();patches.mockReturnValueOnce(commit.promise);eventOf(document.querySelector('[data-setting="always-translate-site"]')!)();await drain();expect(commands()).toHaveLength(0)
-    // 配置服务失败时回读权威存储并订阅回滚，展示层只负责真实反馈。
+    // 配置服务失败时回读权威存储并订阅回滚，不在翻译卡片增加 .notice 行。
     subscribe({...config,alwaysTranslateDomains:[]} as Config);commit.reject(Error('write failed'));await drain()
-    expect(state.pageState.savingRule).toBe(false);expect(state.config.alwaysTranslateDomains).toEqual([]);expect(state.notice).toBe('未能保存 example.com 的网站设置，请重试');expect(document.querySelector('.notice')?.getAttribute('role')).toBe('alert');expect(commands()).toHaveLength(0)
+    expect(state.pageState.savingRule).toBe(false);expect(state.config.alwaysTranslateDomains).toEqual([]);expect(state.notice).toBe('');expect(document.querySelector('.notice')).toBeNull();expect(commands()).toHaveLength(0)
   })
   it('站点保存保留同 tick 尚未由 post watcher 提交的其他用户草稿',async()=>{
     await mount();const {messages,records}=await attachPersistence()
@@ -1045,10 +1045,10 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     config.selectionAreaEnabled=false;await mount();await openFeature('image');const area=eventOf(document.querySelector('[aria-label="启用或关闭圈选翻译"]')!),caps=fixture.capabilities;caps.areaTranslation=false;caps.areaTranslation=true;await drain();area();expect(state.config.selectionAreaEnabled).toBe(false);eventOf(document.querySelector('[aria-label="启用或关闭圈选翻译"]')!)();expect(state.config.selectionAreaEnabled).toBe(true)
   })
   it('缓存清理独占请求；失活旧回复不能释放重新激活后的新请求',async()=>{
-    await mount();const first=deferred(),second=deferred();runtimeSend.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);const cached=eventOf(document.querySelector('footer button')!),pending=cached();await cached();expect(runtimeSend).toHaveBeenCalledOnce();expect(document.querySelector('footer button')!.hasAttribute('disabled')).toBe(true);shown.value=false;await drain();shown.value=true;await drain();cached();expect(runtimeSend).toHaveBeenCalledOnce();const newer=eventOf(document.querySelector('footer button')!)();expect(runtimeSend).toHaveBeenCalledTimes(2);first.resolve({success:true});await pending;await drain();expect(state.clearingCache).toBe(true);expect(state.notice).toBe('');second.resolve({success:true});await newer;expect(state.clearingCache).toBe(false);expect(state.notice).toBe('全部翻译缓存已清除')
+    await mount();const first=deferred(),second=deferred();runtimeSend.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);const cached=eventOf(document.querySelector('footer button')!),pending=cached();await cached();expect(runtimeSend).toHaveBeenCalledOnce();expect(document.querySelector('footer button')!.hasAttribute('disabled')).toBe(true);shown.value=false;await drain();shown.value=true;await drain();cached();expect(runtimeSend).toHaveBeenCalledOnce();const newer=eventOf(document.querySelector('footer button')!)();expect(runtimeSend).toHaveBeenCalledTimes(2);first.resolve({success:true});await pending;await drain();expect(state.clearingCache).toBe(true);expect(state.notice).toBe('');second.resolve({success:true});await newer;expect(state.clearingCache).toBe(false);expect(state.notice).toBe('');expect(document.querySelector('.notice')).toBeNull()
   })
-  it('缓存失败与暂停均有确定结束状态，失败只显示当前会话通知',async()=>{
-    await mount();const error=vi.spyOn(console,'error').mockImplementation(()=>{});runtimeSend.mockResolvedValueOnce({success:false,error:'fixture'});await eventOf(document.querySelector('footer button')!)();expect(state.notice).toBe('缓存清除失败');expect(state.clearingCache).toBe(false);const reply=deferred();runtimeSend.mockReturnValueOnce(reply.promise);const pending=eventOf(document.querySelector('footer button')!)();state.config.on=false;reply.resolve({success:true});await pending;expect(state.clearingCache).toBe(false);expect(state.notice).toBe('全部翻译缓存已清除');error.mockRestore()
+  it('缓存失败与暂停均有确定结束状态，不展示卡片底部提示行',async()=>{
+    await mount();const error=vi.spyOn(console,'error').mockImplementation(()=>{});runtimeSend.mockResolvedValueOnce({success:false,error:'fixture'});await eventOf(document.querySelector('footer button')!)();expect(error).toHaveBeenCalledOnce();expect(state.notice).toBe('');expect(document.querySelector('.notice')).toBeNull();expect(state.clearingCache).toBe(false);const reply=deferred();runtimeSend.mockReturnValueOnce(reply.promise);const pending=eventOf(document.querySelector('footer button')!)();state.config.on=false;reply.resolve({success:true});await pending;expect(state.clearingCache).toBe(false);expect(state.notice).toBe('');expect(document.querySelector('.notice')).toBeNull();error.mockRestore()
   })
   it.each(['success','failure'] as const)('[cache-recovery] 超时恢复按钮，旧%s回复不覆盖重试且不记录异常',async outcome=>{
     vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});localized=true;await mount()
@@ -1058,17 +1058,17 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     await vi.advanceTimersByTimeAsync(14999);expect(state.clearingCache).toBe(true)
     await vi.advanceTimersByTimeAsync(1);await drain()
     try{
-      expect(state.clearingCache).toBe(false);expect(state.notice).toBe('暂未确认清除结果，请稍后刷新');expect(error).not.toHaveBeenCalled()
+      expect(state.clearingCache).toBe(false);expect(state.notice).toBe('');expect(document.querySelector('.notice')).toBeNull();expect(error).not.toHaveBeenCalled()
       const newer=eventOf(document.querySelector('footer button')!)();expect(state.clearingCache).toBe(true)
       if(outcome==='success')first.resolve({success:true});else first.reject(new Error('late fixture'))
-      await pending;await drain();expect(state.clearingCache).toBe(true);expect(state.notice).toBe('暂未确认清除结果，请稍后刷新')
-      second.resolve({success:true});await newer;expect(state.clearingCache).toBe(false);expect(state.notice).toBe('全部翻译缓存已清除');expect(error).not.toHaveBeenCalled()
+      await pending;await drain();expect(state.clearingCache).toBe(true);expect(state.notice).toBe('')
+      second.resolve({success:true});await newer;expect(state.clearingCache).toBe(false);expect(state.notice).toBe('');expect(document.querySelector('.notice')).toBeNull();expect(error).not.toHaveBeenCalled()
     }finally{error.mockRestore()}
   })
-  it('[cache-recovery] 已清后台而页面同步未完成时保留准确状态',async()=>{
+  it('[cache-recovery] 已清后台而页面同步未完成时恢复按钮且不展示卡片底部提示行',async()=>{
     localized=true;await mount();runtimeSend.mockResolvedValueOnce({success:true,invalidationPending:true})
     await eventOf(document.querySelector('footer button')!)();expect(state.clearingCache).toBe(false)
-    expect(state.notice).toBe('后台缓存已清除，部分页面仍在同步');expect(state.noticeType).toBe('pending');expect(document.querySelector('.notice')!.getAttribute('role')).toBe('status')
+    expect(state.notice).toBe('');expect(document.querySelector('.notice')).toBeNull()
   })
   it.each(['cached','pagehide','unmount'] as const)('[cache-recovery] %s 立即结束旧清理等待和计时器，迟到错误不影响新会话',async reason=>{
     vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});await mount()
@@ -1086,7 +1086,7 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
       first.reject(new Error('late closed fixture'));await drain();expect(error).not.toHaveBeenCalled()
       if(reason!=='unmount'){
         expect(state.clearingCache).toBe(true);expect(state.notice).toBe('')
-        second.resolve({success:true});await newer;expect(state.clearingCache).toBe(false);expect(state.notice).toBe('全部翻译缓存已清除')
+        second.resolve({success:true});await newer;expect(state.clearingCache).toBe(false);expect(state.notice).toBe('');expect(document.querySelector('.notice')).toBeNull()
       }
     }finally{error.mockRestore();schedules.mockRestore();releases.mockRestore()}
   })
@@ -1097,7 +1097,7 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     await mount();const cached=eventOf(document.querySelector('.donation-button')!),pending=cached();state.donationVisible=false;await pending;expect(focused).toBe(document.body);await drain();await eventOf(document.querySelector('.donation-button')!)();const before=focused;shown.value=false;await drain();shown.value=true;await drain();cached();await drain();expect(state.donationVisible).toBe(false);expect(focused).toBe(before)
   })
   it.each(['settings','document'])('%s 的 API 失败可恢复，关闭后旧成功不关闭新会话',async target=>{
-    await mount();const selector=target==='settings'?'.settings-button':'[data-feature="document-translation"]',api=target==='settings'?openOptions:createTab;api.mockRejectedValueOnce(new Error('fixture'));await eventOf(document.querySelector(selector)!)();expect(state.noticeType).toBe('error');expect(close).not.toHaveBeenCalled();const reply=deferred();api.mockReturnValueOnce(reply.promise);const cached=eventOf(document.querySelector(selector)!),pending=cached();await drain();expect(api).toHaveBeenCalledTimes(2);shown.value=false;await drain();shown.value=true;await drain();reply.resolve(undefined);await pending;cached();expect(api).toHaveBeenCalledTimes(2);expect(close).not.toHaveBeenCalled();await eventOf(document.querySelector(selector)!)();expect(close).toHaveBeenCalledOnce()
+    await mount();const selector=target==='settings'?'.settings-button':'[data-feature="document-translation"]',api=target==='settings'?openOptions:createTab;api.mockRejectedValueOnce(new Error('fixture'));await eventOf(document.querySelector(selector)!)();expect(state.notice).toBe('');expect(document.querySelector('.notice')).toBeNull();expect(close).not.toHaveBeenCalled();const reply=deferred();api.mockReturnValueOnce(reply.promise);const cached=eventOf(document.querySelector(selector)!),pending=cached();await drain();expect(api).toHaveBeenCalledTimes(2);shown.value=false;await drain();shown.value=true;await drain();reply.resolve(undefined);await pending;cached();expect(api).toHaveBeenCalledTimes(2);expect(close).not.toHaveBeenCalled();await eventOf(document.querySelector(selector)!)();expect(close).toHaveBeenCalledOnce()
   })
 })
 
@@ -1106,8 +1106,9 @@ describe('Popup 快捷键提示与能力边界',()=>{
     config.selectionAreaHotkey='custom';config.customSelectionAreaHotkey='Alt+J';config.selectionAreaEnabled=false
     config.quickTranslationProfiles=[{id:'occupied',enabled:true,action:'hover',hotkey:'Alt+J',service:'google',model:'',targetLanguage:'',displayMode:'inherit',fullPageMode:'inherit'}]
     await mount();await openFeature('image');eventOf(document.querySelector('[aria-label="启用或关闭圈选翻译"]')!)();await drain()
-    expect(state.config.selectionAreaEnabled).toBe(false);expect(state.notice).toBe('quickTranslation.conflictProfilePopup');expect(state.noticeType).toBe('error');expect(state.config.quickTranslationProfiles).toHaveLength(1)
-    state.config.quickTranslationProfiles=[];await drain();eventOf(document.querySelector('[aria-label="启用或关闭圈选翻译"]')!)();await drain();expect(state.config.selectionAreaEnabled).toBe(true)
+    expect(state.config.selectionAreaEnabled).toBe(false);expect(state.notice).toBe('quickTranslation.conflictProfilePopup');expect(state.noticeType).toBe('error');expect(document.querySelector('.hero-card .notice')).toBeNull();expect(document.querySelector('.drawer-surface .notice.error')?.textContent).toBe('quickTranslation.conflictProfilePopup');expect(state.config.quickTranslationProfiles).toHaveLength(1)
+    eventOf(document.querySelector('.drawer-header > button')!)();await drain();expect(state.notice).toBe('')
+    await openFeature('image');state.config.quickTranslationProfiles=[];await drain();eventOf(document.querySelector('[aria-label="启用或关闭圈选翻译"]')!)();await drain();expect(state.config.selectionAreaEnabled).toBe(true)
     state.config.quickTranslationProfiles=config.quickTranslationProfiles;await drain();eventOf(document.querySelector('[aria-label="启用或关闭圈选翻译"]')!)();await drain();expect(state.config.selectionAreaEnabled).toBe(false)
   })
   it('不支持圈选的浏览器保留已保存偏好，并明确隐藏不可执行的入口',async()=>{

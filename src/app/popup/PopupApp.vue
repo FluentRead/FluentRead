@@ -3,9 +3,9 @@
  默认布局：以原有玫红配色和独立卡片组织语言、服务与翻译，各控件使用固定槽位；完整服务名和局部翻译用途可由悬停或聚焦查看。
  服务启用：默认服务提示和功能选择同步用户关闭状态，具体候选与旧选择保护由 PopupServices 执行。
  文件职责：实现浏览器 Popup 的主交互界面，连接当前标签页状态、翻译配置、可插拔皮肤、功能抽屉和高频操作，让现场开关与显示操作保持简短，将长期偏好引导到对应设置页，并为从划词抽屉打开的设置保留明确返回原网页的入口。
- 主要内容：Aa 按钮通过既有配置补丁保存全局译文字体偏好，以固定尺寸的衬线／无衬线图标、按下状态和紧凑操作提示反馈选择；保存失败时在翻译卡片内显示居中提示与重试按钮，重试时将焦点交回字体按钮；已有配置订阅同步其他页面的选择，导航不撤销已接受保存，关闭与失活只取消界面等待和迟到反馈；翻译卡片右下角的双语/仅译文图标与网站规则同行，两种按钮共用提示样式并支持 Escape 收起，模式回调随服务和操作变化失效；品牌官网入口保留稳定点击区域，内部图标在悬停和键盘聚焦时缓慢单次摇摆并遵循动画偏好，停留后显示可用 Escape 关闭的官网提示；全文翻译进度与完成状态由主按钮反馈，失败时在主操作内的预留区域呈现自助诊断入口，不挤动网站开关，配置修复定位当前服务，本地报告由用户预览并手动导出；在配置 hydration 后汇总翻译服务，直接展示网页默认服务与适用的配置模型；翻译与局部同排，主操作用短标题合并平台快捷键并保留加载状态，长组合在悬停提示中完整显示，站点开关保留独立按钮；赞赏码在当前弹窗内切换放大与还原，关闭后重置；悬停、划词与图片抽屉优先展示开关和操作示意，首次单屏语言选择独占内容，保存后立即显示主菜单；页面操作、抽屉和导航绑定活跃会话，等待期间独占请求，关闭和配置切换使旧回复失效；网站规则写前复验标签页，等待后台确认并呈现保存忙碌、暂停与失败反馈；Safari 免费池精确授权，焦点复查保留已就绪按钮，点击接管旧读取并重新确认实际许可，撤权取消待发操作，授权事件合并刷新，错误随语言资源更新；打开的实际 teleport 抽屉复用平台可见视口订阅跟随键盘与缩放，极矮区域由同一订阅派生紧凑布局，整页遮罩保持背景拦截，可见高度扩大时仅修正当前聚焦服务搜索被吸顶标题遮住的外框，关闭、缓存失活和卸载立即释放，根画布保持固有尺寸。
+ 主要内容：Aa 按钮通过既有配置补丁保存全局译文字体偏好，以固定尺寸的衬线／无衬线图标、按下状态和紧凑操作提示反馈选择；保存失败时在翻译卡片内显示居中提示与重试按钮，重试时将焦点交回字体按钮；已有配置订阅同步其他页面的选择，导航不撤销已接受保存，关闭与失活只取消界面等待和迟到反馈；翻译卡片右下角的双语/仅译文图标与网站规则同行，两种按钮共用提示样式并支持 Escape 收起，模式回调随服务和操作变化失效；品牌官网入口保留稳定点击区域，内部图标在悬停和键盘聚焦时缓慢单次摇摆并遵循动画偏好，停留后显示可用 Escape 关闭的官网提示；全文翻译进度与完成状态由主按钮反馈，失败时在主操作内的预留区域呈现自助诊断入口，不挤动网站开关，配置修复定位当前服务，本地报告由用户预览并手动导出；翻译卡片底部不展示额外 `.notice` 提示行以避免撑动弹窗布局，仅抽屉内保留错误提示并在抽屉关闭时清理；在配置 hydration 后汇总翻译服务，直接展示网页默认服务与适用的配置模型；翻译与局部同排，主操作用短标题合并平台快捷键并保留加载状态，长组合在悬停提示中完整显示，站点开关保留独立按钮；赞赏码在当前弹窗内切换放大与还原，关闭后重置；悬停、划词与图片抽屉优先展示开关和操作示意，首次单屏语言选择独占内容，保存后立即显示主菜单；页面操作、抽屉和导航绑定活跃会话，等待期间独占请求，关闭和配置切换使旧回复失效；网站规则写前复验标签页，等待后台确认并通过开关自身状态反馈保存忙碌与结果；Safari 免费池精确授权，焦点复查保留已就绪按钮，点击接管旧读取并重新确认实际许可，撤权取消待发操作，授权事件合并刷新，错误随语言资源更新；打开的实际 teleport 抽屉复用平台可见视口订阅跟随键盘与缩放，极矮区域由同一订阅派生紧凑布局，整页遮罩保持背景拦截，可见高度扩大时仅修正当前聚焦服务搜索被吸顶标题遮住的外框，关闭、缓存失活和卸载立即释放，根画布保持固有尺寸。
  信息层级：服务摘要只保留当前服务与模型；悬停和划词的快捷开关与标题同排，独立快捷方案的作用范围仍明确说明，圈选快捷键只在操作示意中展示。
- 缓存清理：每次清理拥有独立的可取消等待，失活或卸载释放旧等待，超时恢复按钮并提示结果未确认，后台确认清除但页面仍同步时展示中性状态；全局暂停不取消清理，旧回复不能覆盖新请求。
+ 缓存清理：每次清理拥有独立的可取消等待，失活或卸载释放旧等待，超时恢复按钮，后台完成或失败后恢复按钮状态，不在翻译卡片增加提示行；全局暂停不取消清理，旧回复不能覆盖新请求。
  顶部入口：赞赏使用带提示的咖啡图标；支持的浏览器在其右侧提供带悬停和键盘提示的侧边栏图标，按配置从当前标签页或窗口打开 Chromium 面板，Firefox 直接使用原生侧栏；保留打开所需的用户手势，成功后关闭弹窗，失败保留重试入口。
  模块边界：组件编排 UI、浏览器导航事件与生命周期；页内面板通过授权来源固定发起网页，页面消息归属由 pageActions 管理，不实现翻译 provider、缓存存储或 content 挂载；公共配置由 services/config 管理；配置草稿复用共享编辑会话，保留 post 合并和关闭补丁交接。
 -->
@@ -249,8 +249,6 @@
         <button class="page-font-retry" type="button" data-testid="page-font-retry" :aria-label="t('popup.pageFont.retryAction')"
           :disabled="pageFontButton.disabled" :onClick="retryPageFont">{{ t('popup.pageFont.retry') }}</button>
       </div>
-
-      <p v-if="notice" class="notice" :class="noticeType" :role="noticeType === 'error' ? 'alert' : 'status'" :aria-live="noticeType === 'error' ? 'assertive' : 'polite'">{{ notice }}</p>
     </section>
 
     <PopupSiteRule
@@ -454,7 +452,7 @@
 import {ElTooltip, type TooltipInstance} from 'element-plus/es/components/tooltip/index';
 import PopupLanguageSelect from './PopupLanguageSelect.vue';
 import DiagnosticNotice from '@/src/features/self-help/ui/DiagnosticNotice.vue';
-import {getDiagnosticUiText, diagnoseFailure, normalizeDiagnostic, type Diagnostic, type DiagnosticAction, type DiagnosticUiTextKey} from '@/src/services/diagnostics';
+import {diagnoseFailure, normalizeDiagnostic, type Diagnostic, type DiagnosticAction} from '@/src/services/diagnostics';
 import {normalizeTranslationToolbarStatus, type TranslationToolbarStatus} from '@/src/features/full-page-translation/toolbarStatus';
 
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, toRefs, watch } from 'vue';
@@ -553,11 +551,7 @@ const setPageFontFocusAnchor = (element: unknown) => {pageFontFocusAnchor.value 
 const setDisplayModeTooltip = (tooltip: unknown) => {displayModeTooltip.value = tooltip ? tooltip as TooltipInstance : undefined;};
 const ElDrawer = defineAsyncComponent(() => import('./PopupDrawer'));
 const UiLanguageOnboarding = defineAsyncComponent(() => import('@/src/ui/components/UiLanguageOnboarding.vue'));
-const {language, bundleRevision, t, translateLegacy} = useUiI18n();
-function diagnosticUi(key: DiagnosticUiTextKey): string {
-  void bundleRevision.value;
-  return getDiagnosticUiText(key, config.value.uiLanguage);
-}
+const {language, t, translateLegacy} = useUiI18n();
 const version = browser.runtime.getManifest().version;
 // composition root 已等待配置服务；首次渲染直接使用完整快照，不能先暴露默认布局。
 const config = ref(normalizeConfig(runtimeConfig));
@@ -589,7 +583,7 @@ function readPageResult(value: unknown) {
   if (pageResultStatus.value === 'error' && !pageDiagnostic.value) pageDiagnostic.value = diagnoseFailure(undefined);
 }
 const notice = ref('');
-const noticeType = ref<'success' | 'error' | 'pending'>('success');
+const noticeType = ref<'error'>('error');
 const hydrated = ref(false);
 const showLanguageOnboarding = ref(false);
 let pageExitSaveStarted = false;
@@ -936,9 +930,9 @@ const pageActions = createPopupPageActions({state: pageState, config: () => conf
   warning: () => credentialWarning.value || '', getTab: tabSource.getTab,
   persistRule: persistSiteRulePatch,
   openPdf: source => browser.tabs.create({url: createPdfReaderUrl(browser.runtime.getURL('document.html'), source)}),
-  onStatus: readPageResult, onFailure: diagnostic => {pageDiagnostic.value = diagnostic;notice.value = ''},
+  onStatus: readPageResult, onFailure: diagnostic => {pageDiagnostic.value = diagnostic},
   send: (id, message) => browser.tabs.sendMessage(id, message, {frameId: 0}),
-  notice: showNotice, close: closePopupSurface, translate: t, thunderbird: isThunderbird});
+  notice: () => {}, close: closePopupSurface, translate: t, thunderbird: isThunderbird});
 const {hydrate: hydrateCurrentSite, toggle: togglePageTranslation, section: startSectionTranslation,
   setAlways: setCurrentSiteAlwaysTranslated, setDisabled: setCurrentSiteExtensionDisabled} = pageActions;
 watch(pageContext.revision, () => {pageActions.invalidate();readPageResult(undefined);if (!config.value.on || currentSiteExtensionDisabled.value) pageTranslated.value = false}, {flush: 'sync'});
@@ -1029,7 +1023,7 @@ async function openSidebarTranslation() {
       windowId: pageState.windowId,
     }, current);
     if (current()) closePopupSurface();
-  } catch {if (current()) showNotice(t('sidepanel.openError'), 'error');}
+  } catch { /* 侧边栏打开失败保留按钮可重试，不在翻译卡片新增提示行。 */ }
   finally {sidepanelOpening.value = false;}
 }
 // 快捷模式属于整个弹窗；服务、显示模式或在途操作变化会淘汰旧按钮回调。
@@ -1098,7 +1092,8 @@ const drawerDisplayModes = computed(() => {
   return options.display.map(item => ({...item, disabled: !config.value.on,
     choose: () => {if (current() && config.value.on) config.value.display = item.value}}));
 });
-watch(popupContext.active, enabled => {if (!enabled) {drawerVisible.value = false;donationVisible.value = false;notice.value = '';if (noticeTimer) clearTimeout(noticeTimer)}}, {flush: 'sync'});
+watch(popupContext.active, enabled => {if (!enabled) {drawerVisible.value = false;donationVisible.value = false;clearNotice()}}, {flush: 'sync'});
+watch(drawerVisible, visible => {if (!visible) clearNotice()}, {flush: 'sync'});
 // 只向自己实际 teleport 的遮罩提供内部抽屉定位变量；遮罩仍覆盖整页，键盘视口不参与根 popup 尺寸协商。
 watch([drawerVisible, drawerSurface, popupContext.active], ([visible, surface, active]) => {
   releaseDrawerViewport?.();
@@ -1282,9 +1277,9 @@ async function diagnosticAction(action: DiagnosticAction) {
     try {
     const tab = await tabSource.getTab();
     if (current() && tab?.id === currentTabId.value && (tab.pendingUrl || tab.url || '') === pageState.url) {
-      try {await browser.tabs.reload(tab.id);if (current()) closePopupSurface();} catch {if (current()) showNotice(diagnosticUi('refresh-failed'), 'error');}
+      try {await browser.tabs.reload(tab.id);if (current()) closePopupSurface();} catch { /* 保留诊断卡片可重试，不在翻译卡片新增提示行。 */ }
     }
-    } catch {if (current()) showNotice(diagnosticUi('source-closed'), 'error');}
+    } catch { /* 保留诊断卡片可重试，不在翻译卡片新增提示行。 */ }
     return;
   }
   if (action === 'retry') {pageDiagnostic.value = undefined;await runPageWithFreePoolAccess('retry');}
@@ -1320,7 +1315,7 @@ onUnmounted(() => {
   browser.tabs.onRemoved.removeListener(handleTabRemoved);
   darkMode.onchange = null;
   delete document.documentElement.dataset.popupHeight;
-  if (noticeTimer) clearTimeout(noticeTimer);
+  clearNotice();
 });
 
 function saveOnPageHide() {
@@ -1349,16 +1344,24 @@ function persistOnPageExit() {
     .catch((error) => console.warn('[FluentRead] popup 关闭前交接设置失败', error));
 }
 
-function showNotice(message: string, type: 'success' | 'error' | 'pending' = 'success') {
+function clearNotice() {
+  notice.value = '';
+  if (noticeTimer) {
+    clearTimeout(noticeTimer);
+    noticeTimer = undefined;
+  }
+}
+
+function showNotice(message: string, type: 'error' = 'error') {
   if (!popupContext.active.value) return;
   notice.value = message;
   noticeType.value = type;
   if (noticeTimer) clearTimeout(noticeTimer);
-  noticeTimer = setTimeout(() => { notice.value = ''; }, type === 'success' ? 2800 : 5000);
+  noticeTimer = setTimeout(() => { notice.value = ''; noticeTimer = undefined; }, 5000);
 }
 
 // 配置订阅是内容功能的唯一状态来源；避免无 revision 的广播晚到后覆盖新快照。
-function openDrawer(name: DrawerName) {if (!popupContext.active.value || (!config.value.on && name !== 'services' && name !== 'aiContext')) return;activeDrawer.value = name;drawerMounted.value = true;drawerVisible.value = true;}
+function openDrawer(name: DrawerName) {if (!popupContext.active.value || (!config.value.on && name !== 'services' && name !== 'aiContext')) return;clearNotice();activeDrawer.value = name;drawerMounted.value = true;drawerVisible.value = true;}
 async function openOptions(section?: SettingsSection, target?: string, service?: string, repairSource = false) {
   if (!popupContext.active.value) return;
   const current = popupContext.capture();
@@ -1375,7 +1378,7 @@ async function openOptions(section?: SettingsSection, target?: string, service?:
     }
     if (current()) closePopupSurface();
   } catch {
-    if (current()) showNotice(translateLegacy('无法打开设置，请从扩展菜单打开设置后重试'), 'error');
+    if (current() && drawerVisible.value) showNotice(translateLegacy('无法打开设置，请从扩展菜单打开设置后重试'), 'error');
   }
 }
 
@@ -1389,7 +1392,7 @@ async function openDocumentTranslation() {
     const readerUrl = browser.runtime.getURL('document.html');
     await browser.tabs.create({ url: source ? createPdfReaderUrl(readerUrl, source) : readerUrl });
     if (current()) closePopupSurface();
-  } catch {if (current()) showNotice(t('translationCenter.requestError'), 'error');}
+  } catch { /* 文档入口失败时保持弹窗打开以便重试，不在翻译卡片新增提示行。 */ }
 }
 
 async function clearCache() {
@@ -1399,15 +1402,10 @@ async function clearCache() {
   cacheController = controller;
   clearingCache.value = true;
   try {
-    const result = await requestTranslationCacheClear((message) => browser.runtime.sendMessage(message), {signal: controller.signal});
-    if (current() && cacheController === controller) {
-      if (result.invalidationPending) showNotice(t('settings.cache.clearedPendingPages'), 'pending');
-      else showNotice('全部翻译缓存已清除');
-    }
+    await requestTranslationCacheClear((message) => browser.runtime.sendMessage(message), {signal: controller.signal});
   } catch (error) {
-    if (current() && cacheController === controller) {
-      if (error instanceof TranslationCacheRequestTimeoutError) showNotice(t('settings.cache.clearUnconfirmed'), 'pending');
-      else {console.error(error);showNotice('缓存清除失败', 'error');}
+    if (current() && cacheController === controller && !(error instanceof TranslationCacheRequestTimeoutError)) {
+      console.error(error);
     }
   } finally {
     if (cacheController === controller) {
@@ -1458,7 +1456,3 @@ function setAreaEnabled(enabled: boolean) {
   config.value.selectionAreaEnabled = enabled;
 }
 </script>
-
-<style scoped>
-.notice.pending { color: var(--muted); }
-</style>

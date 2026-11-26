@@ -169,6 +169,38 @@ describe('FloatingBall actual SFC lifecycle', () => {
     expect(port.style('--fr-ball-x')).toBe(966 - margin);
   });
 
+  it('softens opacity and desaturates the tucked idle ball while honoring 20% floor and 100% full clarity', async () => {
+    const port = mountBall();
+    await flush();
+    expect(port.ball().classList.contains('is-tucked')).toBe(true);
+    expect(port.style('--fr-ball-collapsed-opacity')).toBeCloseTo(0.265, 3);
+    expect(port.style('--fr-ball-collapsed-grayscale')).toBe(0.85);
+
+    // 历史保存的 52% 在半隐停靠下也会进一步降低视觉干扰。
+    port.props.presentation = {collapsedOpacity: 52};
+    await flush();
+    expect(port.style('--fr-ball-collapsed-opacity')).toBeCloseTo(0.427, 3);
+    expect(port.style('--fr-ball-collapsed-grayscale')).toBe(0.85);
+
+    // 最低值不跌破 20% 可见底线；100% 保留完全清晰与原色。
+    port.props.presentation = {collapsedOpacity: 20};
+    await flush();
+    expect(port.style('--fr-ball-collapsed-opacity')).toBe(0.2);
+    expect(port.style('--fr-ball-collapsed-grayscale')).toBe(0.85);
+
+    port.props.presentation = {collapsedOpacity: 100};
+    await flush();
+    expect(port.style('--fr-ball-collapsed-opacity')).toBe(1);
+    expect(port.style('--fr-ball-collapsed-grayscale')).toBe(0);
+
+    // 非半隐停靠保留用户设定的收起不透明度，同时维持闲置降饱和。
+    port.props.presentation = {defaultMargin: 0, popoutMargin: 0, collapsedOpacity: 36};
+    await flush();
+    expect(port.ball().classList.contains('is-tucked')).toBe(false);
+    expect(port.style('--fr-ball-collapsed-opacity')).toBe(0.36);
+    expect(port.style('--fr-ball-collapsed-grayscale')).toBe(0.85);
+  });
+
   it('centers settings above and hide below without moving the main button vertically', async () => {
     const port = mountBall({onHide: vi.fn()});
     const y = port.style('--fr-ball-y');

@@ -23,8 +23,16 @@ describe('低干扰悬浮 UI', () => {
     expect(root).toContain('transition: transform');
     expect(cssRule(floatingBall, '.floating-ball-tools')).toContain('visibility: hidden');
     expect(cssRule(floatingBall, '.fr-floating-ball.viewport-sync')).toContain('transition: none');
+    expect(cssRule(floatingBall, '.floating-ball-mascot')).toContain('filter: grayscale(var(--fr-ball-collapsed-grayscale))');
+    expect(floatingBall).toContain('filter: none;');
     expect(floatingBall).toContain('prefers-reduced-motion: reduce');
     expect(floatingBall).toContain('outline: 2px solid var(--fr-accent)');
+
+    const mangaEntry = source('src/features/image-translation/ui/manga-entry.css');
+    const launcherRule = cssRule(mangaEntry, '.fr-manga-launcher');
+    expect(launcherRule).toContain('grayscale(');
+    expect(Number(launcherRule.match(/opacity:\s*([0-9.]+)/u)?.[1])).toBeLessThanOrEqual(0.36);
+    expect(cssRule(mangaEntry, '.fr-manga-launcher.is-expanded,.fr-manga-launcher:focus-visible')).toContain('filter: none');
   });
 
   it('进度面板使用半透明背景，并由活动请求而非离屏候选决定显隐', () => {

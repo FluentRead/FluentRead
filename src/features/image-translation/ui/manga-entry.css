@@ -493,11 +493,11 @@
   box-shadow: 0 3px 12px #1720331f;
   pointer-events: auto;
   cursor: pointer;
-  transition: transform .18s ease, opacity .18s ease, box-shadow .18s ease;
+  transition: transform .18s ease, opacity .18s ease, box-shadow .18s ease, filter .18s ease;
 }
 
-.fr-manga-launcher { top: 50%; right: 16px; transform: translateX(52%); clip-path: inset(-6px 50% -6px -6px); opacity: .55; }
-.fr-manga-launcher.is-expanded,.fr-manga-launcher:focus-visible { transform: translateX(0); clip-path: none; opacity: 1; }
+.fr-manga-launcher { top: 50%; right: 16px; transform: translateX(52%); clip-path: inset(-6px 50% -6px -6px); opacity: .32; filter: grayscale(.85); }
+.fr-manga-launcher.is-expanded,.fr-manga-launcher:focus-visible { transform: translateX(0); clip-path: none; opacity: 1; filter: none; }
 .fr-manga-reading-launcher { top: calc(50% + 40px); right: 16px; opacity: 0; pointer-events: none; }
 .fr-manga-reading-launcher.is-touch,.fr-manga-reading-launcher.is-expanded,.fr-manga-reading-launcher:focus-visible { opacity: 1; pointer-events: auto; }
 .fr-manga-launcher:hover,.fr-manga-reading-launcher:hover { box-shadow: 0 5px 16px #1720332e; }

@@ -1333,7 +1333,8 @@ function mountVideoSubtitleRuntime(): () => void {
       const player = playerLocator.getTarget()?.player, control = target.closest('button, [role="button"]');
       if (player && control && player.contains(control) && isXNativeCaptionControl(control)) scheduleXNativeCaptionSync();
     }
-    if (!event.isTrusted || !menuElement?.isConnected || menuElement.hidden || !(target instanceof Node)) return;
+    if (!event.isTrusted) return;
+    if (!menuElement?.isConnected || menuElement.hidden || !(target instanceof Node)) return;
     if (buttonElement?.contains(target) || menuElement.contains(target)) return;
     closeMenu();
   };

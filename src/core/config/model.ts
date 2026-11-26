@@ -196,6 +196,7 @@ import {
     DEFAULT_MIN_TRANSLATION_TEXT_LENGTH,
     normalizeEagerTranslationCharacters,
     normalizeExcludedLanguages,
+    normalizeExcludedTags,
     normalizeMinTranslationTextLength,
 } from './pageTranslation';
 import {normalizeWritingPreferences, type WritingPreferences} from './writing';
@@ -406,6 +407,7 @@ export class Config {
     from: string;
     to: string;
     excludedLanguages: string[]; // 网页全文、悬浮及标题翻译跳过的语言
+    excludedTags: string[]; // 网页全文及悬浮翻译跳过的 HTML 标签或 CSS 选择器
     hotkey: string;
     hoverShortcutBeforeDisable: string; // 关闭默认悬停开关前的选择，重开恢复；不参与运行时触发
     style: number;
@@ -633,6 +635,7 @@ export class Config {
         this.from = defaultOption.from;
         this.to = defaultOption.to;
         this.excludedLanguages = [];
+        this.excludedTags = [];
         this.style = defaultOption.style;
         this.translationAppearance = normalizeTranslationAppearance(DEFAULT_TRANSLATION_APPEARANCE); // 默认沿用各样式自带配色
         this.browserDefaultTranslationFont = false;
@@ -1300,6 +1303,7 @@ export function normalizeConfig(value: unknown): Config {
     normalized.from = normalizeConfigLanguage(source.from) || defaultOption.from;
     normalized.to = normalizeConfigLanguage(source.to) || defaultOption.to;
     normalized.excludedLanguages = normalizeExcludedLanguages(source.excludedLanguages);
+    normalized.excludedTags = normalizeExcludedTags(source.excludedTags);
     normalized.customInputBoxTranslationHotkey = normalizeCustomInputBoxTranslationHotkey(
         source.customInputBoxTranslationHotkey,
     );

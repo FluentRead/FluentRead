@@ -57,6 +57,10 @@ export const settingsSearchTargets: readonly SettingsSearchTarget[] = [
     label: '悬浮球进阶设置', description: '翻译设置', searchTerms: '悬浮球配置、悬浮球设置、悬浮球位置',
   },
   {
+    id: 'excluded-tags', sectionId: 'settings-translation', targetId: 'excluded-tag-settings',
+    label: '不翻译的标签', description: '翻译设置', searchTerms: '不翻译的标签、排除标签、忽略标签、跳过标签、HTML 标签、CSS 选择器、ignoreSelector',
+  },
+  {
     id: 'translation-sentence-highlight', sectionId: 'settings-translation', targetId: 'translation-sentence-highlight',
     label: '双语逐句高亮', description: '翻译设置', searchTerms: '阅读辅助、原文译文、句子对应',
   },
@@ -281,6 +285,7 @@ export const settingsPagePanels: Readonly<Record<string, readonly SettingsPagePa
     {id: 'paragraph-copy', labelKey: 'paragraphCopy.settings.title', searchTerms: '段落复制 复制内容 快捷键', targetIds: ['paragraph-copy-settings']},
     {id: 'section-translation', labelKey: 'sectionTranslation.settings.title', searchTerms: '局部翻译 分段 区域 快捷键', targetIds: ['section-translation-settings']},
     {id: 'excluded-languages', labelKey: 'settings.excludedLanguages.title', searchTerms: '不翻译的语言 跳过语言 排除语言', targetIds: ['excluded-language-settings']},
+    {id: 'excluded-tags', labelKey: 'settings.excludedTags.title', searchTerms: '不翻译的标签 排除标签 忽略标签 跳过标签 HTML 标签 CSS 选择器 ignoreSelector tag selector', targetIds: ['excluded-tag-settings']},
   ],
   'settings-interface': [
     {"id": "translation", "labelKey": "options.panel.translation", "searchTerms": "译文 样式 颜色 字号 高亮", "targetIds": ["translation-appearance-panel", "translation-sentence-highlight-style"]},

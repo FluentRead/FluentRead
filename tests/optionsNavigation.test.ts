@@ -263,6 +263,7 @@ describe('settings page categories', () => {
     expect(resolveSettingsPanel('settings-translation', 'paragraph-copy-settings')).toBe('paragraph-copy')
     expect(resolveSettingsPanel('settings-translation', 'section-translation-settings')).toBe('section-translation')
     expect(resolveSettingsPanel('settings-translation', 'excluded-language-settings')).toBe('excluded-languages')
+    expect(resolveSettingsPanel('settings-translation', 'excluded-tag-settings')).toBe('excluded-tags')
     expect(resolveSettingsPanel('settings-translation', 'context-menu-settings')).toBe('context-menu')
     expect(resolveSettingsPanel('settings-interface', 'translation-appearance-panel')).toBe('translation')
     expect(resolveSettingsPanel('settings-interface', 'translation-sentence-highlight-style')).toBe('translation')

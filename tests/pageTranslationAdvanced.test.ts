@@ -17,13 +17,20 @@ vi.mock('@/src/core/config/catalog', () => ({
 import {config as configMock} from '@/src/services/config/store';
 
 import {
+    COMMON_EXCLUDED_TAG_OPTIONS,
     DEFAULT_EAGER_TRANSLATION_CHARACTERS,
     DEFAULT_MIN_TRANSLATION_TEXT_LENGTH,
     EAGER_TRANSLATION_CHARACTERS_MAX,
+    EXCLUDED_TAGS_MAX,
+    EXCLUDED_TAG_MAX_LENGTH,
     MIN_TRANSLATION_TEXT_LENGTH_MAX,
     normalizeEagerTranslationCharacters,
     normalizeExcludedLanguages,
+    normalizeExcludedTagEntry,
+    normalizeExcludedTags,
     normalizeMinTranslationTextLength,
+    splitExcludedTagInput,
+    validateExcludedTagSelector,
 } from '@/src/core/config/pageTranslation';
 import {
     LONG_PARAGRAPH_LINE_BREAK_MIN_LENGTH,
@@ -37,10 +44,14 @@ import {
     getEagerTranslationBudget,
 } from '@/src/features/full-page-translation/content/eagerTranslation';
 import {
+    collectLiveTranslationTextSlots,
+    createDeclarativeAdapter,
+    createTranslationSourceSnapshot,
     extractTranslationText,
     extractTranslationTextFromNodes,
     getCurrentTranslationCore,
     isMeaningfulTranslationText,
+    setCurrentTranslationExcludedSelectors,
     setCurrentTranslationSidebarRegions,
     setMinimumTranslationTextLength,
 } from '@/src/core/translation/public';
@@ -60,6 +71,7 @@ function sources(candidates: readonly TranslationCandidate[]): string[] {
 afterEach(() => {
     setMinimumTranslationTextLength(DEFAULT_MIN_TRANSLATION_TEXT_LENGTH);
     setCurrentTranslationSidebarRegions(false);
+    setCurrentTranslationExcludedSelectors([]);
     configMock.longParagraphLineBreakEnabled = false;
     configMock.translationBeforeOriginal = false;
     configMock.eagerTranslationCharacters = DEFAULT_EAGER_TRANSLATION_CHARACTERS;
@@ -423,5 +435,128 @@ describe('排除语言配置归一化', () => {
         expect(result).toEqual(['zh-Hans', 'zh-Hant', 'en', 'de']);
         result.push('fr');
         expect(input).not.toContain('fr');
+    });
+});
+
+describe('不翻译标签与选择器配置归一化', () => {
+    it('清洗、规范标签大小写、去重、拒绝根选择器与超限条目', () => {
+        expect(COMMON_EXCLUDED_TAG_OPTIONS.length).toBeGreaterThan(0);
+        for (const value of [undefined, null, 'blockquote', 1, {}, []]) expect(normalizeExcludedTags(value)).toEqual([]);
+        expect(normalizeExcludedTagEntry(123)).toBeNull();
+        expect(normalizeExcludedTagEntry('   ')).toBeNull();
+        expect(normalizeExcludedTagEntry('a\u0000b')).toBeNull();
+        expect(normalizeExcludedTagEntry('a'.repeat(EXCLUDED_TAG_MAX_LENGTH + 1))).toBeNull();
+        for (const root of ['html', 'HTML', 'body', 'BODY', '*', ':root']) {
+            expect(normalizeExcludedTagEntry(root)).toBeNull();
+        }
+        const normalized = normalizeExcludedTags([
+            ' BLOCKQUOTE ', 'blockquote', '.NoTrans', '[data-Role="Badge"]', 'H1', 'html', 'body', '*', '', null,
+        ]);
+        expect(normalized).toEqual(['blockquote', '.NoTrans', '[data-Role="Badge"]', 'h1']);
+
+        const overflowing = Array.from({length: EXCLUDED_TAGS_MAX + 10}, (_, index) => `.item-${index}`);
+        expect(normalizeExcludedTags(overflowing)).toHaveLength(EXCLUDED_TAGS_MAX);
+    });
+
+    it('按非嵌套分隔符拆分用户输入并校验选择器语法', () => {
+        expect(splitExcludedTagInput(
+            'blockquote, .ad，#toc; [data-a="1,2\\"3"]；:is(h1, h2)\n[data-b=\'x;y\']  ) ]',
+        )).toEqual([
+            'blockquote',
+            '.ad',
+            '#toc',
+            '[data-a="1,2\\"3"]',
+            ':is(h1, h2)',
+            "[data-b='x;y']  ) ]",
+        ]);
+        const {document} = page('');
+        expect(validateExcludedTagSelector('BLOCKQUOTE', document)).toEqual({ok: true, selector: 'blockquote'});
+        expect(validateExcludedTagSelector('.no-trans', document)).toEqual({ok: true, selector: '.no-trans'});
+        expect(validateExcludedTagSelector('body', document)).toEqual({ok: false, reason: 'disallowed'});
+        expect(validateExcludedTagSelector('*', document)).toEqual({ok: false, reason: 'disallowed'});
+        expect(validateExcludedTagSelector('   ', document)).toEqual({ok: false, reason: 'invalid'});
+        expect(validateExcludedTagSelector('div[unclosed', document)).toEqual({ok: false, reason: 'invalid'});
+        expect(validateExcludedTagSelector('blockquote')).toEqual({ok: true, selector: 'blockquote'});
+    });
+
+    it('在全文发现、悬浮解析、行内保护、全部范围和站点适配器中一致跳过不翻译标签', () => {
+        const {document, url} = page(`
+            <main>
+                <article>
+                    <h1 id="title">Main article heading</h1>
+                    <p id="mixed">Read the <mark id="inline-mark">highlighted term</mark> carefully today.</p>
+                    <p id="only-excluded"><mark>Only excluded content here.</mark></p>
+                    <blockquote id="quote"><p id="quoted-p">Quoted paragraph should stay original.</p></blockquote>
+                    <div class="ad-box"><p id="ad-p">Sponsored advertisement text.</p></div>
+                </article>
+                <nav id="site-nav"><a id="nav-link" href="/docs">Navigation link text</a></nav>
+            </main>
+        `);
+        const adapter = createDeclarativeAdapter({
+            id: 'test-force-h1',
+            hosts: ['example.test'],
+            targets: [{selector: 'h1', reason: 'forced-heading'}],
+        });
+        const core = createTranslationCore({
+            url,
+            adapters: [adapter],
+            excludedSelectors: ['blockquote', 'mark', '.ad-box', 'h1', 'div[broken'],
+        });
+        const candidates = core.discover(document.body);
+        expect(candidates.map(item => item.element.id)).toEqual(['mixed']);
+
+        const mixed = document.getElementById('mixed') as HTMLElement;
+        expect(extractTranslationText(mixed, core.shouldStayOriginal, undefined, core.textOptions())).toBe('Read the carefully today.');
+        const slots = collectLiveTranslationTextSlots(mixed, core.shouldStayOriginal, undefined, core.textOptions());
+        expect(slots.map(slot => slot.source)).toEqual(['Read the', 'carefully today.']);
+        const snapshot = createTranslationSourceSnapshot(mixed, core.shouldStayOriginal, undefined, core.textOptions());
+        expect(snapshot.slots.map(slot => slot.source)).toEqual(['Read the', 'carefully today.']);
+
+        expect(core.resolve(document.getElementById('quoted-p')!.firstChild)).toBeNull();
+        expect(core.resolve(document.getElementById('ad-p')!.firstChild)).toBeNull();
+        expect(core.resolve(document.getElementById('inline-mark')!.firstChild)).toBeNull();
+        expect(core.resolve(mixed.firstChild)?.element.id).toBe('mixed');
+
+        const mark = document.getElementById('inline-mark')!;
+        (document as unknown as {elementsFromPoint?: (x: number, y: number) => Element[]}).elementsFromPoint = () => [mark, mixed, document.body];
+        expect(core.resolveAtPoint(document, 10, 10)).toBeNull();
+        expect(core.shouldStayOriginal(document.body)).toBe(false);
+
+        const allScopeCore = createTranslationCore({
+            url,
+            scope: 'all',
+            includeSidebarRegions: true,
+            excludedSelectors: ['nav', 'blockquote', '.ad-box', 'h1', 'mark'],
+        });
+        expect(allScopeCore.discover(document.body).map(item => item.element.id)).toEqual(['mixed']);
+
+        const brokenOnlyCore = createTranslationCore({url, excludedSelectors: ['div[broken']});
+        expect(brokenOnlyCore.discover(document.body).some(item => item.element.id === 'quote' || item.element.id === 'quoted-p')).toBe(true);
+        expect(core.shouldStayOriginal({ownerDocument: null} as unknown as Element)).toBe(false);
+
+        const forceAndExcludeCore = createTranslationCore({
+            url,
+            adapters: [{...adapter, forceTranslate: ['#mixed']}],
+            excludedSelectors: ['mark'],
+        });
+        expect(forceAndExcludeCore.textOptions()?.allowNoTranslate).toBeTypeOf('function');
+        expect(forceAndExcludeCore.textOptions()?.isExcludedElement).toBeTypeOf('function');
+    });
+
+    it('通过 setCurrentTranslationExcludedSelectors 注入共享核心并仅在变化时重建缓存', () => {
+        const before = getCurrentTranslationCore('content');
+        expect(setCurrentTranslationExcludedSelectors([])).toEqual([]);
+        expect(getCurrentTranslationCore('content')).toBe(before);
+
+        expect(setCurrentTranslationExcludedSelectors(['BLOCKQUOTE', '.ad'])).toEqual(['blockquote', '.ad']);
+        const updated = getCurrentTranslationCore('content');
+        expect(updated).not.toBe(before);
+        expect(updated.excludedSelectors).toEqual(['blockquote', '.ad']);
+
+        expect(setCurrentTranslationExcludedSelectors(['blockquote', '.ad'])).toEqual(['blockquote', '.ad']);
+        expect(getCurrentTranslationCore('content')).toBe(updated);
+
+        expect(setCurrentTranslationExcludedSelectors(['blockquote', '#toc'])).toEqual(['blockquote', '#toc']);
+        expect(getCurrentTranslationCore('content')).not.toBe(updated);
     });
 });

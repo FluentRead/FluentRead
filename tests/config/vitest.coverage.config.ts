@@ -150,6 +150,7 @@ export default defineConfig({
                 'src/features/settings/ui/SelectionSettings.vue',
                 'src/features/settings/ui/ReadingAssistanceSettings.vue',
                 'src/features/settings/ui/ExcludedLanguageSettings.vue',
+                'src/features/settings/ui/ExcludedTagSettings.vue',
                 'src/features/settings/ui/HarnessPromptSettings.vue',
                 'src/features/writing-assistant/ui/WritingChoices.vue',
                 'src/features/writing-assistant/ui/WritingLanguagePicker.vue',

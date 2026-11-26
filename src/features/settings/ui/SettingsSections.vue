@@ -473,6 +473,9 @@
     <SettingsPanel name="excluded-languages" id="excluded-language-settings" :active="props.activePanel">
       <ExcludedLanguageSettings v-model="config.excludedLanguages" />
     </SettingsPanel>
+    <SettingsPanel name="excluded-tags" id="excluded-tag-settings" :active="props.activePanel">
+      <ExcludedTagSettings v-model="config.excludedTags" />
+    </SettingsPanel>
 </section>
 
     <section v-if="hasVisitedSection('settings-advanced')" v-show="props.activeSection === 'settings-advanced'" class="settings-section settings-section-continuation">
@@ -724,6 +727,7 @@ import AiMultiSegmentSettings from './AiMultiSegmentSettings.vue';
 import type {AiMultiSegmentLimits} from '@/src/core/config/aiMultiSegment';
 import SettingsGroup from './components/SettingsGroup.vue';
 import ExcludedLanguageSettings from './ExcludedLanguageSettings.vue';
+import ExcludedTagSettings from './ExcludedTagSettings.vue';
 import ReadingAssistanceSettings from './ReadingAssistanceSettings.vue';
 import SettingsItem from './components/SettingsItem.vue';
 import SettingsNumberInput from './components/SettingsNumberInput.vue';

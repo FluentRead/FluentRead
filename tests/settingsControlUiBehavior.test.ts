@@ -14,6 +14,7 @@ import ToolbarClickSetting from '@/src/features/settings/ui/components/ToolbarCl
 import SelectionSettings from '@/src/features/settings/ui/SelectionSettings.vue';
 import ReadingAssistanceSettings from '@/src/features/settings/ui/ReadingAssistanceSettings.vue';
 import ExcludedLanguageSettings from '@/src/features/settings/ui/ExcludedLanguageSettings.vue';
+import ExcludedTagSettings from '@/src/features/settings/ui/ExcludedTagSettings.vue';
 import HarnessPromptSettings from '@/src/features/settings/ui/HarnessPromptSettings.vue';
 import {Config} from '@/src/core/config/model';
 import {EMPTY_DICTIONARY_FIELDS} from '@/src/core/config/dictionaryWorkspace';
@@ -210,6 +211,54 @@ it('preserves selected uncommon languages when collapsed, normalizes toggles, cl
   await click(button(ui.host,'settings.excludedLanguages.more'));expect(ui.host.querySelectorAll('[data-language]')).toHaveLength(options.to.length);
   locale.value.value='en';await flush();expect(ui.host.querySelector(`[data-language="${first.value}"] span`)!.textContent).toBe(getMultilingualTargetLanguageLabel(first.value,first.label,'en').split(' / ')[0]);
   await click(button(ui.host,'settings.excludedLanguages.less'));await click(button(ui.host,'settings.excludedLanguages.clear'));expect(ui.props.modelValue).toEqual([]);expect(ui.host.querySelectorAll('.excluded-language-actions button')).toHaveLength(1);
+});
+
+it('toggles preset excluded tags, adds validated custom selectors, reports invalid or disallowed entries, removes chips and clears all',async()=>{
+  let ui:ReturnType<typeof mount>;
+  ui=mount(ExcludedTagSettings,{modelValue:[], 'onUpdate:modelValue':(value:string[])=>{ui.props.modelValue=value;}});
+  await click(ui.host.querySelector('[data-tag="blockquote"]')!);
+  expect(ui.props.modelValue).toEqual(['blockquote']);
+  await click(ui.host.querySelector('[data-tag="blockquote"]')!);
+  expect(ui.props.modelValue).toEqual([]);
+
+  const field=ui.host.querySelector('.excluded-tag-input') as HTMLInputElement;
+  const addBtn=ui.host.querySelector('.excluded-tag-add') as HTMLButtonElement;
+  expect(addBtn.hasAttribute('disabled')).toBe(true);
+  await input(field,'   ');
+  field.dispatchEvent(Object.assign(new win.Event('keydown',{bubbles:true,cancelable:true}),{key:'Enter'}));await flush();
+  expect(ui.props.modelValue).toEqual([]);
+
+  await input(field,'H4, .no-trans，:is(h5, h6)');
+  await click(addBtn);
+  expect(ui.props.modelValue).toEqual(['h4','.no-trans',':is(h5, h6)']);
+  expect(field.value).toBe('');
+  expect(ui.host.querySelectorAll('[data-custom-tag]')).toHaveLength(3);
+
+  await input(field,'.valid-box, div[broken');
+  field.dispatchEvent(Object.assign(new win.Event('keydown',{bubbles:true,cancelable:true}),{key:'Enter'}));await flush();
+  expect(ui.props.modelValue).toContain('.valid-box');
+  expect(ui.host.querySelector('[role="alert"]')?.textContent).toBe('settings.excludedTags.invalid');
+  expect(field.value).toBe('div[broken');
+
+  await input(field,'body, #sidebar');
+  expect(ui.host.querySelector('[role="alert"]')).toBeNull();
+  await click(addBtn);
+  expect(ui.props.modelValue).toContain('#sidebar');
+  expect(ui.host.querySelector('[role="alert"]')?.textContent).toBe('settings.excludedTags.disallowed');
+  expect(field.value).toBe('body');
+
+  await input(field,'html');
+  await click(addBtn);
+  expect(ui.host.querySelector('[role="alert"]')?.textContent).toBe('settings.excludedTags.disallowed');
+  expect(field.value).toBe('html');
+
+  await click(ui.host.querySelector('[data-custom-tag=".no-trans"]')!);
+  expect(ui.props.modelValue).not.toContain('.no-trans');
+  expect(ui.host.querySelector('[role="alert"]')).toBeNull();
+
+  await click(button(ui.host,'settings.excludedTags.clear'));
+  expect(ui.props.modelValue).toEqual([]);
+  expect(ui.host.querySelector('.excluded-tag-actions')).toBeNull();
 });
 
 it('ignores a late insertion click from a detached prompt toolbar',async()=>{

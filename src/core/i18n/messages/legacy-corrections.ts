@@ -790,6 +790,7 @@ export const correctionRows: readonly LegacyCorrectionRow[] = [
     ['标准翻译', 'Standard translation', '標準翻訳', '표준 번역', 'Traduction standard', 'Стандартный перевод', 'Traducción estándar'],
     ['AI 上下文增强', 'AI context enhancement', 'AI による文脈補正', 'AI 문맥 보정', 'Amélioration contextuelle par IA', 'Контекстная обработка ИИ', 'Mejora contextual con IA'],
     ['跟随当前服务', 'Follow the current translation service', '現在の翻訳サービスを使用', '현재 번역 서비스 사용', 'Utiliser le service de traduction actuel', 'Использовать текущий сервис перевода', 'Usar el servicio de traducción actual'],
+    ['不翻译的标签', 'Tags to skip', '翻訳しないタグ', '번역하지 않을 태그', 'Balises à ne pas traduire', 'Теги без перевода', 'Etiquetas que no se traducen'],
 ];
 
 const LANGUAGE_COLUMNS: Readonly<Record<RegisteredUiLanguage, 1 | 2 | 3 | 4 | 5 | 6>> = {

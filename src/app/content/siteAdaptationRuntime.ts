@@ -7,7 +7,11 @@
 import {builtinSiteRulePack} from '@/src/core/site-adaptation/catalog';
 import type {OfficialSiteRuleRelease} from '@/src/core/site-adaptation/officialRelease';
 import {createSiteAdaptationSession, type SiteAdaptationSession} from '@/src/core/site-adaptation/session';
-import {setCurrentTranslationAdapters, setCurrentTranslationSidebarRegions} from '@/src/core/translation/current';
+import {
+    setCurrentTranslationAdapters,
+    setCurrentTranslationExcludedSelectors,
+    setCurrentTranslationSidebarRegions,
+} from '@/src/core/translation/current';
 import {setMinimumTranslationTextLength} from '@/src/core/translation/text';
 import type {Config} from '@/src/core/config/model';
 import {restoreOriginalContent} from '@/src/features/full-page-translation/public';
@@ -16,6 +20,7 @@ import {resetPageTranslationContextCache} from '@/src/services/translation/conte
 
 let appliedMinimumLength: number | null = null;
 let appliedSidebarRegions: boolean | null = null;
+let appliedExcludedSelectors: string | null = null;
 
 function invalidatePageTranslation(): void {
     restoreOriginalContent();
@@ -25,15 +30,19 @@ function invalidatePageTranslation(): void {
 
 /**
  * 把候选发现相关的网页翻译偏好注入共享核心。已渲染的译文保持不变，
- * 新阈值和范围在下一次发现时生效；返回值说明本次是否真的改变了取值。
+ * 新阈值、范围和排除标签在下一次发现时生效；返回值说明本次是否真的改变了取值。
  */
 export function applyCoreTranslationPreferences(source: Config): boolean {
     const minimumLength = setMinimumTranslationTextLength(source.minTranslationTextLength);
     const sidebarRegions = source.sidebarTranslationEnabled === true;
     setCurrentTranslationSidebarRegions(sidebarRegions);
-    const changed = appliedMinimumLength !== minimumLength || appliedSidebarRegions !== sidebarRegions;
+    const excludedSelectors = JSON.stringify(setCurrentTranslationExcludedSelectors(source.excludedTags));
+    const changed = appliedMinimumLength !== minimumLength
+        || appliedSidebarRegions !== sidebarRegions
+        || appliedExcludedSelectors !== excludedSelectors;
     appliedMinimumLength = minimumLength;
     appliedSidebarRegions = sidebarRegions;
+    appliedExcludedSelectors = excludedSelectors;
     return changed;
 }
 

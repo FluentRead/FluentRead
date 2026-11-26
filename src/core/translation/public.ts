@@ -69,6 +69,7 @@ export {
     getCurrentTranslationCore,
     createCurrentTranslationResolverBatch,
     setCurrentTranslationAdapters,
+    setCurrentTranslationExcludedSelectors,
     setCurrentTranslationSidebarRegions,
     resolveTranslationCandidateAtPoint,
 } from './current';

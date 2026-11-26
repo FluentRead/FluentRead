@@ -29,6 +29,7 @@ describe('hover pending config ownership', () => {
         ['target', (source: Config) => {source.to = 'en';}],
         ['source', (source: Config) => {source.from = 'en';}],
         ['excluded languages', (source: Config) => {source.excludedLanguages = ['en'];}],
+        ['excluded tags', (source: Config) => {source.excludedTags = ['blockquote'];}],
         ['service', (source: Config) => {source.hoverTranslationService = 'google';}],
         ['model', (source: Config) => {source.model[source.service] = 'changed-model';}],
         ['scope', (source: Config) => {source.translationScope = 'all';}],

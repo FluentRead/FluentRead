@@ -55,6 +55,7 @@ const bytes = Buffer.byteLength(source);
 // 合入最新 main（含 #1383/#1387/#1422/#1425/#1429/#1431）与 Calm Reading 统一令牌、批量缓存事务及紧凑批量协议后，
 // 独立油猴脚本 CI 实测为 3,730,373 字节，无新增依赖或模型资源，Greasy Fork 与精简版上限不变，追加 26 kB。
 // 合入 #1374/#1382/#1415 及 #1421 内联 br 拆分与通用双 br 分段后实测为 3,733,845 字节，无新增依赖或资源，追加 3 kB。
-const maxBytes = 3_736_000;
+// 合入 #1416（可配置不翻译的标签与 CSS 选择器组件、核心跳过逻辑及七语界面文案）后实测为 3,742,643 字节，无新增依赖或资源，Greasy Fork 与精简版上限不变，追加 9 kB。
+const maxBytes = 3_745_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

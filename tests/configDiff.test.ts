@@ -238,6 +238,15 @@ describe('配置差异预览', () => {
             {key: 'longParagraphLineBreakEnabled', label: '长段落自动换行', before: '关闭', after: '开启'},
             {key: 'translationBeforeOriginal', label: '译文在原文之前', before: '关闭', after: '开启'},
         ]);
+
+        const tagDiff = buildConfigDiff({excludedTags: []}, {excludedTags: ['blockquote', '.no-trans']});
+        expect(group(tagDiff, 'translation')?.changes).toEqual([
+            {key: 'excludedTags', label: '不翻译的标签', before: '无', after: 'blockquote、.no-trans'},
+        ]);
+        const invalidTagDiff = buildConfigDiff({excludedTags: null}, {excludedTags: ['mark']});
+        expect(group(invalidTagDiff, 'translation')?.changes).toEqual([
+            {key: 'excludedTags', label: '不翻译的标签', before: '未设置', after: 'mark'},
+        ]);
     });
 
     it('语言配置差异明确标出简体与繁体名称', () => {

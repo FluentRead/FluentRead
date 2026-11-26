@@ -3244,6 +3244,187 @@ describe('context menu selection ownership', () => {
         expect(fixture.state.translateSelectionFromContextMenu('Good ideas deserve attention.')).toBe(false);
         expect(fixture.translateText).not.toHaveBeenCalled();
     });
+
+    it('reads open Shadow DOM selections for both floating hover trigger and right-click context menu translation', async () => {
+        const fixture = mountSelection();
+        const doc = fixture.document as unknown as Document;
+        fixture.config.selectionTranslatorTrigger = 'icon';
+        fixture.config.selectionTranslatorDelay = 0;
+        fixture.state.selectionConfigVersion += 1;
+        await Vue.nextTick();
+
+        const host = doc.createElement('shreddit-post');
+        const shadow = host.attachShadow({mode: 'open'});
+        const paragraph = doc.createElement('p');
+        const text = 'Reddit comment inside open Shadow DOM.';
+        paragraph.textContent = text;
+        shadow.appendChild(paragraph);
+        doc.body.appendChild(host);
+        const textNode = paragraph.firstChild!;
+        const rect = {left: 40, right: 320, top: 180, bottom: 204, width: 280, height: 24};
+        const shadowRange = Vue.markRaw({
+            startContainer: textNode,
+            endContainer: textNode,
+            commonAncestorContainer: textNode,
+            startOffset: 0,
+            endOffset: text.length,
+            collapsed: false,
+            getClientRects: () => [rect],
+            getBoundingClientRect: () => rect,
+            cloneRange: () => shadowRange,
+            toString: () => text,
+        });
+        const activeShadowSelection: Record<string, unknown> = {
+            rangeCount: 1,
+            isCollapsed: false,
+            anchorNode: textNode,
+            anchorOffset: 0,
+            getRangeAt: () => shadowRange,
+            toString: () => text,
+            containsNode: () => false,
+        };
+        let shadowSelection: Record<string, unknown> | null = null;
+        Object.assign(shadow, {getSelection: () => shadowSelection});
+        // Chromium 在 Shadow DOM 内拖选时，window.getSelection() 返回空/折叠选区。
+        Object.assign(fixture.window, {getSelection: () => ({rangeCount: 0, isCollapsed: true, toString: () => ''})});
+
+        const composedEvent = (extra: Record<string, unknown>) => ({
+            isTrusted: true,
+            target: host,
+            composedPath: () => [paragraph, shadow, host, doc.body, doc],
+            ...extra,
+        });
+
+        // 1. 划词悬浮入口正常出现（拖选开始时无旧选区，松开前形成新 Shadow DOM 选区）
+        fixture.state.handlePointerDown(composedEvent({button: 0, pointerType: 'mouse'}));
+        shadowSelection = activeShadowSelection;
+        fixture.state.handlePointerUp(composedEvent({button: 0, pointerType: 'mouse'}));
+        await vi.advanceTimersByTimeAsync(20);
+        expect(fixture.state.showIndicator).toBe(true);
+        expect(fixture.state.selectedText).toBe(text);
+
+        // 2. 右键触发前或右键菜单期间即使页面清空原生选区，仍能通过已审核快照完成右键翻译
+        fixture.state.handlePointerDown(composedEvent({button: 2, pointerType: 'mouse'}));
+        shadowSelection = null;
+        fixture.state.handleContextMenu(composedEvent({}));
+        expect(fixture.state.contextMenuSelection).not.toBeNull();
+        expect(fixture.contextMenuHandler(text)).toBe(true);
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+        await Vue.nextTick();
+        expect(fixture.state.translationResult).toBe('这是译文');
+        expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+    });
+
+    it('rejects right-click context menu on a native input inside an open Shadow DOM even when target is retargeted to the host', async () => {
+        const fixture = mountSelection();
+        const doc = fixture.document as unknown as Document;
+        const host = doc.createElement('custom-panel');
+        const shadow = host.attachShadow({mode: 'open'});
+        const input = doc.createElement('input');
+        const paragraph = doc.createElement('p');
+        const text = 'Visible shadow text.';
+        paragraph.textContent = text;
+        shadow.appendChild(paragraph);
+        shadow.appendChild(input);
+        doc.body.appendChild(host);
+        const textNode = paragraph.firstChild!;
+        const rect = {left: 40, right: 240, top: 180, bottom: 204, width: 200, height: 24};
+        const shadowRange = Vue.markRaw({
+            startContainer: textNode,
+            endContainer: textNode,
+            commonAncestorContainer: textNode,
+            startOffset: 0,
+            endOffset: text.length,
+            collapsed: false,
+            getClientRects: () => [rect],
+            getBoundingClientRect: () => rect,
+            cloneRange: () => shadowRange,
+            toString: () => text,
+        });
+        Object.assign(shadow, {
+            getSelection: () => ({
+                rangeCount: 1,
+                isCollapsed: false,
+                anchorNode: textNode,
+                anchorOffset: 0,
+                getRangeAt: () => shadowRange,
+                toString: () => text,
+            }),
+        });
+        Object.assign(fixture.window, {getSelection: () => ({rangeCount: 0, isCollapsed: true, toString: () => ''})});
+
+        const inputRightClick = {
+            isTrusted: true,
+            button: 2,
+            target: host,
+            composedPath: () => [input, shadow, host, doc.body, doc],
+        };
+        fixture.state.handlePointerDown(inputRightClick);
+        fixture.state.handleContextMenu(inputRightClick);
+        expect(fixture.state.contextMenuSourceRejected).toBe(true);
+        expect(fixture.state.contextMenuSelection).toBeNull();
+        expect(fixture.contextMenuHandler(text)).toBe(false);
+        expect(fixture.translateText).not.toHaveBeenCalled();
+    });
+
+    it('translates an open Shadow DOM selection resolved through standard getComposedRanges when shadowRoot.getSelection is absent', async () => {
+        const fixture = mountSelection();
+        const doc = fixture.document as unknown as Document;
+        const host = doc.createElement('safari-shadow-card');
+        const shadow = host.attachShadow({mode: 'open'});
+        const paragraph = doc.createElement('p');
+        const text = 'WebKit composed range text.';
+        paragraph.textContent = text;
+        shadow.appendChild(paragraph);
+        doc.body.appendChild(host);
+        const textNode = paragraph.firstChild!;
+        const rect = {left: 50, right: 310, top: 200, bottom: 224, width: 260, height: 24};
+        Object.assign(doc, {
+            createRange: () => {
+                let start: Node = textNode;
+                let startOffset = 0;
+                let end: Node = textNode;
+                let endOffset = 0;
+                const built = Vue.markRaw({
+                    get startContainer() {return start;},
+                    get startOffset() {return startOffset;},
+                    get endContainer() {return end;},
+                    get endOffset() {return endOffset;},
+                    get commonAncestorContainer() {return start;},
+                    get collapsed() {return start === end && startOffset === endOffset;},
+                    setStart(node: Node, offset: number) {start = node; startOffset = offset;},
+                    setEnd(node: Node, offset: number) {end = node; endOffset = offset;},
+                    getClientRects: () => [rect],
+                    getBoundingClientRect: () => rect,
+                    cloneRange: () => built,
+                    toString: () => text.slice(startOffset, endOffset),
+                });
+                return built;
+            },
+        });
+        Object.assign(fixture.window, {
+            getSelection: () => ({
+                rangeCount: 0,
+                isCollapsed: true,
+                toString: () => '',
+                getComposedRanges: ({shadowRoots}: {shadowRoots: ShadowRoot[]}) => shadowRoots.includes(shadow)
+                    ? [{startContainer: textNode, startOffset: 0, endContainer: textNode, endOffset: text.length, collapsed: false}]
+                    : [],
+            }),
+        });
+
+        fixture.state.handleContextMenu({
+            isTrusted: true,
+            target: host,
+            composedPath: () => [paragraph, shadow, host, doc.body, doc],
+        });
+        expect(fixture.state.contextMenuSelection).not.toBeNull();
+        expect(fixture.contextMenuHandler(text)).toBe(true);
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.state.selectedText).toBe(text);
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+    });
 });
 
 describe('selection card on an extension PDF page', () => {

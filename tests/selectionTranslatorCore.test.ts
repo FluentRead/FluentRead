@@ -5,6 +5,7 @@ import {
     canUseBundledDictionaryFallback,
     calculateSelectionPopupPosition,
     chooseSelectionRect,
+    collectEventShadowRoots,
     getSelectionPopupAnchor,
     getSelectionPresentationDelayRemaining,
     getEditableSelectionRoot,
@@ -13,6 +14,7 @@ import {
     normalizeSelectionText,
     readSelectionText,
     readSelectionParts,
+    resolveActiveSelection,
     resolveSelectionDirection,
     translateSelectionParts,
     normalizeSpeechLanguage,
@@ -1505,5 +1507,396 @@ describe('selection translator text and speech language normalization', () => {
         expect(hasCandidate).not.toHaveBeenCalled();
         expect(shouldClaimConfiguredHotkey(control, 'Control', '', hasCandidate)).toBe(true);
         expect(hasCandidate).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('开放 Shadow DOM 选区解析与跨边界过滤', () => {
+    function createShadowFixture(text = 'Shadow post paragraph') {
+        const {document: doc, window: domWindow} = parseHTML('<html><body><div id="wrapper"></div></body></html>');
+        const host = doc.createElement('shreddit-post');
+        const shadow = host.attachShadow({mode: 'open'});
+        const paragraph = doc.createElement('p');
+        paragraph.textContent = text;
+        shadow.appendChild(paragraph);
+        doc.getElementById('wrapper')!.appendChild(host);
+        const textNode = paragraph.firstChild!;
+        const range = {
+            startContainer: textNode,
+            endContainer: textNode,
+            commonAncestorContainer: textNode,
+            startOffset: 0,
+            endOffset: text.length,
+            collapsed: false,
+            toString: () => text,
+            cloneRange: () => range,
+        } as unknown as Range;
+        return {doc, domWindow, host, shadow, paragraph, textNode, range};
+    }
+
+    it('collectEventShadowRoots 只提取当前文档中已连接的页面开放 ShadowRoot 并保持由深到浅去重', () => {
+        const {doc, host, shadow, paragraph} = createShadowFixture();
+        const innerHost = doc.createElement('shreddit-comment');
+        const innerShadow = innerHost.attachShadow({mode: 'open'});
+        shadow.appendChild(innerHost);
+
+        const uiHost = doc.createElement('div');
+        uiHost.id = 'fluent-read-selection-translator-container';
+        const uiShadow = uiHost.attachShadow({mode: 'open'});
+        doc.body.appendChild(uiHost);
+
+        const attrUiHost = doc.createElement('div');
+        attrUiHost.setAttribute('data-fluent-read-ui', 'true');
+        const attrUiShadow = attrUiHost.attachShadow({mode: 'open'});
+        doc.body.appendChild(attrUiHost);
+
+        const detachedHost = doc.createElement('div');
+        const detachedShadow = detachedHost.attachShadow({mode: 'open'});
+
+        const otherDoc = parseHTML('<html><body></body></html>').document;
+        const foreignHost = otherDoc.createElement('div');
+        const foreignShadow = foreignHost.attachShadow({mode: 'open'});
+        otherDoc.body.appendChild(foreignHost);
+
+        const event = {
+            composedPath: () => [
+                paragraph,
+                innerShadow,
+                innerShadow,
+                uiShadow,
+                attrUiShadow,
+                detachedShadow,
+                foreignShadow,
+                shadow,
+                host,
+                doc,
+            ],
+        } as unknown as Event;
+
+        expect(collectEventShadowRoots(null, doc)).toEqual([]);
+        expect(collectEventShadowRoots({composedPath: () => []} as unknown as Event, doc)).toEqual([]);
+        expect(collectEventShadowRoots(event, doc)).toEqual([innerShadow, shadow]);
+        expect(collectEventShadowRoots(event)).toEqual([innerShadow, foreignShadow, shadow]);
+    });
+
+    it('优先读取普通文档选区，并识别正向/反向及扩展自身忽略选区', () => {
+        const {doc} = createShadowFixture();
+        const p = doc.createElement('p');
+        p.textContent = 'Light DOM text';
+        doc.body.appendChild(p);
+        const textNode = p.firstChild!;
+        const range = {
+            startContainer: textNode,
+            endContainer: textNode,
+            startOffset: 0,
+            endOffset: 14,
+            collapsed: false,
+            toString: () => 'Light DOM text',
+        } as unknown as Range;
+        const backwardSelection = {
+            rangeCount: 1,
+            isCollapsed: false,
+            anchorNode: textNode,
+            anchorOffset: 14,
+            getRangeAt: () => range,
+            toString: () => 'Light DOM text',
+        } as unknown as Selection;
+        const view = {getSelection: () => backwardSelection} as unknown as Window;
+
+        const resolved = resolveActiveSelection(view, doc);
+        expect(resolved?.nativeText).toBe('Light DOM text');
+        expect(resolved?.isForward).toBe(false);
+        expect(resolveActiveSelection(view, doc, {isIgnoredSelection: () => true})).toBeNull();
+
+        const forwardSelection = {...backwardSelection, anchorOffset: 0} as unknown as Selection;
+        const forward = resolveActiveSelection({getSelection: () => forwardSelection} as unknown as Window, doc);
+        expect(forward?.isForward).toBe(true);
+    });
+
+    it('通过 Chromium shadowRoot.getSelection 解析提示、activeElement、重定位边界和文档兜底扫描中的 Shadow DOM 选区', () => {
+        const {doc, host, shadow, textNode, range} = createShadowFixture('Reddit shadow comment');
+        const shadowSelection = {
+            rangeCount: 1,
+            isCollapsed: false,
+            anchorNode: textNode,
+            anchorOffset: 0,
+            getRangeAt: () => range,
+            toString: () => 'Reddit shadow comment',
+        } as unknown as Selection;
+        Object.assign(shadow, {getSelection: () => shadowSelection});
+        const emptyRootSelection = {
+            rangeCount: 0,
+            isCollapsed: true,
+            anchorNode: null,
+            anchorOffset: 0,
+            focusNode: null,
+            focusOffset: 0,
+            toString: () => '',
+        } as unknown as Selection;
+        const view = {getSelection: () => emptyRootSelection} as unknown as Window;
+
+        // 1. 显式提示路径
+        const fromHint = resolveActiveSelection(view, doc, {shadowRoots: [shadow]});
+        expect(fromHint?.nativeText).toBe('Reddit shadow comment');
+        expect(fromHint?.selection).toBe(shadowSelection);
+        expect(resolveActiveSelection(view, doc, {shadowRoots: [shadow], isIgnoredSelection: () => true})).toBeNull();
+
+        // 2. activeElement 链（嵌套 ShadowRoot，内层优先）
+        const innerHost = doc.createElement('shreddit-inner');
+        const innerShadow = innerHost.attachShadow({mode: 'open'});
+        const innerP = doc.createElement('p');
+        innerP.textContent = 'Nested shadow text';
+        innerShadow.appendChild(innerP);
+        shadow.appendChild(innerHost);
+        const innerRange = {
+            startContainer: innerP.firstChild!,
+            endContainer: innerP.firstChild!,
+            startOffset: 0,
+            endOffset: 18,
+            collapsed: false,
+            toString: () => 'Nested shadow text',
+        } as unknown as Range;
+        const innerSelection = {
+            rangeCount: 1,
+            isCollapsed: false,
+            anchorNode: innerP.firstChild!,
+            anchorOffset: 0,
+            getRangeAt: () => innerRange,
+            toString: () => 'Nested shadow text',
+        } as unknown as Selection;
+        Object.assign(innerShadow, {getSelection: () => innerSelection});
+        Object.assign(shadow, {getSelection: () => ({rangeCount: 1, isCollapsed: false, getRangeAt: () => range, toString: () => '   '})});
+        Object.defineProperty(doc, 'activeElement', {configurable: true, value: host});
+        Object.defineProperty(shadow, 'activeElement', {configurable: true, value: innerHost});
+        const fromActive = resolveActiveSelection(view, doc);
+        expect(fromActive?.nativeText).toBe('Nested shadow text');
+
+        // 3. 重定位到宿主父节点 childNodes[offset] 的 Selection 边界提示
+        Object.defineProperty(doc, 'activeElement', {configurable: true, value: null});
+        Object.assign(shadow, {getSelection: () => shadowSelection});
+        Object.assign(innerShadow, {getSelection: () => null});
+        const wrapper = doc.getElementById('wrapper')!;
+        const retargetedRange = {
+            startContainer: wrapper,
+            startOffset: 0,
+            endContainer: wrapper,
+            endOffset: 1,
+            collapsed: false,
+            toString: () => '',
+        } as unknown as Range;
+        const retargetedRootSelection = {
+            rangeCount: 1,
+            isCollapsed: false,
+            anchorNode: wrapper,
+            anchorOffset: 0,
+            focusNode: wrapper,
+            focusOffset: 1,
+            getRangeAt: () => retargetedRange,
+            toString: () => '',
+        } as unknown as Selection;
+        const fromRetarget = resolveActiveSelection({getSelection: () => retargetedRootSelection} as unknown as Window, doc);
+        expect(fromRetarget?.nativeText).toBe('Reddit shadow comment');
+
+        // 4. 仅外层 shadow 在 hints 中且为空时，文档兜底扫描仍会下探外层 shadow 内的嵌套内层 shadow
+        Object.assign(shadow, {getSelection: () => null});
+        Object.assign(innerShadow, {getSelection: () => innerSelection});
+        const fromNestedScan = resolveActiveSelection(view, doc, {shadowRoots: [shadow]});
+        expect(fromNestedScan?.nativeText).toBe('Nested shadow text');
+        expect(resolveActiveSelection(view, doc, {shadowRoots: [shadow], isIgnoredSelection: () => true})).toBeNull();
+    });
+
+    it('通过 W3C getComposedRanges（含 Safari 17 可变参数回退）解析 Shadow DOM 选区并拒绝跨树或无效 StaticRange', () => {
+        const {doc, shadow, textNode} = createShadowFixture('Composed shadow text');
+        const lightP = doc.createElement('p');
+        lightP.textContent = 'Light sibling';
+        doc.body.appendChild(lightP);
+        const otherDoc = parseHTML('<html><body><p>Foreign</p></body></html>').document;
+        const foreignText = otherDoc.querySelector('p')!.firstChild!;
+        const detachedText = doc.createTextNode('Detached');
+
+        const createRange = () => {
+            let start: Node = textNode;
+            let startOffset = 0;
+            let end: Node = textNode;
+            let endOffset = 0;
+            return {
+                get startContainer() {return start;},
+                get startOffset() {return startOffset;},
+                get endContainer() {return end;},
+                get endOffset() {return endOffset;},
+                get collapsed() {return start === end && startOffset === endOffset;},
+                setStart(node: Node, offset: number) {start = node; startOffset = offset;},
+                setEnd(node: Node, offset: number) {end = node; endOffset = offset;},
+                toString() {return (start.textContent ?? '').slice(startOffset, endOffset);},
+            } as unknown as Range;
+        };
+        Object.assign(doc, {createRange});
+
+        const validStaticRange = {
+            startContainer: textNode,
+            startOffset: 0,
+            endContainer: textNode,
+            endOffset: 20,
+            collapsed: false,
+        };
+        const emptyStaticRange = {
+            startContainer: textNode,
+            startOffset: 0,
+            endContainer: textNode,
+            endOffset: 0,
+            collapsed: false,
+        };
+        const crossRootStaticRange = {
+            startContainer: textNode,
+            startOffset: 0,
+            endContainer: lightP.firstChild!,
+            endOffset: 5,
+            collapsed: false,
+        };
+        const foreignStaticRange = {
+            startContainer: foreignText,
+            startOffset: 0,
+            endContainer: foreignText,
+            endOffset: 7,
+            collapsed: false,
+        };
+        const detachedStaticRange = {
+            startContainer: detachedText,
+            startOffset: 0,
+            endContainer: detachedText,
+            endOffset: 8,
+            collapsed: false,
+        };
+
+        // 标准选项对象 + direction: 'backward' + 空 rootSelection.toString 回退到 range.toString
+        const standardSelection = {
+            rangeCount: 0,
+            isCollapsed: true,
+            direction: 'backward',
+            toString: () => '',
+            getComposedRanges: vi.fn(() => [
+                {...validStaticRange, collapsed: true},
+                detachedStaticRange,
+                foreignStaticRange,
+                crossRootStaticRange,
+                emptyStaticRange,
+                validStaticRange,
+            ]),
+        } as unknown as Selection;
+        const standardResult = resolveActiveSelection({getSelection: () => standardSelection} as unknown as Window, doc, {shadowRoots: [shadow]});
+        expect(standardResult?.nativeText).toBe('Composed shadow text');
+        expect(standardResult?.isForward).toBe(false);
+
+        // Safari 17 可变参数回退 + 非空 rootSelection.toString 优先
+        const safari17Selection = {
+            rangeCount: 0,
+            isCollapsed: true,
+            toString: () => 'Composed\nshadow text',
+            getComposedRanges: vi.fn((first: unknown) => {
+                if (first && typeof first === 'object' && 'shadowRoots' in first) throw new TypeError('legacy variadic signature');
+                return [validStaticRange];
+            }),
+        } as unknown as Selection;
+        const safariResult = resolveActiveSelection({getSelection: () => safari17Selection} as unknown as Window, doc, {shadowRoots: [shadow]});
+        expect(safariResult?.nativeText).toBe('Composed\nshadow text');
+        expect(safariResult?.isForward).toBe(true);
+
+        // 两种签名均抛错或返回空时安全返回 null
+        const brokenSelection = {
+            rangeCount: 0,
+            isCollapsed: true,
+            toString: () => '',
+            getComposedRanges: vi.fn(() => {throw new Error('unsupported');}),
+        } as unknown as Selection;
+        expect(resolveActiveSelection({getSelection: () => brokenSelection} as unknown as Window, doc, {shadowRoots: [shadow]})).toBeNull();
+
+        const nullishSelection = {
+            rangeCount: 0,
+            isCollapsed: true,
+            toString: () => '',
+            getComposedRanges: vi.fn(() => undefined as unknown as StaticRange[]),
+        } as unknown as Selection;
+        expect(resolveActiveSelection({getSelection: () => nullishSelection} as unknown as Window, doc, {shadowRoots: [shadow]})).toBeNull();
+
+        const nullishSafari17Selection = {
+            rangeCount: 0,
+            isCollapsed: true,
+            toString: () => '',
+            getComposedRanges: vi.fn((first: unknown) => {
+                if (first && typeof first === 'object' && 'shadowRoots' in first) throw new TypeError('legacy');
+                return undefined as unknown as StaticRange[];
+            }),
+        } as unknown as Selection;
+        expect(resolveActiveSelection({getSelection: () => nullishSafari17Selection} as unknown as Window, doc, {shadowRoots: [shadow]})).toBeNull();
+
+        // 无 createTreeWalker / 无 createRange 的极简文档不会抛错
+        expect(resolveActiveSelection({getSelection: () => null} as unknown as Window, {} as Document)).toBeNull();
+        const docWithoutCreateRange = Object.assign(Object.create(doc), {createRange: undefined}) as Document;
+        Object.assign(doc, {createRange: undefined});
+        expect(resolveActiveSelection({getSelection: () => standardSelection} as unknown as Window, doc, {shadowRoots: [shadow]})).toBeNull();
+        expect(resolveActiveSelection({getSelection: () => standardSelection} as unknown as Window, docWithoutCreateRange)).toBeNull();
+    });
+
+    it('shouldIgnoreSelection 与 getEditableSelectionRoot 跨 Shadow DOM 边界校验宿主保护与直接文本子节点', () => {
+        const {doc, host, shadow, paragraph, textNode} = createShadowFixture('Shadow text');
+        const makeRange = (node: Node) => ({
+            startContainer: node,
+            endContainer: node,
+            commonAncestorContainer: node,
+            startOffset: 0,
+            endOffset: 1,
+            collapsed: false,
+            intersectsNode: () => true,
+        } as unknown as Range);
+
+        // 普通自定义元素宿主（即使 body 有全局 notranslate）放行
+        doc.body.classList.add('notranslate');
+        expect(shouldIgnoreSelection(makeRange(textNode), true)).toBe(false);
+
+        // 宿主外层有局部 .notranslate 或交互控件 button 时仍排除
+        host.setAttribute('aria-hidden', 'true');
+        expect(shouldIgnoreSelection(makeRange(textNode), true)).toBe(true);
+        host.removeAttribute('aria-hidden');
+
+        // ShadowRoot 直接文本子节点与 ShadowRoot 容器本身都能正确解析宿主
+        const directText = doc.createTextNode('Direct shadow text');
+        shadow.appendChild(directText);
+        expect(shouldIgnoreSelection(makeRange(directText), true)).toBe(false);
+        expect(shouldIgnoreSelection(makeRange(shadow), true)).toBe(false);
+
+        const buttonHost = doc.createElement('button');
+        const buttonShadow = buttonHost.attachShadow({mode: 'open'});
+        const buttonDirectText = doc.createTextNode('Button label');
+        buttonShadow.appendChild(buttonDirectText);
+        doc.body.appendChild(buttonHost);
+        expect(shouldIgnoreSelection(makeRange(buttonDirectText), true)).toBe(true);
+        expect(shouldIgnoreSelection(makeRange(buttonShadow), true)).toBe(true);
+
+        // 局部 contenteditable 宿主包含开放 Shadow DOM 子树时，两端共享同一编辑宿主
+        const editor = doc.createElement('div');
+        editor.setAttribute('contenteditable', 'true');
+        const editorHost = doc.createElement('custom-editor-chunk');
+        const editorShadow = editorHost.attachShadow({mode: 'open'});
+        const editorSpan = doc.createElement('span');
+        editorSpan.textContent = 'Editable shadow text';
+        editorShadow.appendChild(editorSpan);
+        editor.appendChild(editorHost);
+        doc.body.appendChild(editor);
+
+        expect(getEditableSelectionRoot(editorSpan.firstChild)).toBe(editor);
+        expect(shouldIgnoreSelection(makeRange(editorSpan.firstChild!), true)).toBe(false);
+        expect(shouldIgnoreSelection(makeRange(editorSpan.firstChild!), false)).toBe(true);
+
+        // Shadow DOM 内的公式在受保护宿主下同样被排除
+        const formula = doc.createElement('math');
+        formula.textContent = 'x + 1';
+        const formulaHost = doc.createElement('button');
+        const formulaShadow = formulaHost.attachShadow({mode: 'open'});
+        formulaShadow.appendChild(formula);
+        doc.body.appendChild(formulaHost);
+        expect(shouldIgnoreSelection(makeRange(formula), true)).toBe(true);
+
+        // 未连接 host 的非元素节点不会崩溃
+        expect(getEditableSelectionRoot({nodeType: 11, host: null} as unknown as Node)).toBeNull();
+        expect(paragraph.isConnected).toBe(true);
     });
 });

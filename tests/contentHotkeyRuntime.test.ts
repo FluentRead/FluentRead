@@ -161,6 +161,26 @@ describe('全文翻译快捷键状态联动', () => {
         expect(ports.hasActiveSelectionTranslationCandidate()).toBe(true);
         expect(mocks.shouldIgnoreSelection).toHaveBeenCalledWith(range, true);
     });
+    it('detects a valid selection shortcut candidate inside an open ShadowRoot when document Selection is collapsed', async () => {
+        const range = {getClientRects: () => [{width: 160, height: 24}],
+            getBoundingClientRect: () => ({width: 160, height: 24})};
+        const shadowSelection = {
+            rangeCount: 1,
+            isCollapsed: false,
+            toString: () => 'Selected text inside open shadow DOM.',
+            getRangeAt: () => range,
+        };
+        const shadowRoot = {nodeType: 11, host: null as unknown, getSelection: () => shadowSelection};
+        const host = {nodeType: 1, id: 'reddit-post', isConnected: true, ownerDocument: document, shadowRoot, hasAttribute: () => false};
+        shadowRoot.host = host;
+        Object.defineProperty(document, 'activeElement', {configurable: true, value: host});
+        mocks.getSelection.mockReturnValue({rangeCount: 0, isCollapsed: true, toString: () => ''} as unknown as Selection);
+
+        const {createContentHotkeyRuntime} = await import('@/src/app/content/hotkeyRuntime');
+        const ports = createContentHotkeyRuntime(() => false).selectionShortcutPorts;
+        expect(ports.hasActiveSelectionTranslationCandidate()).toBe(true);
+        expect(mocks.shouldIgnoreSelection).toHaveBeenCalledWith(range, true);
+    });
     it.each([['Alt+T', 'MacIntel', 'macOS'], ['custom', 'Win32', '其他']] as const)('开发模式记录实际配置的 %s 快捷键并执行全文动作', async (configured, platform, os) => {
         vi.stubGlobal('process', {env: {NODE_ENV: 'development'}});
         vi.stubGlobal('navigator', {platform});

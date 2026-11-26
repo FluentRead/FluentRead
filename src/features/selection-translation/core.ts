@@ -1,10 +1,10 @@
 /**
  * @file src/features/selection-translation/core.ts
- * 文件职责：集中划词翻译的纯交互与内容算法，包括请求代次、词典回退、触发展示状态、选区过滤、上下文摘要、弹窗锚点、临时译文语言选项与方向解析及语音语言规范化。
- * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、单次卡片目标语言选项与方向解析、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、按实际 Range 边界遍历的敏感区域排除、无文本装饰图标放行及单遍祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
+ * 文件职责：集中划词翻译的纯交互与内容算法，包括请求代次、词典回退、触发展示状态、开放 Shadow DOM 选区解析、选区过滤、上下文摘要、弹窗锚点、临时译文语言选项与方向解析及语音语言规范化。
+ * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型及开放 Shadow DOM 选区解析（composedPath 收集、Chromium shadowRoot.getSelection 与 W3C getComposedRanges 兼容、有界文档扫描），处理中英划词反向目标、单次卡片目标语言选项与方向解析、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、跨 Shadow 边界的祖先与敏感区域排除、无文本装饰图标放行、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
  * 模块边界：本模块不监听 document selection、不发消息、不渲染 Vue 或播放音频；组件负责连接 DOM，词典和 TTS 由 services/background 提供，函数保持确定性以供单元测试。DOM 安全判断直接复用 translation/dom 的同一实现，不初始化翻译候选或站点规则 registry。
  */
-import {getElementTagName, isDocumentSurfaceNoTranslateShell, isTopLevelApplicationShell} from '@/src/core/translation/dom';
+import {getComposedParent, getElementTagName, isDocumentSurfaceNoTranslateShell, isTopLevelApplicationShell} from '@/src/core/translation/dom';
 import {unwrapSoftLineBreaks, unwrapWrappedParagraphs} from '@/src/core/translation/wrappedParagraphs';
 import {translationLanguageOptions} from '@/src/core/language/catalog';
 import {getChineseScript, normalizeChineseLanguageCode} from '@/src/core/language/chinese';
@@ -344,7 +344,230 @@ function isInlineSelectionFormulaPart(element: Element): boolean {
     if ((selectionExcludedTagNames.has(tag) && tag !== 'math' && tag !== 'svg') ||
         selectionExcludedRoles.has(element.getAttribute('role')?.trim().toLowerCase() ?? '')) return false;
     const outer = root.parentElement?.closest(selectionFormulaSelector) ?? root;
-    return !isSelectionExcludedElement(outer.parentElement);
+    return !isSelectionExcludedElement(getComposedParent(outer));
+}
+
+const FLUENT_READ_SHADOW_HOST_IDS = new Set([
+    'fluent-read-selection-translator-container',
+    'fluent-read-floating-ball-container',
+    'fluent-read-share-card-container',
+    'fluent-read-translation-status-container',
+]);
+const MAX_SHADOW_SCAN_ELEMENTS = 4000;
+const MAX_SHADOW_SCAN_ROOTS = 256;
+
+export interface ResolvedSelection {
+    selection: Selection;
+    range: Range;
+    nativeText: string;
+    isForward: boolean;
+}
+
+export interface ResolveActiveSelectionOptions {
+    shadowRoots?: Iterable<ShadowRoot>;
+    isIgnoredSelection?: (selection: Selection) => boolean;
+}
+
+type ShadowRootWithSelection = ShadowRoot & {getSelection?: () => Selection | null};
+type SelectionWithComposedRanges = Selection & {
+    direction?: string;
+    getComposedRanges?: (options?: {shadowRoots?: ShadowRoot[]} | ShadowRoot, ...rest: ShadowRoot[]) => StaticRange[];
+};
+
+function isShadowRootNode(value: unknown): value is ShadowRoot {
+    return typeof value === 'object' && value !== null && (value as Node).nodeType === 11 && 'host' in value;
+}
+
+function getShadowHostElement(node: Node): Element | null {
+    const root = node.getRootNode?.();
+    return isShadowRootNode(root) && root.host?.nodeType === 1 ? root.host : null;
+}
+
+function isUsablePageShadowRoot(value: unknown, ownerDocument?: Document): value is ShadowRoot {
+    if (!isShadowRootNode(value)) return false;
+    const host = value.host;
+    if (!host || host.nodeType !== 1 || !host.isConnected) return false;
+    if (ownerDocument && host.ownerDocument !== ownerDocument) return false;
+    return !FLUENT_READ_SHADOW_HOST_IDS.has(host.id) && !host.hasAttribute?.('data-fluent-read-ui');
+}
+
+/** 从事件 composedPath 提取已连接的页面开放 ShadowRoot（保持由深到浅顺序，跳过扩展自身宿主）。 */
+export function collectEventShadowRoots(event: Event | null | undefined, ownerDocument?: Document): ShadowRoot[] {
+    const path = event?.composedPath?.();
+    if (!path?.length) return [];
+    const roots: ShadowRoot[] = [];
+    const seen = new Set<ShadowRoot>();
+    for (const entry of path) {
+        if (!isUsablePageShadowRoot(entry, ownerDocument) || seen.has(entry)) continue;
+        seen.add(entry);
+        roots.push(entry);
+    }
+    return roots;
+}
+
+function isSelectionForward(selection: Selection, range: Range): boolean {
+    if (selection.anchorNode === range.startContainer && selection.anchorOffset === range.startOffset) return true;
+    if (selection.anchorNode === range.endContainer && selection.anchorOffset === range.endOffset) return false;
+    return (selection as SelectionWithComposedRanges).direction !== 'backward';
+}
+
+function readUsableSelection(
+    selection: Selection | null | undefined,
+    isIgnored?: (selection: Selection) => boolean,
+): ResolvedSelection | null | 'ignored' {
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+    if (isIgnored?.(selection)) return 'ignored';
+    const range = selection.getRangeAt(0);
+    const nativeText = selection.toString();
+    if (!nativeText.trim()) return null;
+    return {selection, range, nativeText, isForward: isSelectionForward(selection, range)};
+}
+
+function addShadowRootCandidate(target: ShadowRoot[], seen: Set<ShadowRoot>, root: unknown, doc: Document): void {
+    if (!isUsablePageShadowRoot(root, doc) || seen.has(root)) return;
+    seen.add(root);
+    target.push(root);
+}
+
+function addNodeShadowCandidates(target: ShadowRoot[], seen: Set<ShadowRoot>, node: Node | null | undefined, offset: number, doc: Document): void {
+    if (!node) return;
+    addShadowRootCandidate(target, seen, node.getRootNode?.(), doc);
+    if (node.nodeType !== 1) return;
+    const element = node as Element;
+    addShadowRootCandidate(target, seen, element.shadowRoot, doc);
+    for (const index of [offset, offset - 1]) {
+        const child = element.childNodes?.[index];
+        if (child?.nodeType === 1) addShadowRootCandidate(target, seen, (child as Element).shadowRoot, doc);
+    }
+}
+
+function collectHintedShadowRoots(doc: Document, rootSelection: Selection | null, hints?: Iterable<ShadowRoot>): ShadowRoot[] {
+    const candidates: ShadowRoot[] = [];
+    const seen = new Set<ShadowRoot>();
+    if (hints) {
+        for (const root of hints) addShadowRootCandidate(candidates, seen, root, doc);
+    }
+    const activeRoots: ShadowRoot[] = [];
+    let active = doc.activeElement as (Element & {shadowRoot?: ShadowRoot | null}) | null;
+    while (active?.shadowRoot && isUsablePageShadowRoot(active.shadowRoot, doc)) {
+        activeRoots.push(active.shadowRoot);
+        active = active.shadowRoot.activeElement as (Element & {shadowRoot?: ShadowRoot | null}) | null;
+    }
+    for (let index = activeRoots.length - 1; index >= 0; index -= 1) {
+        addShadowRootCandidate(candidates, seen, activeRoots[index], doc);
+    }
+    if (rootSelection) {
+        addNodeShadowCandidates(candidates, seen, rootSelection.anchorNode, rootSelection.anchorOffset, doc);
+        addNodeShadowCandidates(candidates, seen, rootSelection.focusNode, rootSelection.focusOffset, doc);
+        if (rootSelection.rangeCount > 0) {
+            const range = rootSelection.getRangeAt(0);
+            addNodeShadowCandidates(candidates, seen, range.startContainer, range.startOffset, doc);
+            addNodeShadowCandidates(candidates, seen, range.endContainer, range.endOffset, doc);
+        }
+    }
+    return candidates;
+}
+
+function collectDocumentOpenShadowRoots(doc: Document, excluded: Set<ShadowRoot>): ShadowRoot[] {
+    const startRoot = doc.body ?? doc.documentElement;
+    if (!startRoot || typeof doc.createTreeWalker !== 'function') return [];
+    const discovered: ShadowRoot[] = [];
+    const seen = new Set<ShadowRoot>(excluded);
+    const pending: Node[] = [startRoot, ...excluded];
+    let visitedElements = 0;
+    const recordHost = (element: Element) => {
+        if (!element.shadowRoot || !isUsablePageShadowRoot(element.shadowRoot, doc) || seen.has(element.shadowRoot)) return;
+        seen.add(element.shadowRoot);
+        discovered.push(element.shadowRoot);
+        pending.push(element.shadowRoot);
+    };
+    for (let queueIndex = 0; queueIndex < pending.length && discovered.length < MAX_SHADOW_SCAN_ROOTS && visitedElements < MAX_SHADOW_SCAN_ELEMENTS; queueIndex += 1) {
+        const root = pending[queueIndex]!;
+        if (root.nodeType === 1) recordHost(root as Element);
+        const walker = doc.createTreeWalker(root, 1);
+        let current = walker.nextNode();
+        while (current && discovered.length < MAX_SHADOW_SCAN_ROOTS && visitedElements < MAX_SHADOW_SCAN_ELEMENTS) {
+            visitedElements += 1;
+            recordHost(current as Element);
+            current = walker.nextNode();
+        }
+    }
+    return discovered.reverse();
+}
+
+function readComposedRanges(selection: SelectionWithComposedRanges, shadowRoots: ShadowRoot[]): StaticRange[] {
+    if (typeof selection.getComposedRanges !== 'function') return [];
+    try {
+        return selection.getComposedRanges({shadowRoots}) ?? [];
+    } catch {
+        try {
+            return selection.getComposedRanges(...shadowRoots) ?? [];
+        } catch {
+            return [];
+        }
+    }
+}
+
+function resolveFromShadowRoots(
+    rootSelection: Selection | null,
+    doc: Document,
+    selectionRoots: ShadowRoot[],
+    composedRoots: ShadowRoot[],
+    isIgnored?: (selection: Selection) => boolean,
+): ResolvedSelection | null | 'ignored' {
+    for (const shadowRoot of selectionRoots) {
+        const reader = (shadowRoot as ShadowRootWithSelection).getSelection;
+        if (typeof reader !== 'function') continue;
+        const resolved = readUsableSelection(reader.call(shadowRoot), isIgnored);
+        if (resolved) return resolved;
+    }
+    if (!rootSelection || typeof doc.createRange !== 'function') return null;
+    for (const staticRange of readComposedRanges(rootSelection as SelectionWithComposedRanges, composedRoots)) {
+        if (staticRange.collapsed
+            || !staticRange.startContainer.isConnected || !staticRange.endContainer.isConnected
+            || staticRange.startContainer.ownerDocument !== doc
+            || staticRange.startContainer.getRootNode() !== staticRange.endContainer.getRootNode()) continue;
+        const range = doc.createRange();
+        range.setStart(staticRange.startContainer, staticRange.startOffset);
+        range.setEnd(staticRange.endContainer, staticRange.endOffset);
+        const rangeText = range.toString();
+        if (range.collapsed || !rangeText.trim()) continue;
+        const selectionText = rootSelection.toString();
+        return {
+            selection: rootSelection,
+            range,
+            nativeText: selectionText.trim() ? selectionText : rangeText,
+            isForward: isSelectionForward(rootSelection, range),
+        };
+    }
+    return null;
+}
+
+/**
+ * 读取当前活动选区：优先普通文档选区；当选区位于开放 Shadow DOM 中被宿主重定位或折叠时，
+ * 依次尝试 Chromium shadowRoot.getSelection() 与标准 Selection.getComposedRanges()。
+ */
+export function resolveActiveSelection(
+    view: Window,
+    doc: Document,
+    options: ResolveActiveSelectionOptions = {},
+): ResolvedSelection | null {
+    const rootSelection = view.getSelection?.() ?? null;
+    const light = readUsableSelection(rootSelection, options.isIgnoredSelection);
+    if (light === 'ignored') return null;
+    if (light) return light;
+
+    const hinted = collectHintedShadowRoots(doc, rootSelection, options.shadowRoots);
+    if (hinted.length > 0) {
+        const fromHints = resolveFromShadowRoots(rootSelection, doc, hinted, hinted, options.isIgnoredSelection);
+        if (fromHints === 'ignored') return null;
+        if (fromHints) return fromHints;
+    }
+
+    const discovered = collectDocumentOpenShadowRoots(doc, new Set(hinted));
+    if (discovered.length === 0) return null;
+    const fromScan = resolveFromShadowRoots(rootSelection, doc, discovered, [...discovered, ...hinted], options.isIgnoredSelection);
+    return fromScan === 'ignored' ? null : fromScan;
 }
 
 const selectionExcludedTagNames = new Set([
@@ -402,7 +625,7 @@ function isEditableSelectionElement(element: Element): boolean {
         if (current.hasAttribute('contenteditable')) {
             return current.getAttribute('contenteditable')?.trim().toLowerCase() !== 'false';
         }
-        current = current.parentElement;
+        current = getComposedParent(current);
     }
     return false;
 }
@@ -428,25 +651,32 @@ function isSelectionExcludedElement(element: Element | null, editableRoot: Eleme
             || ((current as HTMLElement).isContentEditable
                 || current.hasAttribute('contenteditable') && current.getAttribute('contenteditable')?.trim().toLowerCase() !== 'false')
                 && !insideEditableRoot) return true;
-        current = current.parentElement;
+        current = getComposedParent(current);
     }
 
-    let excluded = element.closest(selectionExcludedSelector);
-    while (excluded) {
-        // DeepSeek 等页面在 html/body 上禁止浏览器整页翻译；显式划词仍可读取正文。
-        // 文档根禁译标记可放行；UI、隐藏、本地禁译标记和授权编辑宿主之外的编辑边界仍逐层检查。
-        const shell = isDocumentSurfaceNoTranslateShell(excluded) ||
-            excluded !== element && isTopLevelApplicationShell(excluded);
-        if ((!shell && !isAllowedEditableSelectionMarker(excluded, editableRoot))
-            || isSelectionNonMarkerExcluded(excluded, editableRoot)) return true;
-        excluded = excluded.parentElement?.closest(selectionExcludedSelector) ?? null;
+    let scope: Element | null = element;
+    while (scope) {
+        let excluded = scope.closest(selectionExcludedSelector);
+        while (excluded) {
+            // DeepSeek 等页面在 html/body 上禁止浏览器整页翻译；显式划词仍可读取正文。
+            // 文档根禁译标记可放行；UI、隐藏、本地禁译标记和授权编辑宿主之外的编辑边界仍逐层检查。
+            const shell = isDocumentSurfaceNoTranslateShell(excluded) ||
+                excluded !== element && isTopLevelApplicationShell(excluded);
+            if ((!shell && !isAllowedEditableSelectionMarker(excluded, editableRoot))
+                || isSelectionNonMarkerExcluded(excluded, editableRoot)) return true;
+            excluded = excluded.parentElement?.closest(selectionExcludedSelector) ?? null;
+        }
+        scope = getShadowHostElement(scope);
     }
     return false;
 }
 
 function elementFromSelectionNode(node: Node | null): Element | null {
     if (!node) return null;
-    return node.nodeType === 1 ? node as Element : node.parentElement;
+    if (node.nodeType === 1) return node as Element;
+    if (isShadowRootNode(node)) return node.host?.nodeType === 1 ? node.host : null;
+    if (node.parentElement) return node.parentElement;
+    return isShadowRootNode(node.parentNode) && node.parentNode.host?.nodeType === 1 ? node.parentNode.host : null;
 }
 
 /** 只把两个边界共享的同一个局部编辑宿主视为可放行范围；文档根编辑模式仍保持排除。 */
@@ -466,9 +696,9 @@ export function getEditableSelectionRoot(node: Node | null): Element | null {
             const role = current.getAttribute('role')?.trim().toLowerCase();
             if (!isDocumentRoot && role === 'textbox') root = current;
             else if (!isDocumentRoot && (current as HTMLElement).isContentEditable
-                && !(current.parentElement as HTMLElement | null)?.isContentEditable) root = current;
+                && !(getComposedParent(current) as HTMLElement | null)?.isContentEditable) root = current;
         }
-        current = current.parentElement;
+        current = getComposedParent(current);
     }
     return root;
 }
@@ -477,10 +707,10 @@ function isWithinEditableSelectionRoot(element: Element, root: Element | null): 
     if (!root) return false;
     if (element === root) return true;
     if (typeof root.contains === 'function') {
-        try {return root.contains(element);}
+        try {if (root.contains(element)) return true;}
         catch {/* 使用父链回退，单个宿主代理异常不能放宽选区校验。 */}
     }
-    for (let current: Element | null = element; current; current = current.parentElement) {
+    for (let current: Element | null = element; current; current = getComposedParent(current)) {
         if (current === root) return true;
     }
     return false;

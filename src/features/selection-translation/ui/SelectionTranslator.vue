@@ -242,7 +242,7 @@ import DictionaryCardTools from './DictionaryCardTools.vue';
 import {EMPTY_DICTIONARY_FIELDS} from '@/src/core/config/dictionaryWorkspace';
 import {normalizeDictionaryWord} from '../dictionary/model';
 import { isSingleEnglishWord, normalizeEnglishWord } from '@/src/features/selection-translation/services/wordNormalization';
-import { buildSelectionTargetOptions, calculateSelectionPopupPosition, chooseSelectionRect, getSelectionPopupAnchor, getEditableSelectionRoot, getSelectionPresentationDelayRemaining, readSelectionParts, resolveSelectionDirection, translateSelectionParts, normalizeSpeechLanguage, reconcileSelectionPresentation, resolveSelectionDictionaryFallback, resolveSelectionVocabularyAnswer, selectionReverseTarget, selectionTargetShortLabel, SelectionRequestTokenGate, shouldIgnoreSelection, summarizeSelectionContext, type SelectionAnswerCandidate, type SelectionContentRequest, type SelectionRect, type SelectionTextPart } from '@/src/features/selection-translation/core';
+import { buildSelectionTargetOptions, calculateSelectionPopupPosition, chooseSelectionRect, collectEventShadowRoots, getSelectionPopupAnchor, getEditableSelectionRoot, getSelectionPresentationDelayRemaining, readSelectionParts, resolveActiveSelection, resolveSelectionDirection, translateSelectionParts, normalizeSpeechLanguage, reconcileSelectionPresentation, resolveSelectionDictionaryFallback, resolveSelectionVocabularyAnswer, selectionReverseTarget, selectionTargetShortLabel, SelectionRequestTokenGate, shouldIgnoreSelection, summarizeSelectionContext, type SelectionAnswerCandidate, type SelectionContentRequest, type SelectionRect, type SelectionTextPart } from '@/src/features/selection-translation/core';
 import {
   createSelectionTtsClientRequestId,
 } from '@/src/features/selection-translation/protocol';
@@ -494,7 +494,11 @@ const runtimeMessageUnsubscribers: Array<() => void> = [];
 let releaseContextMenuHandler: (() => void) | null = null;
 // 原生菜单可能让 Selection 暂时折叠；只保存 trusted contextmenu 已审核的 Range，不从浏览器文本猜测 DOM 位置。
 let contextMenuSelection: ContextMenuSelection | null = null;
+// 部分站点在右键 pointerdown/mousedown 阶段清空原生选区；在 contextmenu 前暂存同一右键手势的已连接 Range。
+let pendingContextMenuSelection: ContextMenuSelection | null = null;
 let contextMenuSourceRejected = false;
+const MAX_RECENT_SHADOW_ROOTS = 8;
+let recentShadowRoots: ShadowRoot[] = [];
 let tooltipResizeObserver: ResizeObserver | null = null;
 const selectionConfigVersion = ref(0);
 const clickSelectionState = ref<'idle' | 'start' | 'end'>('idle');
@@ -649,19 +653,56 @@ function toSelectionRect(rect: DOMRect | DOMRectReadOnly): SelectionRect {
   return { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height };
 }
 
-function isExtensionSelection(selection: Selection): boolean {
-  const host = document.getElementById('fluent-read-selection-translator-container');
-  return Boolean(host && selection.containsNode(host, true));
+function getComposedEventTarget(event: Event): EventTarget | null {
+  return event.composedPath?.()[0] ?? event.target;
 }
 
-function readSelectionSnapshot(explicitRange?: Range): SelectionSnapshot | null {
+function rememberEventShadowRoots(event: Event | null | undefined): void {
+  const roots = collectEventShadowRoots(event, document);
+  if (roots.length === 0) return;
+  const merged = [...roots];
+  for (const existing of recentShadowRoots) {
+    if (existing.host?.isConnected && existing.host.ownerDocument === document && !merged.includes(existing)) {
+      merged.push(existing);
+    }
+    if (merged.length >= MAX_RECENT_SHADOW_ROOTS) break;
+  }
+  recentShadowRoots = merged.slice(0, MAX_RECENT_SHADOW_ROOTS);
+}
+
+function getCandidateShadowRoots(event?: Event): ShadowRoot[] {
+  const roots = collectEventShadowRoots(event, document);
+  const pruned: ShadowRoot[] = [];
+  for (const existing of recentShadowRoots) {
+    if (existing.host?.isConnected && existing.host.ownerDocument === document) pruned.push(existing);
+  }
+  recentShadowRoots = pruned;
+  if (roots.length === 0) return pruned;
+  const merged = [...roots];
+  for (const existing of pruned) {
+    if (!merged.includes(existing)) merged.push(existing);
+  }
+  return merged;
+}
+
+function isExtensionSelection(selection: Selection): boolean {
+  const host = document.getElementById('fluent-read-selection-translator-container');
+  return Boolean(host && typeof selection.containsNode === 'function' && selection.containsNode(host, true));
+}
+
+function readSelectionSnapshot(explicitRange?: Range, event?: Event): SelectionSnapshot | null {
   try {
-    const selection = explicitRange ? null : window.getSelection();
-    if (!explicitRange && (!selection || selection.rangeCount === 0 || selection.isCollapsed || isExtensionSelection(selection))) return null;
-    const range = (explicitRange ?? selection!.getRangeAt(0)).cloneRange();
+    const resolved = explicitRange
+      ? null
+      : resolveActiveSelection(window, document, {
+        shadowRoots: getCandidateShadowRoots(event),
+        isIgnoredSelection: isExtensionSelection,
+      });
+    if (!explicitRange && !resolved) return null;
+    const range = (explicitRange ?? resolved!.range).cloneRange();
     if (!isSelectionRangeConnected(range)
       || (props.selectionAdapter ? !props.selectionAdapter.acceptsRange(range) : shouldIgnoreSelection(range, true))) return null;
-    const nativeText = selection ? selection.toString() : range.toString();
+    const nativeText = resolved ? resolved.nativeText : range.toString();
     const sourceText = props.selectionAdapter?.extractText?.(range, nativeText) ?? nativeText;
     const parts = props.selectionAdapter?.normalizeText
       ? [{kind: 'text' as const, text: props.selectionAdapter.normalizeText(sourceText)}]
@@ -671,7 +712,7 @@ function readSelectionSnapshot(explicitRange?: Range): SelectionSnapshot | null 
 
     const rects = Array.from(range.getClientRects()).map(toSelectionRect).filter(rect => rect.width > 0 || rect.height > 0);
     const visualRects = rects.length > 0 ? rects : [toSelectionRect(range.getBoundingClientRect())];
-    const isForward = !selection || (selection.anchorNode === range.startContainer && selection.anchorOffset === range.startOffset);
+    const isForward = resolved ? resolved.isForward : true;
     const anchor = chooseSelectionRect(visualRects, isForward);
     if (!anchor || (anchor.width === 0 && anchor.height === 0)) return null;
     // 跨段时 Selection 会插入段落换行，Range 的序列化则可能直接拼接文本；各自只与同一种序列化核对。
@@ -1285,7 +1326,10 @@ function openTooltipFromIndicator(event?: MouseEvent): void {
   if ((import.meta.env.BROWSER !== 'safari' && import.meta.env.BROWSER !== 'firefox') || !touchInteraction.value || componentDisposed
     || wasVisible || !showTooltip.value || !current || snapshot.value !== current) return;
   try {
-    const selection = window.getSelection();
+    const selection = resolveActiveSelection(window, document, {
+      shadowRoots: getCandidateShadowRoots(),
+      isIgnoredSelection: isExtensionSelection,
+    })?.selection ?? window.getSelection();
     const live = readSelectionSnapshot();
     if (!selection || !live || !isSameSelection(current, live)) return;
     touchOpenedSelection = current;
@@ -2144,33 +2188,71 @@ async function toggleWordAudio(pronunciation: WordPronunciation): Promise<void> 
 
 function clearContextMenuSelection(): void {
   contextMenuSelection = null;
+  pendingContextMenuSelection = null;
   contextMenuSourceRejected = false;
 }
 
+function elementFromEventTarget(target: EventTarget | null): Element | null {
+  if (target instanceof Element) return target;
+  if (!(target instanceof Node)) return null;
+  if (target.nodeType === 11 && 'host' in target) {
+    const host = (target as ShadowRoot).host;
+    return host instanceof Element ? host : null;
+  }
+  if (target.parentElement) return target.parentElement;
+  const parent = target.parentNode;
+  return parent && parent.nodeType === 11 && 'host' in parent && (parent as ShadowRoot).host instanceof Element
+    ? (parent as ShadowRoot).host
+    : null;
+}
+
 function isContextMenuInputTarget(target: EventTarget | null): boolean {
-  let element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+  let element = elementFromEventTarget(target);
   // 原生输入控件不提供可核验的 DOM Range，避免把页面旧选区误当成控件里的输入内容。
-  return Boolean(element?.closest('input, textarea, select, button'));
+  while (element) {
+    if (element.closest('input, textarea, select, button')) return true;
+    const root = element.getRootNode?.();
+    element = root && root.nodeType === 11 && 'host' in root && (root as ShadowRoot).host instanceof Element
+      ? (root as ShadowRoot).host
+      : null;
+  }
+  return false;
 }
 
 function rangeBelongsToContextMenuTarget(range: Range, target: EventTarget | null): boolean {
-  const element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+  const element = elementFromEventTarget(target);
   const editableRoot = getEditableSelectionRoot(element);
   if (!editableRoot) return true;
   return getEditableSelectionRoot(range.startContainer) === editableRoot
     && getEditableSelectionRoot(range.endContainer) === editableRoot;
 }
 
+function revalidateCapturedContextMenuSelection(captured: ContextMenuSelection | null): SelectionSnapshot | null {
+  if (!captured) return null;
+  try {
+    const {range} = captured.snapshot;
+    // 快照跨菜单等待仍须属于当前文档、保有原文并再次通过敏感区域规则；裸 selectionText 永远不作为翻译来源。
+    if (!isSelectionRangeConnected(range) || range.toString() !== captured.rangeText
+      || (props.selectionAdapter ? !props.selectionAdapter.acceptsRange(range) : shouldIgnoreSelection(range, true))) return null;
+    return captured.snapshot;
+  } catch {
+    return null;
+  }
+}
+
 function handleContextMenu(event: MouseEvent): void {
   if (!event.isTrusted) return;
+  const preCaptured = pendingContextMenuSelection;
   clearContextMenuSelection();
+  const target = getComposedEventTarget(event);
+  rememberEventShadowRoots(event);
   // 输入控件的系统菜单可能保留正文旧 Range，触摸与鼠标都必须先核对来源。
-  contextMenuSourceRejected = isInsideUi(event.target) || isContextMenuInputTarget(event.target);
+  contextMenuSourceRejected = isInsideUi(target) || isContextMenuInputTarget(target);
   if (contextMenuSourceRejected) { cancelSelectionPresentation(); cancelTouchSelectionRead(); return; }
   // 移动端长按菜单与系统选区句柄共用同一次触摸。保留原生菜单，不冻结后续句柄调整。
   if (isTouchSelectionActive()) {
-    const current = readSelectionSnapshot();
-    if (current && !rangeBelongsToContextMenuTarget(current.range, event.target)) {
+    const current = readSelectionSnapshot(undefined, event);
+    if (current && !rangeBelongsToContextMenuTarget(current.range, target)) {
       contextMenuSourceRejected = true;
       cancelSelectionPresentation();
       cancelTouchSelectionRead();
@@ -2183,9 +2265,9 @@ function handleContextMenu(event: MouseEvent): void {
   }
   // 原生菜单接管这次选区交互，旧的延迟出卡和入口收起计时器不能在菜单期间清掉快照。
   cancelSelectionPresentation();
-  const current = readSelectionSnapshot();
+  const current = readSelectionSnapshot(undefined, event) ?? revalidateCapturedContextMenuSelection(preCaptured);
   if (!current) return;
-  if (!rangeBelongsToContextMenuTarget(current.range, event.target)) {
+  if (!rangeBelongsToContextMenuTarget(current.range, target)) {
     contextMenuSourceRejected = true;
     return;
   }
@@ -2205,15 +2287,7 @@ function matchesContextMenuText(current: SelectionSnapshot, selectionText?: stri
 function recoverContextMenuSelection(selectionText?: string): SelectionSnapshot | null {
   const captured = contextMenuSelection;
   if (!captured || !matchesContextMenuText(captured.snapshot, selectionText)) return null;
-  try {
-    const {range} = captured.snapshot;
-    // 快照跨菜单等待仍须属于当前文档、保有原文并再次通过敏感区域规则；裸 selectionText 永远不作为翻译来源。
-    if (!isSelectionRangeConnected(range) || range.toString() !== captured.rangeText
-      || (props.selectionAdapter ? !props.selectionAdapter.acceptsRange(range) : shouldIgnoreSelection(range, true))) return null;
-    return captured.snapshot;
-  } catch {
-    return null;
-  }
+  return revalidateCapturedContextMenuSelection(captured);
 }
 
 /** 右键“翻译选中文本”：使用菜单绑定的可信选区出卡片，跳过触发方式与延迟设置。 */
@@ -2276,7 +2350,7 @@ function isInsideUi(target: EventTarget | null): boolean {
   if (!node) return false;
   const host = document.getElementById('fluent-read-selection-translator-container');
   const root = node.getRootNode();
-  return Boolean(node === host || host?.contains(node) || root === host?.shadowRoot);
+  return Boolean(node === host || host?.contains(node) || (host?.shadowRoot && root === host.shadowRoot));
 }
 function matchesSelectionModifierOnPointer(event: PointerEvent): boolean {
   const shortcut = selectionShortcut.value;
@@ -2303,8 +2377,9 @@ function handlePointerDown(event: PointerEvent): void {
   else clearReadingKeyboardFocus();
   // 第二根手指可以落在入口外；document capture 先撤销尚未完成的入口触摸。
   if (event.pointerType === 'touch') cancelIndicatorTouch();
+  const target = getComposedEventTarget(event);
   lastTrustedSelectionInteractionAt = Date.now();
-  if (isInsideUi(event.target)) {
+  if (isInsideUi(target)) {
     if (import.meta.env.BROWSER === 'safari') readingFocusGestureAt = Date.now();
     touchSelectionActiveUntil = 0;
     cancelTouchSelectionRead();
@@ -2318,6 +2393,13 @@ function handlePointerDown(event: PointerEvent): void {
   if (import.meta.env.BROWSER !== 'userscript') clearContextMenuSelection();
   // 右键是打开原生菜单的准备动作；保留同一选区正在进行的请求和已完成结果。
   if (import.meta.env.BROWSER !== 'userscript' && event.button === 2) {
+    rememberEventShadowRoots(event);
+    if (!isContextMenuInputTarget(target)) {
+      const preCaptured = readSelectionSnapshot(undefined, event);
+      if (preCaptured && rangeBelongsToContextMenuTarget(preCaptured.range, target)) {
+        pendingContextMenuSelection = {snapshot: preCaptured, rangeText: preCaptured.range.toString()};
+      }
+    }
     isSelecting = false;
     pendingSelectionShortcutUntil = 0;
     suppressSelectionRead();
@@ -2327,6 +2409,7 @@ function handlePointerDown(event: PointerEvent): void {
   isSelecting = event.button === 0;
   pendingSelectionShortcutUntil = 0;
   hideAll();
+  rememberEventShadowRoots(event);
   touchInteraction.value = event.pointerType === 'touch';
   if (touchInteraction.value) {
     touchSelectionActiveUntil = Date.now() + TOUCH_SELECTION_GRACE_MS;
@@ -2337,8 +2420,9 @@ function handlePointerUp(event: PointerEvent): void {
   if (!event.isTrusted) return;
   if (clickSelection.handlePointerUp(event)) return;
   if (import.meta.env.BROWSER === 'safari') finishReadingCardPan(event);
+  const target = getComposedEventTarget(event);
   lastTrustedSelectionInteractionAt = Date.now();
-  if (uiPointerInteraction || isInsideUi(event.target)) {
+  if (uiPointerInteraction || isInsideUi(target)) {
     if (import.meta.env.BROWSER === 'safari') readingFocusGestureAt = Date.now();
     uiPointerInteraction = false;
     isSelecting = false;
@@ -2349,6 +2433,7 @@ function handlePointerUp(event: PointerEvent): void {
   const completedSelectionGesture = isSelecting;
   isSelecting = false;
   if (!completedSelectionGesture || event.button !== 0) return;
+  rememberEventShadowRoots(event);
   if (event.pointerType === 'touch') scheduleTouchSelectionRead();
   else scheduleSelectionRead(matchesSelectionModifierOnPointer(event) || selectionShortcutHeld);
 }
@@ -2724,10 +2809,11 @@ function handleKeydown(event: KeyboardEvent): void {
     if (!['Control', 'Alt', 'Shift', 'Meta', 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) clickSelection.cancel();
     return;
   }
+  rememberEventShadowRoots(event);
   const matchesSelectionShortcut = matchesConfiguredHotkey(event, selectionShortcutConfig.value, selectionSettings.value.customHotkey);
   if (!matchesSelectionShortcut) return;
   selectionShortcutHeld = true;
-  const currentSelection = readSelectionSnapshot();
+  const currentSelection = readSelectionSnapshot(undefined, event);
   if (currentSelection) {
     if (isSelectionInTargetLanguage(currentSelection.text)) { hideAll(); return; }
     event.preventDefault();
@@ -2798,6 +2884,7 @@ defineExpose({revalidateSource: restoreSelectionSource, translateExplicitRange})
 function handlePageHide(): void {
   isSelecting = false;
   uiPointerInteraction = false;
+  recentShadowRoots = [];
   hideAll();
 }
 
@@ -2996,6 +3083,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('pagehide', handlePageHide);
   window.removeEventListener('pageshow', restoreSelectionSource);
   resetSelectionContentState(true);
+  recentShadowRoots = [];
   if (import.meta.env.BROWSER !== 'userscript') clearContextMenuSelection();
 });
 </script>

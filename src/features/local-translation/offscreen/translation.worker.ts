@@ -15,7 +15,7 @@ import {
 import {assertLocalTranslationOutput, hunyuanTranslationPrompt, splitLocalTranslationText} from '@/src/core/translation/localInference';
 import {getTranslationArtifacts, matchTranslationArtifact, translationArtifactBlob} from './artifactStore';
 import {supportsHunyuanTranslation} from '@/src/platform/browser/localTranslationSupport';
-import {configureOnnxWasmBackend, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
+import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
 import {readWorkerRequestId} from '@/src/core/messaging/validation';
 import {parseLocalTranslationWorkerRequest, type LocalTranslationWorkerRequest as WorkerRequest, type LocalTranslationWorkerResponse as WorkerResponse} from '../workerProtocol';
 
@@ -50,10 +50,7 @@ function configureEnvironment(): void {
     env.remotePathTemplate = '{model}/resolve/{revision}/';
     if (env.backends.onnx.wasm) {
         env.backends.onnx.wasm.numThreads = localWasmThreads();
-        configureOnnxWasmBackend(env.backends.onnx.wasm, {
-            mjs: extensionUrl('fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'),
-            wasm: extensionUrl('fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'),
-        });
+        configureOnnxWasmBackend(env.backends.onnx.wasm, resolveOnnxWasmAssetPaths(extensionUrl));
     }
 }
 
@@ -87,7 +84,7 @@ async function getTranslator(request: Extract<WorkerRequest, {type: 'translate'}
     }) as unknown as Promise<Translator>;
     const wasm = env.backends.onnx.wasm;
     translator = await paceLocalInitialization(() => wasm
-        ? withCompressedWasmBinary(wasm, extensionUrl('fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'), create)
+        ? withCompressedWasmBinary(wasm, resolveOnnxWasmAssetPaths(extensionUrl).wasm, create)
         : create());
     translatorRepository = repository;
     backend = 'wasm';

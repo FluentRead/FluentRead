@@ -11,7 +11,14 @@ vi.mock('@/src/shared/onnx/resources', () => ({forceSingleThreadInference: mocks
     paceLocalInference: (run: () => Promise<unknown>) => run(), paceLocalInitialization: (run: () => Promise<unknown>) => run()}));
 vi.mock('@/src/features/local-translation/offscreen/artifactStore', () => ({getTranslationArtifacts: mocks.artifacts, matchTranslationArtifact: mocks.matchArtifact, translationArtifactBlob: mocks.artifactBlob}));
 vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: mocks.supportsHunyuan}));
-vi.mock('@/src/shared/onnx/wasmBinary', () => ({configureOnnxWasmBackend: mocks.configureWasm, withCompressedWasmBinary: mocks.compressedWasm}));
+vi.mock('@/src/shared/onnx/wasmBinary', async () => {
+    const actual = await vi.importActual<typeof import('@/src/shared/onnx/wasmBinary')>('@/src/shared/onnx/wasmBinary');
+    return {
+        ...actual,
+        configureOnnxWasmBackend: mocks.configureWasm,
+        withCompressedWasmBinary: mocks.compressedWasm,
+    };
+});
 
 beforeEach(() => {vi.resetModules();vi.resetAllMocks();mocks.threads.mockReturnValue(1);mocks.env.backends.onnx = {};
     mocks.artifacts.mockReturnValue([]);mocks.supportsHunyuan.mockReturnValue(true);
@@ -84,8 +91,8 @@ describe('actual local translation Worker message boundary', () => {
         const open = vi.fn().mockResolvedValue({match: legacyMatch});vi.stubGlobal('caches', {open});
         const scope = await start();
         expect(mocks.configureWasm).toHaveBeenCalledWith(wasm, {
-            mjs: 'chrome-extension://test/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs',
-            wasm: 'chrome-extension://test/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm',
+            mjs: 'chrome-extension://test/fluent-read-ai/ort-wasm-simd-threaded.jspi.mjs',
+            wasm: 'chrome-extension://test/fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm',
         });
         expect(wasm).toMatchObject({numThreads: 1});
         expect(mocks.env).toMatchObject({allowRemoteModels: false, useBrowserCache: false, useFSCache: false, useCustomCache: true});

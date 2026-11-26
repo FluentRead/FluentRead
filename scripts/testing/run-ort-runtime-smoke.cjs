@@ -41,9 +41,12 @@ const model = Buffer.concat([scalar(1, 8), message(7, graph), message(8, scalar(
 fs.writeFileSync(path.join(fixture, 'probe-model.onnx'), model);
 fs.writeFileSync(path.join(fixture, 'probe.html'), '<!doctype html><title>ORT packaged runtime verification</title><h1>ORT packaged runtime verification</h1>');
 
+const detectedRuntimeName = fs.existsSync(path.join(source, 'fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm'))
+  ? 'ort-wasm-simd-threaded.jspi'
+  : 'ort-wasm-simd-threaded.asyncify';
 for (const label of ['opus-whisper', 'kokoro', 'paddle']) {
   const prefix = '';
-  const runtimeName = 'ort-wasm-simd-threaded.asyncify';
+  const runtimeName = detectedRuntimeName;
   const packageRoot = fs.realpathSync(path.resolve('node_modules/@huggingface/transformers-kokoro'));
   const req = createRequire(path.join(packageRoot, 'package.json'));
   const dist = path.dirname(req.resolve('onnxruntime-web/webgpu'));

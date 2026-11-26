@@ -44,7 +44,10 @@ const wasmMocks = vi.hoisted(() => ({
     withCompressedWasmBinary: (_backend: unknown, _url: string, initialize: () => Promise<unknown>) => initialize(),
 }));
 
-vi.mock('@/src/shared/onnx/wasmBinary', () => wasmMocks);
+vi.mock('@/src/shared/onnx/wasmBinary', async () => {
+    const actual = await vi.importActual<typeof import('@/src/shared/onnx/wasmBinary')>('@/src/shared/onnx/wasmBinary');
+    return {...actual, ...wasmMocks};
+});
 const webGpuMocks = vi.hoisted(() => ({
     probeWebGpu: vi.fn(async () => ({available: false, info: ''})),
 }));
@@ -529,8 +532,8 @@ describe('视频 AI Worker timestamp parser', () => {
         expect(wasmMocks.configureOnnxWasmBackend).toHaveBeenCalledWith(
             workerMocks.env.backends.onnx.wasm,
             expect.objectContaining({
-                mjs: expect.stringContaining('ort-wasm-simd-threaded.asyncify.mjs'),
-                wasm: expect.stringContaining('ort-wasm-simd-threaded.asyncify.wasm'),
+                mjs: expect.stringContaining('ort-wasm-simd-threaded.jspi.mjs'),
+                wasm: expect.stringContaining('ort-wasm-simd-threaded.jspi.wasm'),
             }),
         );
         const send = (requestId: number, languageSessionKey: string) => scope.onmessage?.({data: {

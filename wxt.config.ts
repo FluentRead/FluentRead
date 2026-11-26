@@ -33,6 +33,11 @@ const firefoxRunnerBinary = process.env.FLUENTREAD_FIREFOX_RUNNER_BINARY;
 const firefoxRunnerProfile = process.env.FLUENTREAD_FIREFOX_RUNNER_PROFILE;
 const firefoxRunnerStartUrl = process.env.FLUENTREAD_FIREFOX_RUNNER_START_URL;
 
+/** 按目标浏览器选择本地 ONNX WASM 变体：Chrome/Edge/Firefox 采用无栈改写且小 9 MB 的 JSPI，Safari 保留 Asyncify。 */
+export function resolveOnnxWasmVariant(browser: string): 'jspi' | 'asyncify' {
+    return browser === 'safari' ? 'asyncify' : 'jspi';
+}
+
 /** Safari 的自动 MV2 后台页没有编码声明；显式页面在任何宿主语言下均按 UTF-8 加载原后台脚本。 */
 export function createSafariBackgroundPage(env: Pick<ConfigEnv, 'browser' | 'manifestVersion'>): {relativeDest: string; contents: string}[] {
     if (env.browser !== 'safari' || env.manifestVersion !== 2) return [];
@@ -522,6 +527,7 @@ export default defineConfig({
             },
             define: {
                 'process.env.VUE_APP_VERSION': JSON.stringify(packageJson.version),
+                '__FLUENTREAD_ONNX_WASM_VARIANT__': JSON.stringify(resolveOnnxWasmVariant(env.browser)),
             },
         };
     },
@@ -714,7 +720,10 @@ export default defineConfig({
             // 移除无 WASM JS 回退、子 frame 去除 tldts 表及非页面入口裁剪不可达中文目录。
             // 实测 Chrome 68.92 → 61.07 MB（-7.85 MB）、Firefox 68.56 → 60.71 MB（-7.85 MB）；收紧生产体积门槛锁住瘦身成果。
             const deepSlimLayer1Layer2Savings = -9_000_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : deepSlimLayer1Layer2Savings + courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + designSystemAndEfficiencyBudget));
+            // MR 2（第三层路线 A：WASM 瘦身）：Chrome/Edge/Firefox 切换至 WebAssembly JSPI 原生栈切换变体，
+            // 消除 Asyncify 栈改写膨胀（23.57 MB → 14.56 MB，净减 9.01 MB），Safari 自动保留 Asyncify。
+            const deepSlimLayer3WasmSavings = resolveOnnxWasmVariant(browser) === 'jspi' ? -9_000_000 : 0;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : deepSlimLayer1Layer2Savings + deepSlimLayer3WasmSavings + courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + designSystemAndEfficiencyBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);
@@ -758,8 +767,11 @@ export default defineConfig({
             files.push({absoluteSrc: resolve(fs.realpathSync(resolve(__dirname, 'node_modules/ppu-paddle-ocr')), '../ppu-ocv/LICENSE'), relativeDest: 'third-party-notices/ppu-ocv-MIT.txt'});
             // JS 和 WASM 来自同一锁定版本；模型数据继续按需下载，执行代码只用包内资源。
             const ortDist = sharedOnnxDist();
-            files.push({absoluteSrc: packageWasmDiagnostics(__dirname, resolve(ortDist, 'ort-wasm-simd-threaded.asyncify.mjs'), 'ort-wasm-simd-threaded.asyncify.mjs', 'onnx'), relativeDest: 'fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'});
-            files.push({absoluteSrc: resolve(ortDist, 'ort-wasm-simd-threaded.asyncify.wasm'), relativeDest: 'fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'});
+            const onnxVariant = resolveOnnxWasmVariant(wxt.config.browser);
+            const onnxMjs = `ort-wasm-simd-threaded.${onnxVariant}.mjs`;
+            const onnxWasm = `ort-wasm-simd-threaded.${onnxVariant}.wasm`;
+            files.push({absoluteSrc: packageWasmDiagnostics(__dirname, resolve(ortDist, onnxMjs), onnxMjs, 'onnx'), relativeDest: `fluent-read-ai/${onnxMjs}`});
+            files.push({absoluteSrc: resolve(ortDist, onnxWasm), relativeDest: `fluent-read-ai/${onnxWasm}`});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@wllama/wllama/esm/wasm/wllama.wasm'), relativeDest: 'fluent-read-ai/wllama.wasm'});
             const ocrSources = resolveTesseractSources(__dirname);
             const packagedOcr = packageTesseractWasm(__dirname, ocrSources.glue);

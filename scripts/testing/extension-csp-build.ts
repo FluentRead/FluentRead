@@ -16,6 +16,7 @@ const SOURCE_SHA256 = {
     'fontkit': '62ad9c769e6a7a9028b0c711504908f0a231955b39619aaabd56dd4eabe800be',
     'lodash-root': 'df58ff96c454ca91ace20d20e6af49b354c70dfba7e737adc00cd23e8ff77168',
     'onnx-asyncify': '5959c6733039619c9af710d8e1bae8d6e84402787990637be987c2b1bd6c5fa9',
+    'onnx-jspi': '0cc011001c75c3d5dfdabbd1e1377d1968fa9759afd20729032e229433df5cd8',
     'zod-v4-schemas': '0ee56e8afbae28eeb1060a162ad7e56f0675ee6fb83f0ae56bea2e088f6cdbc0',
 } as const;
 export type ExtensionVendorSource = keyof typeof SOURCE_SHA256;
@@ -42,6 +43,19 @@ default:throw new Error('Unsupported Emscripten invocation kind');}
 if(!isVoid)return Kg(f,destructorsRef,result);
 };
 return Ig(Object.defineProperty(k,"name",{value:\`methodCaller<(\${e.map(m=>m.name)}) => \${d.name}>\`}))}`;
+
+const ONNX_JSPI_INVOKER = `function Db(a,b,c){var [d,...e]=Ge(a,b>>>0);var f=d.l.bind(d),h=e.map(m=>m.j.bind(m)),isVoid=d.J;
+var k=function(handle,methodName,destructorsRef,args){
+var receiver,target;if(c===0||c===2)target=R(handle);else if(c===1){receiver=R(handle);target=receiver[Je(methodName)]}
+var values=h.map((read,index)=>read(args+8*index)),result;
+switch(c){case 0:result=Reflect.apply(target,undefined,values);break;
+case 1:result=Reflect.apply(target,receiver,values);break;
+case 2:result=Reflect.construct(target,values);break;
+case 3:result=values[values.length-1];break;
+default:throw new Error('Unsupported Emscripten invocation kind');}
+if(!isVoid)return He(f,destructorsRef,result);
+};
+return Fe(Object.defineProperty(k,"name",{value:\`methodCaller<(\${e.map(m=>m.name)}) => \${d.name}>\`}))}`;
 
 export function patchExtensionVendorSource(kind: ExtensionVendorSource, original: string): string {
     if (createHash('sha256').update(original).digest('hex') !== SOURCE_SHA256[kind]) {
@@ -81,6 +95,12 @@ export function patchExtensionVendorSource(kind: ExtensionVendorSource, original
             const end = source.indexOf('function Rb(a,b){', start);
             if (start < 0 || end < 0) throw new Error('Missing pinned ONNX method invoker');
             return source.slice(0, start) + ONNX_INVOKER + source.slice(end);
+        }
+        case 'onnx-jspi': {
+            const start = source.indexOf('function Db(a,b,c){');
+            const end = source.indexOf('function Fb(a,b){', start);
+            if (start < 0 || end < 0) throw new Error('Missing pinned ONNX JSPI method invoker');
+            return source.slice(0, start) + ONNX_JSPI_INVOKER + source.slice(end);
         }
     }
 }

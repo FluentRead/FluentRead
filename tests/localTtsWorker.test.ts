@@ -35,10 +35,14 @@ vi.mock('@huggingface/transformers-kokoro', () => ({
     },
 }));
 
-vi.mock('@/src/shared/onnx/wasmBinary', () => ({
-    configureOnnxWasmBackend: vi.fn(),
-    withCompressedWasmBinary: vi.fn(async (_backend: unknown, _url: string, initialize: () => Promise<unknown>) => initialize()),
-}));
+vi.mock('@/src/shared/onnx/wasmBinary', async () => {
+    const actual = await vi.importActual<typeof import('@/src/shared/onnx/wasmBinary')>('@/src/shared/onnx/wasmBinary');
+    return {
+        ...actual,
+        configureOnnxWasmBackend: vi.fn(),
+        withCompressedWasmBinary: vi.fn(async (_backend: unknown, _url: string, initialize: () => Promise<unknown>) => initialize()),
+    };
+});
 
 vi.mock('@/src/shared/onnx/webgpu', () => ({probeWebGpu: mocks.probeWebGpu}));
 

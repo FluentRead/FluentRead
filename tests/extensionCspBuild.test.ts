@@ -20,6 +20,7 @@ const sources: Record<ExtensionVendorSource, string> = {
     'fontkit': path.join(path.dirname(require.resolve('@pdf-lib/fontkit')), 'fontkit.es.js'),
     'lodash-root': createRequire(require.resolve('element-plus')).resolve('lodash-es/_root.js'),
     'onnx-asyncify': path.join(path.dirname(transformersRequire.resolve('onnxruntime-web/webgpu')), 'ort-wasm-simd-threaded.asyncify.mjs'),
+    'onnx-jspi': path.join(path.dirname(transformersRequire.resolve('onnxruntime-web/webgpu')), 'ort-wasm-simd-threaded.jspi.mjs'),
     'zod-v4-schemas': path.join(path.dirname(require.resolve('zod/v4/core')), 'schemas.js'),
 };
 const original = (kind: ExtensionVendorSource) => fs.readFileSync(sources[kind], 'utf8');

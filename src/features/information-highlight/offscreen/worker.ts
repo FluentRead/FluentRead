@@ -7,7 +7,7 @@
 import {AutoConfig, AutoModelForCausalLM, AutoTokenizer, env, Tensor} from '@huggingface/transformers';
 import {getInformationHighlightModel, type InformationHighlightModelId} from '@/src/core/config/informationHighlightModel';
 import {localWasmThreads, paceLocalInference, paceLocalInitialization} from '@/src/shared/onnx/resources';
-import {configureOnnxWasmBackend} from '@/src/shared/onnx/wasmBinary';
+import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
 import {getInformationHighlightArtifactStore} from './artifacts';
 import {createSurprisalResultCache, scoreLocalSurprisal, type CausalScoringEngine, type ScoringPast, type ScoringTensor} from './scorer';
 import type {InformationHighlightResult} from '../protocol';
@@ -24,7 +24,7 @@ export function startInformationHighlightWorker(): void {
     const wasm = env.backends.onnx.wasm;
     if (wasm) {
         wasm.numThreads = localWasmThreads();
-        configureOnnxWasmBackend(wasm, {mjs: new URL('fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs', self.location.href).href, wasm: new URL('fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm', self.location.href).href});
+        configureOnnxWasmBackend(wasm, resolveOnnxWasmAssetPaths(path => new URL(path, self.location.href).href));
     }
     let engine: CausalScoringEngine | undefined, creating: Promise<CausalScoringEngine> | undefined;
     const controllers = new Map<number, AbortController>();

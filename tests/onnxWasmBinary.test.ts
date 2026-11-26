@@ -6,7 +6,7 @@
  */
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {configureOnnxWasmBackend, loadCompressedWasmBinary, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
+import {configureOnnxWasmBackend, loadCompressedWasmBinary, resolveOnnxWasmAssetPaths, resolveOnnxWasmVariant, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
 
 const wasmBytes = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
 
@@ -24,29 +24,44 @@ afterEach(() => {
 });
 
 describe('compressed ONNX WASM loader', () => {
-    it('三个 ONNX Worker 和公共资源 hook 共享同一匹配版本的 runtime MJS 与原始 WASM', () => {
-        const sources = [
+    it('所有 ONNX Worker 和公共资源 hook 共享同一匹配版本的 runtime MJS 与原始 WASM（按目标浏览器区分 JSPI/Asyncify）', () => {
+        const workers = [
             source('src/features/local-translation/offscreen/translation.worker.ts'),
             source('src/features/video-subtitle/offscreen/transcription.worker.ts'),
-            source('wxt.config.ts'),
+            source('src/features/local-tts/offscreen/tts.worker.ts'),
         ];
-        for (const content of sources) {
-            expect(content).toContain('ort-wasm-simd-threaded.asyncify.mjs');
-            expect(content).toContain('ort-wasm-simd-threaded.asyncify.wasm');
+        for (const content of workers) {
+            expect(content).toContain('resolveOnnxWasmAssetPaths(');
             expect(content).not.toContain("ort-wasm-simd-threaded.mjs'");
             expect(content).not.toContain("ort-wasm-simd-threaded.wasm'");
         }
-        const whisper = sources[1]!;
+        const whisper = workers[1]!;
         expect(whisper).toContain("device: 'webgpu'");
         expect(whisper).toContain('withCompressedWasmBinary(wasm');
-        const tts = source('src/features/local-tts/offscreen/tts.worker.ts');
-        const wxt = sources[2]!;
-        expect(wxt).toContain('ort-wasm-simd-threaded.asyncify.mjs');
-        expect(wxt).toContain('ort-wasm-simd-threaded.asyncify.wasm');
-        expect(tts).toContain('ort-wasm-simd-threaded.asyncify.mjs');
-        expect(tts).toContain('ort-wasm-simd-threaded.asyncify.wasm');
+        const tts = workers[2]!;
         expect(tts).toMatch(/paceLocalInitialization\(\(\) => wasm\s*\? withCompressedWasmBinary\(wasm,/u);
         expect(tts).not.toContain("device === 'wasm' && wasm");
+
+        const wxt = source('wxt.config.ts');
+        expect(wxt).toContain('resolveOnnxWasmVariant');
+        expect(wxt).toContain('ort-wasm-simd-threaded.${onnxVariant}.mjs');
+        expect(wxt).toContain('ort-wasm-simd-threaded.${onnxVariant}.wasm');
+
+        expect(resolveOnnxWasmVariant()).toBe('jspi');
+        vi.stubGlobal('__FLUENTREAD_ONNX_WASM_VARIANT__', 'asyncify');
+        expect(resolveOnnxWasmVariant()).toBe('asyncify');
+        vi.stubGlobal('__FLUENTREAD_ONNX_WASM_VARIANT__', 'jspi');
+        expect(resolveOnnxWasmVariant()).toBe('jspi');
+        vi.unstubAllGlobals();
+
+        expect(resolveOnnxWasmAssetPaths(p => `chrome-extension://id/${p}`, {variant: 'jspi'})).toEqual({
+            mjs: 'chrome-extension://id/fluent-read-ai/ort-wasm-simd-threaded.jspi.mjs',
+            wasm: 'chrome-extension://id/fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm',
+        });
+        expect(resolveOnnxWasmAssetPaths(p => `safari-web-extension://id/${p}`, {variant: 'asyncify'})).toEqual({
+            mjs: 'safari-web-extension://id/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs',
+            wasm: 'safari-web-extension://id/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm',
+        });
     });
 
     it('无解压能力时加载原始 WASM，拒绝损坏资源且初始化后释放引用', async () => {

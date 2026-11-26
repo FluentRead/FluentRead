@@ -274,7 +274,7 @@ describe('漫画局部神经修补',()=>{
         vi.stubGlobal('crossOriginIsolated',true);vi.stubGlobal('SharedArrayBuffer',class {});
         const port=await createBrowserMangaInpainter(),patch={image:new Float32Array(3),mask:new Float32Array(1),width:1,height:1};
         expect(mocks.wasm.numThreads).toBe(2);
-        expect(mocks.wasm.wasmPaths).toEqual({mjs:'chrome-extension://test/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs',wasm:'chrome-extension://test/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'});
+        expect(mocks.wasm.wasmPaths).toEqual({mjs:'chrome-extension://test/fluent-read-ai/ort-wasm-simd-threaded.jspi.mjs',wasm:'chrome-extension://test/fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm'});
         expect(await port.run(patch)).toEqual(new Float32Array([.25]));
         const failure=new Error('paced inference failed');mocks.run.mockRejectedValueOnce(failure);
         await expect(port.run(patch)).rejects.toBe(failure);

@@ -1103,6 +1103,11 @@ export default defineConfig({
                 'src/ui/translationLoadingIndicator.ts',
                 'src/ui/popupQuickFeatureIcons.ts',
                 'src/core/translation/wrappedParagraphs.ts',
+                'src/core/assets/mirrors.ts',
+                'src/core/i18n/remoteLanguagePacks.ts',
+                'src/core/site-rules/subframeDomain.ts',
+                'src/features/document-translation/services/pdfBinaryDataFactory.ts',
+                'src/platform/assets/verifiedAssetCache.ts',
             ],
             exclude: ['**/*.d.ts'],
             thresholds: {

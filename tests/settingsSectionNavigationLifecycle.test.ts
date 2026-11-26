@@ -141,7 +141,7 @@ describe('设置分区导航实际组件列表与几何更新', () => {
       await fixture.flushFrame();
     }
     expect(fixture.query).toHaveBeenCalledTimes(6);
-    expect(fixture.clientRects).toHaveBeenCalledTimes(60);expect(fixture.boundingRects).toHaveBeenCalledTimes(120);
+    expect(fixture.clientRects).toHaveBeenCalledTimes(fixture.panels.length * 6);expect(fixture.boundingRects).toHaveBeenCalledTimes(fixture.panels.length * 12);
     expect(fixture.state.anchors).toBe(previous);expect(fixture.arrayChanges).not.toHaveBeenCalled();expect(fixture.render).not.toHaveBeenCalled();
   });
 
@@ -170,18 +170,18 @@ describe('设置分区导航实际组件列表与几何更新', () => {
   });
 
   it('锚点 style 隐藏、祖先 class 隐藏及 details 展开折叠更新可见集合', async () => {
-    const fixture = await mountNavigation();const panel = fixture.elements[1];
-    panel.setAttribute('style', 'display: none');await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(9);
-    panel.setAttribute('style', '');await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(10);
+    const fixture = await mountNavigation();const panel = fixture.elements[1];const total = fixture.panels.length;
+    panel.setAttribute('style', 'display: none');await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(total - 1);
+    panel.setAttribute('style', '');await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(total);
     const wrapper = fixture.document.createElement('div');fixture.container.appendChild(wrapper as unknown as Node);
     wrapper.appendChild(panel as unknown as Node);await fixture.flushFrame();
-    wrapper.className = 'fixture-hidden';await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(9);
-    wrapper.className = '';await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(10);
+    wrapper.className = 'fixture-hidden';await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(total - 1);
+    wrapper.className = '';await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(total);
     const details = fixture.document.createElement('details'), nested = fixture.document.createElement('article');
     nested.dataset.settingsAnchor = 'fixture-nested';nested.dataset.settingsAnchorLabel = 'Nested heading';details.appendChild(nested);
-    fixture.container.appendChild(details as unknown as Node);await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(10);
-    details.setAttribute('open', '');await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(11);
-    details.removeAttribute('open');await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(10);
+    fixture.container.appendChild(details as unknown as Node);await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(total);
+    details.setAttribute('open', '');await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(total + 1);
+    details.removeAttribute('open');await fixture.flushFrame();expect(fixture.state.anchors).toHaveLength(total);
   });
 
   it('子控件布局改变时保留锚点数组但更新当前位置与导航高亮', async () => {

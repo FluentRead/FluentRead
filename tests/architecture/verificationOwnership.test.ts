@@ -74,7 +74,7 @@ function listFiles(directory: string): string[] {
             const absolute = resolve(current, entry);
             if (statSync(absolute).isDirectory()) {
                 visit(absolute);
-            } else if (AUDITED_EXTENSIONS.test(entry) && !entry.endsWith('.d.ts')) {
+            } else if (AUDITED_EXTENSIONS.test(entry) && !/\.d(?:\.[^./]+)?\.ts$/u.test(entry)) {
                 files.push(relativePath(absolute));
             }
         }
@@ -149,6 +149,7 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
         || path.startsWith('scripts/quality/')
         || path.startsWith('scripts/agent-bridge/')
         || path.startsWith('scripts/wasm/')
+        || path.startsWith('scripts/i18n/')
         || PRODUCT_TOOL_SCRIPTS.includes(path)
         || DOCS_TOOL_SCRIPTS.includes(path)
         || QUALITY_TOOL_SCRIPTS.includes(path)
@@ -197,7 +198,7 @@ function classifyModule(path: string): ModuleClassification {
 }
 
 function isTypeOnlyModule(path: string): boolean {
-    if (path.endsWith('.d.ts')) return true;
+    if (/\.d(?:\.[^./]+)?\.ts$/u.test(path)) return true;
     return path.endsWith('.ts') && classifyModule(path).typeOnly;
 }
 

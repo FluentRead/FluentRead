@@ -575,7 +575,8 @@
       "tests/htmlMedia.test.ts",
       "tests/subtitleExport.test.ts",
       "tests/bilibiliAudio.test.ts",
-      "tests/bilibiliAiSource.test.ts"
+      "tests/bilibiliAiSource.test.ts",
+      "tests/deepSlimLayer1Layer2.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",

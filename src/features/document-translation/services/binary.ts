@@ -12,7 +12,8 @@ import {pdfFallbackBidiLine} from '../core/pdfFallbackBidi';
 import {stripDocumentInlineMarkers} from '@/src/core/translation/documentInlineMarkers';
 import type JSZip from 'jszip';
 import type {PDFDict, PDFDocument, PDFEmbeddedPage} from 'pdf-lib';
-import {getPdfResources} from './pdfResources';
+import {getPdfResources, hasCustomPdfAssetRoot} from './pdfResources';
+import {createPdfBinaryDataFactory, type PdfBinaryDataFactoryConstructor} from './pdfBinaryDataFactory';
 import {generateDocumentArchive, preserveStoredDocumentEntries} from './archive';
 import {analyzePdfPageLayout, extractPdfGraphicsShapes, type PdfGraphicsShape, type PdfLayoutAtom, type PdfLayoutBlock} from '../core/pdfLayoutAnalysis';
 import {buildPdfReadingPlan, type PdfReadingPlan, type PdfReadingPresentation} from '../core/pdfReadingPlan';
@@ -846,6 +847,9 @@ async function parsePdf(fileName: string, bytes: Uint8Array, signal?: AbortSigna
     const {getDocument: getPdfDocument, GlobalWorkerOptions} = pdfJs;
     signal?.throwIfAborted();
     if (typeof window !== 'undefined') GlobalWorkerOptions.workerSrc = workerUrl;
+    const binaryDataFactoryOptions: {BinaryDataFactory?: PdfBinaryDataFactoryConstructor} = pdfAssetRoot
+        ? {BinaryDataFactory: createPdfBinaryDataFactory({preferLocalDataAssets: hasCustomPdfAssetRoot()})}
+        : {};
     const loadingTask = getPdfDocument({
         data: new Uint8Array(bytes),
         disableFontFace: true,
@@ -857,7 +861,8 @@ async function parsePdf(fileName: string, bytes: Uint8Array, signal?: AbortSigna
             standardFontDataUrl: `${pdfAssetRoot}/standard_fonts/`,
             wasmUrl: `${pdfAssetRoot}/wasm/`,
         } : {}),
-    });
+        ...binaryDataFactoryOptions,
+    } as Parameters<typeof getPdfDocument>[0]);
 
     let destruction: Promise<void> | undefined;
     const destroy = () => destruction ??= loadingTask.destroy();

@@ -1,10 +1,11 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {configurePdfResources, getPdfResources} from '../src/features/document-translation/services/pdfResources';
+import {configurePdfResources, getPdfResources, hasCustomPdfAssetRoot} from '../src/features/document-translation/services/pdfResources';
 
 afterEach(() => {configurePdfResources(); vi.unstubAllGlobals();});
 describe('PDF static resource application boundary', () => {
     it('uses no browser asset base in a non-DOM runtime', () => {
         vi.stubGlobal('window', undefined);
+        expect(hasCustomPdfAssetRoot()).toBe(false);
         expect(getPdfResources().assetRoot).toBe('');
         expect(getPdfResources().workerUrl).toContain('pdf.worker.min.mjs');
     });
@@ -16,9 +17,11 @@ describe('PDF static resource application boundary', () => {
         const source = {assetRoot: 'chrome://fluentread/content/pdfjs///', workerUrl: 'chrome://fluentread/content/pdfjs/worker.mjs'};
         configurePdfResources(source);
         source.workerUrl = 'changed';
+        expect(hasCustomPdfAssetRoot()).toBe(true);
         expect(getPdfResources()).toEqual({assetRoot: 'chrome://fluentread/content/pdfjs', workerUrl: 'chrome://fluentread/content/pdfjs/worker.mjs'});
         expect(Object.isFrozen(getPdfResources())).toBe(true);
         configurePdfResources();
+        expect(hasCustomPdfAssetRoot()).toBe(false);
         expect(getPdfResources().workerUrl).not.toBe('changed');
     });
 });

@@ -7,7 +7,9 @@ import JSZip from 'jszip';
 import {resolveBrowserCapabilities} from './src/platform/browser/capabilities';
 import {checkExtensionSize} from './scripts/testing/extension-size-budget';
 import {wllamaExtensionWorker} from './scripts/testing/wllama-extension-build';
-import {createExtensionMetadataLocaleFiles, createUiLanguageBundleFiles} from './src/core/i18n/bundles';
+import {createExtensionMetadataLocaleFiles} from './src/core/i18n/bundles';
+import {createExtensionUiLanguageBundleFiles} from './scripts/i18n/extensionLanguageBundles';
+import {scopedChineseCatalogBuildPlugin} from './scripts/i18n/scopedChineseCatalogPlugin';
 import {UI_LANGUAGE_BUNDLE_DIRECTORY} from './src/core/i18n/language';
 import {packageWasmDiagnostics, packageTesseractWasm, packageTesseractWorker, resolveTesseractSources} from './scripts/wasm/package-diagnostics';
 import {tesseractSdkBuildPlugin} from './scripts/wasm/tesseract-sdk-build';
@@ -195,6 +197,47 @@ export function extendSubframePageContextBuildConfig(
     if (entrypoints.length === 0 || !entrypoints.every((entrypoint) =>
         entrypoint.type === 'content-script' && typeof entrypoint.name === 'string' && SUBFRAME_CONTENT_SCRIPT_NAMES.has(entrypoint.name))) return;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), subframePageContextBuildPlugin()];
+}
+
+/**
+ * 受限子 frame（youtubeEmbed、supportedFrame、neteaseMailFrame）只消费后台已规范化的域名名单，
+ * 不必各自内联 261 KB 的 tldts Public Suffix 数据表；顶层网页、后台与设置页仍保留完整 tldts 实现。
+ */
+export function subframeSiteRulesBuildPlugin() {
+    const domainModule = /[\\/]src[\\/]core[\\/]site-rules[\\/]domain(?:\.ts)?$/u;
+    const relativeDomainImporter = /[\\/]src[\\/]core[\\/]/u;
+    const subframeDomain = resolve(__dirname, 'src/core/site-rules/subframeDomain.ts');
+    return {
+        name: 'fluentread-subframe-site-rules',
+        enforce: 'pre' as const,
+        resolveId(source: string, importer?: string) {
+            if (domainModule.test(source)) return subframeDomain;
+            if ((source === '../site-rules/domain' || source === '../site-rules/domain.ts')
+                && importer && relativeDomainImporter.test(importer)) {
+                return subframeDomain;
+            }
+            return null;
+        },
+    };
+}
+
+export function extendSubframeSiteRulesBuildConfig(
+    entrypoints: readonly {type: string; name?: string}[],
+    viteConfig: {plugins?: unknown[]},
+): void {
+    if (entrypoints.length === 0 || !entrypoints.every((entrypoint) =>
+        entrypoint.type === 'content-script' && typeof entrypoint.name === 'string' && SUBFRAME_CONTENT_SCRIPT_NAMES.has(entrypoint.name))) return;
+    viteConfig.plugins = [...(viteConfig.plugins ?? []), subframeSiteRulesBuildPlugin()];
+}
+
+/** 内容脚本与后台仅注入其产物实际可达的中文界面条目；所有扩展 UI 页面继续共享完整中文目录块。 */
+export function extendScopedChineseCatalogBuildConfig(
+    entrypoints: readonly {type: string}[],
+    viteConfig: {plugins?: unknown[]},
+): void {
+    const scopedTypes = new Set(['content-script', 'background']);
+    if (entrypoints.length === 0 || !entrypoints.every((entrypoint) => scopedTypes.has(entrypoint.type))) return;
+    viteConfig.plugins = [...(viteConfig.plugins ?? []), scopedChineseCatalogBuildPlugin()];
 }
 
 /** 按入口构建组裁剪不可能命中的 Vite 插件，减少 13 组串行构建中无关插件的 hook 调度开销。 */
@@ -667,7 +710,11 @@ export default defineConfig({
             // Calm Reading 设计体系令牌与全界面样式统一、翻译缓存批量事务与紧凑批量协议，以及合入最新 main（含 #1383/#1387/#1422/#1425/#1429/#1431 等代码与文案增量）；
             // 无新增静态资源、模型、WASM 或第三方依赖，278 份非代码资源保持不变，按实测产物增量登记 60 kB 代码与样式预算。
             const designSystemAndEfficiencyBudget = 60_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + designSystemAndEfficiencyBudget));
+            // MR 1（前两层瘦身）：PDF.js CMap/标准字体与 ECDICT 按需多镜像校验缓存、五语非默认界面包 delta-v1 增量外置、
+            // 移除无 WASM JS 回退、子 frame 去除 tldts 表及非页面入口裁剪不可达中文目录。
+            // 实测 Chrome 68.92 → 61.07 MB（-7.85 MB）、Firefox 68.56 → 60.71 MB（-7.85 MB）；收紧生产体积门槛锁住瘦身成果。
+            const deepSlimLayer1Layer2Savings = -9_000_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : deepSlimLayer1Layer2Savings + courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + designSystemAndEfficiencyBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);
@@ -675,6 +722,8 @@ export default defineConfig({
         'vite:build:extendConfig': (entrypoints, viteConfig) => {
             extendRemoteConfigBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
             extendSubframePageContextBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
+            extendSubframeSiteRulesBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
+            extendScopedChineseCatalogBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
             pruneEntrypointVitePlugins(entrypoints, viteConfig as {plugins?: unknown[]});
             attachRolldownTransformFilters(viteConfig as {plugins?: unknown[]});
             configureExtensionUiChunks(entrypoints, viteConfig);
@@ -691,13 +740,16 @@ export default defineConfig({
             for (const [source, destination] of [['@faanau/kuromoji/LICENSE-2.0.txt','kuromoji-Apache-2.0.txt'],['@faanau/kuromoji/NOTICE.md','kuromoji-NOTICE.md'],['kuroshiro/LICENSE','kuroshiro-MIT.txt'],['pinyin-pro/LICENSE','pinyin-pro-MIT.txt'],['thai-rtgs/LICENSE','thai-rtgs-MIT.txt']]) {
                 files.push({absoluteSrc: resolve(__dirname, 'node_modules', source), relativeDest: `third-party-notices/${destination}`});
             }
-            // 非中文界面文案只生成一份 JSON，由各运行上下文按当前语言加载，不再内联进每个 bundle。
-            files.push(...createUiLanguageBundleFiles());
+            // 非中文界面文案：en-US 保持完整本地文件，其余五语按固定远程基线生成紧凑 delta-v1 增量包，运行时经国内外多镜像校验并缓存基线后无损合并。
+            files.push(...createExtensionUiLanguageBundleFiles(__dirname));
             // 安装名称、功能说明和工具栏提示由浏览器按界面语言解析，复用七语资源。
             files.push(...createExtensionMetadataLocaleFiles());
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@wllama/wllama/LICENCE'), relativeDest: 'third-party-notices/wllama-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@noble/hashes/LICENSE'), relativeDest: 'third-party-notices/noble-hashes-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/LICENSE'), relativeDest: 'third-party-notices/pdfjs-bidi-Apache-2.0.txt'});
+            files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/cmaps/LICENSE'), relativeDest: 'third-party-notices/pdfjs-cmaps-Apache-2.0.txt'});
+            files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/standard_fonts/LICENSE_FOXIT'), relativeDest: 'third-party-notices/pdfjs-foxit-BSD.txt'});
+            files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/standard_fonts/LICENSE_LIBERATION'), relativeDest: 'third-party-notices/pdfjs-liberation-OFL.txt'});
             for (const file of PDFJS_DECODER_FILES) {
                 files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/wasm', file), relativeDest: `pdfjs/wasm/${file}`});
             }

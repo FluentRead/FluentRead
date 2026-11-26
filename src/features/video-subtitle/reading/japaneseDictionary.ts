@@ -4,13 +4,11 @@
  * 主要内容：锁定 @faanau/kuromoji 0.2.1 的十二份 gzip 数据，通过本 feature 可信缓存返回原始压缩字节。
  * 模块边界：不加载远程脚本、不处理字幕或构建分词器；调用者在 Worker 中解压并装配随扩展提供的本地算法。
  */
+import {buildNpmAssetMirrorUrls, detectPreferredMirrorLocale} from '@/src/core/assets/mirrors';
 import {createReadingAssetStore, type ReadingAssetFile} from './assetStore';
 
 export const JAPANESE_DICTIONARY_VERSION = '0.2.1';
-const sources = [
-    `https://cdn.jsdelivr.net/npm/@faanau/kuromoji@${JAPANESE_DICTIONARY_VERSION}/dict/`,
-    `https://unpkg.com/@faanau/kuromoji@${JAPANESE_DICTIONARY_VERSION}/dict/`,
-] as const;
+const locale = detectPreferredMirrorLocale();
 
 const manifest = [
     ['base.dat.gz', 3956825, '0803327762e1c93ca731e4319ab8343340f2806bb84941207782cde9d2d5a8eb'],
@@ -28,7 +26,7 @@ const manifest = [
 ] as const;
 
 export const JAPANESE_DICTIONARY_FILES: readonly ReadingAssetFile[] = manifest.map(([name, size, sha256]) => ({
-    name, size, sha256, urls: sources.map(source => source + name),
+    name, size, sha256, urls: buildNpmAssetMirrorUrls('@faanau/kuromoji', JAPANESE_DICTIONARY_VERSION, `dict/${name}`, locale),
 }));
 export const JAPANESE_DICTIONARY_BYTES = JAPANESE_DICTIONARY_FILES.reduce((total, file) => total + file.size, 0);
 

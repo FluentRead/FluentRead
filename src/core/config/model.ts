@@ -916,7 +916,7 @@ const modelMigrations: Record<string, Record<string, string>> = {
     },
     [services.huanYuan]: {
         // 官方已于 2026-08-31 下线预览版，迁移到正式版并复用模型级偏好迁移。
-        'hy3-preview': currentModelIds.huanYuan,
+        'hy3-preview': 'hy3',
         'hunyuan-turbos-latest': currentModelIds.huanYuan,
         'hunyuan-t1-latest': currentModelIds.huanYuan,
         'hunyuan-a13b': currentModelIds.huanYuan,

@@ -197,6 +197,7 @@
           <template #content>
             <div>{{ translateLegacy('需与控制台资源所在区域一致') }}</div>
             <code v-if="service === services.aliyunTranslation" data-cloud-region-endpoint>{{ getAliyunTranslationEndpoint(config.serviceRegion[service]) }}</code>
+            <code v-else-if="service === services.huanYuan" data-cloud-region-endpoint>{{ getHuanYuanEndpoint(config.serviceRegion[service]) }}</code>
             <div v-else-if="service === services.azureTranslator">{{ translateLegacy('选择全球区域时不发送区域请求头；其余区域会通过 Ocp-Apim-Subscription-Region 请求头一并发送') }}</div>
           </template>
         </FieldHelp>
@@ -493,7 +494,7 @@ import { getDeepLEndpoint } from '@/src/core/config/deepl'
 import browser from 'webextension-polyfill'
 import { normalizeDiagnostic, diagnoseFailure, type Diagnostic } from '@/src/services/diagnostics'
 import { requestConfigSave, waitForConfigPersistenceQueue } from '@/src/services/config/store'
-import { CONNECTION_TEST_MESSAGE, DEFAULT_OLLAMA_ENDPOINT, getAliyunTranslationEndpoint, getMimoEndpoint, MINIMAX_ENDPOINTS } from '@/src/core/config/constants'
+import { CONNECTION_TEST_MESSAGE, DEFAULT_OLLAMA_ENDPOINT, getAliyunTranslationEndpoint, getHuanYuanEndpoint, getMimoEndpoint, MINIMAX_ENDPOINTS } from '@/src/core/config/constants'
 import { chromeTranslationPreparationStore } from '@/src/platform/browser/chromeTranslationPreparationRequest'
 import { getTranslationServiceUnavailableMessage } from '@/src/services/translation/capabilities'
 import { ElMessage, ElTabs, ElTabPane } from 'element-plus'

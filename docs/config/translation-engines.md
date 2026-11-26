@@ -214,7 +214,7 @@ https://myproxy.example/v1beta/models/{model}:generateContent?key={key}
 
 ### 腾讯混元连接失败
 
-**腾讯混元**使用混元控制台 API Key；**腾讯混元翻译**需要 SecretId 和 SecretKey，两者不同。自建代理或网关需填写对应完整接口与配套密钥，参考[官方接入说明](https://cloud.tencent.com/document/product/1729/116755)。
+**腾讯混元模型**已迁移至腾讯云 [TokenHub 控制台](https://console.cloud.tencent.com/tokenhub/)，需使用对应服务区域（新加坡 / 全球 `tokenhub-intl.tencentmaas.com` 或华南 / 广州 `tokenhub.tencentmaas.com`）的 TokenHub API Key，两个区域的密钥不互通；**腾讯混元翻译**仍需要 SecretId 和 SecretKey。自建代理或网关需填写对应完整接口与配套密钥，参考[官方接入说明](https://cloud.tencent.com/document/product/1823/132252)。
 
 ### 使用本机 Agent 的 ACP 桥接
 

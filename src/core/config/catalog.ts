@@ -260,6 +260,7 @@ export const servicesType = {
         services.azureTranslator,
         services.aliyunTranslation,
         services.volcTranslation,
+        services.huanYuan,
     ]),
     // 支持代理
     useProxy: new Set([
@@ -355,6 +356,10 @@ export const cloudRegionOptions: Record<string, ReadonlyArray<{value: string; la
         {value: "cn-north-1", label: "华北 2 / 北京（cn-north-1）"},
         {value: "ap-southeast-1", label: "新加坡（ap-southeast-1）"},
     ],
+    [services.huanYuan]: [
+        {value: "ap-singapore", label: "新加坡 / 全球（ap-singapore）"},
+        {value: "ap-guangzhou", label: "华南 / 广州（ap-guangzhou）"},
+    ],
 };
 
 /** 未选择地域时使用的默认值，保证首次配置即可直接发起请求。 */
@@ -423,7 +428,7 @@ export const currentModelIds = {
     minimax: "MiniMax-M2.7",
     mimo: "mimo-v2.6-pro",
     jieyue: "step-3.5-flash",
-    huanYuan: "hy3",
+    huanYuan: "hy4",
     grok: "grok-4.5",
     groqLarge: "openai/gpt-oss-120b",
     groqSmall: "openai/gpt-oss-20b",
@@ -452,7 +457,7 @@ export const defaultModelIds = {
     [services.minimax]: "MiniMax-M2.7-highspeed",
     [services.mimo]: "mimo-v2.6-flash",
     [services.jieyue]: "step-2-mini",
-    [services.huanYuan]: currentModelIds.huanYuan,
+    [services.huanYuan]: "hy4-flash",
     [services.huanYuanTranslation]: "hunyuan-translation-lite",
     [services.localTranslation]: DEFAULT_LOCAL_TRANSLATION_MODEL,
     [services.newapi]: "gpt-5.4-mini",
@@ -495,7 +500,7 @@ export const models = new Map<string, Array<string>>([
     [services.minimax, [defaultModelIds[services.minimax], "MiniMax-M3.1-flash", "MiniMax-M3", currentModelIds.minimax, "MiniMax-M2.5", "MiniMax-M2.5-highspeed", customModelString]],
     [services.mimo, [defaultModelIds[services.mimo], currentModelIds.mimo, customModelString]],
     [services.jieyue, [defaultModelIds[services.jieyue], "step-3.7-flash", "step-5-preview", "step-3.5-flash-2603", currentModelIds.jieyue, "step-3", "step-2", customModelString]],
-    [services.huanYuan, [currentModelIds.huanYuan, customModelString]],
+    [services.huanYuan, [defaultModelIds[services.huanYuan], currentModelIds.huanYuan, "hy3", customModelString]],
     [services.huanYuanTranslation, [defaultModelIds[services.huanYuanTranslation], "hunyuan-translation", customModelString]],
     [services.localTranslation, [...LOCAL_TRANSLATION_MODELS.map((model) => model.value), customModelString]],
     [services.newapi, [defaultModelIds[services.newapi], currentModelIds.openai, "gpt-5.6-sol", "gemini-3.6-flash", "gemini-3.5-flash-lite", currentModelIds.claude, currentModelIds.deepseek, "kimi-k2.7-code", customModelString]],

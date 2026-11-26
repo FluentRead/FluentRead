@@ -16,6 +16,7 @@ const {mockConfig} = vi.hoisted(() => ({
     user_role: {} as Record<string, string>,
     requireApiKey: {} as Record<string, boolean>,
     proxy: {} as Record<string, string>,
+    serviceRegion: {} as Record<string, string>,
     custom: 'http://127.0.0.1:11434/v1/chat/completions',
     deeplx: '',
     newApiUrl: '',
@@ -343,13 +344,15 @@ describe.each([['locked SDK', translateWithSdk], ['standalone HTTP', translateWi
   });
 
   it.each([
-    ['', 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions'],
-    ['https://gateway.example.com/v1/chat/completions', 'https://gateway.example.com/v1/chat/completions'],
-  ])('issue #513：混元使用官方接口且保留显式代理 %s', async (proxy, expectedEndpoint) => {
+    ['', undefined, 'hy4', 'https://tokenhub-intl.tencentmaas.com/v1/chat/completions'],
+    ['', 'ap-guangzhou', 'hy4-flash', 'https://tokenhub.tencentmaas.com/v1/chat/completions'],
+    ['https://gateway.example.com/v1/chat/completions', 'ap-guangzhou', 'hy3', 'https://gateway.example.com/v1/chat/completions'],
+  ])('issue #513/#1433：混元使用 TokenHub 地域官方接口且保留显式代理 %s (%s)', async (proxy, region, model, expectedEndpoint) => {
     mockConfig.service = services.huanYuan;
-    mockConfig.model[services.huanYuan] = 'hy3';
+    mockConfig.model[services.huanYuan] = model;
     mockConfig.token[services.huanYuan] = 'hunyuan-test-key';
     mockConfig.proxy[services.huanYuan] = proxy;
+    mockConfig.serviceRegion = region ? {[services.huanYuan]: region} : {};
     const fetchMock = vi.fn().mockResolvedValue(successResponse('你好'));
     setRuntimeFetch(fetchMock);
 
@@ -359,7 +362,7 @@ describe.each([['locked SDK', translateWithSdk], ['standalone HTTP', translateWi
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(expectedEndpoint);
     expect(new Headers(init.headers).get('Authorization')).toBe('Bearer hunyuan-test-key');
-    expect(JSON.parse(String(init.body))).toMatchObject({model: 'hy3', stream: false});
+    expect(JSON.parse(String(init.body))).toMatchObject({model, stream: false});
     expect(mockConfig.token[services.huanYuan]).toBe('hunyuan-test-key');
     expect(mockConfig.proxy[services.huanYuan]).toBe(proxy);
   });

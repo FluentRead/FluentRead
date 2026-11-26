@@ -93,6 +93,22 @@ describe('凭据与真实请求目的地绑定', () => {
             mimoRegion: 'ams',
         });
         expect(rebound(proxied, proxiedTokenPlan).token[services.mimo]).toBe('mimo-secret');
+
+        const hunyuan = configured(services.huanYuan, {
+            serviceRegion: {[services.huanYuan]: 'ap-singapore'},
+        });
+        const hunyuanGuangzhou = transition(hunyuan, {
+            serviceRegion: {[services.huanYuan]: 'ap-guangzhou'},
+        });
+        const hunyuanDefault = transition(hunyuan, {serviceRegion: {}});
+        expect(rebound(hunyuan, hunyuanDefault).token[services.huanYuan]).toBe('huanYuan-secret');
+        expect(rebound(hunyuan, hunyuanGuangzhou).token).not.toHaveProperty(services.huanYuan);
+
+        const proxiedHunyuan = transition(hunyuan, {proxy: {[services.huanYuan]: stableProxy}});
+        const proxiedHunyuanGuangzhou = transition(proxiedHunyuan, {
+            serviceRegion: {[services.huanYuan]: 'ap-guangzhou'},
+        });
+        expect(rebound(proxiedHunyuan, proxiedHunyuanGuangzhou).token[services.huanYuan]).toBe('huanYuan-secret');
     });
 
     it('通义普通模型共享官方 endpoint，Token Plan 或配置的目的地集合变化会解绑', () => {

@@ -84,7 +84,7 @@ describe('AI SDK 首批服务路由', () => {
         [services.lingyi, 'https://api.lingyiwanwu.com/v1/chat/completions', 'https://api.lingyiwanwu.com/v1'],
         [services.jieyue, 'https://api.stepfun.com/v1/chat/completions', 'https://api.stepfun.com/v1'],
         [services.groq, 'https://api.groq.com/openai/v1/chat/completions', 'https://api.groq.com/openai/v1'],
-        [services.huanYuan, 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions', 'https://api.hunyuan.cloud.tencent.com/v1'],
+        [services.huanYuan, 'https://tokenhub-intl.tencentmaas.com/v1/chat/completions', 'https://tokenhub-intl.tencentmaas.com/v1'],
         [services.doubao, 'https://ark.cn-beijing.volces.com/api/v3/chat/completions', 'https://ark.cn-beijing.volces.com/api/v3'],
         [services.siliconCloud, 'https://api.siliconflow.cn/v1/chat/completions', 'https://api.siliconflow.cn/v1'],
         [services.openrouter, 'https://openrouter.ai/api/v1/chat/completions', 'https://openrouter.ai/api/v1'],
@@ -101,6 +101,18 @@ describe('AI SDK 首批服务路由', () => {
             ? {'api-version': '2024-02-15-preview'}
             : undefined);
         expect(result.exactEndpoint).toBeUndefined();
+    });
+    it.each([
+        [undefined, 'https://tokenhub-intl.tencentmaas.com/v1/chat/completions', 'https://tokenhub-intl.tencentmaas.com/v1'],
+        ['ap-singapore', 'https://tokenhub-intl.tencentmaas.com/v1/chat/completions', 'https://tokenhub-intl.tencentmaas.com/v1'],
+        ['ap-guangzhou', 'https://tokenhub.tencentmaas.com/v1/chat/completions', 'https://tokenhub.tencentmaas.com/v1'],
+        ['unknown-region', 'https://tokenhub-intl.tencentmaas.com/v1/chat/completions', 'https://tokenhub-intl.tencentmaas.com/v1'],
+    ])('腾讯混元 TokenHub 按服务地域解析端点 %s', (region, endpoint, baseURL) => {
+        const result = resolveOpenAICompatibleEndpoint(services.huanYuan, endpointConfig({
+            serviceRegion: region ? {[services.huanYuan]: region} : {},
+        }));
+        expect(result.endpoint).toBe(endpoint);
+        expect(result.baseURL).toBe(baseURL);
     });
 });
 

@@ -1306,6 +1306,7 @@ describe('设置主表单当前连接字段能力',()=>{
         {service:'deeplx',visible:['showProxy','showToken','showDeepLX']},
         {service:'minimax',visible:[...ai,'showMiniMaxRegion']},
         {service:'mimo',visible:[...ai,'showMiMoRegion']},
+        {service:'huanYuan',visible:[...ai,'showServiceRegion']},
         {service:'newapi',visible:['showAI','showModel','showCustomBody','showToken','showNewAPI']},
         {service:'azureOpenai',visible:['showAI','showModel','showCustomBody','showToken','showAzureOpenaiEndpoint']},
         {service:'deepseek',visible:[...ai,'showDeepseekApiType']},

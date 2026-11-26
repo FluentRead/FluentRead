@@ -159,6 +159,7 @@ export function getHarnessModelCacheKey(config: {
     minimaxRegion: string;
     mimoBillingPlan: string;
     mimoRegion: string;
+    serviceRegion?: Record<string, string>;
 }): string {
     const {service, model} = resolveHarnessModel(config);
     // 匿名B站不读取密钥、代理或默认服务模型；缓存只比较实际生效输入。
@@ -167,7 +168,7 @@ export function getHarnessModelCacheKey(config: {
         config.on, config.uiLanguage, service, model, config.token[service], config.proxy[service],
         config.modelThinking, config.customOpenAIProviders, config.custom, config.newApiUrl,
         config.azureOpenaiEndpoint, config.deepseekApiType, config.minimaxBillingPlan,
-        config.minimaxRegion, config.mimoBillingPlan, config.mimoRegion,
+        config.minimaxRegion, config.mimoBillingPlan, config.mimoRegion, config.serviceRegion?.[service],
         config.apiKeys?.[service], config.apiKeyRotationEnabled?.[service], config.customHeaders?.[service],
     ]);
 }

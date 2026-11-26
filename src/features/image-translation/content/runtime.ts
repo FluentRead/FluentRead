@@ -407,6 +407,7 @@ function configurationIdentity(manga = false): string {
         config.modelThinking?.[service], config.system_role?.[service], config.user_role?.[service],
         config.enableAIContext,
         config.minimaxBillingPlan, config.minimaxRegion, config.mimoBillingPlan, config.mimoRegion,
+        config.serviceRegion?.[service],
         document.title,
         manga,
         getImageOcrEngine(sourceLanguage, manga ? 'paddle' : config.imageTranslationOcrEngine),
@@ -443,6 +444,7 @@ function watchTranslationConfiguration(): () => void {
         void config.minimaxRegion;
         void config.mimoBillingPlan;
         void config.mimoRegion;
+        void config.serviceRegion?.[service];
         // 回调中的 UI 文案/动效读取不能反向成为翻译身份依赖。
         return {};
     }, () => {

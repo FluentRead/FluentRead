@@ -131,7 +131,8 @@ describe('AI 模型编号列表', () => {
             'mimo-v2.6-flash', 'mimo-v2.6-pro', customModelString,
         ]);
         expect(models.get(services.jieyue)).toContain('step-3.5-flash');
-        expect(models.get(services.huanYuan)).toContain('hy3');
+        expect(models.get(services.huanYuan)).toEqual(['hy4-flash', 'hy4', 'hy3', customModelString]);
+        expect(defaultModelIds[services.huanYuan]).toBe('hy4-flash');
         expect(models.get(services.grok)).toContain('grok-4.5');
         expect(models.get(services.groq)).not.toContain('whisper-large-v3');
         expect(models.get(services.openrouter)?.at(-1)).toBe(customModelString);
@@ -1431,7 +1432,7 @@ describe('旧模型编号兼容迁移', () => {
             [services.yiyan]: 'ernie-5.1',
             [services.minimax]: 'MiniMax-M2.7',
             [services.jieyue]: 'step-3.5-flash',
-            [services.huanYuan]: 'hy3',
+            [services.huanYuan]: 'hy4',
             [services.infini]: 'glm-5.2',
         });
         expect(normalized.documentModel[services.minimax]).toBe('MiniMax-M3.1-flash');
@@ -1750,7 +1751,7 @@ describe('OpenAI 兼容服务端点', () => {
         expect(MINIMAX_ENDPOINTS.payg.cn).toBe('https://api.minimaxi.com/v1/chat/completions');
         expect(MINIMAX_ENDPOINTS['token-plan'].global).toBe('https://api.minimax.io/v1/chat/completions');
         expect(urls[services.infini]).toBe('https://cloud.infini-ai.com/maas/v1/chat/completions');
-        expect(urls[services.huanYuan]).toBe('https://api.hunyuan.cloud.tencent.com/v1/chat/completions');
+        expect(urls[services.huanYuan]).toBe('https://tokenhub-intl.tencentmaas.com/v1/chat/completions');
         expect(tongyiTokenPlanUrl).toBe('https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions');
     });
 

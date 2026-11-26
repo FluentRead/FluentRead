@@ -6,7 +6,7 @@
  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
  */
 
-import {getMimoEndpoint, MIMO_ENDPOINTS, MINIMAX_ENDPOINTS, urls} from '@/src/core/config/constants';
+import {getHuanYuanEndpoint, getMimoEndpoint, MIMO_ENDPOINTS, MINIMAX_ENDPOINTS, urls} from '@/src/core/config/constants';
 import {referenceAiPlatformServices, services} from '@/src/core/config/catalog';
 import {migrateModelIdentifier} from '@/src/core/config/model';
 import {normalizeAzureEndpoint} from '@/src/core/config/azure';
@@ -31,6 +31,7 @@ export interface AiSdkEndpointConfig {
     minimaxRegion?: string;
     mimoBillingPlan?: string;
     mimoRegion?: string;
+    serviceRegion?: Record<string, string | undefined>;
 }
 
 export interface OpenAICompatibleEndpointResolution {
@@ -187,6 +188,10 @@ function resolveCommonEndpoint(service: string, config: AiSdkEndpointConfig): st
 
     if (service === services.mimo) {
         return getMimoEndpoint(config.mimoBillingPlan || 'payg', config.mimoRegion || 'cn');
+    }
+
+    if (service === services.huanYuan) {
+        return getHuanYuanEndpoint(config.serviceRegion?.[services.huanYuan]);
     }
 
     const endpoint = urls[service];

@@ -212,7 +212,7 @@ Placeholders use the current model and saved key. A URL containing `{key}` recei
 
 ### Tencent Hunyuan connection failures
 
-**Tencent Hunyuan** uses a Hunyuan console API key. **Hunyuan Translation** instead needs SecretId and SecretKey. A custom gateway needs its matching full endpoint and credentials; see the [official integration guide](https://cloud.tencent.com/document/product/1729/116755).
+**Tencent Hunyuan** now uses the Tencent Cloud [TokenHub console](https://console.cloud.tencent.com/tokenhub/) and requires a TokenHub API key matching the selected service region (Singapore / Global `tokenhub-intl.tencentmaas.com` or South China / Guangzhou `tokenhub.tencentmaas.com`; keys are not shared across regions). **Hunyuan Translation** instead needs SecretId and SecretKey. A custom gateway needs its matching full endpoint and credentials; see the [official integration guide](https://cloud.tencent.com/document/product/1823/132252).
 
 ### Local ACP agent bridge
 

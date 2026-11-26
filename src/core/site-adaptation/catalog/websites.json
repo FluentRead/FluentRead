@@ -6362,5 +6362,40 @@
       "[role=\"article\"][aria-posinset=\"1\"] [data-ad-rendering-role=\"profile_name\"]:not([data-ad-preview=\"message\"] *)",
       "[role=\"article\"][aria-label] span:has(+ div > span[dir=\"auto\"][lang]):not(span[dir=\"auto\"][lang] *):not([data-ad-preview=\"message\"] *)"
     ]
+  },
+  {
+    "id": "paulgraham-essays",
+    "name": "Paul Graham 文章",
+    "match": {
+      "hosts": [
+        "paulgraham.com",
+        "www.paulgraham.com"
+      ]
+    },
+    "mode": "augment",
+    "content": [
+      {
+        "css": [
+          "td > font:has(> br)"
+        ],
+        "key": "paulgraham-essay-lines",
+        "resolve": "closest",
+        "atomic": true,
+        "splitOnBr": true
+      }
+    ],
+    "protect": [
+      "pre",
+      "code",
+      "kbd",
+      "samp",
+      "input",
+      "textarea",
+      "button",
+      "select"
+    ],
+    "exclude": [
+      "nav"
+    ]
   }
 ]

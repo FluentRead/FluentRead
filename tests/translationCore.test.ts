@@ -38,6 +38,7 @@ import {
 } from '@/src/core/translation/dom';
 import {
     classifyGenericCandidate,
+    collectDoubleBrParagraphBarriers,
     getAllScopeCandidateKind,
     getDirectInlineRuns,
     hasStructuralAncestor,
@@ -5071,6 +5072,168 @@ describe('explicit source line breaks', () => {
         const {core, document, paragraph} = lines('<p>' + 'Readable sentence.<br>'.repeat(1030) + '</p>');
         expect(core.discover(document)).toEqual([]);
         expect(core.resolve(paragraph)).toBeNull();
+    });
+
+    it('splits explicit splitOnBr targets on inline containers such as td > font', () => {
+        const {document} = parseHTML(`<html><body><table><tbody><tr><td id="cell">
+            <img src="title.gif" alt="Title"><br><br>
+            <font id="essay" size="2" face="verdana">
+                First paragraph with <a id="link" href="/note">a reference link</a>.<br><br>
+                <b>Second paragraph</b> keeps inline formatting.<br><br>
+                <code>skip()</code><br><br>
+                Third paragraph concludes the essay.
+            </font>
+        </td></tr></tbody></table></body></html>`);
+        const core = new TranslationCandidateCore({url: new URL('https://inline-lines.test'), adapters: [
+            createDeclarativeAdapter({id: 'inline-lines', hosts: ['inline-lines.test'], targets: [
+                {selector: 'td > font:has(> br)', match: 'closest', reason: 'inline-source-lines', atomic: true, splitOnBr: true},
+            ]}),
+        ]});
+        const font = document.getElementById('essay')!;
+        const candidates = core.discover(document);
+        expect(candidates).toHaveLength(3);
+        expect(candidates.every(candidate => candidate.element === font && candidate.sourceLine === true && candidate.adapterId === 'inline-lines')).toBe(true);
+        expect(candidates.map(candidate => extractTranslationTextFromNodes(candidate.nodes!))).toEqual([
+            'First paragraph with a reference link .',
+            'Second paragraph keeps inline formatting.',
+            'Third paragraph concludes the essay.',
+        ]);
+        expect(core.resolve(document.getElementById('link')!.firstChild)?.nodes).toEqual(candidates[0]!.nodes);
+        expect(core.resolve(font.querySelector('b')!.firstChild)?.nodes).toEqual(candidates[1]!.nodes);
+        expect(core.resolve(font.querySelector('br'))).toBeNull();
+        expect(core.resolve(font.querySelector('code')!.firstChild)).toBeNull();
+    });
+});
+
+describe('generic legacy double-br paragraph splitting', () => {
+    it('splits inline font/span wrappers and block containers with three or more double-br paragraphs without duplicating ancestors', () => {
+        const {document} = parseHTML(`<html><body>
+            <table><tbody><tr><td id="cell">
+                <img src="hero.gif" alt=""><br><br>
+                <font id="essay" size="2">
+                    Opening paragraph line one<br>line two stays together.
+                    <br><!-- spacer --><br>
+                    Second paragraph with <a id="inline-link" href="/ref">short link</a> and <b>bold</b>.
+                    <br>
+                    <br>
+                    Third paragraph ends cleanly.
+                </font>
+            </td></tr></tbody></table>
+            <div id="div-wrapper"><span id="span-essay">
+                Alpha paragraph text.<br><br>
+                Beta paragraph with <a id="div-link" href="/beta">beta</a>.<br><br>
+                Gamma paragraph text.
+            </span></div>
+            <div id="direct-block">
+                Block paragraph one.<br><br>
+                Block paragraph two.<br><br>
+                Block paragraph three.
+            </div>
+        </body></html>`);
+        const core = new TranslationCandidateCore({url: new URL('https://legacy-generic.test/essay.html')});
+        const font = document.getElementById('essay')!;
+        const span = document.getElementById('span-essay')!;
+        const directBlock = document.getElementById('direct-block')!;
+        const candidates = core.discover(document);
+
+        const fontRuns = candidates.filter(candidate => candidate.element === font);
+        expect(fontRuns).toHaveLength(3);
+        expect(fontRuns.every(candidate => candidate.sourceLine === true && candidate.kind === 'content')).toBe(true);
+        expect(fontRuns.map(candidate => extractTranslationTextFromNodes(candidate.nodes!))).toEqual([
+            'Opening paragraph line one line two stays together.',
+            'Second paragraph with short link and bold .',
+            'Third paragraph ends cleanly.',
+        ]);
+        expect(candidates.some(candidate => candidate.element.id === 'cell')).toBe(false);
+
+        const spanRuns = candidates.filter(candidate => candidate.element === span);
+        expect(spanRuns).toHaveLength(3);
+        expect(candidates.some(candidate => candidate.element.id === 'div-wrapper' || candidate.element.id === 'div-link')).toBe(false);
+
+        const blockRuns = candidates.filter(candidate => candidate.element === directBlock);
+        expect(blockRuns).toHaveLength(3);
+
+        // 悬浮与全文共享相同分段；命中 <br> 或外层单元格不会回退吞并整篇正文。
+        expect(core.resolve(document.getElementById('inline-link')!.firstChild)?.nodes).toEqual(fontRuns[1]!.nodes);
+        expect(core.resolve(document.getElementById('div-link')!.firstChild)?.nodes).toEqual(spanRuns[1]!.nodes);
+        expect(core.resolve(font.querySelectorAll('br')[1])).toBeNull();
+        expect(core.resolve(document.getElementById('cell')!.querySelector('img'))).toBeNull();
+        expect(core.resolve(directBlock.querySelector('br'))).toBeNull();
+    });
+
+    it('keeps short two-paragraph double-br blocks, non-wrapper inline tags, over-budget nodes, and focus sites intact', () => {
+        const {document} = parseHTML(`<html><body>
+            <div id="two-para">First paragraph.<br><br>Second paragraph.</div>
+            <div id="leading-trailing"><br><br>Only one real paragraph.<br><br></div>
+            <div id="single-br">Line one.<br>Line two.<br>Line three.<br>Line four.</div>
+            <p><em id="non-wrapper">First.<br><br>Second.<br><br>Third.</em></p>
+            <button id="btn"><font id="btn-font">First.<br><br>Second.<br><br>Third.</font></button>
+            <nav id="nav-block"><font id="nav-font">First nav.<br><br>Second nav.<br><br>Third nav.</font></nav>
+            <nav id="nav-direct">Direct nav one.<br><br>Direct nav two.<br><br>Direct nav three.</nav>
+            <font id="mixed-descendant">
+                First paragraph.<br><br>
+                Second paragraph.<br><br>
+                <blockquote id="nested-quote">Quoted block paragraph.</blockquote>
+                Third paragraph.
+            </font>
+        </body></html>`);
+        const overBudget = parseHTML(`<html><body><div id="over-budget">${'Sentence.<br><br>'.repeat(700)}</div></body></html>`)
+            .document.getElementById('over-budget')!;
+        expect(collectDoubleBrParagraphBarriers(document.getElementById('two-para')!)).toBeNull();
+        expect(collectDoubleBrParagraphBarriers(document.getElementById('leading-trailing')!)).toBeNull();
+        expect(collectDoubleBrParagraphBarriers(document.getElementById('single-br')!)).toBeNull();
+        expect(collectDoubleBrParagraphBarriers(document.getElementById('non-wrapper')!)).toBeNull();
+        expect(collectDoubleBrParagraphBarriers(overBudget)).toBeNull();
+
+        const core = new TranslationCandidateCore({url: new URL('https://legacy-bounds.test/')});
+        const discovered = core.discover(document);
+        expect(discovered.filter(candidate => candidate.element.id === 'two-para')).toHaveLength(1);
+        expect(discovered.find(candidate => candidate.element.id === 'two-para')?.nodes).toBeUndefined();
+        expect(core.resolve(document.getElementById('btn-font')!.firstChild)?.element.id).toBe('btn');
+        expect(discovered.some(candidate => candidate.element.id === 'nav-font' || candidate.element.id === 'nav-direct')).toBe(false);
+
+        const mixedFont = document.getElementById('mixed-descendant')!;
+        expect(discovered.filter(candidate => candidate.element === mixedFont)).toHaveLength(3);
+        expect(discovered.some(candidate => candidate.element.id === 'nested-quote')).toBe(true);
+
+        // 全部节点范围下，结构区域内的双 br 分段保留 control 语义，正文区域仍按 content 渲染。
+        const allCore = new TranslationCandidateCore({url: new URL('https://legacy-bounds.test/'), scope: 'all'});
+        const allCandidates = allCore.discover(document);
+        expect(allCandidates.filter(candidate => candidate.element.id === 'nav-font').every(candidate => candidate.kind === 'control')).toBe(true);
+        expect(allCandidates.filter(candidate => candidate.element.id === 'nav-direct').every(candidate => candidate.kind === 'control')).toBe(true);
+        expect(allCandidates.filter(candidate => candidate.element === mixedFont).every(candidate => candidate.kind === 'content')).toBe(true);
+
+        // targets-only（focus）站点不触发通用双 br 回退。
+        const focusCore = new TranslationCandidateCore({
+            url: new URL('https://focus-only.test/'),
+            adapters: [createDeclarativeAdapter({
+                id: 'focus-only',
+                hosts: ['focus-only.test'],
+                genericCandidatePolicy: 'targets-only',
+                targets: [{selector: '#nested-quote', reason: 'quote'}],
+            })],
+        });
+        expect(focusCore.discover(document).map(candidate => candidate.element.id)).toEqual(['nested-quote']);
+        expect(focusCore.resolve(mixedFont.firstChild)).toBeNull();
+    });
+
+    it('preserves double-br paragraph detection while partially materialized for single-paragraph retry', () => {
+        const {document} = parseHTML(`<html><body><td><font id="essay">
+            <span class="fluent-read-source-line" data-fr-translation-segment="true">First paragraph.<span class="fluent-read-bilingual-content" data-fr-translation-owned="true">第一段。</span></span>
+            <br><br>
+            Second paragraph awaiting retry.
+            <br><br>
+            <span class="fluent-read-source-line" data-fr-translation-segment="true">Third paragraph.<span class="fluent-read-bilingual-content" data-fr-translation-owned="true">第三段。</span></span>
+        </font></td></body></html>`);
+        const core = new TranslationCandidateCore({url: new URL('https://retry-generic.test/')});
+        const font = document.getElementById('essay')!;
+        const candidates = core.discover(document);
+        expect(candidates).toHaveLength(1);
+        expect(candidates[0]!.element).toBe(font);
+        expect(candidates[0]!.sourceLine).toBe(true);
+        expect(extractTranslationTextFromNodes(candidates[0]!.nodes!)).toBe('Second paragraph awaiting retry.');
+        const retryText = Array.from(font.childNodes).find(node => node.nodeType === 3 && node.nodeValue?.includes('awaiting retry'))!;
+        expect(core.resolve(retryText)?.nodes).toEqual(candidates[0]!.nodes);
     });
 });
 

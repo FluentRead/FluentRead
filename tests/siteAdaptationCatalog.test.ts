@@ -175,6 +175,60 @@ describe('网站正文规则目录', () => {
         expect(document.querySelector('#label')!.textContent).toBe('Category:Internationalization');
     });
 
+    it('Paul Graham 文章按直接 br 拆分 td > inline font 正文，保留链接、强调与嵌套页脚表格边界', () => {
+        const document = documentFor(`
+            <table><tbody><tr>
+                <td><img src="sidebar.gif" alt="Essays"></td>
+                <td><img src="spacer.gif" alt=""></td>
+                <td id="outer-td">
+                    <img src="title.gif" alt="How to Do Great Work"><br><br>
+                    <table id="essay-table"><tbody><tr><td id="inner-td">
+                        <img src="banner.gif" alt=""><br><br>
+                        <font id="essay-font" size="2" face="verdana">
+                            July 2023<br><br>
+                            If you collected lists of techniques for doing great work in a lot of different fields, what would the intersection look like? [<a id="fn-ref" href="#f1n"><font color="#000000">1</font></a>]<br><br>
+                            The first step is to decide what to work on, and read <a id="inline-link" href="read.html">the related essay</a> with <b>care</b>.<br><br>
+                            <code>skip_code_line()</code><br><br>
+                            <b>Notes</b><br><br>
+                            [<a name="f1n"><font color="#000000">1</font></a>] Footnote explaining an earlier observation.
+                        </font>
+                    </td></tr></tbody></table>
+                    <table id="footer-table"><tbody><tr><td id="footer-td"><font id="footer-font" size="2">You'll find this essay and 14 others in Hackers &amp; Painters.</font></td></tr></tbody></table>
+                </td>
+            </tr></tbody></table>
+        `);
+        const adapter = adapterById.get('paulgraham-essays')!;
+        for (const raw of ['https://paulgraham.com/greatwork.html', 'https://www.paulgraham.com/greatwork.html']) {
+            const url = new URL(raw);
+            expect(adapter.matches(url), raw).toBe(true);
+            const core = new TranslationCandidateCore({url, adapters: [adapter]});
+            const font = document.getElementById('essay-font')!;
+            const candidates = core.discover(document);
+            const essayRuns = candidates.filter(candidate => candidate.element === font);
+            expect(essayRuns, raw).toHaveLength(5);
+            expect(essayRuns.every(candidate => candidate.adapterId === 'paulgraham-essays' && candidate.sourceLine === true)).toBe(true);
+            expect(essayRuns.map(candidate => extractTranslationTextFromNodes(candidate.nodes!, core.shouldStayOriginal))).toEqual([
+                'July 2023',
+                'If you collected lists of techniques for doing great work in a lot of different fields, what would the intersection look like? [ ]',
+                'The first step is to decide what to work on, and read the related essay with care .',
+                'Notes',
+                '[ ] Footnote explaining an earlier observation.',
+            ]);
+            // 脚注数字本身受 live-data 保护，但对应链接与嵌套 <font> 仍完整保留在该段节点中。
+            expect(essayRuns[1]!.nodes).toContain(document.getElementById('fn-ref'));
+            expect(document.getElementById('fn-ref')!.textContent).toBe('1');
+            // 外层与内层 td 不应再把整篇 67 KB 正文吞并成一个大候选。
+            expect(candidates.some(candidate => candidate.element.id === 'outer-td' || candidate.element.id === 'inner-td')).toBe(false);
+            // 无 br 的页脚单元格保留常规通用发现。
+            expect(candidates.some(candidate => candidate.element.id === 'footer-td')).toBe(true);
+            // 悬浮命中文本、链接和嵌套脚注 <font> 均回到对应段落，命中 <br> 或独立 <code> 返回 null。
+            expect(core.resolve(document.getElementById('fn-ref')!.firstChild!.firstChild)?.nodes).toEqual(essayRuns[1]!.nodes);
+            expect(core.resolve(document.getElementById('inline-link')!.firstChild)?.nodes).toEqual(essayRuns[2]!.nodes);
+            expect(core.resolve(font.querySelector('br'))).toBeNull();
+            expect(core.resolve(font.querySelector('code')!.firstChild)).toBeNull();
+        }
+    });
+
     it('BBC 主图只保护独立署名，主图内正文和真正图注仍可翻译', () => {
         const fixture = fixtures.find(item => item.id === 'bbc-news')!;
         const url = new URL('https://www.bbc.com/future/article/20261001-five-exercises-to-help-reduce-neck-pain');

@@ -1,8 +1,8 @@
 /**
  * @file src/core/translation/engine.ts
  *
- * 文件职责：实现 DOM 节点到 TranslationCandidate 的核心解析引擎，协调安全守卫、站点适配器、布局边界和文本有效性；为显式非原子行内容器保留直属正文与独立子段落的一致发现和悬浮边界。
- * 主要内容：按正文/全部节点范围协调候选，统一发现、悬浮与请求取词的精确禁译覆盖；定义 TranslationCandidateCore、候选优选与键值函数，提供同步只读祖先 miss 缓存作用域（退出或显式失效后立即释放），记录发现步骤和原因，按站点规则把显式换行拆为两种入口一致的内联候选，处理编辑器坐标命中屏障、hover 屏障、适配优先级、快照省略、缓存及坐标命中；局部脏内联子树仅在完整保护检查通过后回到最近显式非原子祖先重扫，不把每个正文子节点重定向成重复整段请求；发现强制目标时仅在当前 enter 的同步检查中复用既有决策和祖先选择器 miss，不跨生成器让出缓存；同步只读批量解析复用全部范围及无站点适配/应用外壳例外的普通正文祖先守卫和文本保护，涉及显式外壳权限或站点重定向目标时独立解析；无元素子节点的非文档表面不重复探测不可能成立的内联分段，仍由完整候选分类复验文本和保护；悬浮命中独立后代的包裹层时禁止回退吞并整个容器，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
+ * 文件职责：实现 DOM 节点到 TranslationCandidate 的核心解析引擎，协调安全守卫、站点适配器、布局边界和文本有效性；为显式非原子行内容器保留直属正文与独立子段落的一致发现和悬浮边界，并支持内联容器显式换行拆分与通用层旧式双 br 多段正文拆分。
+ * 主要内容：按正文/全部节点范围协调候选，统一发现、悬浮与请求取词的精确禁译覆盖；定义 TranslationCandidateCore、候选优选与键值函数，提供同步只读祖先 miss 缓存作用域（退出或显式失效后立即释放），记录发现步骤和原因，按站点规则把显式换行（含内联正文容器如 font）拆为两种入口一致的内联候选，并在通用层对含至少三段连续双 br 的块级或透明内联包装容器（font/span）自动拆分分段，处理编辑器坐标命中屏障、hover 屏障、适配优先级、快照省略、缓存及坐标命中；局部脏内联子树仅在完整保护检查通过后回到最近显式非原子祖先重扫，不把每个正文子节点重定向成重复整段请求；发现强制目标时仅在当前 enter 的同步检查中复用既有决策和祖先选择器 miss，不跨生成器让出缓存；同步只读批量解析复用全部范围及无站点适配/应用外壳例外的普通正文祖先守卫和文本保护，涉及显式外壳权限或站点重定向目标时独立解析；无元素子节点的非文档表面不重复探测不可能成立的内联分段，仍由完整候选分类复验文本和保护；悬浮命中独立后代的包裹层时禁止回退吞并整个容器，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
  * 模块边界：本文件属于可独立测试的 core 候选领域；内置站点提供的应用外壳正文入口仍须经过显式目标、局部保护与去重检查，不改变通用发现守卫；可以读取传入 DOM 以计算结果，坐标命中栈与祖先守卫只在单次同步解析中复用，不跨手势缓存；不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
@@ -25,6 +25,7 @@ import type {HardGuardResult} from './dom';
 import type {TranslationTextProtectionOptions} from './dom';
 import {
     classifyGenericCandidate,
+    collectDoubleBrParagraphBarriers,
     findTranslationControlOwner,
     getDirectInlineRuns,
     getAllScopeCandidateKind,
@@ -586,13 +587,29 @@ export class TranslationCandidateCore {
         // 未出现显式换行时仍使用完整段落；超宽节点由下层预算拒绝物化。
         if (candidate.element.childNodes.length <= 2048 &&
             !Array.from(candidate.element.children).some((child) => child.localName === 'br')) return [candidate];
+        // 老式站点可能把按 <br> 分段的正文直接放在 inline <font>/<span> 内；
+        // force-target 已通过硬守卫与站点规则核准，允许该容器按直接子级 br 拆分。
         const runs = getDirectInlineRuns(
             candidate.element, this.shouldStayOriginal, true,
             (child) => child.localName === 'br' || isTranslationControlElement(child),
             textProtectionCache, evaluationContext?.textProtectionOptions ?? this.textOptions(), this.scope,
-            false, this.structuralRegionOptions(),
+            true, this.structuralRegionOptions(),
         );
         return runs.map((nodes) => ({...candidate, nodes, sourceLine: true}));
+    }
+
+    private genericDoubleBrBarriers(
+        element: Element,
+        textProtectionCache: TranslationTextProtectionCache,
+        evaluationContext?: ResolutionEvaluationContext,
+    ): ReadonlySet<Element> | null {
+        if (!this.allowsGenericCandidates()) return null;
+        return collectDoubleBrParagraphBarriers(
+            element,
+            this.shouldStayOriginal,
+            textProtectionCache,
+            evaluationContext?.textProtectionOptions ?? this.textOptions(),
+        );
     }
 
     private inlineRunCandidates(
@@ -602,6 +619,7 @@ export class TranslationCandidateCore {
         explicitContainer: boolean,
         candidateChildBarriers?: ReadonlySet<Element>,
         evaluationContext?: ResolutionEvaluationContext,
+        doubleBrBarriers?: ReadonlySet<Element> | null,
     ): TranslationCandidate[] {
         if (!this.allowsGenericCandidates() && !explicitContainer) return [];
         const candidates: TranslationCandidate[] = [];
@@ -617,6 +635,7 @@ export class TranslationCandidateCore {
             return result;
         };
         const isDirectRunBarrier = (candidate: Element): boolean =>
+            doubleBrBarriers?.has(candidate) === true ||
             candidateChildBarriers?.has(candidate) === true ||
             isAtomicAdapterTarget(candidate) || isTranslationControlElement(candidate) ||
             (this.scope === 'all' && isTranslationTextElementProtected(
@@ -632,14 +651,17 @@ export class TranslationCandidateCore {
             textProtectionCache,
             protectionOptions,
             this.scope,
-            explicitContainer,
+            explicitContainer || Boolean(doubleBrBarriers),
             this.structuralRegionOptions(),
         )) {
             candidates.push({
                 element: element as HTMLElement,
                 nodes,
-                kind: this.scope === 'all' ? getAllScopeCandidateKind(element)
-                    : findTranslationControlOwner(element) ? 'control' : 'content',
+                ...(doubleBrBarriers ? {sourceLine: true} : {}),
+                kind: doubleBrBarriers
+                    ? (this.scope === 'all' && (isStructuralContainer(element) || hasStructuralAncestor(element)) ? 'control' : 'content')
+                    : this.scope === 'all' ? getAllScopeCandidateKind(element)
+                        : findTranslationControlOwner(element) ? 'control' : 'content',
                 reason: 'generic-inline-run',
                 ...this.candidateResolutionMetadata(evaluationContext),
             });
@@ -686,9 +708,13 @@ export class TranslationCandidateCore {
             (decision.target ?? element) === element;
         if (this.scope === 'content' && (isDocumentSurface(element) || (!explicitContainer && (
             this.isStructuralContainerForResolution(element, evaluationContext) ||
-            this.hasStructuralAncestorForResolution(element, evaluationContext) ||
-            !isBlockBoundary(element))) ||
-            element.children.length === 0)) {
+            this.hasStructuralAncestorForResolution(element, evaluationContext))))) {
+            return null;
+        }
+        const doubleBrBarriers = explicitContainer
+            ? null
+            : this.genericDoubleBrBarriers(element, evaluationContext.textProtectionCache, evaluationContext);
+        if (this.scope === 'content' && !explicitContainer && !doubleBrBarriers && !isBlockBoundary(element)) {
             return null;
         }
         // 优先探测全文后序发现记录的所有权屏障，再在统一严格预算内复核每个内联子节点；
@@ -700,11 +726,12 @@ export class TranslationCandidateCore {
                 this.discoveredCandidateChildBarriers.get(element),
                 explicitContainer,
             );
+            const candidates = this.inlineRunCandidates(
+                element, true, evaluationContext.textProtectionCache, explicitContainer, childBarriers, evaluationContext, doubleBrBarriers,
+            );
             summary = {
-                candidates: this.inlineRunCandidates(
-                    element, true, evaluationContext.textProtectionCache, explicitContainer, childBarriers, evaluationContext,
-                ),
-                blocksWholeCandidate: childBarriers.size > 0,
+                candidates,
+                blocksWholeCandidate: childBarriers.size > 0 || (Boolean(doubleBrBarriers) && candidates.length > 0),
             };
             evaluationContext.inlineRuns.set(element, summary);
         }
@@ -1122,18 +1149,35 @@ export class TranslationCandidateCore {
                                 textProtectionCache,
                                 explicitContainer,
                                 frame.candidateChildBarriers,
+                                undefined,
+                                this.genericDoubleBrBarriers(frame.element, textProtectionCache),
                             );
                     } else {
-                        const candidate = this.genericCandidateForDiscovery(
-                            frame.element,
-                            frame.insideStructural,
-                            textProtectionCache,
-                        );
-                        frame.exitCandidates = candidate ? [candidate] : this.scope === 'all'
-                            ? this.inlineRunCandidates(
-                                frame.element, true, textProtectionCache, explicitContainer, frame.candidateChildBarriers,
-                            )
-                            : [];
+                        const doubleBrBarriers = frame.insideStructural
+                            ? null
+                            : this.genericDoubleBrBarriers(frame.element, textProtectionCache);
+                        if (doubleBrBarriers) {
+                            frame.exitCandidates = this.inlineRunCandidates(
+                                frame.element,
+                                true,
+                                textProtectionCache,
+                                explicitContainer,
+                                frame.candidateChildBarriers,
+                                undefined,
+                                doubleBrBarriers,
+                            );
+                        } else {
+                            const candidate = this.genericCandidateForDiscovery(
+                                frame.element,
+                                frame.insideStructural,
+                                textProtectionCache,
+                            );
+                            frame.exitCandidates = candidate ? [candidate] : this.scope === 'all'
+                                ? this.inlineRunCandidates(
+                                    frame.element, true, textProtectionCache, explicitContainer, frame.candidateChildBarriers,
+                                )
+                                : [];
+                        }
                     }
                     this.discoveredCandidateChildBarriers.set(
                         frame.element,

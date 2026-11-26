@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/attributeMutationBatch.ts
  * 文件职责：协调一个 MutationObserver 检查点中的有状态 owner 属性复验，合并 class/style 的纯延迟排时。
- * 主要内容：按既有影响根枚举 owner，特殊 owner 和非布局属性仍即时检查硬边界；状态或骨架写入使局部根快照失效，合并边界检查意图，并在排时前复验会话、连接和 state 身份。
+ * 主要内容：按既有影响根枚举 owner，特殊 owner 和非布局属性仍即时检查硬边界，全属性观察下对已通过范围与来源复验的无关属性保留普通已译 owner 避免反复重建；状态或骨架写入使局部根快照失效，合并边界检查意图，并在排时前复验会话、连接和 state 身份。
  * 模块边界：只维护当前回调的临时读数和排时意图；资格判断、状态读取、恢复、骨架刷新、重启、重扫和定时器均经 ports 调用，不发现候选、不读取配置、不创建持久状态，也不调用 provider。
  */
 import type {TranslationState} from './state';
@@ -19,6 +19,13 @@ export interface AttributeMutationBatchPorts {
     isActive(): boolean;
     hasTargetsOnlyAdapter: boolean;
 }
+
+/** 直接影响普通已译 owner 资格、原文结构或扩展标记的受关注非布局属性。 */
+const DIRECT_RESTART_ATTRIBUTES = new Set([
+    'role', 'open', 'aria-modal', 'hidden', 'inert', 'contenteditable', 'aria-hidden', 'translate',
+    'lang', 'dir', 'href', 'rel', 'title', 'value', 'type', 'name',
+    'data-notranslate', 'data-fr-translation-owned', 'data-fr-translation-segment',
+]);
 
 /** 每次 observer 回调新建一批；invalidate 必须与该回调的 DOM/状态写入同步调用。 */
 export function createAttributeMutationBatch(ports: AttributeMutationBatchPorts) {
@@ -54,6 +61,11 @@ export function createAttributeMutationBatch(ports: AttributeMutationBatchPorts)
                         // 非直属关系变化不能仅凭原文相同放过 focus 模式的合成 owner。
                         if (current && direct && !direct.has(target) &&
                             (!current.syntheticSegment || !ports.hasTargetsOnlyAdapter) &&
+                            ports.sourceIsCurrent(target, current)) continue;
+                        // 全属性观察下，祖先上的无关展示/交互属性（如 data-*、aria-expanded、tabindex）
+                        // 已通过范围与来源复验且未触及工件时，保留当前普通译文，避免整页反复重建。
+                        if (current && site && attribute !== null && !DIRECT_RESTART_ATTRIBUTES.has(attribute) &&
+                            !current.syntheticSegment && !ports.isArtifact(mutationTarget) &&
                             ports.sourceIsCurrent(target, current)) continue;
                         if (current && !ports.isArtifact(mutationTarget) &&
                             !ports.sourceIsCurrent(target, current) && ports.refreshSkeleton(target, current)) continue;

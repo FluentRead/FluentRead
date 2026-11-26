@@ -504,7 +504,18 @@ describe.each(['youdaoFree', 'icibaFree'] as const)('%s auto 仅按实际正文�
             .rejects.toMatchObject({freeFailure: 'request', statusCode: 400});
         expect(fetchMock).not.toHaveBeenCalled();
     });
-    it.each(['Mary Jane', 'OpenAI API', 'GPT-6', 'This software keeps every reader preference available after the application restarts.'])('保守保留短名称、技术词和英文 auto：%s', async origin => {
+    it.each([
+        '東京近辺に住んでいたゲーマー女子高生。以降彼女は"JK勇者(とてもつよい)"と自称している。',
+        'Nagi-chan おはよ〜 また基地の建設に戻ったんだね',
+        '陵本なぎ',
+        'せなな_',
+        'Valorant 같이 할 사람',
+    ])('混合或短非中英文字体系（如含英文缩写的日文/韩文）在 HTTP 前退出，不退回英文方向：%s', async origin => {
+        await expect(translateFreeChineseWebText(provider, origin, 'auto', 'zh-Hans'))
+            .rejects.toMatchObject({freeFailure: 'request', statusCode: 400});
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+    it.each(['Mary Jane', 'OpenAI API', 'GPT-6', 'Set α = 0.5 and β = 1.', 'This software keeps every reader preference available after the application restarts.'])('保守保留短名称、技术词和英文 auto：%s', async origin => {
         fetchMock.mockImplementation(async () => provider === 'youdaoFree' ? Response.json({fanyi: {tran: '中文译文'}}) : icibaResponse({err_no: 0, out: '中文译文'}));
         await expect(translateFreeChineseWebText(provider, origin, 'auto', 'zh-Hans')).resolves.toBe('中文译文');
         const [url, init] = fetchMock.mock.calls[0];

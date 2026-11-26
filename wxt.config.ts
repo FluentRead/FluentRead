@@ -517,9 +517,12 @@ export default defineConfig({
             // 行末空心边饰与译文范围核对使 Chrome 增加 1,083 字节代码。
             // 分割复核边饰旁的框外窄笔画再增加 1,083 字节代码。
             const imageClippedGlyphBudget = 8_100;
-            // 接入第三代混元 Hy-MT3 1.8B（102 语种表、制品摘要、ModelScope 来源与七语文案，无新增依赖或静态资源），Chrome 实测 70,578,980 字节。
-            const localTranslationHyMt3Budget = 35_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + localTranslationHyMt3Budget));
+            // Calm Reading 设计体系令牌与全界面样式统一、翻译缓存批量事务与紧凑批量协议，以及合入最新 main（含 #1383/#1387/#1422/#1425/#1429/#1431 等代码与文案增量）；
+            // 无新增静态资源、模型、WASM 或第三方依赖，278 份非代码资源保持不变，按实测产物增量登记 60 kB 代码与样式预算。
+            const designSystemAndEfficiencyBudget = 60_000;
+            // 接入第三代混元 Hy-MT3 1.8B（102 语种表、制品摘要、ModelScope 来源与七语文案，无新增依赖或静态资源），按合入最新 main 后的实测代码增量登记 36 kB 预算。
+            const localTranslationHyMt3Budget = 36_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + designSystemAndEfficiencyBudget + localTranslationHyMt3Budget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

@@ -21,7 +21,7 @@ In the OpenAI Developer Community, navigation, filters, and activity dates also 
 
 Full-page translation on Google Search also includes recognized AI Overview text.
 
-Full-page translation includes the Twitch live chat message text. Enable **Sidebar translation** to include streamer display names in the left sidebar.
+Full-page translation includes Twitch live chat messages, pinned and reply preview text, and streamer display names in the left sidebar while preserving login handles, chat `@` mentions, and emote buttons.
 
 ## Translate every time—or leave it alone
 

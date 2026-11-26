@@ -95,18 +95,49 @@
   },
   {
     "id": "twitch-live-chat",
-    "name": "Twitch 直播聊天",
+    "name": "Twitch 直播聊天与侧边栏",
     "match": {"hosts": ["twitch.tv", "www.twitch.tv"]},
     "mode": "augment",
     "content": [
       {
         "css": [
           ".chat-scrollable-area__message-container [data-a-target=\"chat-line-message-body\"]",
-          ".chat-scrollable-area__message-container .chat-line__message span[data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)"
+          ".chat-scrollable-area__message-container .chat-line__message span[data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)",
+          "[data-test-selector=\"chat-room-component-layout\"] [data-a-target=\"chat-line-message-body\"]",
+          "[data-test-selector=\"chat-room-component-layout\"] span[data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)",
+          ".stream-chat [data-a-target=\"chat-line-message-body\"]",
+          ".stream-chat span[data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)",
+          ".video-chat__message-list-wrapper [data-a-target=\"chat-line-message-body\"]",
+          ".video-chat__message-list-wrapper [data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)"
         ],
         "resolve": "closest",
         "key": "twitch-live-chat:message"
+      },
+      {
+        "css": [
+          ".chat-line__message-container p[title] > span[dir=\"auto\"]:not(:first-of-type)"
+        ],
+        "resolve": "closest",
+        "key": "twitch-live-chat:reply-preview"
+      },
+      {
+        "css": [
+          ".side-nav-card__title [data-a-target=\"side-nav-title\"]",
+          "[data-a-target=\"side-nav-bar\"] [data-a-target=\"side-nav-title\"]"
+        ],
+        "resolve": "closest",
+        "key": "twitch-live-chat:sidebar-channel-name"
       }
+    ],
+    "protect": [
+      ".chat-line__message .mention-fragment",
+      ".chat-line__message [data-a-target=\"chat-message-mention\"]"
+    ],
+    "omit": [
+      "[data-a-target=\"side-nav-title\"] .intl-login",
+      ".side-nav-card__title .intl-login",
+      ".chat-line__message--emote-button",
+      "[data-a-target=\"emote-name\"]"
     ]
   },
   {

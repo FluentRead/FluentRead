@@ -1,12 +1,12 @@
 /**
  * @file src/ui/styles/feedback.css
- * 文件职责：统一扩展自有页面的轻量操作反馈，使 Element Plus 消息使用共享语义色和当前亮暗表面。
+ * 文件职责：统一扩展自有页面的轻量操作反馈，使 Element Plus 消息使用共享语义色、圆角与层级阴影。
  * 主要内容：覆盖成功、警告、错误和普通提示的消息变量及圆角阴影，保持可读的状态文字而不使用固定浅色背景。
  * 模块边界：仅由 Popup、Options、文档页的样式入口引入，不注入宿主网页，不改变消息内容、持续时间或交互。
  */
 @import "./tokens.css";
-:root .el-message { border-radius: 10px; box-shadow: 0 4px 16px rgba(23, 32, 51, .08); }
-:root .el-message--success { --el-message-bg-color: var(--fr-success-soft); --el-message-border-color: color-mix(in srgb, var(--fr-success) 24%, var(--line)); --el-message-text-color: var(--fr-success); }
-:root .el-message--warning { --el-message-bg-color: var(--fr-warning-soft); --el-message-border-color: color-mix(in srgb, var(--fr-warning) 24%, var(--line)); --el-message-text-color: var(--fr-warning); }
-:root .el-message--error { --el-message-bg-color: var(--fr-danger-soft); --el-message-border-color: color-mix(in srgb, var(--fr-danger) 24%, var(--line)); --el-message-text-color: var(--fr-danger); }
-:root .el-message--info { --el-message-bg-color: var(--surface); --el-message-border-color: var(--line); --el-message-text-color: var(--muted); }
+:root .el-message { border-radius: var(--fr-radius-md, 10px); box-shadow: var(--fr-shadow-md); }
+:root .el-message--success { --el-message-bg-color: var(--fr-success-soft); --el-message-border-color: color-mix(in srgb, var(--fr-success) 26%, var(--line)); --el-message-text-color: var(--fr-success); }
+:root .el-message--warning { --el-message-bg-color: var(--fr-warning-soft); --el-message-border-color: color-mix(in srgb, var(--fr-warning) 26%, var(--line)); --el-message-text-color: var(--fr-warning); }
+:root .el-message--error { --el-message-bg-color: var(--fr-danger-soft); --el-message-border-color: color-mix(in srgb, var(--fr-danger) 26%, var(--line)); --el-message-text-color: var(--fr-danger); }
+:root .el-message--info { --el-message-bg-color: var(--surface); --el-message-border-color: var(--line); --el-message-text-color: var(--ink); }

@@ -31,7 +31,7 @@
       </div>
     </header>
 
-    <input ref="fileInput" class="visually-hidden" type="file" multiple :accept="accept" tabindex="-1" @change="handleFileInput" />
+    <input ref="fileInput" class="visually-hidden" type="file" multiple :accept="accept" aria-label="选择文件" tabindex="-1" @change="handleFileInput" />
     <main class="document-main">
       <p v-if="hydrated && !config.on" class="notice" role="status" data-testid="document-translation-paused">{{ t('popup.heroDisabled') }} · <button type="button" @click="openGeneralSettings">通用设置</button></p>
       <!-- 打开文档后，文件与目录收进左侧可折叠的侧栏；未打开文档时这里只显示导入失败的文件。 -->

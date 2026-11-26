@@ -416,7 +416,7 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
 /* 紧凑：对应 compact.css——压缩间距与控件高度，文字不缩到难以辨认。 */
 .preview-popup[data-preview-kind="compact"] {
   padding: 8px 12px 4px;
-  background: radial-gradient(circle at 92% 0, rgba(239, 71, 118, .12), transparent 30%), linear-gradient(180deg, var(--surface) 0, var(--surface-soft) 165px);
+  background: var(--surface);
 }
 .preview-popup[data-preview-kind="compact"] .preview-header { margin-bottom: 5px; }
 .preview-popup[data-preview-kind="compact"] .preview-brand { gap: 7px; }

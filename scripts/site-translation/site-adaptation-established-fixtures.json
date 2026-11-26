@@ -50,11 +50,11 @@
   {
     "id": "twitch-live-chat",
     "url": "https://www.twitch.tv/monstercat",
-    "html": "<nav id=\"navigation\">Twitch navigation links</nav><main><p id=\"intro\">This live channel broadcasts independent electronic music around the clock.</p></main><aside id=\"chat\"><div id=\"messages\" class=\"chat-scrollable-area__message-container\"><div class=\"chat-line__message\"><button id=\"author\">Chat author</button><span id=\"first-message\" data-a-target=\"chat-line-message-body\">Thanks for this wonderful live stream, and greetings to everyone in the chat.</span></div></div></aside>",
+    "html": "<nav id=\"navigation\">Twitch navigation links</nav><div data-a-target=\"side-nav-bar\"><nav id=\"side-nav\"><a href=\"/nagisekaied\"><div class=\"side-nav-card__title\"><p id=\"channel-name\" data-a-target=\"side-nav-title\"><span>陵本なぎ <span class=\"intl-login\">(nagisekaied)</span></span></p></div></a></nav></div><main><p id=\"intro\">This live channel broadcasts independent electronic music around the clock.</p></main><aside id=\"chat\"><section data-test-selector=\"chat-room-component-layout\"><div id=\"pinned\"><span id=\"pinned-message\" data-a-target=\"chat-message-text\">Important stream announcement for tonight.</span></div><div id=\"messages\" class=\"chat-scrollable-area__message-container\"><div class=\"chat-line__message\"><div class=\"chat-line__message-container\"><p title=\"Previous chat message in reply preview\">回复 <span dir=\"auto\">@Matti533</span> ：<span id=\"reply-preview\" dir=\"auto\">Previous chat message in reply preview</span></p><button id=\"author\">Chat author</button><span id=\"first-message\" data-a-target=\"chat-line-message-body\">Thanks for this wonderful live stream, and greetings to everyone in the chat.</span></div></div></div></section></aside>",
     "modes": ["full"],
-    "required": ["#intro", "#first-message"],
+    "required": ["#channel-name", "#intro", "#pinned-message", "#reply-preview", "#first-message"],
     "forbidden": ["#navigation", "#author"],
-    "restoreSelectors": ["main", "#chat"],
+    "restoreSelectors": ["main", "#chat", "#side-nav"],
     "dynamic": {
       "appendHtml": [
         {

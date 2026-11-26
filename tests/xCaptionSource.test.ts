@@ -2,8 +2,8 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import type {VideoSubtitleCue} from '@/src/features/video-subtitle/content/youtubeSubtitleData';
 vi.mock('@/src/services/config/store', () => ({config: {uiLanguage: 'zh-CN'}}));
-import {XCaptionSource} from '@/src/features/video-subtitle/content/xCaptionSource';
-import {getXSubtitleBottomInset, VIDEO_AI_CAPTION_CONTAINER_ID} from '@/src/features/video-subtitle/content/ui';
+import {XCaptionSource, isXNativeCaptionControl, readXNativeCaptionControlState} from '@/src/features/video-subtitle/content/xCaptionSource';
+import {getXSubtitleBottomInset, VIDEO_AI_CAPTION_CONTAINER_ID, VIDEO_NATIVE_CUE_HIDDEN_CLASS} from '@/src/features/video-subtitle/content/ui';
 
 afterEach(() => {vi.restoreAllMocks();vi.unstubAllGlobals();});
 function fixture() {
@@ -76,26 +76,39 @@ describe('X 原生字幕来源', () => {
     expect(source.sync()!.textContent).toBe('');
   });
 
-  it('主页直接读取宿主已选韩语原字幕，并导出完整韩语轨道', () => {
-    const {source, korean, english} = fixture();
+  it('主页直接读取宿主已选韩语原字幕，保留宿主 showing 状态并由视频级样式隐藏原生绘制', () => {
+    const {source, state, korean, english} = fixture();
     const container = source.sync()!;
     expect(container.textContent).toBe('오늘은 좋은 날입니다.');
     expect(container.dataset.fluentReadCaptionSource).toBe('native');
-    expect(korean.mode).toBe('hidden');
-    expect(english.mode).toBe('hidden');
+    expect(korean.mode).toBe('showing');
+    expect(english.mode).toBe('disabled');
+    expect(state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(true);
     expect(source.readNativeTrack()).toEqual({languageCode: 'ko', cues: [{startMs: 0, durationMs: 2000, text: '오늘은 좋은 날입니다.'}]});
     source.restoreTracks();
     expect(korean.mode).toBe('showing');
     expect(english.mode).toBe('disabled');
+    expect(state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(false);
   });
-  it('显式视频原语言切换可选择另一轨道，关闭后恢复宿主状态', () => {
+  it('显式视频原语言切换可选择另一轨道，关闭或原生 CC 关掉后恢复宿主状态', () => {
     const {source, state, korean, english} = fixture();
     state.language = 'en';
+    expect(source.sync()!.textContent).toBe('This is a good day.');
+    expect(korean.mode).toBe('showing');
+    expect(english.mode).toBe('hidden');
+    expect(state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(true);
+    korean.mode = 'disabled';
+    expect(source.sync()!.textContent).toBe('');
+    expect(korean.mode).toBe('disabled');
+    expect(english.mode).toBe('disabled');
+    expect(state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(false);
+    korean.mode = 'showing';
     expect(source.sync()!.textContent).toBe('This is a good day.');
     state.enabled = false;
     expect(source.sync()!.textContent).toBe('');
     expect(korean.mode).toBe('showing');
     expect(english.mode).toBe('disabled');
+    expect(state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(false);
   });
   it('原生时间轴的静音空档不混入缓存或 sidecar 的旧字幕', () => {
     const {source, state, korean, english} = fixture();
@@ -140,6 +153,7 @@ describe('X 原生字幕来源', () => {
   it('隐藏模式写完后才选择 live 轨道和语言，不沿用隐藏前列表', () => {
     const f = fixture();
     const measured = measuredNativeSelection(f);
+    f.state.language = 'en';
     const cue = {startTime: 0, endTime: 2, text: 'Nouvelle piste française.'};
     const french = {kind: 'subtitles', mode: 'showing', language: 'fr', activeCues: [cue], cues: [cue]};
     let englishMode = f.english.mode;
@@ -151,7 +165,7 @@ describe('X 原生字幕来源', () => {
       }
     }});
     const container = f.source.sync()!;
-    expect(f.korean.mode).toBe('hidden');
+    expect(f.korean.mode).toBe('showing');
     expect(f.english.mode).toBe('hidden');
     expect(container.textContent).toBe('Nouvelle piste française.');
     expect(container.dataset.fluentReadCaptionSource).toBe('native');
@@ -241,5 +255,81 @@ describe('X 原生字幕来源', () => {
     expect(container.textContent).toBe('');expect(container.dataset.fluentReadCaptionSource).toBe('none');
     expect(measured.selection).toHaveBeenCalledTimes(101);expect(measured.reads()).toBe(202);
     expect(f.korean.mode).toBe('showing');expect(f.english.mode).toBe('disabled');
+  });
+
+  it('原生 CC 关闭时不激活 disabled 轨道、不泄漏 sidecar 或未激活 AI 字幕，并在重新开启后恢复', () => {
+    const f = fixture();
+    f.korean.mode = 'disabled';
+    f.english.mode = 'disabled';
+    f.state.sidecarCues = [{startMs: 0, durationMs: 5000, text: 'Sidecar caption while CC is off'}];
+    f.state.aiCues = [{startMs: 0, durationMs: 5000, text: 'Cached AI caption while CC is off'}];
+    const onChange = vi.fn();
+
+    let container = f.source.sync(onChange)!;
+    expect(container.textContent).toBe('');
+    expect(container.dataset.fluentReadCaptionSource).toBe('none');
+    expect(f.korean.mode).toBe('disabled');
+    expect(f.english.mode).toBe('disabled');
+    expect(f.state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(false);
+    expect(f.source.isNativeCaptionActive()).toBe(false);
+
+    // 宿主开启 CC（track.mode = 'showing'）后立即显示，并保留宿主 showing 状态。
+    f.korean.mode = 'showing';
+    container = f.source.sync(onChange)!;
+    expect(container.textContent).toBe('오늘은 좋은 날입니다.');
+    expect(container.dataset.fluentReadCaptionSource).toBe('native');
+    expect(f.korean.mode).toBe('showing');
+    expect(f.state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(true);
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    // 宿主再次关闭 CC（track.mode = 'disabled'）后立即清空并通知回调，不回退到 sidecar。
+    f.korean.mode = 'disabled';
+    container = f.source.sync(onChange)!;
+    expect(container.textContent).toBe('');
+    expect(container.dataset.fluentReadCaptionSource).toBe('none');
+    expect(f.korean.mode).toBe('disabled');
+    expect(f.state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(false);
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('识别 X 原生 CC 按钮状态并在控制栏卸载后保持关闭记忆，不误认自有按钮或设置按钮', () => {
+    const f = fixture();
+    Object.assign(f.state.video, {textTracks: []});
+    f.state.sidecarCues = [{startMs: 0, durationMs: 5000, text: 'Sidecar caption controlled by CC'}];
+
+    const controls = f.document.createElement('div');
+    const settings = f.document.createElement('button');
+    settings.setAttribute('aria-label', 'Settings');
+    const ownButton = f.document.createElement('button');
+    ownButton.className = 'fluent-read-video-ui';
+    ownButton.setAttribute('aria-label', 'Turn on captions');
+    const ccButton = f.document.createElement('button');
+    ccButton.setAttribute('aria-label', 'Closed captions');
+    ccButton.setAttribute('aria-pressed', 'false');
+    controls.append(settings, ownButton, ccButton);
+    f.state.player.appendChild(controls);
+
+    expect(isXNativeCaptionControl(settings)).toBe(false);
+    expect(isXNativeCaptionControl(ownButton)).toBe(false);
+    expect(isXNativeCaptionControl(ccButton)).toBe(true);
+    expect(readXNativeCaptionControlState(f.state.player)).toBe('off');
+    expect(f.source.sync()!.textContent).toBe('');
+
+    // 控制栏在鼠标移出后卸载，仍记住最近一次 CC=off 状态，不泄漏 sidecar。
+    controls.remove();
+    expect(readXNativeCaptionControlState(f.state.player)).toBeNull();
+    expect(f.source.sync()!.textContent).toBe('');
+
+    // 重新挂载控制栏并开启 CC（aria-label 语义或 aria-pressed="true"），立即显示字幕。
+    f.state.player.appendChild(controls);
+    ccButton.removeAttribute('aria-pressed');
+    ccButton.setAttribute('aria-label', 'Turn off captions');
+    expect(readXNativeCaptionControlState(f.state.player)).toBe('on');
+    expect(f.source.sync()!.textContent).toBe('Sidecar caption controlled by CC');
+
+    // 切回 Turn on captions（即当前已关闭），立即隐藏字幕。
+    ccButton.setAttribute('aria-label', 'Turn on captions');
+    expect(readXNativeCaptionControlState(f.state.player)).toBe('off');
+    expect(f.source.sync()!.textContent).toBe('');
   });
 });

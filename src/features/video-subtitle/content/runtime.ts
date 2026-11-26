@@ -52,7 +52,7 @@ import {
   applyVideoDisplayState,
   installVideoSubtitleStyle
 } from './ui';
-import {XCaptionSource} from './xCaptionSource';
+import {XCaptionSource, isXNativeCaptionControl} from './xCaptionSource';
 import {XHlsAudioReader} from './hlsAudioRuntime';
 import {XSubtitleLoader} from './xSubtitleLoader';
 import {VideoTranslationCache} from './translationCache';
@@ -296,6 +296,7 @@ function mountVideoSubtitleRuntime(): () => void {
   // 身份，不能让用户刚完成的模型下载失去启动识别的资格。
   let observedMediaEpoch = 0;
   let mediaMissingTimer: ReturnType<typeof setTimeout> | undefined;
+  let xNativeCaptionSyncTimer: ReturnType<typeof setTimeout> | undefined;
   let activeVideoLanguage = config.videoSourceLanguage;
   const htmlMediaHost = isHtmlMediaPage() ? createHtmlMediaHost(scheduleSubtitleLayout) : null;
   const playerLocator = createVideoPlayerLocator(htmlMediaHost ? {includeAudio: true, getPlayer: htmlMediaHost.getPlayer} : {});
@@ -309,7 +310,7 @@ function mountVideoSubtitleRuntime(): () => void {
   };
   const aiSubtitleSession = new VideoAiSubtitleSession({
     readRequest: currentCacheRequest,
-    canRestore: () => !destroyed && canReadVideo() && !isAiFullActive() && !xCaptionSource.readNativeTrack() && xSubtitleCues.length === 0,
+    canRestore: () => !destroyed && canReadVideo() && !isAiFullActive() && !xCaptionSource.hasNativeTracks() && !xCaptionSource.readNativeTrack() && xSubtitleCues.length === 0,
     get: request => transcriptCache.get(request), set: (request, cues) => transcriptCache.set(request, cues),
     restore: cues => { resetAiSubtitleCues(); aiCaptureError = ''; return aiFullCapture!.restore(cues); },
   });
@@ -445,6 +446,7 @@ function mountVideoSubtitleRuntime(): () => void {
     if (!container) return '';
     if (!hasAdjustedTimeline()) return readVisibleCaptionText(container);
     if (isYouTubeVideoPage() && document.querySelector('.ytp-subtitles-button')?.getAttribute('aria-pressed') === 'false') return '';
+    if (isXVideoPage() && !isAiFullActive() && !xCaptionSource.isNativeCaptionActive()) return '';
     return getAdjustedCaptionCue()?.text || '';
   };
 
@@ -548,6 +550,7 @@ function mountVideoSubtitleRuntime(): () => void {
 
   const primeUpcomingVideoCaptions = () => {
     if (destroyed || !canTranslateVideo() || !observedVideo || pretranslationCues.length === 0) return;
+    if (isXVideoPage() && !isAiFullActive() && !xCaptionSource.isNativeCaptionActive()) return;
     videoTranslator.primeUpcoming(pretranslationCues, observedVideo.currentTime * 1000 - subtitleOffsetMs,
       getVideoPretranslationWindowMs(config.videoService || config.service), observedVideo.playbackRate, getCachedVideoTranslation);
   };
@@ -637,6 +640,8 @@ function mountVideoSubtitleRuntime(): () => void {
       setPretranslationTrack('ai:capture', { url: 'ai:capture', cues: aiCues });
       return;
     }
+
+    if (isXVideoPage() && !xCaptionSource.isNativeCaptionActive()) return;
 
     if (native) {
       setPretranslationTrack(`x:native:${native.languageCode}`, {url: 'x:native', cues: native.cues});
@@ -1314,10 +1319,29 @@ function mountVideoSubtitleRuntime(): () => void {
     return button;
   };
 
+  const scheduleXNativeCaptionSync = () => {
+    if (xNativeCaptionSyncTimer !== undefined) clearTimeout(xNativeCaptionSyncTimer);
+    xNativeCaptionSyncTimer = setTimeout(() => {
+      xNativeCaptionSyncTimer = undefined;
+      if (destroyed) return;
+      ensurePretranslationTrack();
+      syncXVideoCaptionSource();
+      scheduleUpdate();
+      schedulePretranslation();
+    }, 0);
+  };
+
   const handleDocumentClick = (event: MouseEvent) => {
+    const target = event.target;
+    if (isXVideoPage() && target instanceof Element) {
+      const player = playerLocator.getTarget()?.player;
+      const control = target.closest('button, [role="button"]');
+      if (player && control && player.contains(control) && isXNativeCaptionControl(control)) {
+        scheduleXNativeCaptionSync();
+      }
+    }
     if (!event.isTrusted) return;
     if (!menuElement?.isConnected || menuElement.hidden) return;
-    const target = event.target;
     if (!(target instanceof Node)) return;
     if (buttonElement?.contains(target) || menuElement.contains(target)) return;
     closeMenu();
@@ -1839,6 +1863,7 @@ function mountVideoSubtitleRuntime(): () => void {
     pendingTranslationSource = '';
     pendingTranslationOverlay = null;
     if (mediaMissingTimer) clearTimeout(mediaMissingTimer);
+    if (xNativeCaptionSyncTimer !== undefined) clearTimeout(xNativeCaptionSyncTimer);
     cancelStableCaption();
     clearPretranslationState(true);
     stopCaptionClock();

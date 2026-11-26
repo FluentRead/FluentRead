@@ -16,31 +16,58 @@ const rule = (extra: Partial<SiteRule> = {}): SiteRule => ({
 });
 const pack = (rules: SiteRule[] = [rule()]): SiteRulePack => ({version: 1, rules});
 
-describe('Twitch live chat (#1382)', () => {
-    it('discovers English and Japanese messages in an aside and in live updates', () => {
+describe('Twitch live chat and sidebar (#1382)', () => {
+    it('discovers sidebar streamer names, pinned chat, reply previews, VOD chat, and live updates while protecting handles and emotes', () => {
         const {document} = parseHTML(`<html><body>
-            <nav><a href="/monstercat"><div><div class="side-nav-card__title">
-                <p data-a-target="side-nav-title" id="channel">Monstercat live music stream</p>
-            </div></div></a></nav>
+            <div data-a-target="side-nav-bar"><nav id="side-nav">
+                <a href="/directory" id="nav-link">Browse channels</a>
+                <a href="/nagisekaied"><div><div class="side-nav-card__title">
+                    <p data-a-target="side-nav-title" id="channel"><span>陵本なぎ <span class="intl-login">(nagisekaied)</span></span></p>
+                </div><div class="side-nav-card__metadata"><p id="category">WARDOGS</p></div></div></a>
+            </nav></div>
             <main><p id="intro">This channel broadcasts electronic music.</p></main>
-            <aside><div class="chat-scrollable-area__message-container"><div class="chat-line__message">
-                <button class="chat-line__username-container">Chat author</button>
-                <span data-a-target="chat-line-message-body" id="english">
-                    <span data-a-target="chat-message-text">Thanks for this wonderful stream.</span>
-                </span>
-            </div></div><p>Join the daily music chat</p></aside>
+            <aside id="live-page-chat"><section data-test-selector="chat-room-component-layout">
+                <div class="pinned-chat"><span id="pinned" data-a-target="chat-message-text">【お知らせ】配信スケジュールを更新しました。</span></div>
+                <div class="chat-scrollable-area__message-container"><div class="chat-line__message">
+                    <div class="chat-line__message-container">
+                        <div><p title="昨シーズンと比べて増えたという印象は受けない">回复 <span dir="auto" id="reply-user">@Matti533</span> ：<span dir="auto" id="reply-preview">昨シーズンと比べて増えたという印象は受けない</span></p></div>
+                        <button class="chat-line__username-container">Chat author</button>
+                        <span data-a-target="chat-line-message-body" id="english">
+                            <span class="chat-line__message--emote-button" data-a-target="emote-name"><button><img alt="nagise1Furifuri"></button></span>
+                            <span class="mention-fragment" data-a-target="chat-message-mention">@Matti533</span>
+                            <span data-a-target="chat-message-text">Thanks for this wonderful stream.</span>
+                        </span>
+                    </div>
+                </div></div>
+                <p id="aside-note">Join the daily music chat</p>
+            </section></aside>
+            <aside><div class="video-chat__message-list-wrapper"><span id="vod-msg" data-a-target="chat-line-message-body"><span data-a-target="chat-message-text">Replay chat message from VOD.</span></span></div></aside>
         </body></html>`);
         const adapters = compileSiteRulePack(builtinSiteRulePack);
-        const url = new URL('https://www.twitch.tv/monstercat');
+        const url = new URL('https://www.twitch.tv/nagisekaied');
         const core = new TranslationCandidateCore({url, adapters});
-        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['intro', 'english']);
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['channel', 'intro', 'pinned', 'reply-preview', 'english', 'vod-msg']);
+
+        const channel = document.getElementById('channel')!;
+        expect(extractTranslationText(channel, core.shouldStayOriginal)).toBe('陵本なぎ');
+        expect(createTranslationSourceSnapshot(channel, core.shouldStayOriginal, undefined, undefined, core.shouldOmitFromTranslation).clone.textContent?.trim()).toBe('陵本なぎ');
+        expect(collectLiveTranslationTextSlots(channel, core.shouldStayOriginal).map(slot => slot.source)).toEqual(['陵本なぎ']);
+
+        const english = document.getElementById('english')!;
+        expect(collectLiveTranslationTextSlots(english, core.shouldStayOriginal).map(slot => slot.source)).toEqual(['Thanks for this wonderful stream.']);
+        const englishSnapshot = createTranslationSourceSnapshot(english, core.shouldStayOriginal, undefined, undefined, core.shouldOmitFromTranslation);
+        expect(englishSnapshot.clone.querySelector('.chat-line__message--emote-button')).toBeNull();
+        expect(englishSnapshot.clone.querySelector('.mention-fragment')?.textContent).toBe('@Matti533');
+
         const chat = document.querySelector('.chat-scrollable-area__message-container')!;
         chat.insertAdjacentHTML('beforeend', '<div class="chat-line__message"><span id="japanese" data-a-target="chat-message-text">今日も素敵な配信をありがとうございます。</span></div>');
         const japanese = document.getElementById('japanese')!;
         expect(core.discover(japanese).map(candidate => candidate.element)).toEqual([japanese]);
         expect(core.resolve(japanese.firstChild)?.element).toBe(japanese);
+        expect(core.resolve(document.getElementById('reply-user')!.firstChild)).toBeNull();
+        expect(core.resolve(document.getElementById('nav-link')!.firstChild)).toBeNull();
         expect(new TranslationCandidateCore({url, adapters, includeSidebarRegions: true})
-            .discover(document).map(candidate => candidate.element.id)).toContain('channel');
+            .discover(document).map(candidate => candidate.element.id)).toContain('category');
         expect(new TranslationCandidateCore({url: new URL('https://twitch.tv.example.org/'), adapters})
             .discover(document).map(candidate => candidate.element.id)).toEqual(['intro']);
     });

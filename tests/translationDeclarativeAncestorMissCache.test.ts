@@ -129,4 +129,86 @@ describe('inspect-local declarative ancestor misses', () => {
         expect(core.inspect(source).candidate?.element).toBe(source);
         expect(document.body.innerHTML).toBe(before);
     });
+
+    it('deduplicates repeated selectors shared across protect, exclude, and omit rules', () => {
+        const {document} = parseHTML('<html><body><div class="markdown-body"><p id="source">Readable GitHub paragraph.</p></div></body></html>');
+        const source = document.querySelector('#source')!;
+        const adapters = compileSiteRulePack(builtinSiteRulePack).filter(adapter => adapter.id === 'github');
+        const github = adapters[0]!;
+        const observedSelectors: string[] = [];
+        const originalClosest = source.closest.bind(source);
+        vi.spyOn(source, 'closest').mockImplementation(selector => {
+            observedSelectors.push(selector);
+            return originalClosest(selector);
+        });
+        expect(github.shouldStayOriginal?.(source, {url: new URL('https://github.com/example/repo')})).toBe(false);
+        expect(observedSelectors).toHaveLength(1);
+        const parts = observedSelectors[0]!.split(',');
+        expect(parts.length).toBe(new Set(parts).size);
+    });
+
+    it('reuses multi-level cached ancestor misses without re-walking outer containers with closest()', () => {
+        const {document} = parseHTML('<html><body><main id="root"><section id="mid"><div id="inner"><span id="leaf">Readable text.</span></div></section></main></body></html>');
+        const root = document.querySelector('#root')!;
+        const mid = document.querySelector('#mid')!;
+        const inner = document.querySelector('#inner')!;
+        const leaf = document.querySelector('#leaf')!;
+        const adapter = createDeclarativeAdapter({
+            id: 'multi-level-miss', hosts: ['example.test'],
+            prune: [{selector: ['.excluded', '.excluded'], reason: 'exclude'}],
+        });
+        const context = freshContext();
+        expect(adapter.decide(root, context)).toEqual({kind: 'pass'});
+        const leafClosest = vi.spyOn(leaf, 'closest');
+        expect(adapter.decide(leaf, context)).toEqual({kind: 'pass'});
+        expect(leafClosest).not.toHaveBeenCalled();
+
+        // A matching intermediate node below the cached-miss ancestor must still hit via matches().
+        inner.classList.add('excluded');
+        const hitContext = freshContext();
+        expect(adapter.decide(root, hitContext)).toEqual({kind: 'pass'});
+        const hitClosest = vi.spyOn(leaf, 'closest');
+        expect(adapter.decide(leaf, hitContext)).toEqual({kind: 'prune-subtree', reason: 'exclude'});
+        expect(hitClosest).not.toHaveBeenCalled();
+        expect(mid.isConnected).toBe(true);
+    });
+
+    it('shares synchronous read cache across discover, nested epochs, and explicit invalidation', () => {
+        const {document} = parseHTML('<html><body><main id="host"><div><p id="a">First readable sentence.</p><p id="b">Second readable sentence.</p></div></main></body></html>');
+        const host = document.querySelector('#host')!;
+        const first = document.querySelector('#a')!;
+        const second = document.querySelector('#b')!;
+        const adapter = createDeclarativeAdapter({
+            id: 'epoch-cache', hosts: ['example.test'],
+            prune: [{selector: '.blocked', reason: 'blocked'}],
+            keepOriginal: [{selector: '.kept', reason: 'kept'}],
+            targets: [{selector: 'p', match: 'closest', reason: 'paragraph', atomic: true}],
+        });
+        const core = new TranslationCandidateCore({url, adapters: [adapter]});
+        expect(core.getSynchronousTextProtectionCache()).toBeUndefined();
+
+        const closestSpy = vi.spyOn(first, 'closest');
+        const discovered = core.discover(document);
+        expect(discovered.map(candidate => candidate.element)).toEqual([first, second]);
+        expect(closestSpy).not.toHaveBeenCalled();
+        expect(core.getSynchronousTextProtectionCache()).toBeUndefined();
+
+        core.withSynchronousReadCache(invalidate => {
+            const outerCache = core.getSynchronousTextProtectionCache();
+            expect(outerCache).toBeDefined();
+            // Nested epochs inherit the active cache without discarding ancestor misses.
+            core.withSynchronousReadCache(() => {
+                expect(core.getSynchronousTextProtectionCache()).toBe(outerCache);
+                expect(core.inspect(first).candidate?.element).toBe(first);
+                expect(core.inspect(second, {protectedElement: second}).candidate?.element).toBe(second);
+            });
+            expect(core.getSynchronousTextProtectionCache()).toBe(outerCache);
+            host.classList.add('blocked');
+            invalidate();
+            expect(core.getSynchronousTextProtectionCache()).not.toBe(outerCache);
+            expect(core.inspect(first).candidate).toBeNull();
+            expect(core.inspect(second, {protectedElement: second}).candidate).toBeNull();
+        });
+        expect(core.getSynchronousTextProtectionCache()).toBeUndefined();
+    });
 });

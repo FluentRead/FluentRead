@@ -788,6 +788,24 @@ describe('frontend 区分原生数组、机器逐槽与 AI 槽协议的会话边
         expect(h.cacheSet).not.toHaveBeenCalled();
     });
 
+    it('多语种混排（日文与英文同候选）逐槽翻译时不把整段样本覆盖到已识别单槽', async () => {
+        const h = createHarness({service: 'localTranslation'});
+        connectFrontend(h);
+        const jaSlot = '東京近辺に住んでいたゲーマー女子高生。';
+        const enSlot = 'A gamer high school girl from the Tokyo area.';
+        const sources = [jaSlot, enSlot];
+        h.provider.mockImplementation(async message => {
+            if (message.origin === jaSlot) return '住在东京附近的游戏女高中生。';
+            if (message.origin === enSlot) return '来自东京地区的女高中生玩家。';
+            throw new Error('unexpected provider request');
+        });
+        await expect(translateTextSlots(sources, {...snapshot, service: 'localTranslation', sourceLanguage: 'auto', useCache: false}))
+            .resolves.toEqual(['住在东京附近的游戏女高中生。', '来自东京地区的女高中生玩家。']);
+        for (const [, , options] of ports.single.mock.calls) {
+            expect(options).not.toHaveProperty('sourceLanguageDetectionText');
+        }
+    });
+
     it('DeepL frontend 使用真实 broker 的原生数组，中文过滤后保持逐项映射', async () => {
         const h = createHarness({service: 'deepL'});
         connectFrontend(h);

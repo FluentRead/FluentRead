@@ -27,6 +27,10 @@ Copy the full URL rather than a homepage, sharing link, or file URL. Do not appe
 
 Choose **Test connection**, then **Test and save**. Neither uploads a backup. Testing checks directory access and does not prove write permission. The saved connection stays on this device.
 
+## Koofr
+
+Use `https://app.koofr.net/dav/Koofr/` with your Koofr account email and an app password generated for FluentRead. The `/dav/` directory lists mounts and cannot store a backup directly. A new connection using the default or blank backup path selects your personal Koofr directory. For an existing connection that cannot write, enter the full directory URL above and test it again. [Koofr's connection instructions](https://koofr.eu/help/koofr_with_webdav/how-do-i-connect-a-service-to-koofr-through-webdav/)
+
 ## Synology NAS and custom directories
 
 Enable WebDAV Server on your NAS and grant the account read and write access to the shared folder. Enter the final WebDAV directory URL, such as `https://nas.example.com:5006/shared-folder/`, using your configured port and reverse-proxy path. Do not use the DSM sign-in page or a sharing link.

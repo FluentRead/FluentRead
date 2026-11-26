@@ -360,9 +360,15 @@ async function translateSlotsIndividually(
         origins.length,
     );
     // 本地自动检测沿用整段来源；Chrome 槽协议损坏后也不能退回不可靠的短标题检测。
-    const sourceLanguageDetectionText = snapshot.sourceLanguage === 'auto'
+    // 只有同一候选包含不同已识别语种（如日文槽与英文槽混排）时，已独立识别的槽改用自身语种，避免被另一语种覆盖。
+    const joinedDetectionText = snapshot.sourceLanguage === 'auto'
         && (snapshot.service === services.localTranslation || snapshot.service === services.chromeTranslator)
         ? origins.join('\n') : undefined;
+    const slotIdentifications = joinedDetectionText !== undefined && origins.length > 1
+        ? origins.map(origin => identifyTextLanguage(origin ?? '')) : undefined;
+    const hasConflictingSlotLanguages = new Set(
+        slotIdentifications?.flatMap(item => item.status === 'identified' && item.languages.length === 1 ? item.languages : []) ?? [],
+    ).size > 1;
     let failed = false;
     let firstError: unknown;
     let hasFirstError = false;
@@ -376,8 +382,12 @@ async function translateSlotsIndividually(
         while (!failed && nextIndex < origins.length) {
             throwIfAborted(siblingController.signal);
             const index = nextIndex++;
+            const slotOrigin = origins[index] ?? '';
+            const sourceLanguageDetectionText = joinedDetectionText !== undefined
+                && (!hasConflictingSlotLanguages || slotIdentifications?.[index]?.status !== 'identified')
+                ? joinedDetectionText : undefined;
             try {
-                translations[index] = await translateText(origins[index] ?? '', context,
+                translations[index] = await translateText(slotOrigin, context,
                     createSnapshotTranslateOptions(snapshot, {
                         discourseContext,
                         signal: siblingController.signal,

@@ -64,7 +64,7 @@ const initiallyOpen = props.defaultOpen
 .settings-disclosure-status { max-width: 40%; margin-inline-start: auto; color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.5; text-align: end; overflow-wrap: anywhere; }
 .settings-disclosure-status.is-warning { color: var(--fr-warning, #94651c); }
 .settings-disclosure-status.is-danger { color: var(--fr-danger, #b1435e); }
-.settings-disclosure-chevron { flex: none; width: 18px; height: 18px; color: var(--muted); }
+.settings-disclosure-chevron { flex: none; width: 18px; height: 18px; color: var(--muted); transition: transform var(--fr-duration-fast, 160ms) var(--fr-ease-out, ease); }
 .settings-disclosure[open] > .settings-disclosure-summary { border-bottom: 1px solid var(--fr-card-border, var(--line)); border-end-start-radius: 0; border-end-end-radius: 0; }
 .settings-disclosure[open] > .settings-disclosure-summary .settings-disclosure-chevron { transform: rotate(90deg); }
 .settings-disclosure-body { min-width: 0; border-radius: 0 0 var(--fr-card-radius, 14px) var(--fr-card-radius, 14px); }

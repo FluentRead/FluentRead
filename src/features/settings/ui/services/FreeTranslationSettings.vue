@@ -353,21 +353,21 @@ onBeforeUnmount(() => {
 .allocation-total { white-space: nowrap; }
 .fallback-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); align-items: start; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .fallback-list.is-sequential { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.fallback-list > li { box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; gap: 5px; height: 88px; min-width: 0; padding: 10px; border: 1px solid var(--el-border-color-lighter); border-radius: 9px; background: var(--el-fill-color-blank); }
-.fallback-list > li.is-disabled { background: var(--el-fill-color-extra-light); }
+.fallback-list > li { box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; gap: 5px; height: 88px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line, var(--el-border-color-lighter)); border-radius: var(--fr-radius-md, 10px); background: var(--surface, var(--el-fill-color-blank)); }
+.fallback-list > li.is-disabled { background: var(--surface-soft, var(--el-fill-color-extra-light)); }
 .provider-row { display: flex; align-items: center; gap: 8px; }
-.provider-position { width: 14px; flex: none; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
+.provider-position { width: 14px; flex: none; color: var(--muted, var(--el-text-color-secondary)); font-variant-numeric: tabular-nums; }
 .provider-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 5px; }
 .provider-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.provider-copy strong { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.provider-copy strong { min-width: 0; overflow: hidden; font-size: var(--fr-text-sm, 12px); text-overflow: ellipsis; white-space: nowrap; }
 .provider-result { display: flex; align-items: center; gap: 4px 8px; min-height: 19px; }
-.provider-state { padding: 2px 5px; border-radius: 4px; color: var(--muted, var(--el-text-color-secondary)); background: var(--el-fill-color-light); font-size: 10px; white-space: nowrap; }
-.provider-state.is-success { color: var(--el-color-success-dark-2); background: var(--el-color-success-light-9); }
-.provider-state.is-error { color: var(--el-color-danger-dark-2); background: var(--el-color-danger-light-9); }
-.provider-state.is-checking { color: var(--el-color-primary); background: var(--el-color-primary-light-9); }
-.provider-state.is-cooling, .provider-state.is-recovering { color: var(--el-color-warning-dark-2); background: var(--el-color-warning-light-9); }
-.provider-duration { color: var(--el-text-color-regular); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.provider-meta { display: flex; align-items: center; justify-content: space-between; gap: 5px 8px; min-height: 16px; margin-left: 28px; color: var(--el-text-color-secondary); font-size: 10px; }
+.provider-state { padding: 2px 6px; border-radius: var(--fr-radius-xs, 6px); color: var(--muted, var(--el-text-color-secondary)); background: var(--surface-soft, var(--el-fill-color-light)); font-size: var(--fr-text-xs, 11px); white-space: nowrap; }
+.provider-state.is-success { color: var(--fr-success); background: var(--fr-success-soft); }
+.provider-state.is-error { color: var(--fr-danger); background: var(--fr-danger-soft); }
+.provider-state.is-checking { color: var(--brand-strong); background: var(--brand-soft); }
+.provider-state.is-cooling, .provider-state.is-recovering { color: var(--fr-warning); background: var(--fr-warning-soft); }
+.provider-duration { color: var(--ink, var(--el-text-color-regular)); font-size: var(--fr-text-xs, 11px); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.provider-meta { display: flex; align-items: center; justify-content: space-between; gap: 5px 8px; min-height: 16px; margin-left: 28px; color: var(--muted, var(--el-text-color-secondary)); font-size: var(--fr-text-xs, 11px); }
 .provider-language { overflow: hidden; min-width: 0; text-overflow: ellipsis; white-space: nowrap; }
 .provider-allocation { flex: none; margin-left: auto; white-space: nowrap; }
 .provider-weight { color: var(--el-text-color-regular); font-variant-numeric: tabular-nums; }

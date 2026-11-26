@@ -220,6 +220,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
     const pendingPageSummaries = new Map<string, Promise<PageSummaryResult>>();
     const pendingCacheWrites = new Map<Promise<unknown>, number>();
     const pendingCacheValues = new Map<string, PendingCacheValue>();
+    const quotaDigestCache = new WeakMap<TranslationProviderConfigSnapshot, Map<string, string>>();
     let cacheGeneration = 0;
     let cacheClearBarrier: Promise<void> | null = null;
     const now = deps.now ?? (() => Date.now());
@@ -430,13 +431,25 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
     /** 同一冻结配置派生 transport 的实际 key 与 pending 的有效 key 集合；摘要不进入成功缓存身份。 */
     function quotaDigest(execution: TranslationRequestExecution, model: string, transport = false): string {
         const current = execution.config;
-        if (!deps.serviceTypes.isAI(execution.service)) return sha256Hex(JSON.stringify([execution.privateContext]));
-        return sha256Hex(JSON.stringify([
-            execution.service, model, getProviderEndpoint(current, execution.service),
-            transport ? current.token[execution.service]?.trim() || ''
-                : [getServiceApiKeys(current, execution.service), current.apiKeyRotationEnabled?.[execution.service] !== false, current.apiKeyRecoveryMs],
-            current.customHeaders?.[execution.service] || '', current.requestHeaderRules, execution.privateContext,
-        ]));
+        let bySnapshot = quotaDigestCache.get(current);
+        if (!bySnapshot) {
+            bySnapshot = new Map();
+            quotaDigestCache.set(current, bySnapshot);
+        }
+        const privateFlag = execution.privateContext === true ? 1 : execution.privateContext === false ? 0 : 2;
+        const memoKey = `${execution.service}\u0000${model}\u0000${transport ? 1 : 0}\u0000${privateFlag}`;
+        const cached = bySnapshot.get(memoKey);
+        if (cached !== undefined) return cached;
+        const digest = !deps.serviceTypes.isAI(execution.service)
+            ? sha256Hex(JSON.stringify([execution.privateContext]))
+            : sha256Hex(JSON.stringify([
+                execution.service, model, getProviderEndpoint(current, execution.service),
+                transport ? current.token[execution.service]?.trim() || ''
+                    : [getServiceApiKeys(current, execution.service), current.apiKeyRotationEnabled?.[execution.service] !== false, current.apiKeyRecoveryMs],
+                current.customHeaders?.[execution.service] || '', current.requestHeaderRules, execution.privateContext,
+            ]));
+        bySnapshot.set(memoKey, digest);
+        return digest;
     }
 
     function pendingIdentitySuffix(execution: TranslationRequestExecution, modelOverride?: string): string {
@@ -812,7 +825,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             && !isClearlyWrongLanguageResponse(message.origin, result, execution.targetLanguage)) return result;
         const retried = requireSingleResult(await callProviderWithinDeadline(
             execution,
-            applyRemainingDeadline({...message, context, pageContext: '', subtitleContext: undefined}, requestDeadline),
+            applyRemainingDeadline({...message, context, pageContext: '', subtitleContext: undefined, enableNativeBatch: false}, requestDeadline),
         ));
         if (isDefiniteRecoveryPageContextLeak(
             execution, message.origin, retried, validationPageContext, message.modelOverride,
@@ -915,8 +928,14 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         let usedContextFreeRequest = startWithoutPageContext;
         let parsed: string[] | null = null;
         const {service, config: current} = execution;
-        // 高级 body 和自定义提示词可能依赖标记合同。只对已接入的通用聊天适配器启用 JSON。
-        if (deps.serviceTypes.isAiSdk(service)
+        // 高级 body 和自定义提示词可能依赖标记合同。对通用聊天适配器与主流原生 LLM 适配器启用轻量 JSON 协议，
+        // 避免每段反复输出长哨兵标记；返回结构不兼容时自动 5 分钟熔断回退到标记协议。
+        const supportsCompactBatch = deps.serviceTypes.isAiSdk(service)
+            || service === services.claude
+            || service === services.gemini
+            || service === services.deepseek
+            || service === services.tongyi;
+        if (supportsCompactBatch
             && (!current.system_role[service] || current.system_role[service] === defaultOption.system_role)
             && (!current.user_role[service] || current.user_role[service] === defaultOption.user_role)
             && !current.customBody[service]?.trim()) {
@@ -1222,6 +1241,86 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         }
     }
 
+    function readCacheBatchWithPendingValues(generation: number, keys: readonly string[]): Promise<Array<string | null>> {
+        if (!deps.cache.getMany) {
+            const reads = new Map<string, Promise<string | null>>();
+            return Promise.all(keys.map(itemKey => {
+                let read = reads.get(itemKey);
+                if (!read) {
+                    read = readCacheWithPendingValue(generation, itemKey);
+                    reads.set(itemKey, read);
+                }
+                return read;
+            }));
+        }
+        const results = new Array<string | null>(keys.length).fill(null);
+        const missedByKey = new Map<string, number[]>();
+        for (let index = 0; index < keys.length; index += 1) {
+            const key = keys[index]!;
+            const pending = pendingCacheValues.get(key);
+            if (generation === cacheGeneration && pending?.generation === generation) {
+                results[index] = pending.value;
+                continue;
+            }
+            let slots = missedByKey.get(key);
+            if (!slots) {
+                slots = [];
+                missedByKey.set(key, slots);
+            }
+            slots.push(index);
+        }
+        if (missedByKey.size === 0) return Promise.resolve(results);
+        const missedKeys = [...missedByKey.keys()];
+        return deps.cache.getMany(missedKeys).then((fetched) => {
+            for (let index = 0; index < missedKeys.length; index += 1) {
+                const value = fetched[index] ?? null;
+                for (const slot of missedByKey.get(missedKeys[index]!)!) {
+                    results[slot] = value;
+                }
+            }
+            return results;
+        });
+    }
+
+    async function writeCacheBatchIfCurrent(
+        generation: number,
+        entries: readonly {key: string; value: string}[],
+    ): Promise<void> {
+        if (generation !== cacheGeneration) return;
+        const pendingEntries = entries.map(({key, value}) => ({key, pendingValue: {generation, value} as PendingCacheValue}));
+        const write = Promise.resolve().then(() => deps.cache.setMany!(entries));
+        for (const {key, pendingValue} of pendingEntries) {
+            pendingCacheValues.set(key, pendingValue);
+        }
+        pendingCacheWrites.set(write, generation);
+        try {
+            await write;
+        } finally {
+            pendingCacheWrites.delete(write);
+            for (const {key, pendingValue} of pendingEntries) {
+                if (pendingCacheValues.get(key) === pendingValue) pendingCacheValues.delete(key);
+            }
+        }
+    }
+
+    async function persistCacheBatchWrite(
+        generation: number,
+        entries: readonly {key: string; value: string}[],
+    ): Promise<void> {
+        if (entries.length <= 1 || !deps.cache.setMany) {
+            await Promise.all(entries.map(({key, value}) => persistCacheWrite(generation, key, value)));
+            return;
+        }
+        await waitForBoundedPersistence(
+            Promise.resolve().then(() => writeCacheBatchIfCurrent(generation, entries)),
+            {
+                graceMs: deps.persistenceGraceMs,
+                onFailure: (error) => warn('[FluentRead] translation cache write failed:', error),
+                onTimeout: (error) => warn('[FluentRead] translation cache write timed out:', error),
+            },
+        );
+    }
+
     async function persistCacheWrite(generation: number, key: string, value: string): Promise<void> {
         // MV3 service worker 可能在消息 Promise 完成后立即挂起；成功响应前必须持有写入，
         // 但只等待有限宽限期；迟到写仍留在 pendingCacheWrites 中供 clear 严格排空。
@@ -1456,17 +1555,9 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 execution, origin, index, batchFingerprint, context, pageContext, cacheMode, message.modelOverride,
                 message.subtitleContext,
             ));
-            const reads = new Map<string, Promise<string | null>>();
-            // 步骤 1：分项读取缓存，只把缺失且去重后的原文交给 provider。
+            // 步骤 1：分项批量读取缓存，单次 IndexedDB 事务读取全部未命中热层的键。
             const cached = await runWithinDeadline(
-                () => Promise.all(itemKeys.map(itemKey => {
-                    let read = reads.get(itemKey);
-                    if (!read) {
-                        read = readCacheWithPendingValue(requestGeneration, itemKey);
-                        reads.set(itemKey, read);
-                    }
-                    return read;
-                })),
+                () => readCacheBatchWithPendingValues(requestGeneration, itemKeys),
                 requestDeadline,
                 execution.abortSignal,
             );
@@ -1506,15 +1597,14 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                     pageContext,
                     requestDeadline,
                 );
-                await Promise.all(translated.map(async (value, index) => {
+                const entriesToWrite: Array<{key: string; value: string}> = [];
+                translated.forEach((value, index) => {
                     const origin = message.origin[index];
-                    if (!isCacheableResult(origin, value, execution)) return;
-                    await persistCacheWrite(
-                        requestGeneration,
-                        itemKeys[index],
-                        value,
-                    );
-                }));
+                    if (isCacheableResult(origin, value, execution)) {
+                        entriesToWrite.push({key: itemKeys[index]!, value});
+                    }
+                });
+                await persistCacheBatchWrite(requestGeneration, entriesToWrite);
                 return translated;
             }
             // 只有逐项补齐时缓存结果才会被使用；AI 合批整包重算不计入缓存命中。
@@ -1550,25 +1640,21 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 });
             }
 
-            // 步骤 2：按原请求顺序回填结果，并只缓存有效译文。
+            // 步骤 2：按原请求顺序回填结果，并合并单次事务写入有效译文。
             const result = [...validatedCached] as Array<string | null>;
-            const cacheWrites: Promise<void>[] = [];
+            const entriesToWrite: Array<{key: string; value: string}> = [];
             const writtenKeys = new Set<string>();
             missingEntries.forEach(({index, origin}) => {
-                const itemKey = itemKeys[index];
+                const itemKey = itemKeys[index]!;
                 const value = translatedByKey.get(itemKey);
                 result[index] = value as string;
                 if (!writtenKeys.has(itemKey) && isCacheableResult(origin, value, execution)) {
                     writtenKeys.add(itemKey);
-                    cacheWrites.push(persistCacheWrite(
-                        requestGeneration,
-                        itemKey,
-                        value,
-                    ));
+                    entriesToWrite.push({key: itemKey, value});
                 }
             });
 
-            await Promise.all(cacheWrites);
+            await persistCacheBatchWrite(requestGeneration, entriesToWrite);
             return result as string[];
         })() : callBatchProviderWithContextRecovery(
             execution,

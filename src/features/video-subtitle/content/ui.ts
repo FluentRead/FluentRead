@@ -136,6 +136,7 @@ export const VIDEO_TRANSLATION_ACTIVE_CLASS = 'fluent-read-video-subtitle-active
 export const VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS = 'fluent-read-video-display-translation-only';
 export const VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS = 'fluent-read-video-display-original-only';
 export const VIDEO_DISPLAY_HIDDEN_CLASS = 'fluent-read-video-display-hidden';
+export const VIDEO_NATIVE_CUE_HIDDEN_CLASS = 'fluent-read-video-native-cue-hidden';
 export const VIDEO_NORMALIZED_CAPTION_CLASS = 'fluent-read-video-normalized-caption';
 export const VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS = 'fluent-read-video-normalized-caption-active';
 export const VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS = 'fluent-read-video-subtitle-panel-active';
@@ -906,6 +907,26 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
     #ytp-caption-window-container.${VIDEO_NORMALIZED_CAPTION_CLASS} .captions-text,
     .ytp-caption-window-container.${VIDEO_NORMALIZED_CAPTION_CLASS} .ytp-caption-segment,
     .ytp-caption-window-container.${VIDEO_NORMALIZED_CAPTION_CLASS} .captions-text {
+      visibility: hidden !important;
+    }
+    /* X/HTML 原生 TextTrack 保持宿主 showing 状态以同步原生 CC 按钮，由独立样式规则隐藏原生绘制。 */
+    video.${VIDEO_NATIVE_CUE_HIDDEN_CLASS}::-webkit-media-text-track-container {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+    }
+    video.${VIDEO_NATIVE_CUE_HIDDEN_CLASS}::-webkit-media-text-track-display {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+    }
+    video.${VIDEO_NATIVE_CUE_HIDDEN_CLASS}::cue {
+      color: transparent !important;
+      background: transparent !important;
+      background-color: transparent !important;
+      text-shadow: none !important;
+      outline: none !important;
+      opacity: 0 !important;
       visibility: hidden !important;
     }
     :is(#${VIDEO_TRANSLATION_LAYER_ID}, #${VIDEO_SUBTITLE_SCROLL_HOST_ID}).${VIDEO_DISPLAY_HIDDEN_CLASS} {

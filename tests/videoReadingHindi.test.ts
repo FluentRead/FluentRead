@@ -76,7 +76,7 @@ describe('Hindi data asset boundary', () => {
     for (const file of HINDI_READING_ASSETS) {
       expect(file.sha256).toMatch(/^[a-f0-9]{64}$/u);
       expect(file.name).toMatch(/\.(?:tsv|json)$/u);
-      expect(file.urls).toHaveLength(2);
+      expect(file.urls).toHaveLength(4);
       for (const url of file.urls) expect(url).toContain(HINDI_READING_REVISION);
     }
     const {createHindiRomanizer} = await import('@/src/features/video-subtitle/reading/hindi');

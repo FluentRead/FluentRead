@@ -79,7 +79,7 @@ describe('extension dependency CSP packaging', () => {
             pako: createRequire(require.resolve('@pdf-lib/fontkit'))('pako')});
         runInContext(patched('fontkit').replace("import pako from 'pako';", '')
             .replace('export default fontkit;', 'globalThis.fixtureFontkit=fontkit;'), context);
-        const font = context.fixtureFontkit.create(new Uint8Array(fs.readFileSync(new URL('../public/pdfjs/standard_fonts/LiberationSans-Regular.ttf', import.meta.url))));
+        const font = context.fixtureFontkit.create(new Uint8Array(fs.readFileSync(new URL('../node_modules/pdfjs-dist/standard_fonts/LiberationSans-Regular.ttf', import.meta.url))));
         const run = font.layout('Firefox 142');
         expect(run.glyphs.length).toBe(11);
         const subset = font.createSubset();

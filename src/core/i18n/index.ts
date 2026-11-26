@@ -89,7 +89,8 @@ export function translate(key: string, language: UiLanguage, params?: Translatio
     return formatMessage(template, params);
 }
 
-function preserveWhitespace(value: string, translated: string): string {
+function preserveWhitespace(value: string, trimmed: string, translated: string): string {
+    if (value.length === trimmed.length) return translated;
     const leading = value.match(/^\s*/u)![0];
     const trailing = value.match(/\s*$/u)![0];
     // Only nonblank source text reaches this helper; both zero-or-more patterns always match.
@@ -194,21 +195,21 @@ export function translateLegacyText(value: string, language: UiLanguage): string
         if (!text.trim()) return text;
         const trimmed = text.trim();
         const exact = getExactLegacyText(trimmed, language);
-        if (exact) return preserveWhitespace(text, exact);
+        if (exact) return preserveWhitespace(text, trimmed, exact);
         const patterns = getCompiledLegacyPatterns(language, bundle!);
         const dynamic = yield* applyLegacyPatterns(patterns.early, trimmed, language);
-        if (dynamic !== undefined) return preserveWhitespace(text, dynamic);
+        if (dynamic !== undefined) return preserveWhitespace(text, trimmed, dynamic);
         for (const separator of [' · ', ' → ']) {
             const compound = trimmed.split(separator);
             if (compound.length <= 1) continue;
             const translatedParts: string[] = [];
             for (const part of compound) translatedParts.push(yield part);
             const translatedCompound = translatedParts.join(separator);
-            if (translatedCompound !== trimmed) return preserveWhitespace(text, translatedCompound);
+            if (translatedCompound !== trimmed) return preserveWhitespace(text, trimmed, translatedCompound);
         }
         // 复合状态先于 late 兜底；子句逐次交给显式工作栈，保留深嵌套语义而不增长 JS 调用栈。
         const fallback = yield* applyLegacyPatterns(patterns.late, trimmed, language);
-        return fallback === undefined ? text : preserveWhitespace(text, fallback);
+        return fallback === undefined ? text : preserveWhitespace(text, trimmed, fallback);
     }
     const pending = [evaluate(value)];
     let result: string | undefined;

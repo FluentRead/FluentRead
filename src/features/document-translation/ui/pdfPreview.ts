@@ -6,7 +6,8 @@
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {pdfFallbackBidiLine, withPdfFallbackBidiDirection} from '../core/pdfFallbackBidi';
-import {getPdfResources} from '../services/pdfResources';
+import {getPdfResources, hasCustomPdfAssetRoot} from '../services/pdfResources';
+import {createPdfBinaryDataFactory, type PdfBinaryDataFactoryConstructor} from '../services/pdfBinaryDataFactory';
 import type {PDFDocumentProxy, PDFPageProxy} from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import type {
@@ -100,6 +101,9 @@ function browserPdfDocument(bytes: Uint8Array): BrowserPdfResource {
     const promise = import('pdfjs-dist/legacy/build/pdf.mjs').then(({getDocument, GlobalWorkerOptions}) => {
         resource.controller.signal.throwIfAborted();
         GlobalWorkerOptions.workerSrc = workerUrl;
+        const binaryDataFactoryOptions: {BinaryDataFactory?: PdfBinaryDataFactoryConstructor} = pdfAssetRoot
+            ? {BinaryDataFactory: createPdfBinaryDataFactory({preferLocalDataAssets: hasCustomPdfAssetRoot()})}
+            : {};
         resource.task = getDocument({
             data: new Uint8Array(bytes),
             disableFontFace: false,
@@ -109,7 +113,8 @@ function browserPdfDocument(bytes: Uint8Array): BrowserPdfResource {
             cMapUrl: `${pdfAssetRoot}/cmaps/`,
             standardFontDataUrl: `${pdfAssetRoot}/standard_fonts/`,
             wasmUrl: `${pdfAssetRoot}/wasm/`,
-        });
+            ...binaryDataFactoryOptions,
+        } as Parameters<typeof getDocument>[0]);
         return resource.task.promise;
     }).catch((error) => {
         // 加载失败不能固化为永久失败，下次预览允许重试。

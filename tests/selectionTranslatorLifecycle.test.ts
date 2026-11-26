@@ -2921,6 +2921,10 @@ describe('context menu selection ownership', () => {
     it('opens a translation card for an explicit highlighted range without replacing the native selection', async () => {
         const fixture = await prepareMenu();
         fixture.getSelection.mockReturnValue(null);
+        fixture.state.clickSelection.toggle();
+        expect(fixture.state.translateExplicitRange(fixture.range)).toBe(false);
+        expect(fixture.translateText).not.toHaveBeenCalled();
+        fixture.state.clickSelection.cancel();
         expect(fixture.state.translateExplicitRange(fixture.range)).toBe(true);
         expect(fixture.state.showTooltip).toBe(true);
         expect(fixture.state.selectedText).toBe('Good ideas deserve attention.');

@@ -85,7 +85,7 @@ beforeEach(async () => {
       return null
     }, load(id) {
       if (id === '\0highlight-settings-browser') return `export default {runtime: {sendMessage: globalThis.${key}.send}}`
-      if (id === '\0highlight-settings-i18n') return `export const useUiI18n = () => ({t: (key, params) => key === 'informationHighlight.preview.story' ? globalThis.${key}.previewStory : params ? key + ' ' + JSON.stringify(params) : key, translateLegacy: text => text});`
+      if (id === '\0highlight-settings-i18n') return `export const useUiI18n = () => ({t: (key, params) => key === 'informationHighlight.preview.story' ? globalThis.${key}.previewStory : params ? key + ' ' + JSON.stringify(params) : key});`
       if (id === '\0highlight-settings-options') return `import {h} from 'vue';export const ElMessage = {warning: globalThis.${key}.warnings}; export const ElOption = {render: () => null}; export const ElSwitch = {inheritAttrs: false, setup(_, {attrs}) {return () => h('button', attrs)}}; export const ElTooltip = globalThis.${key}.Tooltip; export const ElDialog = globalThis.${key}.Dialog;`
       if (id === '\0highlight-settings-hotkey') return "import {h} from 'vue'; export default {inheritAttrs: false, setup(_, {attrs}) {return () => h('div', {...attrs, 'data-highlight-hotkey-recorder': ''})}};"
       if (id === '\0highlight-settings-select') return "import {h} from 'vue';export default {setup(_, {attrs, slots}) {return () => h('div', attrs, slots.default?.())}};"
@@ -265,7 +265,13 @@ describe('信息高亮设置真实父子模板与生命周期', () => {
     expect(control.getAttribute('aria-label')).toBe('informationHighlight.enabled')
     const toggle = event('[data-information-highlight-enabled]', 'onUpdate:modelValue')
     toggle(true); await settle(); expect(props.config.informationHighlight).toEqual({enabled: true, hotkey: 'Alt+H', hotkeyEnabled: true, model: 'qwen2.5-0.5b', mode: 'keywords', density: 'high', color: 'blue', style: 'underline', intensity: 'standard'})
-    props.active = false; await settle(); toggle(false); expect(props.config.informationHighlight.enabled).toBe(true)
+    const clickControl = element('[data-information-highlight-click-to-translate]')
+    expect(clickControl.getAttribute('aria-label')).toBe('informationHighlight.clickToTranslate')
+    event('[data-information-highlight-click-to-translate]', 'onUpdate:modelValue')(true); await settle(); expect(props.config.informationHighlight.clickToTranslate).toBe(true)
+    const toggleClick = event('[data-information-highlight-click-to-translate]', 'onUpdate:modelValue')
+    toggleClick(false); await settle(); expect(props.config.informationHighlight).not.toHaveProperty('clickToTranslate')
+    const latestToggleClick = event('[data-information-highlight-click-to-translate]', 'onUpdate:modelValue')
+    props.active = false; await settle(); toggle(false); latestToggleClick(true); expect(props.config.informationHighlight.enabled).toBe(true); expect(props.config.informationHighlight).not.toHaveProperty('clickToTranslate')
     expect(send).not.toHaveBeenCalled()
   })
   it('颜色浓度三档即时改变预览、色阶卡与样例的透明度，只保存 intensity', async () => {

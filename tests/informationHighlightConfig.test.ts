@@ -32,6 +32,8 @@ describe('信息高亮偏好与配置迁移', () => {
         expect(normalizeInformationHighlightPreferences({...old, intensity: 'max'}).intensity).toBe('standard');
         for (const enabled of ['true', 1, {}, null]) expect(normalizeInformationHighlightPreferences({...old, enabled}).enabled).toBe(false);
         expect(normalizeInformationHighlightPreferences({...old, enabled: true}).enabled).toBe(true);
+        for (const clickToTranslate of [false, 'true', 1, {}, null, undefined]) expect(normalizeInformationHighlightPreferences({...old, clickToTranslate})).not.toHaveProperty('clickToTranslate');
+        expect(normalizeInformationHighlightPreferences({...old, clickToTranslate: true}).clickToTranslate).toBe(true);
         expect(normalizeInformationHighlightPreferences({...old, hotkey: 'option + shift + j'}).hotkey).toBe('Alt+Shift+J');
         expect(normalizeInformationHighlightPreferences({...old, hotkey: ''}).hotkey).toBe('');
         expect(normalizeInformationHighlightPreferences({...old, hotkeyEnabled: false}).hotkeyEnabled).toBe(false);

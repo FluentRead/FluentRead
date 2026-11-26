@@ -91,7 +91,7 @@ export function installInformationHighlight(document: Document, initial: Informa
                             range.setEnd(last.endContainer, last.endOffset);
                         }
                         // DOM Range 可能跨过扫描未纳入的节点，送翻前确认只包含已分析文字。
-                        if (range.toString() === paragraph.text.slice(entry.span.start, entry.span.end)) ports.translateRange?.(range);
+                        if (range.toString() === paragraph.text.slice(entry.span.start, entry.span.end)) ports.translateRange!(range);
                         return;
                     }
                 }

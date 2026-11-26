@@ -113,10 +113,11 @@ export function createPageInformationHighlightRuntime(ports: {
     translateRange?(range: Range): void;
     notice?(message: InformationHighlightNotice): void;
 }): InformationHighlightContentRuntime & {feature: ContentFeatureDefinition} {
+    const translateRange = ports.translateRange;
     const runtime = createInformationHighlightContentRuntime({document: ports.document, preferences: ports.config.informationHighlight,
         send: ports.send, readTranslationRoot: readVisibleTranslationRoot, canToggle: ports.canToggle,
-        translateRange: ports.translateRange && (range => {
-            if (ports.canToggle?.() !== false) ports.translateRange?.(range);
+        translateRange: translateRange && (range => {
+            if (ports.canToggle?.() !== false) translateRange(range);
         }),
         notice: ports.notice ?? (message => showPageNotice(translate(`informationHighlight.notice.${message}`, normalizeUiLanguage(ports.config.uiLanguage)),
             /^(?:o|model)/u.test(message) ? 'success' : 'error', {key: 'information-highlight'}))});

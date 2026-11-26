@@ -612,7 +612,6 @@ export const correctionRows: readonly LegacyCorrectionRow[] = [
     ['鼠标长按', 'Long press', '長押し', '길게 누르기', 'Appui long', 'Долгое нажатие', 'Pulsación larga'],
     ['双指翻译', 'Two-finger tap translation', '2 本指タップで翻訳', '두 손가락 탭 번역', 'Traduction par appui à deux doigts', 'Перевод касанием двумя пальцами', 'Traducción con toque de dos dedos'],
     ['三指翻译', 'Three-finger tap translation', '3 本指タップで翻訳', '세 손가락 탭 번역', 'Traduction par appui à trois doigts', 'Перевод касанием тремя пальцами', 'Traducción con toque de tres dedos'],
-    ['点击高亮词语翻译', 'Click highlighted words to translate', 'ハイライトされた語をクリックして翻訳', '강조 표시된 단어를 클릭하여 번역', 'Cliquer sur les mots surlignés pour les traduire', 'Переводить выделенные слова по щелчку', 'Traducir palabras resaltadas al hacer clic'],
     ['四指翻译', 'Four-finger tap translation', '4 本指タップで翻訳', '네 손가락 탭 번역', 'Traduction par appui à quatre doigts', 'Перевод касанием четырьмя пальцами', 'Traducción con toque de cuatro dedos'],
     ['双击翻译', 'Double-tap translation', 'ダブルタップで翻訳', '두 번 탭 번역', 'Traduction par double appui', 'Перевод двойным касанием', 'Traducción con doble toque'],
     ['三击翻译', 'Triple-tap translation', 'トリプルタップで翻訳', '세 번 탭 번역', 'Traduction par triple appui', 'Перевод тройным касанием', 'Traducción con triple toque'],

@@ -683,10 +683,11 @@ function readSelectionSnapshot(explicitRange?: Range): SelectionSnapshot | null 
 }
 
 function translateExplicitRange(range: Range): boolean {
-  if (!config.on || config.disableSelectionTranslator || selectionSettings.value.mode === 'disabled') return false;
+  if (clickSelection.active || !config.on || config.disableSelectionTranslator || selectionSettings.value.mode === 'disabled') return false;
   const next = readSelectionSnapshot(range);
   if (!next) return false;
   isSelecting = false;
+  cancelTouchSelectionRead();
   suppressSelectionRead();
   applySelection(next, true, false, true);
   return showTooltip.value;

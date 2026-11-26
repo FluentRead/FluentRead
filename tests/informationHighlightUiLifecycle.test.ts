@@ -16,7 +16,7 @@ import Preferences from '@/src/features/settings/ui/InformationHighlightPreferen
 
 const preferencePorts = vi.hoisted(() => ({warnings: vi.fn()}))
 vi.mock('element-plus', () => ({ElOption: {render: () => null}, ElSwitch: {render: () => null}, ElMessage: {warning: preferencePorts.warnings}}))
-vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({t: (key: string) => key, translateLegacy: (text: string) => text})}))
+vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({t: (key: string) => key})}))
 vi.mock('@/src/ui/components/UiSelect.vue', async () => {
   const {h} = await import('vue'); return {default: {setup(_: unknown, {slots}: any) {return () => h('div', null, slots.default?.())}}}
 })
@@ -60,7 +60,7 @@ beforeEach(async () => {
   }, load(id) {
     if (id === '\0information-elements') return `export const ElMessage = {warning: globalThis.${key}.warnings}; export const ElOption = {}, ElSwitch = {}, ElDialog = {};`
     if (id === '\0information-browser') return `export default {runtime: {sendMessage: globalThis.${key}.send}}`
-    if (id === '\0information-i18n') return 'export const useUiI18n = () => ({t: key => key, translateLegacy: text => text});'
+    if (id === '\0information-i18n') return 'export const useUiI18n = () => ({t: key => key});'
     if (id === '\0information-child') return 'export default {}'
     return null
   }}, vue()]})

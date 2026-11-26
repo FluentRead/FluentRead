@@ -252,13 +252,26 @@ describe('page-owned scoring, paint and cancellation', () => {
         click();
         expect(translateRange).not.toHaveBeenCalled();
         controller.updatePreferences({...defaults, clickToTranslate: true});
-        click({isTrusted: false});
-        click({clientY: 60});
-        click({composedPath: () => [target.querySelector('a')!, target]});
+        for (const ignored of [
+            {isTrusted: false}, {defaultPrevented: true}, {button: 2}, {detail: 2},
+            {ctrlKey: true}, {altKey: true}, {metaKey: true}, {shiftKey: true},
+            {clientX: 0}, {clientX: 999}, {clientY: 10}, {clientY: 60},
+            {composedPath: () => [f.document]},
+            {composedPath: () => [target.querySelector('a')!, target]},
+        ]) click(ignored);
+        let selectionCollapsed = false;
+        Object.defineProperty(f.document, 'getSelection', {configurable: true, value: () => ({isCollapsed: selectionCollapsed})});
+        click();
         expect(translateRange).not.toHaveBeenCalled();
+        selectionCollapsed = true;
         click();
         expect(translateRange).toHaveBeenCalledOnce();
         expect(translateRange.mock.calls[0][0].toString()).toBe('extraordinary');
+        const paintedRange = [...f.registry.values()].flatMap(paint => [...paint]).find(range => range.toString() === 'extraordinary')!;
+        const savedStart = paintedRange.startOffset;
+        paintedRange.setStart(paintedRange.startContainer, savedStart + 1);
+        click();
+        paintedRange.setStart(paintedRange.startContainer, savedStart);
         (target.firstChild as Text).data = 'The extraordinary phrase changed just before the click. ';
         click();
         controller.dispose();
@@ -290,11 +303,17 @@ describe('page-owned scoring, paint and cancellation', () => {
         expect(translateRange).toHaveBeenCalledTimes(2);
 
         const first = [...f.registry.values()].flatMap(paint => [...paint]).find(range => range.toString() === 'extra')!;
+        const last = [...f.registry.values()].flatMap(paint => [...paint]).find(range => range.toString() === 'ordinary')!;
         const start = first.startOffset;
         first.setStart(first.startContainer, start + 1);
         click(inline, 20);
         expect(translateRange).toHaveBeenCalledTimes(2);
         first.setStart(first.startContainer, start);
+        const end = last.endOffset;
+        last.setEnd(last.endContainer, end - 1);
+        click(paragraph, 50);
+        expect(translateRange).toHaveBeenCalledTimes(2);
+        last.setEnd(last.endContainer, end);
 
         const hidden = f.document.createElement('span');
         hidden.hidden = true;
@@ -838,6 +857,41 @@ describe('content composition and runtime score messages', () => {
         runtime.feature.mount({ctx: {} as never, signal: activation.signal, isCurrent: () => true});
         expect(runtime.getState().enabled).toBe(false); runtime.setEnabled(true); await f.settle();
         expect(f.painted()).toContain('Bright'); runtime.feature.unmount!(); expect(runtime.getState().phase).toBe('idle'); activation.abort();
+
+        const g = fixture('<article><p id="paragraph">The extraordinary algorithm preserves original paragraphs.</p></article>');
+        const register = vi.spyOn(g.document, 'addEventListener');
+        let allowed = false;
+        const translateRange = vi.fn();
+        const guarded = createPageInformationHighlightRuntime({
+            document: g.document, config: {on: true, informationHighlight: {...defaults, enabled: true, clickToTranslate: true}},
+            send: vi.fn(), canToggle: () => allowed, translateRange,
+        });
+        guarded.feature.mount({ctx: {} as never, signal: new AbortController().signal, isCurrent: () => true});
+        await g.settle();
+        const clickListener = register.mock.calls.find(([name]) => name === 'click')![1] as EventListener;
+        const paragraph = g.document.querySelector('#paragraph')!;
+        const clickWord = () => clickListener({isTrusted: true, button: 0, detail: 1, clientX: 50, clientY: 25, composedPath: () => [paragraph]} as unknown as Event);
+        clickWord();
+        expect(translateRange).not.toHaveBeenCalled();
+        allowed = true;
+        clickWord();
+        expect(translateRange).toHaveBeenCalledOnce();
+        expect(translateRange.mock.calls[0][0].toString()).toBe('extraordinary');
+        guarded.feature.unmount!();
+
+        const h = fixture('<article><p id="paragraph">The extraordinary algorithm preserves original paragraphs.</p></article>');
+        const registerUnchecked = vi.spyOn(h.document, 'addEventListener');
+        const translateUnchecked = vi.fn();
+        const unchecked = createPageInformationHighlightRuntime({
+            document: h.document, config: {on: true, informationHighlight: {...defaults, enabled: true, clickToTranslate: true}},
+            send: vi.fn(), translateRange: translateUnchecked,
+        });
+        unchecked.feature.mount({ctx: {} as never, signal: new AbortController().signal, isCurrent: () => true});
+        await h.settle();
+        const uncheckedListener = registerUnchecked.mock.calls.find(([name]) => name === 'click')![1] as EventListener;
+        uncheckedListener({isTrusted: true, button: 0, detail: 1, clientX: 50, clientY: 25, composedPath: () => [h.document.querySelector('#paragraph')!]} as unknown as Event);
+        expect(translateUnchecked).toHaveBeenCalledOnce();
+        unchecked.feature.unmount!();
     });
     it('shows a localized page notice for shortcut feedback unless a notice port is injected', async () => {
         const press = (f: ReturnType<typeof fixture>) => {

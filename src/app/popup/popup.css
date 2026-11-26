@@ -42,7 +42,7 @@ button:focus-visible, select:focus-visible { outline: var(--fr-focus-width, 2px)
 .popup-shell {
   --popup-secondary-action-width: 46px;
   position: relative;
-  padding: 12px 14px 6px;
+  padding: 10px 12px 6px;
   background: var(--surface);
 }
 .popup-shell.config-loading { pointer-events: none; }
@@ -104,9 +104,9 @@ button:focus-visible, select:focus-visible { outline: var(--fr-focus-width, 2px)
   box-shadow: none;
 }
 .settings-button {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 66px; height: 32px; padding: 0 10px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 66px; height: 32px; padding: 0 9px;
   border: 1px solid var(--line); border-radius: var(--fr-control-radius, 8px); color: var(--ink); background: var(--surface);
-  font-size: var(--fr-text-sm, 12px); font-weight: 500; cursor: pointer;
+  font-size: var(--fr-text-xs, 11px); font-weight: 500; cursor: pointer;
   transition: border-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), transform var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease);
 }
 .settings-button:hover { border-color: color-mix(in srgb, var(--brand) 38%, var(--line)); color: var(--brand-strong); background: var(--brand-soft); }
@@ -281,12 +281,12 @@ h2 { margin-bottom: 0; font-size: var(--fr-text-lg, 15px); line-height: 1.35; le
   display: grid; min-height: 0; margin-top: 8px; padding: 0;
   border: 0; border-radius: 0; background: none; box-shadow: none;
 }
-.site-rule-actions { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 5px; max-width: 100%; }
+.site-rule-actions { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 4px; max-width: 100%; }
 .site-rule-button {
-  display: inline-flex; flex: none; align-items: center; gap: 5px; min-height: 26px; max-width: 100%; padding: 0 8px;
+  display: inline-flex; flex: none; align-items: center; gap: 4px; min-height: 25px; max-width: 100%; padding: 0 6px;
   border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--line));
   border-radius: var(--fr-radius-xs, 6px); color: var(--brand-strong); background: var(--surface);
-  font-size: var(--fr-text-xs, 11px); font-weight: 500; cursor: pointer;
+  font-size: 10px; font-weight: 550; cursor: pointer;
   transition: border-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease);
 }
 .site-rule-button > i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--fr-color-line-strong, #cfd5e0); }
@@ -659,14 +659,14 @@ footer > button { justify-self: end; }
 .popup-header { margin-bottom: 10px; }
 .popup-header .brand strong { font-size: var(--fr-text-md, 14px); }
 .popup-header .donation-button { color: var(--muted); background: var(--surface); border-color: var(--line); }
-.hero-card { border-radius: var(--fr-radius-lg, 12px); padding: 10px 12px; }
+.hero-card { border-radius: var(--fr-radius-lg, 12px); padding: 10px 10px; }
 .features { margin-top: 10px; }
 .features-eyebrow { font-size: var(--fr-text-xs, 11px); font-weight: 500; letter-spacing: 0; }
 .feature-grid { --fluentread-popup-feature-gap: 8px; gap: var(--fluentread-popup-feature-gap); }
-.feature-card { min-height: 50px; padding: 7px 9px; grid-template-columns: 28px minmax(0, 1fr) 6px; gap: 8px; border-radius: var(--fr-radius-md, 10px); }
-.feature-icon { width: 28px; height: 28px; }
-.feature-card strong { font-size: var(--fr-text-sm, 12px); font-weight: 600; }
-.feature-card small { font-size: var(--fr-text-xs, 11px); }
+.feature-card { min-height: 48px; padding: 7px 8px; grid-template-columns: 26px minmax(0, 1fr) 6px; gap: 7px; border-radius: var(--fr-radius-md, 10px); }
+.feature-icon { width: 26px; height: 26px; }
+.feature-card strong { font-size: 11.5px; font-weight: 600; }
+.feature-card small { font-size: 10px; }
 .popup-shell[data-interface-skin="default"] .feature-icon { color: var(--brand-strong); background: var(--brand-soft); }
 footer { min-height: 30px; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 7px; }
 footer button { font-weight: 500; color: var(--muted); }
@@ -846,12 +846,12 @@ footer button { font-weight: 500; color: var(--muted); }
   min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
 }
 
-.translation-meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; min-width: 0; }
+.translation-meta { display: flex; align-items: center; gap: 4px; margin-top: 8px; min-width: 0; }
 :root .popup-shell[data-interface-skin] .translation-meta > .site-rule-row[data-popup-module="siteRule"] { flex: 1; min-width: 0; margin-top: 0; }
 /* 显示模式常驻局部按钮下方；网站规则可换行，右侧工具独立对齐，不增加默认中文弹窗高度。 */
-.translation-tools { position: relative; display: flex; flex: none; align-items: center; gap: 6px; margin-inline-start: auto; }
+.translation-tools { position: relative; display: flex; flex: none; align-items: center; gap: 4px; margin-inline-start: auto; }
 .display-mode-slot { display: grid; place-items: center; flex: 0 0 var(--popup-secondary-action-width); width: var(--popup-secondary-action-width); }
-.display-mode-slot.with-page-font { display: flex; justify-content: center; gap: 6px; flex-basis: max(54px, var(--popup-secondary-action-width)); width: max(54px, var(--popup-secondary-action-width)); }
+.display-mode-slot.with-page-font { display: flex; justify-content: center; gap: 4px; flex-basis: max(52px, var(--popup-secondary-action-width)); width: max(52px, var(--popup-secondary-action-width)); }
 .display-mode-button { display: grid; place-items: center; box-sizing: border-box; width: 24px; height: 24px; padding: 2px; border: 1px solid transparent; border-radius: 6px; color: var(--brand-strong); background: var(--surface-soft); cursor: pointer; }
 .page-font-entry { flex: none; }
 .page-font-entry.is-browser-default { border-color: var(--brand); background: var(--brand-soft); }
@@ -881,7 +881,7 @@ footer button { font-weight: 500; color: var(--muted); }
 .default-skin .brand, .default-skin .brand-copy { flex: 1; min-width: 0; }
 .default-skin .brand small { line-height: 13px; }
 .default-skin .header-actions { flex: none; }
-.default-skin .settings-button { width: 68px; padding-inline: 5px; }
+.default-skin .settings-button { width: auto; min-width: 66px; max-width: 92px; padding-inline: 8px; }
 .default-skin .language-pair label > span { line-height: 14px; }
 
 .default-skin .provider-strip { position: relative; display: flow-root; }

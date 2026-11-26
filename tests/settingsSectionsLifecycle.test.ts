@@ -78,6 +78,7 @@ function configureSectionPorts(data: Record<string, any>, {template = false, req
         '@/src/features/settings/ui/InputTranslationSettings.vue', '@/src/features/settings/ui/ParagraphCopySettings.vue',
         '@/src/features/settings/ui/SectionTranslationSettings.vue', '@/src/features/settings/ui/ParagraphHandlingSettings.vue',
         '@/src/features/settings/ui/TranslationCacheSettings.vue', '@/src/features/settings/ui/ExcludedLanguageSettings.vue',
+        '@/src/features/settings/ui/ExcludedTagSettings.vue',
         '@/src/features/settings/ui/ReadingAssistanceSettings.vue', '@/src/features/settings/ui/ConfigManagement.vue',
         '@/src/features/settings/ui/QuickTranslationProfiles.vue', '@/src/features/settings/ui/ContextMenuSettings.vue',
         '@/src/features/settings/ui/components/FieldHelp.vue',
@@ -132,6 +133,7 @@ function configureSectionPorts(data: Record<string, any>, {template = false, req
             reading: '@/src/features/settings/ui/ReadingAssistanceSettings.vue',
             profiles: '@/src/features/settings/ui/QuickTranslationProfiles.vue',
             excluded: '@/src/features/settings/ui/ExcludedLanguageSettings.vue',
+            excludedTags: '@/src/features/settings/ui/ExcludedTagSettings.vue',
             glossary: '@/src/ui/components/GlossaryLibrarySelect.vue',
             area: '@/src/features/settings/ui/AreaTranslationSettings.vue',
         })) componentPort(path, childEventPort(name, data.uiPorts));
@@ -1434,6 +1436,7 @@ describe('设置父模板实际功能事件', () => {
         await f.emit('el-switch:settings.fullPage.multiSegmentTitle','update:modelValue',false);expect(f.state.config.enableAIMultiSegment).toBe(false);
         await f.choose('全文翻译范围','翻译到页底');expect(f.state.config.fullPageTranslationMode).toBe('all');
         await f.emit('excluded:','update:modelValue',['en','ja']);expect(f.state.config.excludedLanguages).toEqual(['en','ja']);
+        await f.emit('excludedTags:','update:modelValue',['blockquote','.no-trans']);expect(f.state.config.excludedTags).toEqual(['blockquote','.no-trans']);
     });
     it('AI 多段预算实际子组件编辑及恢复默认各原子保存一次，关闭保留两项预算',async()=>{
         const f=await settingsUiFixture('settings-translation',{enableAIMultiSegment:true,aiMultiSegmentMaxSegments:12,aiMultiSegmentMaxCharacters:3500});

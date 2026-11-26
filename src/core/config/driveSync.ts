@@ -208,7 +208,7 @@ const VISIBLE_FIELDS: Record<string, string> = {
     translationSidepanelScope: '侧边栏显示范围',
     translationAppearance: '译文外观', browserDefaultTranslationFont: '浏览器默认译文字体', translationStyleProfiles: '译文样式', activeTranslationStyleProfileId: '译文样式',
     siteAdaptation: '网站规则', alwaysTranslateDomains: '网站规则', disabledExtensionDomains: '网站规则', translationOnlyDomains: '网站规则',
-    excludedLanguages: '跳过翻译的语言', videoSubtitleAppearance: '视频字幕外观',
+    excludedLanguages: '跳过翻译的语言', excludedTags: '不翻译的标签', videoSubtitleAppearance: '视频字幕外观',
     videoSentenceLearningAppearance: '完整句学习外观',
     system_role: 'System 提示词', user_role: 'User 提示词', glossaryLibraries: '术语库内容',
     contextMenuEntries: '右键菜单入口', shareCard: '双语卡片',

@@ -179,6 +179,8 @@ export function isTopLevelApplicationShell(element: Element): boolean {
 export interface TranslationTextProtectionOptions {
     /** 仅由当前网站规则覆盖元素自身的禁译标记，其他硬守卫始终保留。 */
     allowNoTranslate?: (element: Element) => boolean;
+    /** 用户显式设置的不翻译标签或 CSS 选择器；在发现、悬浮和文本槽提取时统一跳过。 */
+    isExcludedElement?: (element: Element) => boolean;
     /** 只供候选语言预检读取无汉字的行内代码上下文；不得传入翻译槽、请求或渲染快照。 */
     includeInlineCodeForLanguage?: boolean;
     /** 已有翻译的精确来源槽；只穿过真实 host 的扩展标记和自有 translate=no，其他保护仍生效。 */
@@ -272,6 +274,7 @@ export function isProtectedDescendantElement(
     return (!ignoreExtensionSelf && !ownSourceSlot && isExtensionElementSelf(element)) ||
         isForeignTranslationBoundary(element) ||
         isTagMetadataElement(element) ||
+        options?.isExcludedElement?.(element) === true ||
         (isProtectedTextElement(element) && !(options?.includeInlineCodeForLanguage === true
             && getElementTagName(element) === 'code' && element.getAttribute('role') !== 'timer'
             && !/\p{Script=Han}/u.test(element.textContent!))) ||
@@ -295,6 +298,7 @@ export function evaluateElementHardGuard(element: Element, options?: Translation
     if (isExtensionElementSelf(element)) return {prune: true, reason: 'fluentread-owned'};
     if (isForeignTranslationBoundary(element)) return {prune: true, reason: 'foreign-translation'};
     if (isTagMetadataElement(element)) return {prune: true, reason: 'topic-tag'};
+    if (options?.isExcludedElement?.(element)) return {prune: true, reason: 'excluded-tag'};
     if (isHardPruneTag(element)) return {prune: true, reason: `protected-tag:${getElementTagName(element)}`};
     if (isMathRendererElement(element)) return {prune: true, reason: 'math-renderer'};
     if (hasNoTranslateMarker(element) && !isDocumentSurfaceNoTranslateShell(element) &&

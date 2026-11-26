@@ -92,7 +92,7 @@ describe('popup feature visibility', () => {
         expect(directive(highlight, 'bind', 'active')).toBe('props.activePanel');
         expect(directive(component, 'if')).toBe("browserCapabilities.browser !== 'userscript' && props.activeSection === 'settings-translation'");
         expect(directive(component, 'bind', 'active')).toBe("viewActive && props.activeSection === 'settings-translation'");
-        for (const name of ['reading', 'hover', 'input', 'page', 'context-menu', 'floating-ball', 'paragraph-copy', 'section-translation', 'excluded-languages']) {
+        for (const name of ['reading', 'hover', 'input', 'page', 'context-menu', 'floating-ball', 'paragraph-copy', 'section-translation', 'excluded-languages', 'excluded-tags']) {
             expect(panel(name)).toBeDefined();
             expect(directive(panel(name), 'bind', 'active')).toBe('props.activePanel');
         }
@@ -101,6 +101,7 @@ describe('popup feature visibility', () => {
             ['paragraph-copy', 'paragraph-copy-settings', 'ParagraphCopySettings'],
             ['section-translation', 'section-translation-settings', 'SectionTranslationSettings'],
             ['excluded-languages', 'excluded-language-settings', 'ExcludedLanguageSettings'],
+            ['excluded-tags', 'excluded-tag-settings', 'ExcludedTagSettings'],
         ]) {
             expect(panel(name).props.some(prop => prop.type === 6 && prop.name === 'id' && prop.value?.content === target)).toBe(true);
             expect(panel(name).children.some(node => node.type === 1 && node.tag === component)).toBe(true);

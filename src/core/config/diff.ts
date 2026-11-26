@@ -637,6 +637,8 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     quickTranslationProfiles: {group: 'translation', label: '快捷翻译方案', format: formatQuickTranslationProfiles},
     excludedLanguages: {group: 'translation', label: '不翻译的语言', format: value => Array.isArray(value)
         ? value.map(language => formatEnum(language, LANGUAGE_LABELS)).join('、') || '无' : '无'},
+    excludedTags: {group: 'translation', label: '不翻译的标签', format: value => Array.isArray(value)
+        ? formatArray(value) : formatValue(value)},
     glossaryEnabled: {group: 'translation', label: '术语库', format: formatBoolean},
     glossaryLibraries: {group: 'translation', label: '术语库内容', format: formatGlossaryLibraries},
 

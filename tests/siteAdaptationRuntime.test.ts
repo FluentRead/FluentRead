@@ -6,6 +6,11 @@ vi.mock('@/src/core/site-adaptation/catalog', () => ({builtinSiteRulePack: {vers
 }]}}));
 vi.mock('@/src/core/translation/current', () => ({
     setCurrentTranslationAdapters: () => effects.events.push('apply'),
+    setCurrentTranslationExcludedSelectors: (selectors: unknown) => {
+        const normalized = Array.isArray(selectors) ? selectors.map(String) : [];
+        effects.events.push(`excluded:${normalized.join(',')}`);
+        return normalized;
+    },
     setCurrentTranslationSidebarRegions: (enabled: boolean) => effects.events.push(`sidebar:${enabled}`),
 }));
 vi.mock('@/src/core/translation/text', () => ({
@@ -38,12 +43,13 @@ describe('content site adaptation composition', () => {
         expect(session.routeChanged(new URL('https://example.test/settings'))).toBe(false);
     });
 
-    it('publishes paragraph length and sidebar scope to the shared core, reporting only real changes', () => {
-        expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4, sidebarTranslationEnabled: true}))).toBe(true);
-        expect(effects.events).toEqual(['min:4', 'sidebar:true']);
+    it('publishes paragraph length, sidebar scope and excluded tags to the shared core, reporting only real changes', () => {
+        expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4, sidebarTranslationEnabled: true, excludedTags: ['blockquote']}))).toBe(true);
+        expect(effects.events).toEqual(['min:4', 'sidebar:true', 'excluded:blockquote']);
         effects.events = [];
-        expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4, sidebarTranslationEnabled: true}))).toBe(false);
-        expect(effects.events).toEqual(['min:4', 'sidebar:true']);
+        expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4, sidebarTranslationEnabled: true, excludedTags: ['blockquote']}))).toBe(false);
+        expect(effects.events).toEqual(['min:4', 'sidebar:true', 'excluded:blockquote']);
+        expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4, sidebarTranslationEnabled: true, excludedTags: ['blockquote', '.ad']}))).toBe(true);
         expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4}))).toBe(true);
         expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 9}))).toBe(true);
     });

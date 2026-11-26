@@ -56,6 +56,34 @@ import {
     inheritCachedFlag,
 } from './internal';
 import {resolveVisualTranslationRange} from './visual';
+import {normalizeExcludedTags} from '@/src/core/config/pageTranslation';
+
+const combinedExcludedSelectorsByDocument = new WeakMap<Document, Map<string, string | null>>();
+
+function getCombinedExcludedSelector(element: Element, selectors: readonly string[]): string | null {
+    const document = element.ownerDocument;
+    if (!document) return null;
+    const cacheKey = selectors.join('\u0000');
+    let documentCache = combinedExcludedSelectorsByDocument.get(document);
+    if (!documentCache) {
+        documentCache = new Map();
+        combinedExcludedSelectorsByDocument.set(document, documentCache);
+    }
+    if (documentCache.has(cacheKey)) return documentCache.get(cacheKey) ?? null;
+
+    const probe = document.createElement('div');
+    const valid = selectors.filter((selector) => {
+        try {
+            probe.matches(selector);
+            return true;
+        } catch {
+            return false;
+        }
+    });
+    const combined = valid.length > 0 ? valid.join(',') : null;
+    documentCache.set(cacheKey, combined);
+    return combined;
+}
 
 const maxHoverBarrierDiscoverySteps = 256;
 /**
@@ -191,6 +219,8 @@ export class TranslationCandidateCore {
     readonly scope: TranslationScope;
     /** 正文范围下是否把侧边栏与导航当作可翻译内容。 */
     readonly includeSidebarRegions: boolean;
+    /** 用户显式跳过翻译的 HTML 标签或 CSS 选择器列表。 */
+    readonly excludedSelectors: readonly string[];
     readonly adapters: readonly TranslationSiteAdapter[];
     private readonly context: AdapterContext;
     private readOnlyEpoch: SynchronousReadOnlyEpoch | null = null;
@@ -200,6 +230,7 @@ export class TranslationCandidateCore {
         this.url = options.url ?? currentURL();
         this.scope = options.scope ?? 'content';
         this.includeSidebarRegions = options.includeSidebarRegions === true;
+        this.excludedSelectors = normalizeExcludedTags(options.excludedSelectors);
         // 全部节点默认绕过站点正文边界，仅保留显式适用于全部范围的规则（如模型名称）。
         // 脚本、表单输入、代码、隐藏区域等保护仍由统一 DOM 硬守卫负责。
         this.adapters = (options.adapters ?? [])
@@ -218,15 +249,26 @@ export class TranslationCandidateCore {
         this.context = {url: this.url};
     }
 
-    /** 候选发现、请求取词及状态复验使用同一份精确禁译覆盖；无规则时保持原参数。 */
+    /** 候选发现、请求取词及状态复验使用同一份禁译覆盖与排除标签；无规则时保持原参数。 */
     textOptions(options?: TranslationTextProtectionOptions): TranslationTextProtectionOptions | undefined {
-        return this.adapters.some(adapter => adapter.forceTranslate?.length)
-            ? {...options, allowNoTranslate: this.allowNoTranslate}
-            : options;
+        const hasForceTranslate = this.adapters.some(adapter => adapter.forceTranslate?.length);
+        const hasExcludedSelectors = this.excludedSelectors.length > 0;
+        if (!hasForceTranslate && !hasExcludedSelectors) return options;
+        return {
+            ...options,
+            ...(hasForceTranslate ? {allowNoTranslate: this.allowNoTranslate} : {}),
+            ...(hasExcludedSelectors ? {isExcludedElement: this.matchesExcludedSelector} : {}),
+        };
     }
 
     private allowNoTranslate = (element: Element): boolean => this.adapters.some(adapter =>
         adapter.forceTranslate?.some(selector => safeMatches(element, selector)) === true);
+
+    private matchesExcludedSelector = (element: Element): boolean => {
+        if (this.excludedSelectors.length === 0 || isDocumentSurface(element)) return false;
+        const combined = getCombinedExcludedSelector(element, this.excludedSelectors);
+        return combined ? safeMatches(element, combined) : false;
+    };
 
     private newContext(options?: TranslationTextProtectionOptions): ResolutionEvaluationContext {
         return createResolutionEvaluationContext(this.textOptions(options));
@@ -323,6 +365,7 @@ export class TranslationCandidateCore {
     shouldStayOriginal = (element: Element): boolean => this.shouldStayOriginalWithContext(element, this.currentAdapterContext());
 
     private shouldStayOriginalWithContext(element: Element, context: AdapterContext): boolean {
+        if (this.matchesExcludedSelector(element)) return true;
         return this.adapters.some((adapter) => {
             try {
                 return adapter.shouldStayOriginal?.(element, context) === true;
@@ -864,7 +907,7 @@ export class TranslationCandidateCore {
             // 继承硬守卫适用于每个可能的祖先候选；遇到极深树时立即停止，避免反复上溯。
             const guard = this.hardGuard(current, evaluationContext);
             const guardReason = guard.reason;
-            if (guardReason === 'ancestor-depth-limit' || guardReason === 'foreign-translation') return null;
+            if (guardReason === 'ancestor-depth-limit' || guardReason === 'foreign-translation' || guardReason === 'excluded-tag') return null;
             // 外壳本身不是显式目标；避免在缺少更细粒度块边界的 SPA 中把整个应用根
             // 当作候选，同时允许继续向其上方寻找正常的页面结构。
             if (isTopLevelApplicationShell(current) &&
@@ -1245,6 +1288,7 @@ export class TranslationCandidateCore {
             if (!hit) break;
             const guard = evaluateHardGuard(hit, this.textOptions());
             if (guard.reason === 'contenteditable' ||
+                guard.reason === 'excluded-tag' ||
                 guard.reason === 'protected-tag:textarea' ||
                 guard.reason === 'protected-tag:select' ||
                 guard.reason === 'protected-tag:option' ||

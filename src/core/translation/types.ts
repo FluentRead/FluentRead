@@ -95,6 +95,8 @@ export interface TranslationCoreOptions {
     scope?: TranslationScope;
     /** 正文范围下把侧边栏与导航一并纳入候选发现。 */
     includeSidebarRegions?: boolean;
+    /** 用户显式跳过翻译的 HTML 标签或 CSS 选择器；在正文与全部节点范围均生效。 */
+    excludedSelectors?: readonly string[];
     url?: URL;
     adapters?: readonly TranslationSiteAdapter[];
 }

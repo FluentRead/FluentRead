@@ -93,6 +93,7 @@ export default defineConfig({
         resolve(__dirname, 'src/features/settings/ui/AiMultiSegmentSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/ReadingAssistanceSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/ExcludedLanguageSettings.vue'),
+        resolve(__dirname, 'src/features/settings/ui/ExcludedTagSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/HarnessPromptSettings.vue'),
         resolve(__dirname, 'src/features/video-subtitle/ui/VideoSentenceLearning.vue'),
         resolve(__dirname, 'docs/.vitepress/theme/BrandReader.vue'),

@@ -4,7 +4,7 @@
  * 主要内容：校验显式菜单输入，以六十秒和十六条限制管理票据及未完成窗口创建；等待目标身份落地后核对扩展页面与发送方，拒绝重放并清除失效正文。
  * 模块边界：不读取原生 PDF DOM、不下载文件、不调用翻译或磁盘存储；窗口、随机数与时钟均由应用层注入。
  */
-import {normalizeOnlinePdfUrl} from '@/src/features/document-translation/public';
+import {normalizeOnlinePdfUrl} from '@/src/features/document-translation/core/public';
 
 export interface NativePdfSelectionInput {text: string; sourceUrl: string; title: string;}
 export interface NativePdfSelectionSender {id?: string; url?: string; frameId?: number; tab?: {id?: number; windowId?: number};}

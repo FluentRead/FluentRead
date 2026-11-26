@@ -13,7 +13,7 @@ import {FREE_PROVIDER_ORIGINS} from '@/src/core/config/freeProviderOrigins';
 import {GOOGLE_DRIVE_DEFAULT_CLIENT_ID, GOOGLE_DRIVE_EXTENSION_ID, GOOGLE_DRIVE_EXTENSION_PUBLIC_KEY, GOOGLE_DRIVE_SCOPES} from '@/src/platform/google-drive/constants';
 import {createDriveAuth, type DriveAuthPorts} from '@/src/platform/google-drive/auth';
 import type {Entrypoint, EntrypointGroup, UserManifest} from 'wxt';
-import {remoteConfigStorageBuildPlugin, createExtensionManifest, extendRemoteConfigBuildConfig, groupModuleWorkers, finalizeExtensionZip, createSafariBackgroundPage, configureSafariBackgroundPage, configureStableContentUiResources, configureExtensionUiChunks} from '@/wxt.config';
+import {remoteConfigStorageBuildPlugin, createExtensionManifest, extendRemoteConfigBuildConfig, subframePageContextBuildPlugin, extendSubframePageContextBuildConfig, pruneEntrypointVitePlugins, attachRolldownTransformFilters, groupModuleWorkers, finalizeExtensionZip, createSafariBackgroundPage, configureSafariBackgroundPage, configureStableContentUiResources, configureExtensionUiChunks} from '@/wxt.config';
 import type {InlineConfig} from 'vite';
 
 const PROJECT_ROOT = resolve(__dirname, '..');
@@ -1499,5 +1499,89 @@ describe('extension manifest capability contract', () => {
         const library: InlineConfig = {build: {lib: {entry: 'fixture.ts', name: 'fixture'}}};
         configureExtensionUiChunks([{type: 'popup'}], library);
         expect(library.build!.rolldownOptions).toBeUndefined();
+    });
+
+    it('受限子 frame 内容脚本跳过 Defuddle 正文提取器，顶层网页与扩展页保留完整提取器', () => {
+        const plugin = subframePageContextBuildPlugin();
+        expect(plugin.enforce).toBe('pre');
+        const expected = resolve(PROJECT_ROOT, 'src/services/translation/context/subframeReadableExtractor.ts');
+        expect(plugin.resolveId(resolve(PROJECT_ROOT, 'src/services/translation/context/readableExtractor'))).toBe(expected);
+        expect(plugin.resolveId(resolve(PROJECT_ROOT, 'src/services/translation/context/readableExtractor.ts'))).toBe(expected);
+        expect(plugin.resolveId('./readableExtractor', resolve(PROJECT_ROOT, 'src/services/translation/context/browser.ts'))).toBe(expected);
+        expect(plugin.resolveId('./readableExtractor', resolve(PROJECT_ROOT, 'src/services/translation/other.ts'))).toBeNull();
+        expect(plugin.resolveId(resolve(PROJECT_ROOT, 'src/services/translation/context/browser.ts'))).toBeNull();
+
+        for (const name of ['youtubeEmbed', 'supportedFrame', 'neteaseMailFrame']) {
+            const config: {plugins?: unknown[]} = {plugins: ['existing']};
+            extendSubframePageContextBuildConfig([{type: 'content-script', name}], config);
+            expect(config.plugins).toEqual(['existing', expect.objectContaining({name: 'fluentread-subframe-page-context'})]);
+        }
+        for (const group of [
+            [],
+            [{type: 'content-script', name: 'content'}],
+            [{type: 'content-script', name: 'youtubeEmbed'}, {type: 'content-script', name: 'content'}],
+            [{type: 'popup', name: 'popup'}],
+            [{type: 'background', name: 'background'}],
+        ]) {
+            const config: {plugins?: unknown[]} = {plugins: []};
+            extendSubframePageContextBuildConfig(group, config);
+            expect(config.plugins).toEqual([]);
+        }
+    });
+
+    it('按入口类型裁剪无关 Vite 插件并保留各构建组必需插件', () => {
+        const samplePlugins = [
+            {name: 'vite:vue'},
+            {name: 'fluentread-shared-onnx'},
+            {name: 'fluentread-defuddle-entity-decoder'},
+            {name: 'fluentread-deferred-franc-models'},
+            {name: 'escape-extension-noncharacters'},
+        ];
+        const bridgeConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
+        pruneEntrypointVitePlugins([{type: 'content-script', name: 'youtubeBridge'}], bridgeConfig);
+        expect((bridgeConfig.plugins as {name: string}[]).map(plugin => plugin.name)).toEqual(['escape-extension-noncharacters']);
+
+        const contentConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
+        pruneEntrypointVitePlugins([{type: 'content-script', name: 'content'}], contentConfig);
+        expect((contentConfig.plugins as {name: string}[]).map(plugin => plugin.name)).toEqual([
+            'vite:vue',
+            'fluentread-defuddle-entity-decoder',
+            'fluentread-deferred-franc-models',
+            'escape-extension-noncharacters',
+        ]);
+
+        const subframeConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
+        pruneEntrypointVitePlugins([{type: 'content-script', name: 'youtubeEmbed'}], subframeConfig);
+        expect((subframeConfig.plugins as {name: string}[]).map(plugin => plugin.name)).toEqual([
+            'vite:vue',
+            'fluentread-deferred-franc-models',
+            'escape-extension-noncharacters',
+        ]);
+
+        const pageConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
+        pruneEntrypointVitePlugins([{type: 'options', name: 'options'}], pageConfig);
+        expect((pageConfig.plugins as {name: string}[]).map(plugin => plugin.name)).toEqual(samplePlugins.map(plugin => plugin.name));
+    });
+
+    it('为 unimport 与定点构建插件挂接 Rolldown 原生 transform 过滤器而不改写原插件实例', () => {
+        const originalUnimport = {name: 'unimport', transform: () => null};
+        const originalDefuddle = {name: 'fluentread-defuddle-entity-decoder', transform: () => null};
+        const untouched = {name: 'vite:vue', transform: () => null};
+        const config: {plugins?: unknown[]} = {plugins: [[originalUnimport], originalDefuddle, untouched]};
+        attachRolldownTransformFilters(config);
+
+        expect(typeof originalUnimport.transform).toBe('function');
+        const wrappedUnimport = (config.plugins![0] as {transform: {filter: {id: {exclude: RegExp[]}; code: RegExp}; handler: unknown}}[])[0];
+        expect(wrappedUnimport.transform.handler).toBe(originalUnimport.transform);
+        expect(wrappedUnimport.transform.filter.id.exclude.some(rule => rule.test('/app/src/core/i18n/messages/zh-CN.ts'))).toBe(true);
+        expect(wrappedUnimport.transform.filter.id.exclude.some(rule => rule.test('/app/src/app/background/runtime.ts'))).toBe(false);
+        expect(wrappedUnimport.transform.filter.code.test('browser.runtime.sendMessage({})')).toBe(true);
+        expect(wrappedUnimport.transform.filter.code.test('export const plain = 1;')).toBe(false);
+
+        const wrappedDefuddle = config.plugins![1] as {transform: {filter: {id: RegExp}; handler: unknown}};
+        expect(wrappedDefuddle.transform.handler).toBe(originalDefuddle.transform);
+        expect(wrappedDefuddle.transform.filter.id.test('/node_modules/defuddle/dist/index.js')).toBe(true);
+        expect(wrappedDefuddle.transform.filter.id.test('/src/app/content/runtime.ts')).toBe(false);
+        expect(config.plugins![2]).toBe(untouched);
     });
 });

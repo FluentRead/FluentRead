@@ -123,8 +123,9 @@ export function normalizeFloatingBallDisabledDomains(value: unknown): string[] {
 }
 
 function isSiteInDomainList(input: string | URL, domains: unknown): boolean {
+    if (!Array.isArray(domains) || domains.length === 0) return false;
     const currentDomain = getSiteBaseDomain(input);
-    if (!currentDomain || !Array.isArray(domains)) return false;
+    if (!currentDomain) return false;
     // 匹配只需要存在性；命中后不再解析其余条目，也不建立无用途的去重名单。
     for (const item of domains) {
         if (typeof item === 'string' && getSiteBaseDomain(item) === currentDomain) return true;

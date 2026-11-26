@@ -25,7 +25,7 @@
 </template>
 <script setup lang="ts">
 import {computed, defineAsyncComponent, h, onActivated, onBeforeUnmount, onDeactivated, ref, watch} from 'vue'
-import {VocabularyBook} from '@/src/features/vocabulary/ui/public'
+import * as vocabularyUi from '@/src/features/vocabulary/ui/public'
 import {useUiI18n} from '@/src/ui/i18n'
 import SegmentedControl from './components/SegmentedControl.vue'
 import UiIcon from '@/src/ui/components/UiIcon.vue'
@@ -57,8 +57,11 @@ const HarnessReadingHistory = defineAsyncComponent({
   loadingComponent: PanelLoading,
   errorComponent: PanelLoadError,
 })
+const VocabularyBook = vocabularyUi.VocabularyBook
 const MaterialWorkspace = defineAsyncComponent({
-  loader: () => import('@/src/features/vocabulary/ui/public').then(module => module.MaterialWorkspace),
+  loader: async () => 'loadMaterialWorkspace' in vocabularyUi && typeof vocabularyUi.loadMaterialWorkspace === 'function'
+    ? await vocabularyUi.loadMaterialWorkspace()
+    : await vocabularyUi.MaterialWorkspace,
   loadingComponent: PanelLoading,
   errorComponent: PanelLoadError,
 })

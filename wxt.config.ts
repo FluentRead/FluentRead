@@ -23,7 +23,7 @@ import {defuddleEntityBuildPlugin} from './scripts/testing/defuddle-entity-build
 import {francRuntimeBuildPlugin} from './scripts/testing/franc-runtime-build';
 import {hypothesisAssets} from './scripts/testing/hypothesis-assets';
 import {compactExtensionZip} from './scripts/wasm/compact-extension-zip';
-import type {InlineConfig} from 'vite';
+import type {InlineConfig, PluginOption} from 'vite';
 
 
 const packageJson = JSON.parse(fs.readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
@@ -120,6 +120,7 @@ function escapeExtensionNoncharacters() {
             // 写入扩展目录前再检查一次最终 chunk，覆盖后台脚本等产物。
             for (const chunk of Object.values(bundle)) {
                 if (chunk.type !== 'chunk' || chunk.code === undefined) continue;
+                if (!chunk.code.includes('\uFFFE') && !chunk.code.includes('\uFFFF')) continue;
 
                 const escaped = escapeActualNoncharacters(chunk.code);
                 if (escaped !== chunk.code) chunk.code = escaped;
@@ -152,6 +153,124 @@ export function extendRemoteConfigBuildConfig(
     const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page', 'sidepanel']);
     if (entrypoints.length === 0 || !entrypoints.every((entrypoint) => remoteOnlyTypes.has(entrypoint.type))) return;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), remoteConfigStorageBuildPlugin()];
+}
+
+const SUBFRAME_CONTENT_SCRIPT_NAMES = new Set(['youtubeEmbed', 'supportedFrame', 'neteaseMailFrame']);
+const BRIDGE_OR_WORKLET_NAMES = new Set(['bilibiliCaptionBridge', 'shadowBridge', 'xVideoBridge', 'youtubeBridge', 'youtubeEmbedBridge', 'videoPcmWorklet']);
+const NON_CONTENT_SCRIPT_PLUGIN_NAMES = new Set([
+    'fluentread-shared-onnx',
+    'wllama-static-extension-worker',
+    'fluent-read-tesseract-sdk-initialization',
+    'fluentread-pinned-pdfjs-bidi',
+    'fluentread-dictionary-script-runtime',
+    'fluentread-deeplx-runtime-fetch',
+]);
+
+/**
+ * 受限子 frame 内容脚本（嵌入播放器、受限评论/文档 frame、网易邮箱正文 frame）仅需已清洗的脱离 DOM 文本作为上下文，
+ * 不必各自内联 Defuddle + Turndown + MathML-to-LaTeX 正文提取器；顶层网页与扩展页仍保留完整提取器。
+ */
+export function subframePageContextBuildPlugin() {
+    const extractorModule = /[\\/]src[\\/]services[\\/]translation[\\/]context[\\/]readableExtractor(?:\.ts)?$/u;
+    const browserContextImporter = /[\\/]src[\\/]services[\\/]translation[\\/]context[\\/]browser\.ts$/u;
+    const subframeExtractor = resolve(__dirname, 'src/services/translation/context/subframeReadableExtractor.ts');
+    return {
+        name: 'fluentread-subframe-page-context',
+        enforce: 'pre' as const,
+        resolveId(source: string, importer?: string) {
+            if (extractorModule.test(source)) return subframeExtractor;
+            if ((source === './readableExtractor' || source === './readableExtractor.ts')
+                && importer && browserContextImporter.test(importer)) {
+                return subframeExtractor;
+            }
+            return null;
+        },
+    };
+}
+
+export function extendSubframePageContextBuildConfig(
+    entrypoints: readonly {type: string; name?: string}[],
+    viteConfig: {plugins?: unknown[]},
+): void {
+    if (entrypoints.length === 0 || !entrypoints.every((entrypoint) =>
+        entrypoint.type === 'content-script' && typeof entrypoint.name === 'string' && SUBFRAME_CONTENT_SCRIPT_NAMES.has(entrypoint.name))) return;
+    viteConfig.plugins = [...(viteConfig.plugins ?? []), subframePageContextBuildPlugin()];
+}
+
+/** 按入口构建组裁剪不可能命中的 Vite 插件，减少 13 组串行构建中无关插件的 hook 调度开销。 */
+export function pruneEntrypointVitePlugins(
+    entrypoints: readonly {type: string; name?: string}[],
+    viteConfig: {plugins?: unknown[]},
+): void {
+    if (entrypoints.length === 0 || !Array.isArray(viteConfig.plugins) || viteConfig.plugins.length === 0) return;
+    const removed = new Set<string>();
+    const allBridgesOrWorklet = entrypoints.every((entrypoint) =>
+        typeof entrypoint.name === 'string' && BRIDGE_OR_WORKLET_NAMES.has(entrypoint.name));
+    const allNonUiScripts = entrypoints.every((entrypoint) =>
+        entrypoint.type === 'background' || entrypoint.type === 'unlisted-script'
+        || (typeof entrypoint.name === 'string' && BRIDGE_OR_WORKLET_NAMES.has(entrypoint.name)));
+    const allContentScripts = entrypoints.every((entrypoint) => entrypoint.type === 'content-script');
+    const allSubframeContentScripts = allContentScripts && entrypoints.every((entrypoint) =>
+        typeof entrypoint.name === 'string' && SUBFRAME_CONTENT_SCRIPT_NAMES.has(entrypoint.name));
+    if (allNonUiScripts) {
+        removed.add('vite:vue');
+        removed.add('fluentread-defuddle-entity-decoder');
+    }
+    if (allContentScripts || allBridgesOrWorklet) {
+        for (const name of NON_CONTENT_SCRIPT_PLUGIN_NAMES) removed.add(name);
+    }
+    if (allSubframeContentScripts || allBridgesOrWorklet) {
+        removed.add('fluentread-defuddle-entity-decoder');
+    }
+    if (allBridgesOrWorklet) {
+        removed.add('fluentread-deferred-franc-models');
+    }
+    if (removed.size === 0) return;
+    viteConfig.plugins = viteConfig.plugins.filter((plugin) => {
+        if (!plugin || typeof plugin !== 'object' || Array.isArray(plugin)) return true;
+        const name = (plugin as {name?: unknown}).name;
+        return typeof name !== 'string' || !removed.has(name);
+    });
+}
+
+type RolldownTransformFilter = {
+    id?: RegExp | {include?: RegExp[]; exclude?: RegExp[]};
+    code?: RegExp;
+};
+
+const ROLLDOWN_TRANSFORM_FILTERS: Readonly<Record<string, RolldownTransformFilter>> = {
+    unimport: {
+        id: {
+            include: [/\.[jt]sx?$/, /\.vue(?:\?vue.*)?$/],
+            exclude: [/[\\/]node_modules[\\/]/, /[\\/]\.git[\\/]/, /[\\/]src[\\/](?:core|shared)[\\/]/],
+        },
+        code: /\b(?:ContentScriptContext|InvalidMatchPattern|MatchPattern|browser|createIframeUi|createIntegratedUi|createShadowRootUi|defineAppConfig|defineBackground|defineContentScript|defineUnlistedScript|defineWxtPlugin|fakeBrowser|getAppConfig|injectScript|storage|useAppConfig)\b/,
+    },
+    'fluentread-defuddle-entity-decoder': {id: /(?:^|[\\/])defuddle[\\/]dist[\\/]index\.js$/},
+    'fluentread-deferred-franc-models': {id: /(?:^|[\\/])franc-min[\\/]index\.js$/},
+    'wllama-static-extension-worker': {id: /@wllama[\\/]wllama[\\/]esm[\\/]index\.js$/},
+    'fluent-read-tesseract-sdk-initialization': {id: /tesseract\.js[\\/]src[\\/]createWorker\.js(?:\?.*)?$/},
+};
+
+/** 为 legacy Rollup/unplugin transform 挂接 Rolldown 原生过滤器，在 Rust 侧跳过无关模块以减少跨边界调用。 */
+export function attachRolldownTransformFilters(viteConfig: {plugins?: unknown[]}): void {
+    if (!Array.isArray(viteConfig.plugins) || viteConfig.plugins.length === 0) return;
+    const apply = (entry: unknown): unknown => {
+        if (Array.isArray(entry)) return entry.map(apply);
+        if (!entry || typeof entry !== 'object') return entry;
+        const plugin = entry as {name?: unknown; transform?: unknown};
+        if (typeof plugin.name !== 'string') return entry;
+        const filter = ROLLDOWN_TRANSFORM_FILTERS[plugin.name];
+        if (!filter || !plugin.transform) return entry;
+        if (typeof plugin.transform === 'function') {
+            return {...plugin, transform: {filter, handler: plugin.transform}};
+        }
+        if (typeof plugin.transform === 'object' && !('filter' in plugin.transform)) {
+            return {...plugin, transform: {...plugin.transform, filter}};
+        }
+        return entry;
+    };
+    viteConfig.plugins = viteConfig.plugins.map(apply);
 }
 
 /** 这些入口都由 new Worker(..., {type: 'module'}) 启动，可共享一次 ESM 构建及依赖 chunk。 */
@@ -281,6 +400,32 @@ export function createExtensionManifest(
 }
 
 
+let cachedBuildStaticSetup: {
+    alias: ReturnType<typeof createReadingDictionaryAliases>;
+    plugins: PluginOption[];
+} | undefined;
+
+function getBuildStaticSetup() {
+    if (!cachedBuildStaticSetup) {
+        cachedBuildStaticSetup = {
+            alias: createReadingDictionaryAliases(__dirname),
+            plugins: [
+                dictionaryScriptBuildPlugin(),
+                createDeepLXRuntimeBuildPlugin(__dirname),
+                createPdfReaderBidiBuildPlugin(__dirname),
+                extensionCspBuildPlugin(),
+                defuddleEntityBuildPlugin(),
+                francRuntimeBuildPlugin(),
+                sharedOnnxBuildPlugin(),
+                wllamaExtensionWorker(),
+                tesseractSdkBuildPlugin(),
+                escapeExtensionNoncharacters(),
+            ],
+        };
+    }
+    return cachedBuildStaticSetup;
+}
+
 // WXT 配置参考：https://wxt.dev/api/config.html
 export default defineConfig({
     modules: ['@wxt-dev/webextension-polyfill'],
@@ -309,17 +454,19 @@ export default defineConfig({
         },
     },
     imports: {
+        // Vue 模板不使用 WXT 自动导入；源文件的进一步过滤由 attachRolldownTransformFilters 在 Rolldown 原生侧执行。
         addons: {
-            vueTemplate: true,
+            vueTemplate: false,
         },
     },
     vite: (env) => {
         const isProductionBuild = env.command === 'build' && env.mode === 'production';
         const browserTargets: Readonly<Record<string, string>> = {chrome: 'chrome87', edge: 'edge88', firefox: 'firefox140', safari: 'safari26'};
+        const staticSetup = getBuildStaticSetup();
         return {
             // 固定版本的本地分词算法通过缓存适配器读取纯数据，不采用供应商自带的网络加载器。
-            resolve: {alias: createReadingDictionaryAliases(__dirname)},
-            plugins: [dictionaryScriptBuildPlugin(), createDeepLXRuntimeBuildPlugin(__dirname), createPdfReaderBidiBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), francRuntimeBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
+            resolve: {alias: staticSetup.alias},
+            plugins: [...staticSetup.plugins, vue()],
             // WXT 默认在每个开发脚本中内联源码与 sourcemap；需要源码调试时显式开启。
             build: {
                 // WXT 不展示 Vite 的 gzip 统计；实际产物和安装包继续由独立体积门禁校验。
@@ -527,6 +674,9 @@ export default defineConfig({
         },
         'vite:build:extendConfig': (entrypoints, viteConfig) => {
             extendRemoteConfigBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
+            extendSubframePageContextBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
+            pruneEntrypointVitePlugins(entrypoints, viteConfig as {plugins?: unknown[]});
+            attachRolldownTransformFilters(viteConfig as {plugins?: unknown[]});
             configureExtensionUiChunks(entrypoints, viteConfig);
             // Vite 的动态导入预加载帮助器访问 document；模块 Worker 只能使用原生 import。
             if (entrypoints.every(entrypoint => entrypoint.type === 'unlisted-script')) {

@@ -49,16 +49,19 @@ function ownMessage(catalog: MessageCatalog | undefined, key: string): string | 
 function getMessageLegacyCatalog(language: UiLanguage, bundle: UiLanguageBundle): MessageCatalog {
     let catalog = messageLegacyCatalogs.get(language);
     if (!catalog) {
-        catalog = Object.fromEntries(
-            Object.entries(defaultMessages).map(([key, source]) => [source, ownMessage(bundle.messages, key) ?? source]),
-        );
+        const built = Object.create(null) as Record<string, string>;
+        for (const key of Object.keys(defaultMessages)) {
+            const source = defaultMessages[key]!;
+            built[source] = ownMessage(bundle.messages, key) ?? source;
+        }
+        catalog = built;
         messageLegacyCatalogs.set(language, catalog);
     }
     return catalog;
 }
 
 function formatMessage(template: string, params?: TranslationParams): string {
-    if (!params) return template;
+    if (!params || !template.includes('{')) return template;
     return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (placeholder, name: string) => {
         const value = Object.hasOwn(params, name) ? params[name] : undefined;
         return value === undefined || value === null ? placeholder : String(value);
@@ -146,13 +149,16 @@ function getExactLegacyText(value: string, language: UiLanguage): string | undef
     return bundle && (ownMessage(bundle.legacyText, value) ?? ownMessage(getMessageLegacyCatalog(language, bundle), value));
 }
 
+const LEGACY_PLACEHOLDER_PATTERN = /\{(\d+)\}/gu;
+
 function* applyLegacyPatterns(patterns: readonly CompiledLegacyPattern[], value: string, language: UiLanguage): Generator<string, string | undefined, string> {
     for (const {pattern, template, localizedCaptures} of patterns) {
         const match = pattern.exec(value);
         if (!match) continue;
+        if (!template.includes('{')) return template;
         let translated = '';
         let cursor = 0;
-        for (const placeholder of template.matchAll(/\{(\d+)\}/gu)) {
+        for (const placeholder of template.matchAll(LEGACY_PLACEHOLDER_PATTERN)) {
             const capture = match[Number(placeholder[1])] ?? '';
             translated += template.slice(cursor, placeholder.index);
             cursor = placeholder.index + placeholder[0].length;

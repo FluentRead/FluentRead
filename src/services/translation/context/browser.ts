@@ -14,6 +14,7 @@ import {
     shouldUseBoundedPageCapture,
 } from './policy';
 import {resetPageDiscourseContext} from './pageDiscourse';
+import {loadReadablePageExtractor} from './readableExtractor';
 
 interface PageTranslationSnapshot {
     url: string;
@@ -38,12 +39,6 @@ interface PendingPageTranslationSnapshot {
 let cachedSnapshot: PageTranslationSnapshot | null = null;
 let pendingSnapshot: PendingPageTranslationSnapshot | null = null;
 let snapshotGeneration = 0;
-interface ReadablePageExtractor {
-    Defuddle: typeof import('defuddle')['default'];
-    createReadablePageMarkdown: typeof import('./markdown')['createReadablePageMarkdown'];
-}
-
-let defuddleModulePromise: Promise<ReadablePageExtractor> | null = null;
 
 const PAGE_CONTEXT_EXCLUDED_SELECTOR = [
     'script', 'style', 'noscript', 'template', 'svg', 'math', 'pre', 'code',
@@ -72,13 +67,14 @@ function sanitizePageContextSnapshot(root: ParentNode): void {
     // 步骤 2：剩余文章节点只保留文本结构；URL、data/event 与辅助输入属性都可能携带私密值。
     root.querySelectorAll('*').forEach((node) => {
         const element = node as Element;
-        if (!element.attributes || typeof element.removeAttribute !== 'function') return;
-        const names: string[] = [];
-        for (let index = 0; index < element.attributes.length; index += 1) {
-            const attribute = element.attributes.item(index);
-            if (attribute && SENSITIVE_SNAPSHOT_ATTRIBUTE.test(attribute.name)) names.push(attribute.name);
+        const attributes = element.attributes;
+        if (!attributes || typeof element.removeAttribute !== 'function') return;
+        for (let index = attributes.length - 1; index >= 0; index -= 1) {
+            const attribute = attributes.item(index);
+            if (attribute && SENSITIVE_SNAPSHOT_ATTRIBUTE.test(attribute.name)) {
+                element.removeAttribute(attribute.name);
+            }
         }
-        names.forEach((name) => element.removeAttribute(name));
     });
 }
 
@@ -211,26 +207,14 @@ function captureReadablePage(): CapturedReadablePage {
     return {url, documentSnapshot, bodySnapshot, boundedText: null};
 }
 
-function loadDefuddleModule(): Promise<ReadablePageExtractor> {
-    if (defuddleModulePromise) return defuddleModulePromise;
-    const pending = Promise.all([import('defuddle'), import('./markdown')])
-        .then(([{default: Defuddle}, {createReadablePageMarkdown}]) => ({Defuddle, createReadablePageMarkdown}));
-    const wrapped = pending.catch((error) => {
-        // 已创建的模块加载 Promise 在结算前不可替换。
-        defuddleModulePromise = null;
-        throw error;
-    });
-    defuddleModulePromise = wrapped;
-    return defuddleModulePromise;
-}
-
 async function extractReadablePageText(source: CapturedReadablePage): Promise<string> {
     if (source.boundedText !== null) return source.boundedText;
     try {
-        const {Defuddle, createReadablePageMarkdown} = await loadDefuddleModule();
+        const extractor = await loadReadablePageExtractor();
         const snapshot = source.documentSnapshot;
 
-        if (snapshot) {
+        if (extractor && snapshot) {
+            const {Defuddle, createReadablePageMarkdown} = extractor;
             const result = await Promise.resolve(new Defuddle(snapshot, {
                 url: source.url,
                 useAsync: false,

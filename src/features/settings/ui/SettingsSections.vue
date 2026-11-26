@@ -587,7 +587,6 @@
 
 <script lang="ts" setup>
 import SettingsPanel from './components/SettingsPanel.vue';
-import PrivacyProtectionSettings from './PrivacyProtectionSettings.vue';
 import {VIDEO_COURSE_PLATFORMS} from '@/src/core/config/videoCourse';
 const courseSiteLabels = {bilibili: 'Bilibili', udemy: 'Udemy', edx: 'edX'};
 import ServiceRepairReturn from './services/ServiceRepairReturn.vue';
@@ -735,6 +734,7 @@ import {applyInterfaceTheme} from '@/src/ui/interfaceAppearance';
 const ConfigManagement = defineAsyncComponent(() => import('./ConfigManagement.vue'));
 const QuickTranslationProfiles = defineAsyncComponent(() => import('./QuickTranslationProfiles.vue'));
 const ContextMenuSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./ContextMenuSettings.vue'));
+const PrivacyProtectionSettings = defineAsyncComponent(() => import('./PrivacyProtectionSettings.vue'));
 import {useTranslationShortcutSettings} from './useTranslationShortcutSettings';
 import {useSettingsActionContext} from '../model/useSettingsActionContext';
 import {useConfigEditor} from '../model/useConfigEditor';

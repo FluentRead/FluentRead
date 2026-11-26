@@ -19,6 +19,11 @@ let contentScriptContext: ContentScriptContext | null = null;
 let modalDialogHost: ReturnType<typeof createModalDialogHostController> | null = null;
 let selectionHostRecovery: {selectionChanged(range: Range | null): void; dispose(): void} | null = null;
 
+/** 使用已经由可信页面交互命中的范围，保留浏览器当前选区。 */
+export function translateSelectionFromRange(range: Range): boolean {
+  return selectionTranslatorInstance?.translateExplicitRange?.(range) === true;
+}
+
 /** 只观察 host 的祖先节点，不扫描正文子树；连续拒绝两次后等待下一次有效选区。 */
 function watchSelectionHost(host: HTMLElement, requestId: number, context: ContentScriptContext) {
   if (!host?.ownerDocument || typeof MutationObserver === 'undefined') return null;

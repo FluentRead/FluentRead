@@ -15,6 +15,11 @@
       <span class="highlight-enable-copy"><strong>{{ t('informationHighlight.enabled') }}</strong><small>{{ t('informationHighlight.enabled.description') }}</small></span>
       <ElSwitch :model-value="config.informationHighlight.enabled" :disabled="!context.active.value" :aria-label="t('informationHighlight.enabled')" :onUpdate:modelValue="actions.enabled" data-information-highlight-enabled />
     </div>
+    <div v-if="!compact" class="highlight-enable">
+      <span class="highlight-enable-copy"><strong>{{ translateLegacy('点击高亮词语翻译') }}</strong></span>
+      <ElSwitch :model-value="config.informationHighlight.clickToTranslate === true" :disabled="!context.active.value"
+        :aria-label="translateLegacy('点击高亮词语翻译')" :onUpdate:modelValue="actions.clickToTranslate" />
+    </div>
     <label v-if="showMode" class="highlight-field">
       <span>{{ t('informationHighlight.mode') }}</span>
       <UiSelect :model-value="config.informationHighlight.mode" :disabled="!context.active.value" :aria-label="t('informationHighlight.mode')" :onUpdate:modelValue="actions.mode" data-information-highlight-mode-select>
@@ -73,7 +78,7 @@ import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation'
 import {findEnabledQuickTranslationHotkeyConflict, inputBoxTranslationTriggerHotkey} from '@/src/core/config/quickTranslation'
 const CustomHotkeyInput = defineAsyncComponent(() => import('@/src/ui/components/CustomHotkeyInput.vue'))
 const props = withDefaults(defineProps<{config: Config; active?: boolean; compact?: boolean; showMode?: boolean; showDensity?: boolean; showAppearance?: boolean}>(), {active: true, compact: false, showMode: true, showDensity: true, showAppearance: true})
-const {t} = useUiI18n()
+const {t, translateLegacy} = useUiI18n()
 const context = useSettingsActionContext(() => props.active, () => [props.config, props.config.informationHighlight])
 const modes: InformationHighlightMode[] = ['keywords', 'surprisal-local']
 const densities: InformationHighlightDensity[] = ['low', 'medium', 'high']
@@ -111,6 +116,8 @@ const actions = computed(() => {
     closeHotkey(); props.config.informationHighlight = {...props.config.informationHighlight, hotkeyEnabled: value === true}
   }, enabled: (value: unknown) => {
     if (current()) props.config.informationHighlight = {...props.config.informationHighlight, enabled: value === true}
+  }, clickToTranslate: (value: unknown) => {
+    if (current()) props.config.informationHighlight = {...props.config.informationHighlight, clickToTranslate: value === true ? true : undefined}
   }, mode: (value: unknown) => {
     if (current() && modes.includes(value as InformationHighlightMode)) props.config.informationHighlight = {...props.config.informationHighlight, mode: value as InformationHighlightMode}
   }}

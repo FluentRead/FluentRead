@@ -15,6 +15,7 @@ export type InformationHighlightIntensity = 'soft' | 'standard' | 'strong';
 
 export interface InformationHighlightPreferences {
     enabled: boolean;
+    clickToTranslate?: true;
     hotkey: string;
     hotkeyEnabled: boolean;
     mode: InformationHighlightMode;
@@ -38,6 +39,7 @@ export function normalizeInformationHighlightPreferences(value: unknown): Inform
     // 每个列表的首项是缺失或非法值的回退。
     return {
         enabled: record.enabled === true,
+        ...(record.clickToTranslate === true ? {clickToTranslate: true as const} : {}),
         hotkey: hotkey === '' ? '' : (typeof hotkey === 'string' && canonicalizeHotkey(hotkey)) || 'Alt+H',
         hotkeyEnabled: record.hotkeyEnabled === true,
         mode: oneOf(record.mode, ['keywords', 'surprisal-local']),

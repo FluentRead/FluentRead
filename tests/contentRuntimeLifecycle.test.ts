@@ -78,7 +78,7 @@ vi.mock('@/src/app/content/features', async () => {
         'mountParagraphCopyContentFeature', 'mountSectionTranslationContentFeature',
         'readVisibleTranslationRoot',
         'unmountAreaTranslator', 'unmountFloatingBall',
-        'unmountImageTranslator', 'unmountSelectionTranslator', 'unmountTranslationProgressPanel',
+        'unmountImageTranslator', 'unmountSelectionTranslator', 'unmountTranslationProgressPanel', 'translateSelectionFromRange',
     ].map(name => [name, vi.fn()])),
     mountParagraphCopyContentFeature: mocks.mountParagraphCopyContentFeature,
     isFloatingBallAllowedOnPage: () => mocks.floatingBallAllowed,

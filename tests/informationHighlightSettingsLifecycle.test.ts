@@ -85,7 +85,7 @@ beforeEach(async () => {
       return null
     }, load(id) {
       if (id === '\0highlight-settings-browser') return `export default {runtime: {sendMessage: globalThis.${key}.send}}`
-      if (id === '\0highlight-settings-i18n') return `export const useUiI18n = () => ({t: (key, params) => key === 'informationHighlight.preview.story' ? globalThis.${key}.previewStory : params ? key + ' ' + JSON.stringify(params) : key});`
+      if (id === '\0highlight-settings-i18n') return `export const useUiI18n = () => ({t: (key, params) => key === 'informationHighlight.preview.story' ? globalThis.${key}.previewStory : params ? key + ' ' + JSON.stringify(params) : key, translateLegacy: text => text});`
       if (id === '\0highlight-settings-options') return `import {h} from 'vue';export const ElMessage = {warning: globalThis.${key}.warnings}; export const ElOption = {render: () => null}; export const ElSwitch = {inheritAttrs: false, setup(_, {attrs}) {return () => h('button', attrs)}}; export const ElTooltip = globalThis.${key}.Tooltip; export const ElDialog = globalThis.${key}.Dialog;`
       if (id === '\0highlight-settings-hotkey') return "import {h} from 'vue'; export default {inheritAttrs: false, setup(_, {attrs}) {return () => h('div', {...attrs, 'data-highlight-hotkey-recorder': ''})}};"
       if (id === '\0highlight-settings-select') return "import {h} from 'vue';export default {setup(_, {attrs, slots}) {return () => h('div', attrs, slots.default?.())}};"

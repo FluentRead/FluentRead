@@ -30,6 +30,7 @@ import {
     mountHoverTranslationContentFeature, mountParagraphCopyContentFeature, mountSectionTranslationContentFeature,
     mountVideoSubtitleTranslation,
     isSupportedVideoPage,
+    translateSelectionFromRange,
     restoreOriginalContent, resetFullPageTranslationRouteState, createPageTranslationDisplayModeSync,
 } from './features';
 import {mountConfiguredQuickTranslation} from './quickTranslationRuntime';
@@ -91,7 +92,10 @@ export async function startContentApp(ctx: ContentScriptContext,
     let inputBoxConfigGeneration = 0;
     let previousInputBoxConfigKey = inputBoxTranslationConfigKey(config);
     const pageTranslationFont = import.meta.env.BROWSER === 'userscript' ? undefined : createPageTranslationFontRuntime({document, onChange: () => document.dispatchEvent(new Event('fluentread-page-translation-font-changed'))});
-    const informationHighlight = import.meta.env.BROWSER === 'userscript' ? undefined : createPageInformationHighlightRuntime({document, config, send: message => browser.runtime.sendMessage(message), canToggle: () => !currentPageSiteDisabled && !pageLifecycle.isSuspended()});
+    const informationHighlight = import.meta.env.BROWSER === 'userscript' ? undefined : createPageInformationHighlightRuntime({
+        document, config, send: message => browser.runtime.sendMessage(message),
+        canToggle: () => !currentPageSiteDisabled && !pageLifecycle.isSuspended(), translateRange: translateSelectionFromRange,
+    });
     const hotkeys = createContentHotkeyRuntime(() => currentPageSiteDisabled);
     const inputTranslationFeature = createInputTranslationContentFeature({
         context: ctx,

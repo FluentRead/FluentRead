@@ -618,8 +618,8 @@ describe('audit48D Worker controlled model ports', () => {
   external.env.backends.onnx.wasm={};const getURL=vi.fn(path => 'chrome-extension://fixture/'+path);vi.stubGlobal('chrome',{runtime:{getURL}});
   const s=await startWorker(async function*(){yield {audio:{audio:new Float32Array([0.5]),sampling_rate:24000}};});
   await expect(s.send({requestId:1,type:'prepare'})).resolves.toMatchObject({success:true,backend:'wasm'});
-  expect(fetchPort).toHaveBeenCalledOnce();expect(fetchPort.mock.calls[0][0]).toBe('chrome-extension://fixture/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm');
-  expect(external.env.backends.onnx.wasm).toMatchObject({numThreads:1,proxy:false,wasmBinary:undefined,wasmPaths:{mjs:'chrome-extension://fixture/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs',wasm:'chrome-extension://fixture/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'}});
+  expect(fetchPort).toHaveBeenCalledOnce();expect(fetchPort.mock.calls[0][0]).toBe('chrome-extension://fixture/fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm');
+  expect(external.env.backends.onnx.wasm).toMatchObject({numThreads:1,proxy:false,wasmBinary:undefined,wasmPaths:{mjs:'chrome-extension://fixture/fluent-read-ai/ort-wasm-simd-threaded.jspi.mjs',wasm:'chrome-extension://fixture/fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm'}});
   await s.send({requestId:2,type:'dispose'});
  });
  it('reads fixed model and voice caches for string URL and Request inputs and forwards only packaged requests', async () => {

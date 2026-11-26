@@ -23,7 +23,7 @@ import {
 import {VIDEO_AI_MODEL_REVISION} from '@/src/features/video-subtitle/modelFiles';
 import {parseWhisperChunkTimestamps} from './timestampParser';
 import {buildWhisperTranscriptionGenerationOptions, chooseWhisperSourceLanguage, normalizeWhisperSourceLanguage, type WhisperDetectedLanguage} from './transcriptionOptions';
-import {configureOnnxWasmBackend, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
+import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
 import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 import {prepareWhisperEncoderReuse, prepareWhisperProcessorReuse, withWhisperStoppingCriteria, type WhisperAudioProcessor, type WhisperEncoderReuse, type WhisperEncoderReuseModel, type WhisperProcessorReuse} from './whisperEncoderReuse';
 import type {InferenceBackend} from '@/src/core/messaging/inference';
@@ -87,10 +87,7 @@ if (env.backends.onnx.wasm) {
   env.backends.onnx.wasm.numThreads = localWasmThreads();
   // Dedicated worker 已经是隔离执行上下文；proxy worker 在扩展页面中
   // 反而会触发 extension:// WASM 加载失败，因此保持关闭。
-  configureOnnxWasmBackend(env.backends.onnx.wasm, {
-    mjs: extensionUrl('fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'),
-    wasm: extensionUrl('fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'),
-  });
+  configureOnnxWasmBackend(env.backends.onnx.wasm, resolveOnnxWasmAssetPaths(extensionUrl));
 }
 }
 
@@ -166,7 +163,7 @@ async function createWasmTranscriber(modelId: string, model: ReturnType<typeof n
     }) as unknown as Promise<LocalTranscriber>;
     const wasm = env.backends.onnx.wasm;
     const transcriber = await paceLocalInitialization(() => wasm
-      ? withCompressedWasmBinary(wasm, extensionUrl('fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'), createPipeline)
+      ? withCompressedWasmBinary(wasm, resolveOnnxWasmAssetPaths(extensionUrl).wasm, createPipeline)
       : createPipeline());
     transcriberDtype = dtype;
     transcriberEncoderDtype = model === 'small' ? 'fp32' : dtype;
@@ -205,7 +202,7 @@ async function createLocalTranscriber(
       }) as unknown as Promise<LocalTranscriber>;
       const wasm = env.backends.onnx.wasm;
       gpuTranscriber = await paceLocalInitialization(() => wasm
-        ? withCompressedWasmBinary(wasm, extensionUrl('fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'), createPipeline)
+        ? withCompressedWasmBinary(wasm, resolveOnnxWasmAssetPaths(extensionUrl).wasm, createPipeline)
         : createPipeline());
       transcriberBackend = 'webgpu';
       transcriberDtype = 'q4';

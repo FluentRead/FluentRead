@@ -14,5 +14,6 @@ describe('共享 ONNX 构建', () => {
         expect(plugin.resolveId('onnxruntime-node')).toBeNull();
         expect(plugin.resolveId('other-package')).toBeNull();
         expect(readFileSync(resolve(sharedOnnxDist(), 'ort-wasm-simd-threaded.asyncify.wasm')).subarray(0, 4)).toEqual(Buffer.from([0,97,115,109]));
+        expect(readFileSync(resolve(sharedOnnxDist(), 'ort-wasm-simd-threaded.jspi.wasm')).subarray(0, 4)).toEqual(Buffer.from([0,97,115,109]));
     });
 });

@@ -114,8 +114,11 @@ export function instrumentWasmDiagnostics(source: string, runtime: 'onnx' | 'tes
 export function packageWasmDiagnostics(root: string, sourcePath: string, fileName: string, runtime: 'onnx' | 'tesseract'): string {
     const adapter = fs.readFileSync(path.resolve(root, 'scripts/wasm/diagnostics.js'), 'utf8');
     const original = fs.readFileSync(sourcePath, 'utf8');
-    const source = runtime === 'onnx' && fileName === 'ort-wasm-simd-threaded.asyncify.mjs'
-        ? patchExtensionVendorSource('onnx-asyncify', original) : original;
+    const source = runtime === 'onnx' && fileName === 'ort-wasm-simd-threaded.jspi.mjs'
+        ? patchExtensionVendorSource('onnx-jspi', original)
+        : runtime === 'onnx' && fileName === 'ort-wasm-simd-threaded.asyncify.mjs'
+            ? patchExtensionVendorSource('onnx-asyncify', original)
+            : original;
     const output = path.resolve(root, '.wxt/packaged-wasm', fileName);
     fs.mkdirSync(path.dirname(output), {recursive: true});
     fs.writeFileSync(output, instrumentWasmDiagnostics(source, runtime, adapter));

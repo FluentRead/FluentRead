@@ -18,7 +18,7 @@ import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources'
 import {mangaInferenceClient, mangaExtensionUrl, type MangaInferenceProgress} from './mangaInferenceClient';
 import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 import {protectMangaSession} from './mangaSessionFallback';
-import {configureOnnxWasmBackend} from '@/src/shared/onnx/wasmBinary';
+import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
 import {assertMangaOcrActive, loadMangaOcrAssets, removeMangaOcrAssets, withMangaModelAdmission, withMangaModelRemoval} from './mangaOcrAssets';
 import type {MangaOcrItem,MangaRegion} from './mangaRegions';
 import {findMangaBubbleLayout,assignMangaLayoutBubbles,collectMangaRegions,type MangaOcrPage} from './mangaBubbles';
@@ -211,10 +211,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
     // 两个包共享同一 ONNX 实例；在导入 SDK 前覆盖其 CDN 默认路径，符合扩展 CSP。
     const ort = await import('onnxruntime-web/webgpu');
     ort.env.wasm.numThreads = localWasmThreads();
-    configureOnnxWasmBackend(ort.env.wasm, {
-        mjs: mangaExtensionUrl('/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'),
-        wasm: mangaExtensionUrl('/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'),
-    });
+    configureOnnxWasmBackend(ort.env.wasm, resolveOnnxWasmAssetPaths(mangaExtensionUrl, {leadingSlash: true}));
     const {PaddleOcrService,DetectionService,RecognitionService} = await import('ppu-paddle-ocr/web');
     const gpu=await probeWebGpu();
     let activeSignal=signal;

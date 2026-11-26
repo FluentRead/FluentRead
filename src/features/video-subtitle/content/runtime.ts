@@ -1324,25 +1324,17 @@ function mountVideoSubtitleRuntime(): () => void {
     xNativeCaptionSyncTimer = setTimeout(() => {
       xNativeCaptionSyncTimer = undefined;
       if (destroyed) return;
-      ensurePretranslationTrack();
-      syncXVideoCaptionSource();
-      scheduleUpdate();
-      schedulePretranslation();
+      ensurePretranslationTrack(); syncXVideoCaptionSource(); scheduleUpdate(); schedulePretranslation();
     }, 0);
   };
-
   const handleDocumentClick = (event: MouseEvent) => {
     const target = event.target;
     if (isXVideoPage() && target instanceof Element) {
-      const player = playerLocator.getTarget()?.player;
-      const control = target.closest('button, [role="button"]');
-      if (player && control && player.contains(control) && isXNativeCaptionControl(control)) {
-        scheduleXNativeCaptionSync();
-      }
+      const player = playerLocator.getTarget()?.player, control = target.closest('button, [role="button"]');
+      if (player && control && player.contains(control) && isXNativeCaptionControl(control)) scheduleXNativeCaptionSync();
     }
     if (!event.isTrusted) return;
-    if (!menuElement?.isConnected || menuElement.hidden) return;
-    if (!(target instanceof Node)) return;
+    if (!menuElement?.isConnected || menuElement.hidden || !(target instanceof Node)) return;
     if (buttonElement?.contains(target) || menuElement.contains(target)) return;
     closeMenu();
   };

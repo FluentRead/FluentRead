@@ -1529,6 +1529,44 @@ describe('extension manifest capability contract', () => {
         }
     });
 
+    it('正文提取器与词汇 UI 按需加载入口满足缓存复用、失败重置和子 frame 空实现契约', async () => {
+        const {loadReadablePageExtractor: loadSubframeExtractor} = await import('@/src/services/translation/context/subframeReadableExtractor');
+        await expect(loadSubframeExtractor()).resolves.toBeNull();
+
+        vi.resetModules();
+        vi.doMock('defuddle', () => {
+            throw new Error('transient defuddle load failure');
+        });
+        try {
+            const failingModule = await import('@/src/services/translation/context/readableExtractor');
+            await expect(failingModule.loadReadablePageExtractor()).rejects.toThrow();
+            vi.doUnmock('defuddle');
+            const first = failingModule.loadReadablePageExtractor();
+            const second = failingModule.loadReadablePageExtractor();
+            expect(second).toBe(first);
+            const loaded = await first;
+            expect(typeof loaded?.Defuddle).toBe('function');
+            expect(typeof loaded?.createReadablePageMarkdown).toBe('function');
+        } finally {
+            vi.doUnmock('defuddle');
+        }
+
+        const stubWorkspace = {name: 'StubMaterialWorkspace'};
+        const stubBook = {name: 'StubVocabularyBook'};
+        vi.resetModules();
+        vi.doMock('@/src/features/vocabulary/ui/MaterialWorkspace.vue', () => ({default: stubWorkspace}));
+        vi.doMock('@/src/features/vocabulary/ui/VocabularyBook.vue', () => ({default: stubBook}));
+        try {
+            const vocabUi = await import('@/src/features/vocabulary/ui/public');
+            expect(vocabUi.VocabularyBook).toBe(stubBook);
+            expect(vocabUi.MaterialWorkspace).toBeDefined();
+            await expect(vocabUi.loadMaterialWorkspace()).resolves.toBe(stubWorkspace);
+        } finally {
+            vi.doUnmock('@/src/features/vocabulary/ui/MaterialWorkspace.vue');
+            vi.doUnmock('@/src/features/vocabulary/ui/VocabularyBook.vue');
+        }
+    });
+
     it('按入口类型裁剪无关 Vite 插件并保留各构建组必需插件', () => {
         const samplePlugins = [
             {name: 'vite:vue'},

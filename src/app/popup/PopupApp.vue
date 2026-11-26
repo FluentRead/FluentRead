@@ -326,7 +326,7 @@
       size="auto"
       :with-header="false"
       :append-to-body="true"
-      :close-on-press-escape="activeDrawer !== 'services'"
+      :close-on-press-escape="false"
       modal-class="popup-drawer-modal"
       class="popup-drawer"
       :class="{ 'popup-quick-drawer': ['hover', 'selection', 'image'].includes(activeDrawer), 'popup-services-drawer': activeDrawer === 'services' }"
@@ -1213,10 +1213,26 @@ function closeDonation() {
 function handlePopupKeydown(event: KeyboardEvent) {
   if (!popupContext.active.value) return;
   if (event.key === 'Escape') {
-    if (drawerVisible.value && activeDrawer.value === 'services') {
-      // 服务选择和概览共用抽屉，先处理内部返回并阻止浏览器关闭 Popup。
+    if (document.querySelector('.fluentread-popup-language-popper[aria-hidden="false"], .el-select__popper[aria-hidden="false"]')) {
+      // 语言下拉菜单打开时先交由菜单收起，并阻止浏览器直接关闭整个 Popup。
       event.preventDefault();
-      if (!servicesPanel.value?.backToOverview()) drawerActions.value.close();
+      return;
+    }
+    if (donationVisible.value) {
+      event.preventDefault();
+      closeDonation();
+      return;
+    }
+    if (drawerVisible.value) {
+      // 任何子抽屉打开时，Escape 统一返回上级视图或主菜单，并阻止浏览器直接关闭整个 Popup。
+      event.preventDefault();
+      if (activeDrawer.value === 'services') {
+        if (!servicesPanel.value?.backToOverview?.()) drawerActions.value.close();
+      } else if (activeDrawer.value === 'aiContext') {
+        drawerActions.value.services();
+      } else {
+        drawerActions.value.close();
+      }
       return;
     }
     brandTooltip.value?.onClose();
@@ -1227,10 +1243,7 @@ function handlePopupKeydown(event: KeyboardEvent) {
     displayModeTooltip.value?.hide();
   }
   if (!donationVisible.value) return;
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    closeDonation();
-  } else if (event.key === 'Tab') {
+  if (event.key === 'Tab') {
     const controls = donationCard.value?.querySelectorAll<HTMLElement>('button, a[href]');
     if (!controls?.length) return;
     const first = controls[0];

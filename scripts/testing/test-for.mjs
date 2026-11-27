@@ -13,15 +13,14 @@
  */
 
 import {spawn} from 'node:child_process';
-import {mkdirSync, rmSync, writeFileSync} from 'node:fs';
+import {mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {analyze as analyzeCoverage, formatText as formatCoverageGaps} from './coverage-gaps.mjs';
-import {analyzeDependencyGraph, collectAffectedClosure} from './dependency-graph.mjs';
+import {analyzeProjectDependencyGraph, collectAffectedClosure} from './dependency-graph.mjs';
 import {
     REPO_WIDE_ARCHITECTURE_GATE,
-    loadWorkspaceFiles,
     scopedCoverageConfig,
     strictCoveragePaths,
 } from './run-affected-tests.mjs';
@@ -30,7 +29,7 @@ const PROJECT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const COVERAGE_CONFIG = 'tests/config/vitest.coverage.config.ts';
 
 export function parseArguments(argv) {
-    const options = {targets: [], dryRun: false, coverage: false, includeArch: false, reporter: 'dot', testNamePattern: null, json: false, help: false};
+    const options = {targets: [], dryRun: false, coverage: false, includeArch: false, noCache: false, reporter: 'dot', testNamePattern: null, json: false, help: false};
     for (let index = 0; index < argv.length; index++) {
         const arg = argv[index];
         if (arg === '--') continue;
@@ -38,6 +37,7 @@ export function parseArguments(argv) {
         if (arg === '--dry-run') {options.dryRun = true; continue;}
         if (arg === '--coverage') {options.coverage = true; continue;}
         if (arg === '--include-arch') {options.includeArch = true; continue;}
+        if (arg === '--no-cache') {options.noCache = true; continue;}
         if (arg === '--json') {options.json = true; continue;}
         if (arg === '--reporter' || arg === '-t' || arg === '--testNamePattern') {
             const value = argv[++index];
@@ -63,11 +63,10 @@ function normalizeTarget(root, raw) {
 }
 
 export function planTestsForPaths(root, rawTargets, options = {}) {
-    const files = loadWorkspaceFiles(root);
-    const matrix = JSON.parse(files['tests/test-matrix.json']);
+    const {reverse, known, existingFiles} = analyzeProjectDependencyGraph(root, {noCache: Boolean(options.noCache)});
+    const matrix = JSON.parse(readFileSync(path.join(root, 'tests/test-matrix.json'), 'utf8'));
     const allMatrixTests = new Set(Object.values(matrix.groups).flat());
-    const repoArchGates = (matrix.groups.architecture ?? []).filter(file => REPO_WIDE_ARCHITECTURE_GATE.test(file) && Object.hasOwn(files, file));
-    const {reverse, known} = analyzeDependencyGraph(files);
+    const repoArchGates = (matrix.groups.architecture ?? []).filter(file => REPO_WIDE_ARCHITECTURE_GATE.test(file) && existingFiles.has(file));
 
     const matchedTargets = new Set();
     for (const raw of rawTargets) {
@@ -89,7 +88,7 @@ export function planTestsForPaths(root, rawTargets, options = {}) {
 
     const targets = [...matchedTargets].sort();
     const closure = collectAffectedClosure(reverse, targets);
-    const selected = [...closure].filter(file => allMatrixTests.has(file) && Object.hasOwn(files, file));
+    const selected = [...closure].filter(file => allMatrixTests.has(file) && existingFiles.has(file));
     if (options.includeArch) {
         for (const gate of repoArchGates) selected.push(gate);
     }
@@ -98,7 +97,7 @@ export function planTestsForPaths(root, rawTargets, options = {}) {
         throw new Error(`目标路径没有可追踪的运行时测试（若为纯类型文件请运行 pnpm compile）：${rawTargets.join(', ')}`);
     }
 
-    const strictSet = new Set(strictCoveragePaths(files[COVERAGE_CONFIG]));
+    const strictSet = new Set(strictCoveragePaths(readFileSync(path.join(root, COVERAGE_CONFIG), 'utf8')));
     const coverageFiles = options.coverage ? targets.filter(file => strictSet.has(file)) : [];
     return {targets, testFiles, coverageFiles};
 }

@@ -89,8 +89,8 @@ describe('audit48 J complete rendering through controlled Canvas port',()=>{
  });
  it.each(SHARE_CARD_THEMES)('renders %s with columns/alignment/footer and exact literal text',async theme=>{
   const port=canvasPort();const result=await renderShareCard({original:'123 مرحبا',translation:'<svg>',source:'example.test'},normalizeShareCardPreferences({theme,fontSize:'large'}));
-  expect(result.width).toBe(960);expect(result.height).toBeGreaterThanOrEqual(450);expect(result.blob.type).toBe('image/png');
-  expect(port.painted.map(x=>x.text)).toEqual(['123 مرحبا','<svg>','example.test','流畅阅读']);
+  expect(result.width).toBe(1280);expect(result.height).toBeGreaterThanOrEqual(600);expect(result.blob.type).toBe('image/png');
+  expect(port.painted.map(x=>x.text)).toEqual(['123 مرحبا','<svg>','example.test']);
   expect(port.painted[0].direction).toBe('rtl');expect(port.painted[0].align).toBe(theme==='sky'||theme==='sunset'?'center':'right');
   expect(port.operations.filter(x=>x[0]==='save')).toHaveLength(1);expect(port.operations.filter(x=>x[0]==='restore')).toHaveLength(1);
  });
@@ -125,7 +125,7 @@ describe('audit48 J complete rendering through controlled Canvas port',()=>{
   expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));expect(port.canvases[0].width).toBe(0);port.encodings[0](new Blob(['late']));await settle();expect(port.canvases[0].height).toBe(0);
  });
  it('detaches cancellation after successful encoding with an active signal',async()=>{
-  canvasPort();const ctl=new AbortController(),remove=vi.spyOn(ctl.signal,'removeEventListener');const output=await renderShareCard({original:'x',translation:'y',source:''},normalizeShareCardPreferences(),ctl.signal);expect(output.width).toBe(960);expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));ctl.abort();expect(output.canvas.width).toBe(960);
+  canvasPort();const ctl=new AbortController(),remove=vi.spyOn(ctl.signal,'removeEventListener');const output=await renderShareCard({original:'x',translation:'y',source:''},normalizeShareCardPreferences(),ctl.signal);expect(output.width).toBe(1280);expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));ctl.abort();expect(output.canvas.width).toBe(1280);
  });
 });
 
@@ -180,19 +180,17 @@ async function client(copyAvailable=true) {
 }
 
 describe('audit48 J actual ShareCardStudio client template and public runtime',()=>{
- it('品牌通过实际工作台传入，语言和同语言资源迟到均重绘而保留摘录',async()=>{
+ it('工作台不绘制流畅阅读标记且隐藏署名开关，切换语言保持摘录不变',async()=>{
   ports.config.uiLanguage='zh-CN';const ctx=await client();await ctx.studio.open(ctx.source);await ctx.paint();
   const first=ctx.port.canvases.at(-1),firstSize=[first.width,first.height],originalText=ctx.source.original;
-  expect(ctx.port.painted.at(-1).text).toBe('流畅阅读');expect(ctx.port.painted.map(x=>x.text).join(' ')).toContain(originalText);
-  ports.brandOverride!.value='流畅阅读';ports.config.uiLanguage='en-US';await ctx.paint();
-  expect(ctx.port.painted.at(-1).text).toBe('流畅阅读');
-  const beforeResource=ctx.port.canvases.length;
-  ports.brandOverride!.value='FluentRead';await ctx.paint();
-  expect(ctx.port.canvases.length).toBeGreaterThan(beforeResource);expect(ctx.port.painted.at(-1).text).toBe('FluentRead');
-  const foreign=ctx.port.canvases.at(-1);expect([foreign.width,foreign.height]).toEqual(firstSize);
+  expect(ctx.doc.querySelector('[data-setting="showBrand"]')).toBeNull();
+  expect(ctx.port.painted.map(x=>x.text)).not.toContain('流畅阅读');
+  expect(ctx.port.painted.map(x=>x.text)).not.toContain('FluentRead');
   expect(ctx.port.painted.map(x=>x.text).join(' ')).toContain(originalText);
-  ports.brandOverride!.value=undefined;ports.config.uiLanguage='zh-CN';await ctx.paint();
-  expect(ctx.port.painted.at(-1).text).toBe('流畅阅读');
+  ports.config.uiLanguage='en-US';await ctx.paint();
+  const foreign=ctx.port.canvases.at(-1);expect([foreign.width,foreign.height]).toEqual(firstSize);
+  expect(ctx.port.painted.map(x=>x.text)).not.toContain('FluentRead');
+  expect(ctx.port.painted.map(x=>x.text).join(' ')).toContain(originalText);
   ctx.studio.close();await settle();expect(ctx.urls.size).toBe(0);
  });
  it('waits for config hydration before opening with persisted appearance and preserves the host',async()=>{
@@ -218,7 +216,7 @@ describe('audit48 J actual ShareCardStudio client template and public runtime',(
  });
  it('edits through actual textarea/switch/size/format controls, rejects invalid content and renders retry',async()=>{
   const ctx=await client();await ctx.studio.open(ctx.source);await ctx.paint();
-  ctx.event('[data-font-size="small"]');ctx.event('[data-format="square"]');ctx.event('[data-setting="showBrand"]','onChange',{target:{checked:false}});ctx.event('.fr-card-edit','onToggle',{target:{open:true}});await ctx.paint();
+  ctx.event('[data-font-size="small"]');ctx.event('[data-format="square"]');ctx.event('[data-setting="translationFirst"]','onChange',{target:{checked:true}});await ctx.paint();
   expect(ctx.doc.querySelector('[data-font-size="small"]')?.getAttribute('aria-pressed')).toBe('true');expect(ctx.doc.querySelector('[data-format="square"]')?.getAttribute('aria-pressed')).toBe('true');
   ctx.input('textarea','');await ctx.paint();expect(ctx.doc.querySelector('.fr-card-feedback')?.textContent).toContain('shareCard.error.empty');expect(ctx.doc.querySelector('.fr-card-primary')?.hasAttribute('disabled')).toBe(true);
   ctx.input('textarea','recovered');await ctx.paint();expect(ctx.doc.querySelector('canvas')?.getAttribute('role')).toBe('img');expect(ctx.doc.querySelector('.fr-card-primary')?.hasAttribute('disabled')).toBe(false);

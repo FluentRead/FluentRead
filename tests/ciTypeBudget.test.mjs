@@ -80,7 +80,8 @@ test('workflow uses the helper for complete compile and leaves global 4 GiB sett
         assert.equal((source.match(/node scripts\/testing\/run-ci-typecheck\.mjs/gu)??[]).length,1);
         assert.doesNotMatch(source,/max-old-space-size=6144/u);
     }
-    assert.match(extension,/- name: Check extension and shared Vue types\n\s+if: steps\.affected\.outputs\.extension_changed == 'true'\n\s+run: node scripts\/testing\/run-ci-typecheck\.mjs/u);
+    assert.match(extension,/\btypecheck:\n\s+needs: plan-and-audit\n\s+if: needs\.plan-and-audit\.outputs\.extension_changed == 'true'[\s\S]*?- name: Check extension and shared Vue types\n\s+run: node scripts\/testing\/run-ci-typecheck\.mjs/u);
+    assert.match(extension,/\bplan-and-audit:\n[\s\S]*?run-affected-tests\.mjs --plan-only/u);
     assert.match(extension,/node --test --test-concurrency=1 tests\/\*\.test\.mjs/u);
     assert.match(release,/- name: Audit and check types\n\s+run: \|\n\s+pnpm test:audit\n\s+node --test tests\/ciTypeBudget\.test\.mjs\n\s+node scripts\/testing\/run-ci-typecheck\.mjs/u);
     const helper=readFileSync('scripts/testing/run-ci-typecheck.mjs','utf8');

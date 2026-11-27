@@ -38,25 +38,31 @@
 ## 实现原则
 
 - `src/` 下每个 TypeScript、Vue、CSS 与 Markdown 文件必须从第一个字符开始书写中文长注释，明确 `@file` 路径、文件职责、主要内容和模块边界；职责变化时同步更新，不得复制空泛模板。
+- 新增功能界面文案必须使用按功能拆分的模块化 JSON（`src/core/i18n/messages/<feature>/*.json`）配强类型封装（参照 `src/core/i18n/messages/dictionaryWorkspace.ts`，可用 `pnpm i18n:scaffold -- <feature>` 生成脚手架），禁止向 7 个巨型单体语言文件（`zh-CN.ts`、`en-US.ts`、`es-ES.ts`、`fr-FR.ts`、`ja-JP.ts`、`ko-KR.ts`、`ru-RU.ts`）追加新功能键。
 - 修复问题时处理根因，并覆盖翻译、恢复原文、重复触发、动态 DOM、页面卸载和失败重试等相关状态。
 - 引入新的翻译服务时放入 `src/providers/translation/`，通过 provider registry 与 `src/services/translation` 接入；补齐配置可见性、错误处理和调用路径，不在 UI 组件中直接散落网络请求。
 - 从参考项目借鉴功能时，将概念适配为 Vue/TypeScript 实现；不要引入 React 专用依赖或跨仓库运行时耦合。
 - 控制改动范围，不顺手重写无关代码；除非任务需要，不升级依赖或改变构建工具。
-- 搜索限定当前任务 checkout 的相关子目录；文档先定位标题再读片段，避免重复读取其他 worktree、历史报告和构建产物。
+- 优先用 `pnpm find:module -- <keyword>` 基于 `@file` 头快速定位模块，避免盲目全仓搜索；搜索限定当前任务 checkout 的相关子目录；文档先定位标题再读片段，避免重复读取其他 worktree、历史报告和构建产物。
 - 用户可见行为变化同步更新相关文档；版本号和发布产物仅在用户明确要求发布时修改。
 
 ## 验证
 
+- 低 token 日常开发循环（优先使用，避免无筛选全量运行）：
+  - `pnpm test:for -- <paths>`：即时运行与改动文件直接相关的受影响测试。
+  - `pnpm verify:dev` / `pnpm verify:dev -- --compile`：一站式低 token 审计、手写 `.d.mts` 声明检查、受影响测试与严格 100% 覆盖率（直接输出缺口行号）。
+  - `pnpm test:affected:plan` / `pnpm test:affected`：查看或运行相对基线的受影响测试集合。
+  - `pnpm test:impact --hubs` / `pnpm test:impact --explain <file>`：查看高扇出核心模块或单文件测试影响链。
+  - `pnpm test:coverage:gaps`：直接列出覆盖率缺口行与分支。
+  - `pnpm sync:registries -- --check` / `--write`：保持 `vitest.coverage.config.ts` 与 `test-matrix.json` 登记同步。
+  - 本地提交门禁：运行 `pnpm hooks:install`（`git config core.hooksPath .githooks`）启用 `.githooks/pre-commit`，或按需运行 `pnpm check:staged`。
 - 测试分组、覆盖率定义和一键回归以 [测试与回归](docs/testing.md) 为准。
 - 测试文档入口按专题指向详细案例，只读取相关部分。分组命令接受文件/目录和 `-t` 筛选，先用 `--dry-run` 核对范围；未知参数或零匹配须失败，不能静默扩大测试。
 - 完整测试/构建日志写入证据目录，终端只返回摘要、相关失败及路径；原始诊断、错误/告警门禁和退出码保持可核对。
 - 测试与回归须检查 FluentRead 自身的运行时错误和告警，覆盖本次相关的内容脚本隔离世界、扩展页面与后台；在导航/加载前开始采集，重载后继续采集新后台。发现错误或告警须定位、修复并重跑相关用例，不能仅凭功能断言或构建成功判为通过。诊断归属、负向用例预期和采集缺口按 `docs/testing.md` 的门禁记录，禁止宽泛忽略、吞异常或删除日志掩盖问题。
-- 使用 `pnpm test:audit` 检查测试唯一归类、重复用例、`.only`、无说明 `.skip` 和覆盖率忽略。
-- 按改动选择 `pnpm test:architecture`、`pnpm test:unit`、`pnpm test:functional`、`pnpm test:regression`。
+- 使用 `pnpm test:audit` 检查测试唯一归类、重复用例、`.only`、无说明 `.skip` 和覆盖率忽略；按改动选择 `pnpm test:architecture`、`pnpm test:unit`、`pnpm test:functional`、`pnpm test:regression`。
 - 迁入 `src` 的可执行业务模块使用 `pnpm test:coverage`，statements/branches/functions/lines 四维均须 100%。
-- 使用 `pnpm compile` 做 TypeScript/Vue 类型检查。
-- 涉及扩展构建或入口行为时同时运行 `pnpm build` 与 `pnpm build:firefox`；共享翻译或平台代码还要运行 `pnpm build:userscript` 和 userscript verifier。
-- 涉及文档时运行 `pnpm docs:build`。
+- 使用 `pnpm compile` 做 TypeScript/Vue 类型检查；涉及扩展构建或入口行为时同时运行 `pnpm build` 与 `pnpm build:firefox`；共享翻译或平台代码还要运行 `pnpm build:userscript` 和 userscript verifier；涉及文档时运行 `pnpm docs:build`。
 - `pnpm test:regression:all` 执行确定性的一键回归。真实浏览器层必须显式开启，使用临时 profile、第二屏可见但不抢焦点的正常尺寸窗口和 focus-safe helper；不得连接用户日常 profile、最小化窗口或调用 `bringToFront()`。
 - 自动化按键名称使用标准 `Control`，不要使用 `CTRL`；浏览器报告必须说明 launch mode、focus policy、window placement、执行范围与证据目录。
 - 不把参考项目自身的测试通过视为 FluentRead 的验证结果。

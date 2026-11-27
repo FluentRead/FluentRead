@@ -2983,7 +2983,9 @@ describe('userscript appearance registry data owner', () => {
 describe('standalone immutable glossary and UI catalogs', () => {
     const targets = [
         ['src/core/glossary/builtins.ts', ['BUILTIN_GLOSSARIES']],
-        ['src/core/config/catalog.ts', ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels', 'currentModelIds', 'cloudCredentialLabels']],
+        ['src/core/config/catalog/targetLanguageLabels.ts', ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels']],
+        ['src/core/config/catalog/models.ts', ['currentModelIds']],
+        ['src/core/config/catalog/services.ts', ['cloudCredentialLabels']],
         ['src/core/config/featureServices.ts', ['featureServiceDefinitions']],
         ['src/core/config/videoSubtitleAppearance.ts', ['VIDEO_SUBTITLE_SKINS']],
         ['src/features/settings/model/chromeTranslationPreparation.ts', ['TEST_SAMPLES']],

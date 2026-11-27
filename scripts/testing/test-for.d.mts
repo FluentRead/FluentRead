@@ -3,6 +3,7 @@ export interface TestForOptions {
     dryRun: boolean;
     coverage: boolean;
     includeArch: boolean;
+    noCache: boolean;
     reporter: string;
     testNamePattern: string | null;
     json: boolean;

@@ -27,10 +27,10 @@ function locate(): void {
 </script>
 <style scoped>
 .fr-reading-evidence-wrap { display: inline; }
-.fr-reading-evidence { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin: 0 2px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--fr-reading-muted, #756a74); font: inherit; line-height: 1; vertical-align: text-bottom; cursor: pointer; }
-.fr-reading-evidence svg { width: 16px; height: 16px; fill: currentColor; stroke: none; }
-.fr-reading-evidence:hover, .fr-reading-evidence:focus-visible { color: var(--fr-reading-button, #a64b6e); background: var(--fr-reading-soft, #faf7f9); }
-.fr-reading-evidence:focus-visible { outline: 2px solid var(--fr-reading-button, #a64b6e); outline-offset: 1px; }
+.fr-reading-evidence { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin: 0 2px; padding: 0; border: 0; border-radius: 5px; background: none; color: var(--fr-reading-muted, #5d6678); font: inherit; line-height: 1; vertical-align: text-bottom; cursor: pointer; transition: color 120ms cubic-bezier(.23, 1, .32, 1), background-color 120ms cubic-bezier(.23, 1, .32, 1); }
+.fr-reading-evidence svg { width: 15px; height: 15px; fill: currentColor; stroke: none; }
+.fr-reading-evidence:hover, .fr-reading-evidence:focus-visible { color: var(--fr-reading-button, #d4235a); background: var(--fr-reading-active-bg, #fff0f5); }
+.fr-reading-evidence:focus-visible { outline: 2px solid var(--fr-reading-button, #d4235a); outline-offset: 1px; }
 .fr-reading-evidence-status { font-size: 12px; color: var(--fr-answer-quote, inherit); }
 .fr-reading-evidence-status.is-located { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 </style>

@@ -20,6 +20,7 @@ import {
     CODE,
     DEPENDENCY_CONTENT,
     analyzeDependencyGraph,
+    analyzeProjectDependencyGraph,
     buildDependencyGraph,
     collectAffectedClosure,
     explainDependencies,
@@ -131,6 +132,7 @@ export function selectAffected({
     coverageRuntimeChanged = false,
     inertGlobalInputs = [],
     allArchitecture = false,
+    analysis = null,
 }) {
     const allTests = GROUPS.flatMap(group => matrix.groups?.[group] ?? []);
     if (new Set(allTests).size !== allTests.length) throw new Error('测试矩阵存在重复归类');
@@ -143,9 +145,14 @@ export function selectAffected({
     const alwaysRunSet = new Set(alwaysRunArchitecture);
     const scopedTests = allTests.filter(file => !alwaysRunSet.has(file) && Object.hasOwn(files, file));
 
-    const nodes = {...files};
-    for (const file of changed) nodes[file] ??= ''; // 被删除源码仍保留在解析空间内。
-    const {reverse} = analyzeDependencyGraph(nodes);
+    let reverse;
+    if (analysis) {
+        reverse = analysis.reverse;
+    } else {
+        const nodes = {...files};
+        for (const file of changed) nodes[file] ??= ''; // 被删除源码仍保留在解析空间内。
+        ({reverse} = analyzeDependencyGraph(nodes));
+    }
     const affected = collectAffectedClosure(reverse, [...changed, ...coverageAdded]);
 
     // inertGlobalInputs 只用于撤销「文件被改但语义未变」的扩大，例如仅新增 npm script 的 package.json。
@@ -172,12 +179,16 @@ export function selectAffected({
     };
 }
 
-export function loadWorkspaceFiles(root, extraPaths = []) {
-    const paths = [...new Set([
+function listWorkspacePaths(root, extraPaths = []) {
+    return [...new Set([
         ...git(root, ['ls-files', '-z']).split('\0'),
         ...git(root, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0'),
         ...extraPaths,
     ].filter(Boolean))];
+}
+
+export function loadWorkspaceFiles(root, extraPaths = []) {
+    const paths = listWorkspacePaths(root, extraPaths);
     return Object.fromEntries(paths.filter(file => existsSync(path.join(root, file)))
         .map(file => [file, CODE.test(file) && (DEPENDENCY_CONTENT.test(file) || !file.includes('/'))
             ? readFileSync(path.join(root, file), 'utf8') : '']));
@@ -187,8 +198,18 @@ export function createPlan(root, base, options = {}) {
     const difference = options.explicitFiles
         ? {base: git(root, ['rev-parse', 'HEAD']).trim(), paths: [...new Set(options.explicitFiles)].sort()}
         : changedPaths(root, base);
-    const files = loadWorkspaceFiles(root, difference.paths);
-    const coverageConfig = files[COVERAGE_CONFIG];
+    const workspacePaths = listWorkspacePaths(root, difference.paths);
+    const existingOnDisk = workspacePaths.filter(file => existsSync(path.join(root, file)));
+    const existingOnDiskSet = new Set(existingOnDisk);
+    const virtualEmptyFiles = difference.paths.filter(file => !existingOnDiskSet.has(file));
+    const analysis = analyzeProjectDependencyGraph(root, {
+        filePaths: existingOnDisk,
+        virtualEmptyFiles,
+        noCache: Boolean(options.noCache),
+    });
+    const coverageConfig = analysis.existingFiles.has(COVERAGE_CONFIG)
+        ? readFileSync(path.join(root, COVERAGE_CONFIG), 'utf8')
+        : '';
     const coveragePaths = strictCoveragePaths(coverageConfig);
     let coverageRuntimeChanged = false;
     let coverageAdded = [];
@@ -204,28 +225,31 @@ export function createPlan(root, base, options = {}) {
     let inertGlobalInputs = [];
     const baselineManifest = !options.explicitFiles && difference.paths.includes('package.json')
         && git(root, ['ls-tree', '--name-only', difference.base, '--', 'package.json']).trim();
-    if (baselineManifest && Object.hasOwn(files, 'package.json')) {
+    if (baselineManifest && analysis.existingFiles.has('package.json')) {
         try {
             const previous = git(root, ['show', `${difference.base}:package.json`]);
-            if (packageJsonRuntimeSignature(previous) === packageJsonRuntimeSignature(files['package.json'])) {
+            const currentPackageJson = readFileSync(path.join(root, 'package.json'), 'utf8');
+            if (packageJsonRuntimeSignature(previous) === packageJsonRuntimeSignature(currentPackageJson)) {
                 inertGlobalInputs = ['package.json'];
             }
         } catch {
             // 基线缺失或 JSON 不可解析时保持原有全量扩大，不静默缩小验证范围。
         }
     }
+    const files = Object.fromEntries([...analysis.existingFiles].map(file => [file, '']));
     return {
         base: difference.base,
         head: git(root, ['rev-parse', 'HEAD']).trim(),
         ...selectAffected({
             files,
             changed: difference.paths,
-            matrix: JSON.parse(files['tests/test-matrix.json']),
+            matrix: JSON.parse(readFileSync(path.join(root, 'tests/test-matrix.json'), 'utf8')),
             coveragePaths,
             coverageAdded,
             coverageRuntimeChanged,
             inertGlobalInputs,
             allArchitecture: Boolean(options.allArchitecture),
+            analysis,
         }),
     };
 }
@@ -311,7 +335,7 @@ export function renderSummary(plan) {
 }
 
 export async function main(argv = process.argv.slice(2), env = process.env) {
-    const allowed = new Set(['--base', '--report', '--files', '--reporter', '--plan-only', '--summary', '--all-architecture', '--help']);
+    const allowed = new Set(['--base', '--report', '--files', '--reporter', '--plan-only', '--summary', '--all-architecture', '--no-cache', '--help']);
     const options = {};
     for (let index = 0; index < argv.length; index++) {
         const arg = argv[index];
@@ -324,7 +348,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         } else options[arg] = true;
     }
     if (options['--help']) {
-        console.log('node scripts/testing/run-affected-tests.mjs [--base <git-ref> | --files <p1,p2>] [--report <json>] [--reporter <name>] [--all-architecture] [--plan-only] [--summary]');
+        console.log('node scripts/testing/run-affected-tests.mjs [--base <git-ref> | --files <p1,p2>] [--report <json>] [--reporter <name>] [--all-architecture] [--no-cache] [--plan-only] [--summary]');
         return;
     }
     const explicitFiles = options['--files']
@@ -333,6 +357,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     const plan = createPlan(PROJECT_ROOT, options['--base'] ?? env.FLUENTREAD_CI_BASE ?? 'origin/main', {
         explicitFiles,
         allArchitecture: Boolean(options['--all-architecture']),
+        noCache: Boolean(options['--no-cache']),
     });
     if (options['--report']) {
         const report = path.resolve(PROJECT_ROOT, options['--report']);

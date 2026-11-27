@@ -7,15 +7,26 @@
  * - 隔离矩阵/覆盖率清单等注册表数据文件，阻止它们作为反向星型枢纽把无关源码与测试耦合在一起；
  * - 仅在真实路径/文件/夹具上下文提取非 import 引用，并将目录回退限定在夹具、资源与数据目录，消除断言字符串和临时目录脚手架误报；
  * - 输出边来源（import / barrel-symbol / dynamic-import / vi-mock / file-read / template / directory / css-import / vue-asset）供门禁与诊断共用。
- * 模块边界：纯静态分析与内存图计算，不执行测试、不读写 Git、不修改磁盘；供 run-affected-tests、test-impact 与 test-for 复用。
+ * 模块边界：analyzeDependencyGraph / buildDependencyGraph 保持纯内存静态分析，不执行测试、不读写 Git、不修改磁盘；analyzeProjectDependencyGraph 提供可选的 .wxt/cache/dep-graph-v1.json 增量磁盘缓存，供 run-affected-tests、test-impact 与 test-for 复用。
  */
 
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import ts from 'typescript';
 
 export const CODE = /\.(?:[cm]?[jt]sx?|vue|css|html|json)$/u;
 export const DEPENDENCY_CONTENT = /^(?:src|entrypoints|userscript|scripts|tests|docs\/\.vitepress)\//u;
 export const TEST_FILE_PATTERN = /^tests\/.*\.test\.(?:[cm]?[jt]s)$/u;
+export const DEFAULT_DEP_GRAPH_CACHE_PATH = '.wxt/cache/dep-graph-v1.json';
+const SELF_SOURCE_HASH = createHash('sha256')
+    .update(readFileSync(fileURLToPath(import.meta.url), 'utf8'))
+    .digest('hex')
+    .slice(0, 12);
+export const DEP_GRAPH_CACHE_VERSION = `dep-graph-v1:${ts.version}:${SELF_SOURCE_HASH}`;
+const WALK_SKIPPED_DIRS = new Set(['node_modules', '.git', '.wxt', '.output', 'coverage', 'dist', 'temp']);
 
 // 清单/注册表数据文件按文本列出仓库内数百个路径，不能作为反向依赖枢纽把任意源码改动桥接到无关测试。
 // 当注册表文件自身改动时，引用它的测试仍通过自身出边被精确选中。
@@ -374,15 +385,141 @@ function parseScriptModule(file, source) {
     return {runtimeImports, reexports, starReexports, localExports, fileRefs, styleRefs, templateAssets, hasRuntimeBody, isPureBarrel};
 }
 
+function createEmptyModuleInfo() {
+    return {
+        runtimeImports: [],
+        reexports: [],
+        starReexports: [],
+        localExports: new Set(),
+        fileRefs: [],
+        styleRefs: [],
+        templateAssets: [],
+        hasRuntimeBody: false,
+        isPureBarrel: false,
+    };
+}
+
 function parseModule(file, source) {
     if (REGISTRY_DATA_FILES.has(file) || !CODE.test(file)) {
-        return {runtimeImports: [], reexports: [], starReexports: [], localExports: new Set(), fileRefs: [], styleRefs: [], templateAssets: [], hasRuntimeBody: false, isPureBarrel: false};
+        return createEmptyModuleInfo();
     }
     if (file.endsWith('.css')) {
         return {runtimeImports: [], reexports: [], starReexports: [], localExports: new Set(), fileRefs: [], styleRefs: extractCssReferences(source), templateAssets: [], hasRuntimeBody: true, isPureBarrel: false};
     }
     if (SCRIPT_EXT.test(file)) return parseScriptModule(file, source);
-    return {runtimeImports: [], reexports: [], starReexports: [], localExports: new Set(), fileRefs: [], styleRefs: [], templateAssets: [], hasRuntimeBody: false, isPureBarrel: false};
+    return createEmptyModuleInfo();
+}
+
+function shouldParseModuleSource(file) {
+    return (DEPENDENCY_CONTENT.test(file) || !file.includes('/'))
+        && !REGISTRY_DATA_FILES.has(file)
+        && (file.endsWith('.css') || SCRIPT_EXT.test(file));
+}
+
+function serializeModuleInfo(info) {
+    return {
+        runtimeImports: info.runtimeImports.map(imp => ({
+            specifier: imp.specifier,
+            symbols: imp.symbols === '*' ? '*' : [...imp.symbols],
+            via: imp.via,
+        })),
+        reexports: info.reexports,
+        starReexports: info.starReexports,
+        localExports: [...info.localExports],
+        fileRefs: info.fileRefs,
+        styleRefs: info.styleRefs,
+        templateAssets: info.templateAssets,
+        hasRuntimeBody: info.hasRuntimeBody,
+        isPureBarrel: info.isPureBarrel,
+    };
+}
+
+function deserializeModuleInfo(raw) {
+    if (!raw || typeof raw !== 'object'
+        || !Array.isArray(raw.runtimeImports)
+        || !Array.isArray(raw.reexports)
+        || !Array.isArray(raw.starReexports)
+        || !Array.isArray(raw.localExports)
+        || !Array.isArray(raw.fileRefs)
+        || !Array.isArray(raw.styleRefs)
+        || !Array.isArray(raw.templateAssets)
+        || typeof raw.hasRuntimeBody !== 'boolean'
+        || typeof raw.isPureBarrel !== 'boolean') {
+        return null;
+    }
+    const runtimeImports = [];
+    for (const imp of raw.runtimeImports) {
+        if (!imp || typeof imp.specifier !== 'string' || typeof imp.via !== 'string'
+            || (imp.symbols !== '*' && !Array.isArray(imp.symbols))) {
+            return null;
+        }
+        runtimeImports.push({
+            specifier: imp.specifier,
+            symbols: imp.symbols === '*' ? '*' : new Set(imp.symbols),
+            via: imp.via,
+        });
+    }
+    return {
+        runtimeImports,
+        reexports: raw.reexports,
+        starReexports: raw.starReexports,
+        localExports: new Set(raw.localExports),
+        fileRefs: raw.fileRefs,
+        styleRefs: raw.styleRefs,
+        templateAssets: raw.templateAssets,
+        hasRuntimeBody: raw.hasRuntimeBody,
+        isPureBarrel: raw.isPureBarrel,
+    };
+}
+
+function discoverProjectFiles(root) {
+    if (existsSync(path.join(root, '.git'))) {
+        try {
+            const tracked = execFileSync('git', ['ls-files', '-z'], {
+                cwd: root,
+                encoding: 'utf8',
+                maxBuffer: 32 * 1024 * 1024,
+                stdio: ['ignore', 'pipe', 'pipe'],
+            }).split('\0');
+            const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], {
+                cwd: root,
+                encoding: 'utf8',
+                maxBuffer: 32 * 1024 * 1024,
+                stdio: ['ignore', 'pipe', 'pipe'],
+            }).split('\0');
+            return [...new Set([...tracked, ...untracked])]
+                .filter(file => Boolean(file) && !file.startsWith('.wxt/'))
+                .sort();
+        } catch {
+            // 非标准 Git 环境时回退到目录扫描。
+        }
+    }
+    const found = [];
+    const walk = directory => {
+        for (const entry of readdirSync(directory, {withFileTypes: true})) {
+            if (entry.isDirectory()) {
+                if (!WALK_SKIPPED_DIRS.has(entry.name)) walk(path.join(directory, entry.name));
+                continue;
+            }
+            if (entry.isFile()) {
+                found.push(path.relative(root, path.join(directory, entry.name)).split(path.sep).join('/'));
+            }
+        }
+    };
+    if (existsSync(root)) walk(root);
+    return found.sort();
+}
+
+function canSafelyWriteDefaultCache(root) {
+    if (!existsSync(path.join(root, '.git'))) return true;
+    const gitignorePath = path.join(root, '.gitignore');
+    if (!existsSync(gitignorePath)) return false;
+    try {
+        const content = readFileSync(gitignorePath, 'utf8');
+        return /(?:^|\r?\n)\.wxt\/?(?:\r?\n|$)/u.test(content);
+    } catch {
+        return false;
+    }
 }
 
 function resolveSymbolOrigins(infoMap, known, file, symbol, visited = new Set()) {
@@ -423,20 +560,7 @@ function resolveSymbolOrigins(infoMap, known, file, symbol, visited = new Set())
     return info.hasRuntimeBody ? [file] : [];
 }
 
-/**
- * 构建完整依赖分析结构：
- * - `graph`: owner -> Set<dependency>（直接与经纯 barrel 按符号展开后的运行时依赖）
- * - `reverse`: dependency -> Set<owner>（反向传播图：纯 barrel 仅向通配导入者传播，避免兄弟模块污染）
- * - `barrels`: 纯 re-export barrel 集合
- * - `infoMap`: 各文件的 AST 摘要
- */
-export function analyzeDependencyGraph(files) {
-    const known = new Set(Object.keys(files));
-    const infoMap = new Map();
-    for (const [owner, source] of Object.entries(files)) {
-        infoMap.set(owner, parseModule(owner, source));
-    }
-
+function buildGraphFromInfoMap(infoMap, known) {
     const barrels = new Set();
     for (const [owner, info] of infoMap) {
         if (info.isPureBarrel) barrels.add(owner);
@@ -525,6 +649,148 @@ export function analyzeDependencyGraph(files) {
     return {graph, reverse, barrels, infoMap, known};
 }
 
+/**
+ * 构建完整依赖分析结构：
+ * - `graph`: owner -> Set<dependency>（直接与经纯 barrel 按符号展开后的运行时依赖）
+ * - `reverse`: dependency -> Set<owner>（反向传播图：纯 barrel 仅向通配导入者传播，避免兄弟模块污染）
+ * - `barrels`: 纯 re-export barrel 集合
+ * - `infoMap`: 各文件的 AST 摘要
+ */
+export function analyzeDependencyGraph(files) {
+    const known = new Set(Object.keys(files));
+    const infoMap = new Map();
+    for (const [owner, source] of Object.entries(files)) {
+        infoMap.set(owner, parseModule(owner, source));
+    }
+    return buildGraphFromInfoMap(infoMap, known);
+}
+
+/**
+ * 带增量磁盘缓存的仓库依赖图分析器：
+ * - 按每个可解析源码文件的 mtimeNs/mtimeMs + size 命中缓存，跳过未改动文件的磁盘读取与 TS AST 解析；
+ * - 缓存写入 <projectRoot>/.wxt/cache/dep-graph-v1.json（损坏或版本变更时自动降级重建）；
+ * - 产出与无缓存 analyzeDependencyGraph 完全等价的 graph / reverse / barrels / infoMap / known。
+ */
+export function analyzeProjectDependencyGraph(projectRoot, options = {}) {
+    const root = path.resolve(projectRoot);
+    const useCache = !options.noCache;
+    const explicitCachePath = typeof options.cachePath === 'string' && options.cachePath.length > 0;
+    const cachePath = path.resolve(root, explicitCachePath ? options.cachePath : DEFAULT_DEP_GRAPH_CACHE_PATH);
+    const rawPaths = options.filePaths
+        ? [...new Set(options.filePaths)].sort()
+        : discoverProjectFiles(root);
+    const virtualEmptyFiles = options.virtualEmptyFiles ? [...new Set(options.virtualEmptyFiles)].sort() : [];
+
+    let previousEntries = {};
+    let loadedValidCache = false;
+    if (useCache && existsSync(cachePath)) {
+        try {
+            const parsed = JSON.parse(readFileSync(cachePath, 'utf8'));
+            if (parsed && parsed.version === DEP_GRAPH_CACHE_VERSION && parsed.entries && typeof parsed.entries === 'object') {
+                previousEntries = parsed.entries;
+                loadedValidCache = true;
+            }
+        } catch {
+            // 损坏缓存自动退回冷构建，不中断主流程。
+        }
+    }
+
+    const existingFiles = new Set();
+    const known = new Set();
+    const infoMap = new Map();
+    const nextEntries = {};
+    let hits = 0;
+    let misses = 0;
+    let dirty = false;
+
+    for (const file of rawPaths) {
+        const absolute = path.join(root, file);
+        let stat;
+        try {
+            stat = statSync(absolute, {bigint: true});
+        } catch {
+            continue;
+        }
+        if (!stat.isFile()) continue;
+        existingFiles.add(file);
+        known.add(file);
+
+        if (!shouldParseModuleSource(file)) {
+            infoMap.set(file, createEmptyModuleInfo());
+            continue;
+        }
+
+        const size = Number(stat.size);
+        const mtimeMs = Number(stat.mtimeMs);
+        const mtimeNs = stat.mtimeNs.toString();
+        const cached = Object.hasOwn(previousEntries, file) ? previousEntries[file] : undefined;
+        if (useCache && cached && cached.size === size
+            && (cached.mtimeNs ? cached.mtimeNs === mtimeNs : cached.mtimeMs === mtimeMs)) {
+            const restored = deserializeModuleInfo(cached.info);
+            if (restored) {
+                infoMap.set(file, restored);
+                nextEntries[file] = cached;
+                hits += 1;
+                continue;
+            }
+        }
+
+        const source = readFileSync(absolute, 'utf8');
+        const info = parseModule(file, source);
+        infoMap.set(file, info);
+        nextEntries[file] = {mtimeMs, mtimeNs, size, info: serializeModuleInfo(info)};
+        misses += 1;
+        dirty = true;
+    }
+
+    const isPartialScan = Boolean(options.filePaths);
+    let evicted = 0;
+    for (const cachedFile of Object.keys(previousEntries)) {
+        if (!Object.hasOwn(nextEntries, cachedFile)) {
+            if (isPartialScan && !explicitCachePath) {
+                nextEntries[cachedFile] = previousEntries[cachedFile];
+            } else {
+                evicted += 1;
+                dirty = true;
+            }
+        }
+    }
+
+    for (const file of virtualEmptyFiles) {
+        if (!known.has(file)) {
+            known.add(file);
+            infoMap.set(file, parseModule(file, ''));
+        }
+    }
+
+    const shouldPersist = useCache && (dirty || !loadedValidCache)
+        && (explicitCachePath || canSafelyWriteDefaultCache(root));
+    if (shouldPersist) {
+        try {
+            mkdirSync(path.dirname(cachePath), {recursive: true});
+            const tempPath = `${cachePath}.${process.pid}.${Date.now()}.tmp`;
+            writeFileSync(tempPath, JSON.stringify({version: DEP_GRAPH_CACHE_VERSION, entries: nextEntries}));
+            renameSync(tempPath, cachePath);
+        } catch {
+            // 缓存目录不可写时静默降级为纯内存执行。
+        }
+    }
+
+    const analysis = buildGraphFromInfoMap(infoMap, known);
+    return {
+        ...analysis,
+        existingFiles,
+        cacheStats: {
+            hits,
+            misses,
+            evicted,
+            total: hits + misses,
+            fromCache: loadedValidCache && misses === 0,
+            cachePath,
+        },
+    };
+}
+
 export function buildDependencyGraph(files) {
     return analyzeDependencyGraph(files).graph;
 }
@@ -549,7 +815,7 @@ export function explainDependencies(owner, source, known, files = null) {
     if (REGISTRY_DATA_FILES.has(owner)) return [];
     const info = parseModule(owner, source);
     const rows = [];
-    const infoMap = files ? analyzeDependencyGraph(files).infoMap : null;
+    const infoMap = files instanceof Map ? files : (files ? analyzeDependencyGraph(files).infoMap : null);
 
     for (const imp of info.runtimeImports) {
         const target = resolveExactModule(known, owner, imp.specifier);

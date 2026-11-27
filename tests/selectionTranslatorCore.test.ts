@@ -788,12 +788,37 @@ describe('selection translator core geometry', () => {
         expect(card.top + 80 <= anchor.top - 10 || card.top >= anchor.bottom + 10).toBe(true);
     });
 
-    it('keeps the popup above the selection when there is room', () => {
+    it('prefers below the selection when there is comfortable room and flips above near the bottom edge', () => {
         expect(calculateSelectionPopupPosition({ ...rects[0], top: 300, bottom: 324 }, { width: 360, height: 160 }, { width: 1200, height: 800 })).toEqual({
             left: 80,
-            top: 130,
+            top: 334,
+            placement: 'bottom',
+        });
+        expect(calculateSelectionPopupPosition({ ...rects[0], top: 620, bottom: 644 }, { width: 360, height: 160 }, { width: 1200, height: 800 })).toEqual({
+            left: 80,
+            top: 450,
             placement: 'top',
         });
+    });
+
+    it('locks placement and stickyTop to prevent flip-flop and downward bounce during content updates', () => {
+        const anchor = { top: 560, right: 200, bottom: 584, left: 80, width: 120, height: 24 };
+        const viewport = { width: 1200, height: 800 };
+        // Near bottom (availableBelow=194 < 240 comfort): opens above cleanly
+        const initial = calculateSelectionPopupPosition(anchor, { width: 360, height: 180 }, viewport);
+        expect(initial).toEqual({ left: 80, top: 370, placement: 'top' });
+        // Content grows while locked above: shifts up only enough to keep selected text clear
+        const grown = calculateSelectionPopupPosition(anchor, { width: 360, height: 280 }, viewport, 12, 10, {
+            preferredPlacement: initial.placement,
+            stickyTop: initial.top,
+        });
+        expect(grown).toEqual({ left: 80, top: 270, placement: 'top' });
+        // Content shrinks (e.g., switching tabs or reloading): stays at stickyTop without bouncing downward
+        const shrunk = calculateSelectionPopupPosition(anchor, { width: 360, height: 140 }, viewport, 12, 10, {
+            preferredPlacement: grown.placement,
+            stickyTop: grown.top,
+        });
+        expect(shrunk).toEqual({ left: 80, top: 270, placement: 'top' });
     });
 
     it('flips below and clamps to the viewport near the top edge', () => {
@@ -813,7 +838,7 @@ describe('selection translator core geometry', () => {
     it.each([
         {top: 100, bottom: 125, expected: {top: 135, placement: 'bottom', maxHeight: 123}},
         {top: 160, bottom: 185, expected: {top: 12, placement: 'top', maxHeight: 138}},
-        {top: 123, bottom: 147, expected: {top: 12, placement: 'top', maxHeight: 101}},
+        {top: 123, bottom: 147, expected: {top: 157, placement: 'bottom', maxHeight: 101}},
     ])('bounds a tall card beside the selected line: $top–$bottom', ({top, bottom, expected}) => {
         expect(calculateSelectionPopupPosition({top, bottom, left: 80, right: 180, width: 100, height: bottom - top},
             {width: 360, height: 520}, {width: 1000, height: 270})).toEqual({left: 80, ...expected});

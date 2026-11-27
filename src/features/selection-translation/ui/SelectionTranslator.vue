@@ -23,59 +23,21 @@
       <span class="fr-selection-indicator-glyph" aria-hidden="true">译</span>
     </button>
 
-    <section v-if="showTooltip" ref="tooltip-ref" class="fr-translation-tooltip" :class="{ 'fr-dark-theme': isDarkTheme, 'fr-reading-tooltip': readingMode, 'fr-popup-manipulating': popupManipulating, 'fr-short-viewport': isShortViewport() || Number.parseFloat(tooltipStyle.maxHeight) < 140, 'fr-compact-toolbar': Number.parseFloat(tooltipStyle.height ?? tooltipStyle.maxHeight) < 180 }" :data-placement="popupPlacement" :style="[tooltipScaleStyle, tooltipStyle]" role="dialog" aria-label="划词翻译结果" data-presentation="card" @pointerdown.stop="beginPopupGesture" @pointermove="movePopupGesture" @pointerup="stopPopupGesture" @pointercancel="stopPopupGesture" @lostpointercapture="stopPopupGesture">
+    <section v-if="showTooltip" ref="tooltip-ref" class="fr-translation-tooltip" :class="{ 'fr-dark-theme': isDarkTheme, 'fr-reading-tooltip': readingMode, 'fr-popup-manipulating': popupManipulating, 'fr-tooltip-animated': config.animations, 'fr-short-viewport': isShortViewport() || Number.parseFloat(tooltipStyle.maxHeight) < 140, 'fr-compact-toolbar': Number.parseFloat(tooltipStyle.height ?? tooltipStyle.maxHeight) < 180 }" :data-placement="popupPlacement" :style="[tooltipScaleStyle, tooltipStyle]" role="dialog" aria-label="划词翻译结果" data-presentation="card" @pointerdown.stop="beginPopupGesture" @pointermove="movePopupGesture" @pointerup="stopPopupGesture" @pointercancel="stopPopupGesture" @lostpointercapture="stopPopupGesture">
       <div class="fr-study-navigation">
         <img class="fr-tooltip-brand-icon" :src="selectionTranslatorIconUrl" alt="" aria-hidden="true" draggable="false" />
         <div class="fr-study-toolbar" role="group" aria-label="划词卡片内容" @focusin="handleStudyToolbarFocus">
           <button type="button" :aria-pressed="!readingMode" @click="openTooltip()">翻译</button>
           <template v-if="readingEnabled">
-            <button v-for="action in readingActions" :key="action.id" type="button" :title="action.description" :aria-pressed="readingMode && !readingHistoryOnly && readingInitialAction === action.id" @click="openReading(action.id)">{{ action.label }}</button>
-            <button v-if="!isPrivateContext" type="button" :aria-pressed="readingMode && readingHistoryOnly" @click="openReadingHistory">记录</button>
+            <button v-for="action in readingActions" :key="action.id" type="button" :data-reading-action="action.id" :aria-label="action.label" :title="action.description" :aria-pressed="readingMode && !readingHistoryOnly && readingInitialAction === action.id" @click="openReading(action.id)">{{ action.id === 'grammar' ? '句法' : action.label }}</button>
           </template>
-          <button v-else-if="canEnableFreeReading || freeReadingPending" type="button" :disabled="freeReadingPending" title="B站免费基础读懂/用法，无需 API Key；完整语法、练习和追问可切换 AI 服务" @click="enableFreeReading">{{ freeReadingPending ? '正在启用…' : '免费 AI 讲解' }}</button>
-          <button v-else type="button" @click="openSelectionSettings">配置 AI 讲解</button>
+          <button v-else-if="canEnableFreeReading || freeReadingPending" type="button" class="fr-study-cta-tab" :disabled="freeReadingPending" title="B站免费基础读懂/用法，无需 API Key；完整语法、练习和追问可切换 AI 服务" @click="enableFreeReading">{{ freeReadingPending ? '正在启用…' : '免费 AI 讲解' }}</button>
+          <button v-else type="button" class="fr-study-cta-tab" @click="openSelectionSettings">配置 AI 讲解</button>
         </div>
-        <span v-if="!readingMode" class="fr-selection-target" :class="{ 'is-overridden': selectionTargetOverride !== null }" :title="t('selection.targetLanguageHint')">
-          <span class="fr-selection-target-label" data-i18n-ignore aria-hidden="true">
-            <span class="fr-selection-target-arrow">→</span>
-            <span class="fr-selection-target-text">{{ effectiveTargetLabel }}</span>
-            <UiIcon name="chevron-down" :size="12" />
-          </span>
-          <select
-            class="fr-selection-target-select"
-            data-i18n-ignore
-            :value="effectiveTargetLanguage"
-            :aria-label="t('selection.targetLanguage')"
-            @focus="suppressSelectionRead()"
-            @change="handleSelectionTargetChange"
-          >
-            <option
-              v-for="option in selectionTargetOptions"
-              :key="option.value"
-              :value="option.value"
-              data-i18n-ignore
-            >{{ option.label }}</option>
-          </select>
-        </span>
-        <div ref="reading-tools-target" v-show="readingMode && !readingHistoryOnly" class="fr-study-reading-tools" />
         <div class="fr-tooltip-actions">
-          <template v-if="DOCUMENT_ANNOTATIONS && canMarkDocumentSelection">
-          <button class="fr-action-btn fr-selection-highlight" type="button" :title="t('document.pdfReading.annotationHighlight')" :aria-label="t('document.pdfReading.annotationHighlight')" @pointerdown.prevent @click="markDocumentSelection('highlight')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 16 9-12 4 3-9 12H8v-3ZM3 21h16" /></svg></button>
-          <button class="fr-action-btn fr-selection-underline" type="button" :title="t('document.pdfReading.annotationUnderline')" :aria-label="t('document.pdfReading.annotationUnderline')" @pointerdown.prevent @click="markDocumentSelection('underline')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v8a6 6 0 0 0 12 0V3M4 21h16" /></svg></button>
-          </template>
-          <button v-if="!readingMode && shareCardAvailable && translationResult && !isLoading" class="fr-action-btn fr-share-card-entry" type="button" :title="t('shareCard.create')" :aria-label="t('shareCard.create')" @click="openShareCard({original: selectedText, translation: translationResult})"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M21 3l-9 9M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" /></svg></button>
-          <button
-            v-if="!readingMode && config.vocabularyBookEnabled && selectedText && !isPrivateContext"
-            class="fr-action-btn fr-vocabulary-btn"
-            :class="{ 'fr-saved': isVocabularySaved }"
-            type="button"
-            :disabled="vocabularyBusy || !vocabularyAnswer"
-            :title="vocabularyButtonTitle"
-            :aria-label="vocabularyButtonTitle"
-            :aria-pressed="isVocabularySaved"
-            @click="saveVocabularyEntry"
-          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.7 2.86 5.8 6.4.93-4.63 4.51 1.09 6.38L12 17.3l-5.72 3.02 1.09-6.38-4.63-4.51 6.4-.93L12 2.7Z" /></svg></button>
-          <button class="fr-close-btn" type="button" title="关闭" aria-label="关闭翻译结果" @click="closeTooltip"><UiIcon name="close" :size="16" /></button>
+          <button v-if="readingEnabled && !isPrivateContext" class="fr-action-btn fr-history-btn" type="button" title="阅读记录" :aria-pressed="readingMode && readingHistoryOnly" @click="openReadingHistory"><UiIcon name="history" :size="15" /><span class="fr-sr-only">记录</span></button>
+          <div ref="reading-tools-target" v-show="readingMode && !readingHistoryOnly" class="fr-study-reading-tools" />
+          <button class="fr-close-btn" type="button" title="关闭" aria-label="关闭翻译结果" @click="closeTooltip"><UiIcon name="close" :size="15" /></button>
         </div>
       </div>
       <div v-if="readingSelection" v-show="readingMode" class="fr-tooltip-content fr-reading-content">
@@ -199,6 +161,43 @@
           <div v-if="error && (translationResult || wordCard)" class="fr-inline-error"><span>{{ error }}</span><span class="fr-error-actions"><button type="button" @click="retryTranslation">重试</button><button v-if="isAuthenticationErrorCurrent(authenticationError)" type="button" :disabled="!!openingAuthenticationSettings" @click="openAuthenticationSettings">{{ translateLegacy('配置服务') }}</button></span></div>
         </div>
       </div>
+      <div v-if="!readingMode" class="fr-card-footer">
+        <div class="fr-selection-target" :class="{ 'is-overridden': selectionTargetOverride !== null, 'is-open': targetMenuOpen }">
+          <button
+            ref="target-trigger-ref"
+            class="fr-selection-target-trigger"
+            type="button"
+            :title="t('selection.targetLanguageHint')"
+            :aria-label="t('selection.targetLanguage')"
+            aria-haspopup="listbox"
+            :aria-expanded="targetMenuOpen ? 'true' : 'false'"
+            @click="toggleTargetMenu"
+            @keydown="handleTargetTriggerKeydown"
+          >
+            <UiIcon name="globe" :size="13" class="fr-selection-target-globe" />
+            <span class="fr-selection-target-text" data-i18n-ignore>{{ effectiveTargetLabel }}</span>
+            <UiIcon name="chevron-down" :size="12" class="fr-selection-target-chevron" />
+          </button>
+        </div>
+        <div class="fr-card-footer-actions">
+          <template v-if="DOCUMENT_ANNOTATIONS && canMarkDocumentSelection">
+            <button class="fr-action-btn fr-selection-highlight" type="button" :title="t('document.pdfReading.annotationHighlight')" :aria-label="t('document.pdfReading.annotationHighlight')" @pointerdown.prevent @click="markDocumentSelection('highlight')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 16 9-12 4 3-9 12H8v-3ZM3 21h16" /></svg></button>
+            <button class="fr-action-btn fr-selection-underline" type="button" :title="t('document.pdfReading.annotationUnderline')" :aria-label="t('document.pdfReading.annotationUnderline')" @pointerdown.prevent @click="markDocumentSelection('underline')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v8a6 6 0 0 0 12 0V3M4 21h16" /></svg></button>
+          </template>
+          <button v-if="shareCardAvailable && translationResult && !isLoading" class="fr-action-btn fr-share-card-entry" type="button" :title="t('shareCard.create')" :aria-label="t('shareCard.create')" @click="openShareCard({original: selectedText, translation: translationResult})"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M21 3l-9 9M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" /></svg></button>
+          <button
+            v-if="config.vocabularyBookEnabled && selectedText && !isPrivateContext"
+            class="fr-action-btn fr-vocabulary-btn"
+            :class="{ 'fr-saved': isVocabularySaved }"
+            type="button"
+            :disabled="vocabularyBusy || !vocabularyAnswer"
+            :title="vocabularyButtonTitle"
+            :aria-label="vocabularyButtonTitle"
+            :aria-pressed="isVocabularySaved"
+            @click="saveVocabularyEntry"
+          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.7 2.86 5.8 6.4.93-4.63 4.51 1.09 6.38L12 17.3l-5.72 3.02 1.09-6.38-4.63-4.51 6.4-.93L12 2.7Z" /></svg></button>
+        </div>
+      </div>
       <div class="fr-playing-status" :class="{'is-idle': !isPlaying && !isPreparingAudio}" :aria-hidden="!isPlaying && !isPreparingAudio" :aria-busy="isPreparingAudio" role="status">
         <template v-if="isPlaying || isPreparingAudio">
           <span class="fr-playing-label"><template v-if="isPreparingAudio">正在生成语音…</template><template v-else>正在播放{{ currentAudioKind === 'source' ? '原文' : currentAudioKind === 'word' ? '单词' : '译文' }}</template></span>
@@ -213,6 +212,58 @@
       </div>
       <div v-for="edge in popupResizeEdges" :key="edge" class="fr-popup-resize-handle" :class="`fr-popup-resize-${edge}`" :data-resize-edge="edge" aria-hidden="true" />
     </section>
+
+    <div
+      v-if="showTooltip && !readingMode && targetMenuOpen"
+      ref="target-menu-ref"
+      class="fr-selection-target-menu"
+      :class="{ 'fr-dark-theme': isDarkTheme }"
+      :style="targetMenuStyle"
+      @pointerdown.stop
+      @keydown="handleTargetMenuKeydown"
+    >
+      <div class="fr-selection-target-search-wrap">
+        <UiIcon name="search" :size="13" class="fr-selection-target-search-icon" />
+        <input
+          ref="target-search-ref"
+          :value="targetSearchQuery"
+          class="fr-selection-target-search"
+          type="text"
+          data-i18n-ignore
+          :placeholder="t('select.search')"
+          :aria-label="t('select.search')"
+          autocomplete="off"
+          spellcheck="false"
+          @focus="suppressSelectionRead()"
+          @input="handleTargetSearchInput"
+          @keydown.stop="handleTargetMenuKeydown"
+          @keyup.stop
+        />
+      </div>
+      <div ref="target-list-ref" class="fr-selection-target-list" role="listbox" :aria-label="t('selection.targetLanguage')">
+        <div v-if="filteredTargetOptions.length === 0" class="fr-selection-target-empty" data-i18n-ignore>{{ t('select.noMatch') }}</div>
+        <button
+          v-for="(option, index) in filteredTargetOptions"
+          :key="option.value"
+          type="button"
+          role="option"
+          class="fr-selection-target-option"
+          :class="{ 'is-selected': option.value === effectiveTargetLanguage, 'is-highlighted': index === highlightedTargetIndex }"
+          :data-value="option.value"
+          :aria-selected="option.value === effectiveTargetLanguage ? 'true' : 'false'"
+          data-i18n-ignore
+          @pointerenter="highlightedTargetIndex = index"
+          @click="selectTargetOption(option.value)"
+        >
+          <span class="fr-selection-target-option-names">
+            <span class="fr-selection-target-option-primary">{{ option.shortLabel }}</span>
+            <span v-if="option.secondaryLabel" class="fr-selection-target-option-secondary">{{ option.secondaryLabel }}</span>
+          </span>
+          <span v-if="selectionTargetOverride !== null && option.value === selectionSettings.to" class="fr-selection-target-default-badge">{{ translateLegacy('默认') }}</span>
+          <UiIcon v-if="option.value === effectiveTargetLanguage" name="check" :size="14" class="fr-selection-target-check" />
+        </button>
+      </div>
+    </div>
 
     <div v-if="noticeMessage" class="fr-action-toast" :class="{ 'fr-dark-theme': isDarkTheme }" :style="noticeViewportStyle" role="status"><span>{{ noticeMessage }}</span><button v-if="noticeAction === 'open-vocabulary'" type="button" @click="openNoticeSettings">查看</button><button v-else-if="noticeAction === 'open-local-tts'" type="button" @click="openNoticeSettings">设置</button></div>
     <div v-else-if="copySuccess" class="fr-copy-success-toast" :class="{ 'fr-dark-theme': isDarkTheme }" role="status">{{ copySuccessMessage }}</div>
@@ -275,7 +326,8 @@ const props = defineProps<{
     subscribeInvalidation?: (listener: () => void) => () => void;
   };
 }>();
-const {t, translateLegacy} = useUiI18n();
+const uiI18n = useUiI18n();
+const {t, translateLegacy} = uiI18n;
 const shareCardAvailable = isShareCardMounted();
 
 type SelectionTrigger = 'direct' | 'icon' | 'dot' | 'shortcut' | 'contextMenu';
@@ -288,6 +340,14 @@ interface SelectionAuthenticationError { request: SelectionContentRequest; reque
 const tooltipRef = useTemplateRef<HTMLElement>('tooltip-ref');
 const readingPanelRef = useTemplateRef<InstanceType<typeof ReadingPanel>>('reading-panel-ref');
 const readingToolsTarget = useTemplateRef<HTMLElement>('reading-tools-target');
+const targetTriggerRef = useTemplateRef<HTMLButtonElement>('target-trigger-ref');
+const targetMenuRef = useTemplateRef<HTMLElement>('target-menu-ref');
+const targetSearchRef = useTemplateRef<HTMLInputElement>('target-search-ref');
+const targetListRef = useTemplateRef<HTMLElement>('target-list-ref');
+const targetMenuOpen = ref(false);
+const targetSearchQuery = ref('');
+const highlightedTargetIndex = ref(0);
+const targetMenuStyle = ref<Record<string, string>>({});
 const selectionTranslatorIconUrl = browser.runtime.getURL('/icon/128.png');
 const selectedText = ref('');
 const selectionTargetOverride = ref<string | null>(null);
@@ -341,7 +401,7 @@ const copiedTextKind = ref<CopyKind | null>(null);
 const isDarkTheme = ref(false);
 const indicatorStyle = ref<Record<string, string>>({});
 const tooltipStyle = ref<Record<string, string>>({});
-const popupPlacement = ref<'top' | 'bottom'>('top');
+const popupPlacement = ref<'top' | 'bottom'>('bottom');
 const pageZoom = ref(1);
 const viewportSize = ref(getSafeVisualViewportRect());
 const touchInteraction = ref(false);
@@ -626,6 +686,33 @@ const effectiveTargetLanguage = computed(() => selectionDirection.value.targetLa
 const effectiveSourceLanguage = computed(() => selectionDirection.value.sourceLanguage);
 const selectionTargetOptions = computed(() => buildSelectionTargetOptions(effectiveTargetLanguage.value, selectionSettings.value.to));
 const effectiveTargetLabel = computed(() => selectionTargetShortLabel(effectiveTargetLanguage.value));
+const formattedTargetOptions = computed(() => {
+  const activeUiLanguage = uiI18n.language?.value || config.uiLanguage || 'zh-CN';
+  const isChineseUi = activeUiLanguage.toLowerCase().startsWith('zh');
+  return selectionTargetOptions.value.map(option => {
+    const segments = option.label.split(' / ').map(part => part.trim()).filter(Boolean);
+    const preferredSecondary = segments.length > 1
+      ? (isChineseUi ? segments[segments.length - 1] : segments[1])
+      : '';
+    const secondaryLabel = preferredSecondary && preferredSecondary.toLowerCase() !== option.shortLabel.toLowerCase()
+      ? preferredSecondary
+      : '';
+    return {...option, secondaryLabel};
+  });
+});
+const filteredTargetOptions = computed(() => {
+  const query = targetSearchQuery.value.trim().toLowerCase();
+  if (!query) return formattedTargetOptions.value;
+  return formattedTargetOptions.value.filter(option => (
+    option.shortLabel.toLowerCase().includes(query)
+    || option.label.toLowerCase().includes(query)
+    || option.value.toLowerCase().includes(query)
+  ));
+});
+watch(filteredTargetOptions, options => {
+  const selectedIndex = options.findIndex(item => item.value === effectiveTargetLanguage.value);
+  highlightedTargetIndex.value = selectedIndex >= 0 ? selectedIndex : 0;
+});
 const isWordSelection = computed(() => Boolean(selectedWord.value) && (Boolean(selectionSettings.value.dictionaryRecipe) || effectiveTargetLanguage.value !== 'en'
   && (effectiveSourceLanguage.value === 'auto' || /^en(?:-|$)/i.test(effectiveSourceLanguage.value))));
 const isWordCardVisible = computed(() => isWordSelection.value && wordCard.value !== null);
@@ -971,6 +1058,8 @@ const popupResizeEdges = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
 const popupManipulating = ref(false);
 let manualPopupPosition: {left: number; top: number} | null = null;
 let manualPopupSize: {width: number; height: number} | null = null;
+let lockedPopupPlacement: 'top' | 'bottom' | null = null;
+let lastMeasuredPopupSize: {width: number; height: number} | null = null;
 let popupPositionManuallyAdjusted = false;
 let popupGesture: {pointerId: number; x: number; y: number; rect: DOMRect; edge: string; element: HTMLElement} | null = null;
 let pendingPopupPoint: {x: number; y: number} | null = null;
@@ -996,6 +1085,8 @@ function resetPopupGeometry(): void {
   cancelPositionUpdate();
   manualPopupPosition = null;
   manualPopupSize = null;
+  lockedPopupPlacement = null;
+  lastMeasuredPopupSize = null;
   anchoredPopupMaxHeight.value = null;
   popupPositionManuallyAdjusted = false;
 }
@@ -1024,11 +1115,15 @@ function applyManualPopupGeometry(measured?: Pick<DOMRect, 'width'>): void {
     ...(manualPopupSize ? {width: px(width / scale)} : {}),
     ...(height !== undefined ? {height: px(height / scale)} : {}),
   };
+  if (targetMenuOpen.value) void nextTick(updateTargetMenuPosition);
 }
 
 // 自动卡保留自然高度，为生成/播放底栏留出真实空间；手动尺寸仍由用户控制。
 watch([readingMode, showTooltip], () => {
-  if (readingMode.value || !showTooltip.value) openingAuthenticationSettings.value = null;
+  if (readingMode.value || !showTooltip.value) {
+    openingAuthenticationSettings.value = null;
+    closeTargetMenu(false);
+  }
 }, {flush: 'sync'});
 
 function beginPopupGesture(event: PointerEvent): void {
@@ -1045,7 +1140,7 @@ function beginPopupGesture(event: PointerEvent): void {
   const edge = target.dataset.resizeEdge ?? '';
   // 阅读工具菜单保留原生指针；顶栏空白（含 tab 条背景）与正文 <pre> 空白都可拖。
   if (target.matches('.fr-reading-tool-list') || target.closest('.fr-study-reading-tools')) return;
-  const blank = target.matches('.fr-translation-tooltip, .fr-tooltip-content, .fr-translation-container, .fr-text-block, pre, .fr-study-toolbar');
+  const blank = target.matches('.fr-translation-tooltip, .fr-tooltip-content, .fr-translation-container, .fr-text-block, pre, .fr-study-toolbar, .fr-card-footer');
   // 触摸正文应滚动或选词，不让空白拖动吞掉原生平移；触摸仅从明确的标题栏移动卡片。
   if (event.pointerType === 'touch' && (edge || blank)) return;
   if (!edge && !target.closest('.fr-study-navigation') && !blank) return;
@@ -1055,6 +1150,7 @@ function beginPopupGesture(event: PointerEvent): void {
     if (event.clientX >= box.left + (target.clientLeft + target.clientWidth) * popupScale.value
       || event.clientY >= box.top + (target.clientTop + target.clientHeight) * popupScale.value) return;
   }
+  closeTargetMenu(false);
   event.preventDefault();
   stopPopupGesture();
   // 用户开始拖动或调整尺寸后，解除自动锚点的限高，仍由视口边缘约束手动卡片。
@@ -1144,7 +1240,11 @@ function updatePosition(refreshSelection = true, refreshAnchor = false): void {
       }
     }
   }
-  const entryTop = touchInteraction.value ? (anchor.top + anchor.bottom) / 2 : anchor.bottom + anchorOffset;
+  const rawEntryBottom = anchor.bottom + anchorOffset;
+  const rawEntryTop = anchor.top - anchorOffset;
+  const entryTop = touchInteraction.value
+    ? (anchor.top + anchor.bottom) / 2
+    : (rawEntryBottom > viewport.bottom - viewportInset && rawEntryTop >= viewport.top + viewportInset ? rawEntryTop : rawEntryBottom);
   indicatorStyle.value = {
     left: px(Math.max(minEntryLeft, Math.min(maxEntryLeft, entryLeft))),
     top: px(Math.max(viewport.top + viewportInset, Math.min(viewport.bottom - viewportInset, entryTop))),
@@ -1154,11 +1254,26 @@ function updatePosition(refreshSelection = true, refreshAnchor = false): void {
     if (!tooltip || !showTooltip.value || snapshot.value !== current || revision !== positionRevision) return;
     if (popupPositionManuallyAdjusted || manualPopupSize) { applyManualPopupGeometry(); return; }
     const rect = tooltip.getBoundingClientRect();
+    lastMeasuredPopupSize = {width: rect.width, height: rect.height};
     // 自动限高会让实测高度暂时等于旧上限；恢复到默认自然上限参与重算，避免内容变化时在“放开/再次限高”间抖动。
     const measuredHeight = rect.height;
     const naturalHeight = anchoredPopupMaxHeight.value !== null && measuredHeight >= anchoredPopupMaxHeight.value - 1
       ? Math.max(measuredHeight, 520 * popupScale.value) : measuredHeight;
-    const position = calculateSelectionPopupPosition(import.meta.env.BROWSER === 'userscript' ? current.popupAnchor ?? anchor : hypothesisSelectionAnchor(current.popupAnchor ?? anchor, document), { width: rect.width, height: naturalHeight }, viewportSize.value);
+    const preferredPlacement = refreshAnchor ? null : lockedPopupPlacement;
+    const stickyTop = !refreshAnchor && preferredPlacement === 'top' ? manualPopupPosition?.top ?? null : null;
+    const position = calculateSelectionPopupPosition(
+      import.meta.env.BROWSER === 'userscript' ? current.popupAnchor ?? anchor : hypothesisSelectionAnchor(current.popupAnchor ?? anchor, document),
+      { width: rect.width, height: naturalHeight },
+      viewportSize.value,
+      undefined,
+      undefined,
+      {
+        preferredPlacement,
+        stickyTop,
+        comfortHeight: Math.min(240 * popupScale.value, Math.max(120 * popupScale.value, Math.floor((viewportSize.value.height - 24) * 0.45))),
+      },
+    );
+    lockedPopupPlacement = position.placement;
     manualPopupPosition = {left: position.left, top: position.top};
     anchoredPopupMaxHeight.value = position.maxHeight ?? null;
     applyManualPopupGeometry(rect);
@@ -1188,9 +1303,16 @@ function schedulePositionUpdate(refreshSelection = true, refreshAnchor = false):
   });
 }
 
-function scheduleAutomaticPopupResize(): void {
-  // ResizeObserver只需读取当前卡片和保存的选区锚点，不重测或克隆页面选区。
-  if (!popupPositionManuallyAdjusted) schedulePositionUpdate(false);
+function scheduleAutomaticPopupResize(entries?: readonly ResizeObserverEntry[]): void {
+  // ResizeObserver只需读取当前卡片和保存的选区锚点，不重测或克隆页面选区；忽略亚像素抖动避免重复重排。
+  if (popupPositionManuallyAdjusted) return;
+  const box = entries?.[0]?.borderBoxSize?.[0] ?? entries?.[0]?.contentRect;
+  if (box && lastMeasuredPopupSize && manualPopupPosition) {
+    const nextHeight = 'blockSize' in box ? box.blockSize : box.height;
+    const nextWidth = 'inlineSize' in box ? box.inlineSize : box.width;
+    if (Math.abs(nextHeight - lastMeasuredPopupSize.height) < 2 && Math.abs(nextWidth - lastMeasuredPopupSize.width) < 2) return;
+  }
+  schedulePositionUpdate(false);
 }
 
 function cancelPositionUpdate(): void {
@@ -1692,10 +1814,128 @@ function chooseSelectionTarget(targetLanguage: string): void {
   void requestSelectionContent(snapshot.value.text);
 }
 
-function handleSelectionTargetChange(event: Event): void {
+function updateTargetMenuPosition(): void {
+  if (!targetMenuOpen.value) return;
+  const trigger = targetTriggerRef.value;
+  if (!trigger || typeof trigger.getBoundingClientRect !== 'function') return;
+  const rect = trigger.getBoundingClientRect();
+  const viewport = viewportSize.value;
+  const scale = popupScale.value;
+  const margin = 12;
+  const gap = 6 * scale;
+  const width = Math.min(236, Math.max(184, (viewport.width - margin * 2) / scale));
+  const scaledWidth = width * scale;
+  const below = Math.max(0, viewport.bottom - rect.bottom - margin - gap);
+  const above = Math.max(0, rect.top - viewport.top - margin - gap);
+  const measuredHeight = targetMenuRef.value?.getBoundingClientRect().height || 0;
+  const estimatedHeight = Math.min(288 * scale, measuredHeight || 288 * scale);
+  const openUpward = below < estimatedHeight && above > below;
+  const maxHeightPx = Math.max(112, Math.min(288, Math.floor(((openUpward ? above : below) || 240) / scale)));
+  const finalScaledHeight = measuredHeight > 0 ? Math.min(measuredHeight, maxHeightPx * scale) : maxHeightPx * scale;
+  const rawLeft = Math.max(viewport.left + margin, Math.min(rect.left, viewport.right - margin - scaledWidth));
+  const rawTop = openUpward
+    ? Math.max(viewport.top + margin, rect.top - gap - finalScaledHeight)
+    : Math.min(viewport.bottom - margin - Math.min(finalScaledHeight, 120 * scale), rect.bottom + gap);
+  targetMenuStyle.value = {
+    left: px(rawLeft),
+    top: px(rawTop),
+    width: px(width),
+    transform: `scale(${scale})`,
+    transformOrigin: 'top left',
+    '--fr-target-menu-max-height': px(maxHeightPx),
+  };
+}
+
+function scrollTargetOptionIntoView(index: number): void {
+  const list = targetListRef.value;
+  if (!list) return;
+  const option = list.querySelectorAll<HTMLElement>('[role="option"]')[index];
+  option?.scrollIntoView?.({block: 'nearest'});
+}
+
+function closeTargetMenu(restoreFocus = false): void {
+  if (!targetMenuOpen.value) return;
+  targetMenuOpen.value = false;
+  targetSearchQuery.value = '';
+  if (restoreFocus) targetTriggerRef.value?.focus({preventScroll: true});
+}
+
+function dismissTargetMenu(): boolean {
+  if (!targetMenuOpen.value) return false;
+  closeTargetMenu(true);
+  return true;
+}
+
+function openTargetMenu(): void {
+  if (readingMode.value || !showTooltip.value) return;
+  suppressSelectionRead();
+  targetSearchQuery.value = '';
+  const selectedIndex = formattedTargetOptions.value.findIndex(item => item.value === effectiveTargetLanguage.value);
+  highlightedTargetIndex.value = selectedIndex >= 0 ? selectedIndex : 0;
+  targetMenuOpen.value = true;
+  updateTargetMenuPosition();
+  void nextTick(() => {
+    if (!targetMenuOpen.value) return;
+    updateTargetMenuPosition();
+    if (!touchInteraction.value) targetSearchRef.value?.focus({preventScroll: true});
+    scrollTargetOptionIntoView(highlightedTargetIndex.value);
+  });
+}
+
+function toggleTargetMenu(): void {
+  if (targetMenuOpen.value) closeTargetMenu(false);
+  else openTargetMenu();
+}
+
+function selectTargetOption(value: string): void {
+  chooseSelectionTarget(value);
+  closeTargetMenu(true);
+}
+
+function handleTargetSearchInput(event: Event): void {
   const target = event.target as {value?: unknown} | null;
-  if (typeof target?.value !== 'string') return;
-  chooseSelectionTarget(target.value);
+  targetSearchQuery.value = typeof target?.value === 'string' ? target.value : '';
+}
+
+function handleTargetTriggerKeydown(event: KeyboardEvent): void {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (!targetMenuOpen.value) openTargetMenu();
+  } else if (event.key === 'Escape' && targetMenuOpen.value) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeTargetMenu(true);
+  }
+}
+
+function handleTargetMenuKeydown(event: KeyboardEvent): void {
+  const options = filteredTargetOptions.value;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopPropagation();
+    closeTargetMenu(true);
+    return;
+  }
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    if (options.length === 0) return;
+    highlightedTargetIndex.value = (highlightedTargetIndex.value + 1) % options.length;
+    scrollTargetOptionIntoView(highlightedTargetIndex.value);
+    return;
+  }
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (options.length === 0) return;
+    highlightedTargetIndex.value = (highlightedTargetIndex.value - 1 + options.length) % options.length;
+    scrollTargetOptionIntoView(highlightedTargetIndex.value);
+    return;
+  }
+  if (event.key === 'Enter') {
+    const selected = options[highlightedTargetIndex.value];
+    if (!selected) return;
+    event.preventDefault();
+    selectTargetOption(selected.value);
+  }
 }
 
 async function sendWordCardRequest(word: string, targetLanguage: string, translateFields: boolean, signal: AbortSignal): Promise<{success?: boolean; data?: WordCardData | null}> {
@@ -2333,6 +2573,7 @@ function hideAll(): void {
   cancelSelectionPresentation();
   selectionSettledAt = 0;
   resetSelectionContentState(true);
+  closeTargetMenu(false);
   selectionTargetOverride.value = null;
   manuallyRequestedSelection.value = false;
   readingMode.value = false;
@@ -2701,12 +2942,19 @@ function handleReadingKeyboardScroll(event: Event): boolean {
 function dismissReadingToolsOutside(event: Event): void {
   if (import.meta.env.BROWSER === 'safari' && readingCardPan
     && !(event.target instanceof Node && readingCardPan.focus.card.contains(event.target))) clearReadingKeyboardFocus();
+  if (targetMenuOpen.value) {
+    const target = event.target instanceof Node ? event.target : null;
+    if (!target || (!targetMenuRef.value?.contains(target) && !targetTriggerRef.value?.contains(target))) closeTargetMenu(false);
+  }
   readingPanelRef.value?.dismissToolsOutside(event);
 }
 function dismissReadingToolsOnFocusOut(event: FocusEvent): void {
   clearReadingKeyboardFocus();
   const root = event.currentTarget as HTMLElement;
-  if (!event.relatedTarget || !root.contains(event.relatedTarget as Node)) readingPanelRef.value?.closeTools();
+  if (!event.relatedTarget || !root.contains(event.relatedTarget as Node)) {
+    closeTargetMenu(false);
+    readingPanelRef.value?.closeTools();
+  }
 }
 function handleStudyToolbarFocus(event: FocusEvent): void {
   const toolbar = event.currentTarget;
@@ -2781,6 +3029,7 @@ function handleKeydown(event: KeyboardEvent): void {
   if (isInsideUi(event.target)) {
     if (import.meta.env.BROWSER === 'safari') readingFocusGestureAt = Date.now();
     suppressSelectionRead();
+    if (event.key === 'Escape' && dismissTargetMenu()) { event.preventDefault(); event.stopPropagation(); return; }
     if (event.key === 'Escape' && readingPanelRef.value?.dismissTools()) { event.preventDefault(); event.stopPropagation(); return; }
     if (event.key === 'Escape' && snapshot.value) { event.preventDefault(); event.stopPropagation(); closeTooltip(); }
     return;
@@ -3089,24 +3338,53 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.fr-selection-translator-root { position: fixed; inset: 0; z-index: 2147483647; width: 100vw; height: 100vh; pointer-events: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #25252a; }
-.fr-click-selection-hint { position: fixed; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); padding: 7px 12px; border: 1px solid #e5d6de; border-radius: 8px; background: #fff; color: #694157; box-shadow: 0 2px 10px #3021321a; font-size: 12px; line-height: 1.5; text-align: center; pointer-events: none; }
-.fr-click-selection-hint--dark { background: #312b33; border-color: #64505e; color: #f2cede; }
-.fr-selection-indicator, .fr-translation-tooltip, .fr-copy-success-toast, .fr-action-toast { pointer-events: auto; }
-.fr-selection-indicator { position: fixed; width: 22px; height: 22px; padding: 0; border: 1px solid #f3c3d2; border-radius: 7px; transform: translate(-50%, -50%); background: #fff; color: #d83160; box-shadow: 0 2px 8px rgba(40, 35, 43, .2); cursor: pointer; transition: transform .14s ease, box-shadow .14s ease; }
-.fr-selection-indicator--dot { width: 8px; height: 8px; border:0; border-radius:50%; background:#ef4b86; }
+.fr-selection-translator-root { position: fixed; inset: 0; z-index: 2147483647; width: 100vw; height: 100vh; pointer-events: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; color: #172033; }
+.fr-click-selection-hint { position: fixed; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); padding: 7px 12px; border: 1px solid #e7eaf1; border-radius: 8px; background: #ffffff; color: #172033; box-shadow: 0 8px 24px rgba(22, 27, 38, .10), 0 1px 3px rgba(22, 27, 38, .05); font-size: 12px; line-height: 1.5; text-align: center; pointer-events: none; }
+.fr-click-selection-hint--dark { background: #1c2028; border-color: #2f3542; color: #f1f3f7; }
+.fr-selection-indicator, .fr-translation-tooltip, .fr-selection-target-menu, .fr-copy-success-toast, .fr-action-toast { pointer-events: auto; }
+.fr-selection-indicator { position: fixed; width: 24px; height: 24px; padding: 0; border: 1px solid rgba(239, 71, 118, .32); border-radius: 7px; transform: translate(-50%, -50%); background: #ffffff; color: #d4235a; box-shadow: 0 3px 10px rgba(22, 27, 38, .14), 0 1px 2px rgba(22, 27, 38, .06); cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1), border-color 140ms cubic-bezier(.23, 1, .32, 1), background-color 140ms cubic-bezier(.23, 1, .32, 1); }
+.fr-selection-indicator--dot { width: 8px; height: 8px; border: 0; border-radius: 50%; background: #ef4776; }
 .fr-selection-indicator--dot .fr-selection-indicator-glyph { display: none; }
-.fr-selection-indicator:hover, .fr-selection-indicator:focus-visible { transform: translate(-50%, -50%) scale(1.1); color:#b8416b; border-color:#d889a5; box-shadow:0 2px 7px rgba(40, 35, 43, .18); outline:2px solid #f0cede; outline-offset:2px; }
+.fr-selection-indicator:hover, .fr-selection-indicator:focus-visible { transform: translate(-50%, -50%) scale(1.08); background: #fff0f5; color: #d4235a; border-color: #ef4776; outline: 2px solid rgba(239, 71, 118, .30); outline-offset: 2px; }
 .fr-selection-indicator-glyph { font-size: 12px; font-weight: 700; line-height: 1; }
-.fr-translation-tooltip, .fr-translation-tooltip * { box-sizing: border-box; }
-.fr-translation-tooltip { position: fixed; display: flex; flex-direction: column; width: min(388px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 20px)); overflow: hidden; border: 1px solid rgba(22, 27, 38, .12); border-radius: 12px; background: #fff; box-shadow: 0 6px 20px rgba(17, 24, 39, .12); -webkit-user-select: none; user-select: none; }
-.fr-translation-tooltip {
+.fr-translation-tooltip, .fr-translation-tooltip *, .fr-selection-target-menu, .fr-selection-target-menu * { box-sizing: border-box; }
+.fr-translation-tooltip, .fr-selection-target-menu {
+  --fr-card-bg: #ffffff;
   --fr-card-toolbar: #f7f8fb;
+  --fr-card-hover: #eff1f6;
   --fr-card-line: #e7eaf1;
+  --fr-card-line-strong: #d2d7e2;
+  --fr-card-ink: #172033;
+  --fr-card-source-ink: #475266;
   --fr-card-muted: #5d6678;
+  --fr-card-brand: #ef4776;
   --fr-card-active-ink: #d4235a;
   --fr-card-active-bg: #fff0f5;
+  --fr-card-active-border: rgba(239, 71, 118, .22);
   --fr-card-focus: #d4235a;
+  --fr-card-ease: cubic-bezier(.23, 1, .32, 1);
+}
+.fr-translation-tooltip {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  width: min(436px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 20px));
+  overflow: hidden;
+  border: 1px solid var(--fr-card-line);
+  border-radius: 12px;
+  background: var(--fr-card-bg);
+  color: var(--fr-card-ink);
+  box-shadow: 0 10px 30px rgba(22, 27, 38, .12), 0 2px 6px rgba(22, 27, 38, .05);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.fr-translation-tooltip.fr-tooltip-animated {
+  animation: fr-tooltip-fade 120ms var(--fr-card-ease) both;
+}
+@keyframes fr-tooltip-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .fr-popup-manipulating, .fr-popup-manipulating * { cursor: grabbing !important; user-select: none !important; }
 .fr-popup-resize-handle { position: absolute; z-index: 2; touch-action: none; }
@@ -3119,19 +3397,21 @@ onBeforeUnmount(() => {
 .fr-popup-resize-nw { top: 0; left: 0; cursor: nwse-resize; }
 .fr-popup-resize-se { bottom: 0; right: 0; cursor: nwse-resize; }
 .fr-popup-resize-sw { bottom: 0; left: 0; cursor: nesw-resize; }
-.fr-popup-resize-se::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 5px; height: 5px; border-right: 2px solid #95858d; border-bottom: 2px solid #95858d; }
+.fr-popup-resize-se::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 5px; height: 5px; border-right: 1.5px solid var(--fr-card-line-strong); border-bottom: 1.5px solid var(--fr-card-line-strong); border-bottom-right-radius: 1px; }
 .fr-reading-tooltip { display: flex; flex-direction: column; height: auto; overflow: visible; }
 .fr-reading-tooltip > .fr-reading-content { display: flex; flex-direction: column; flex: 1; min-height: 0; max-height: none; overflow: hidden; padding: 0; }
 /* 自动卡用内在高度收拢；达到外框上限后将收缩量传给真正的阅读滚动区。 */
 .fr-reading-content > :deep(.fr-reading) { flex: 1; height: auto; }
-.fr-pos-label { display:flex; gap:6px; align-items:center; }
+.fr-pos-label { display: flex; gap: 6px; align-items: center; }
+.fr-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .fr-study-navigation {
   display: flex;
   flex: none;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 5px 8px;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 8px 6px 10px;
   border-bottom: 1px solid var(--fr-card-line);
   background: var(--fr-card-toolbar);
   cursor: move;
@@ -3141,108 +3421,86 @@ onBeforeUnmount(() => {
   flex: none;
   width: 18px;
   height: 18px;
-  margin-block-start: 5px;
-  margin-inline-end: 2px;
-  border-radius: 4px;
+  border-radius: 5px;
   object-fit: contain;
   pointer-events: none;
 }
 .fr-study-toolbar {
   display: flex;
-  flex: 1 1 112px;
-  flex-wrap: wrap;
+  flex: 1 1 0;
+  flex-wrap: nowrap;
+  align-items: center;
   min-width: 0;
   gap: 2px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
-.fr-study-reading-tools { flex: none; cursor: default; }
-.fr-selection-target {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  max-width: 108px;
-  min-height: 28px;
-  border: 1px solid var(--fr-card-line);
-  border-radius: 7px;
-  background: #fff;
-  color: var(--fr-card-muted);
-  font-size: 11.5px;
-  line-height: 1.2;
-  cursor: pointer;
-}
-.fr-selection-target:hover {
-  border-color: color-mix(in srgb, var(--fr-card-active-ink) 38%, var(--fr-card-line));
-  background: color-mix(in srgb, var(--fr-card-active-bg) 55%, #fff);
-  color: var(--fr-card-active-ink);
-}
-.fr-selection-target.is-overridden {
-  border-color: color-mix(in srgb, var(--fr-card-active-ink) 32%, transparent);
-  background: var(--fr-card-active-bg);
-  color: var(--fr-card-active-ink);
-}
-.fr-selection-target:has(.fr-selection-target-select:focus-visible) {
-  outline: 2px solid var(--fr-card-focus);
-  outline-offset: -2px;
-}
-.fr-selection-target-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  max-width: 100%;
-  padding: 0 6px;
-  pointer-events: none;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.fr-selection-target-arrow {
-  flex: none;
-  color: var(--fr-card-active-ink);
-  font-weight: 600;
-}
-.fr-selection-target-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.fr-selection-target-select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  opacity: 0;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
-  background: transparent;
-}
+.fr-study-toolbar::-webkit-scrollbar { display: none; }
 .fr-study-toolbar button {
-  max-width: 100%;
-  min-height: 28px;
-  padding: 4px 7px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 7px;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: var(--fr-card-muted);
   font: inherit;
   font-size: 12px;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
+  transition: background-color 120ms var(--fr-card-ease), color 120ms var(--fr-card-ease), box-shadow 120ms var(--fr-card-ease), transform 120ms var(--fr-card-ease);
 }
 .fr-study-toolbar button:disabled { cursor: wait; }
+.fr-study-toolbar button:hover:not(:disabled) {
+  background: var(--fr-card-hover);
+  color: var(--fr-card-ink);
+}
+.fr-study-toolbar button:active:not(:disabled) { transform: scale(.97); }
+.fr-study-toolbar button[aria-pressed=true] {
+  background: var(--fr-card-active-bg);
+  color: var(--fr-card-active-ink);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--fr-card-active-border);
+}
+.fr-study-toolbar .fr-study-cta-tab {
+  color: var(--fr-card-active-ink);
+  font-weight: 500;
+}
+.fr-study-toolbar .fr-study-cta-tab:hover:not(:disabled) {
+  background: var(--fr-card-active-bg);
+  color: var(--fr-card-active-ink);
+}
+.fr-study-reading-tools { flex: none; cursor: default; }
+.fr-study-reading-tools :deep(.fr-reading-tools > summary) {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+.fr-study-reading-tools :deep(.fr-reading-controls > .fr-reading-inline-stop) {
+  flex: 0 0 auto;
+  width: auto;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 12px;
+}
 .fr-tooltip-actions {
   display: flex;
   flex: none;
-  flex-wrap: wrap;
-  max-width: 100%;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 2px;
   margin-inline-start: auto;
+  padding-inline-start: 6px;
+  border-inline-start: 1px solid var(--fr-card-line);
 }
-.fr-action-btn, .fr-close-btn, .fr-text-audio-btn, .fr-playing-status button { border: 0; background: transparent; color: #777780; cursor: pointer; }
+.fr-action-btn, .fr-close-btn, .fr-text-audio-btn, .fr-playing-status button { border: 0; background: transparent; color: var(--fr-card-muted); cursor: pointer; }
 .fr-action-btn, .fr-close-btn {
   display: grid;
   flex: none;
@@ -3252,175 +3510,378 @@ onBeforeUnmount(() => {
   place-items: center;
   border-radius: 7px;
   color: var(--fr-card-muted);
+  transition: background-color 120ms var(--fr-card-ease), color 120ms var(--fr-card-ease), box-shadow 120ms var(--fr-card-ease), transform 120ms var(--fr-card-ease);
 }
-.fr-action-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.fr-study-toolbar button:hover:not(:disabled), .fr-action-btn:hover:not(:disabled), .fr-close-btn:hover { background: color-mix(in srgb, currentColor 9%, transparent); }
-.fr-study-toolbar button[aria-pressed=true] { background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); }
-.fr-study-toolbar button:focus-visible, .fr-action-btn:focus-visible, .fr-close-btn:focus-visible { outline: 2px solid var(--fr-card-focus); outline-offset: -2px; }
+.fr-action-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; }
+.fr-action-btn:hover:not(:disabled), .fr-close-btn:hover { background: var(--fr-card-hover); color: var(--fr-card-ink); }
+.fr-action-btn:active:not(:disabled), .fr-close-btn:active { transform: scale(.95); }
+.fr-history-btn[aria-pressed=true] {
+  background: var(--fr-card-active-bg);
+  color: var(--fr-card-active-ink);
+  box-shadow: inset 0 0 0 1px var(--fr-card-active-border);
+}
+.fr-study-toolbar button:focus-visible, .fr-action-btn:focus-visible, .fr-close-btn:focus-visible, .fr-selection-target-trigger:focus-visible { outline: 2px solid var(--fr-card-focus); outline-offset: -2px; }
 .fr-action-btn:disabled, .fr-study-toolbar button:disabled { opacity: .45; }
 .fr-action-btn:disabled { cursor: not-allowed; }
-.fr-vocabulary-btn.fr-saved { color: #ef4b86; }
+.fr-vocabulary-btn.fr-saved { color: var(--fr-card-brand); }
+.fr-vocabulary-btn.fr-saved:hover:not(:disabled) { background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); }
 .fr-vocabulary-btn.fr-saved svg { fill: currentColor; stroke: currentColor; }
-.fr-tooltip-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 8px 12px 10px; scrollbar-color: rgba(108, 105, 112, .4) transparent; scrollbar-width: thin; }
-.fr-translation-container { display: grid; gap: 8px; }
-.fr-loading-state, .fr-error-state { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 80px; color: #777780; font-size: 13px; }
-.fr-error-state { align-items: stretch; flex-direction: column; gap: 0; padding: 10px 8px 12px; color: #1d2535; }
-.fr-error-state h3 { margin: 0; font-size: 15px; font-weight: 650; line-height: 1.5; }
-.fr-error-state p { margin: 9px 0 0; color: #788196; font-size: 13px; line-height: 1.7; }
+.fr-card-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 5px 8px 5px 10px;
+  border-top: 1px solid var(--fr-card-line);
+  background: var(--fr-card-toolbar);
+}
+.fr-card-footer-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+.fr-selection-target {
+  position: relative;
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 176px;
+}
+.fr-selection-target-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--fr-card-line);
+  border-radius: 7px;
+  background: var(--fr-card-bg);
+  color: var(--fr-card-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 120ms var(--fr-card-ease), background-color 120ms var(--fr-card-ease), color 120ms var(--fr-card-ease), transform 120ms var(--fr-card-ease);
+}
+.fr-selection-target-trigger:hover {
+  border-color: var(--fr-card-line-strong);
+  background: var(--fr-card-hover);
+}
+.fr-selection-target-trigger:active { transform: scale(.98); }
+.fr-selection-target.is-open .fr-selection-target-trigger,
+.fr-selection-target.is-overridden .fr-selection-target-trigger {
+  border-color: var(--fr-card-active-border);
+  background: var(--fr-card-active-bg);
+  color: var(--fr-card-active-ink);
+}
+.fr-selection-target-globe {
+  flex: none;
+  color: var(--fr-card-muted);
+}
+.fr-selection-target.is-open .fr-selection-target-globe,
+.fr-selection-target.is-overridden .fr-selection-target-globe {
+  color: var(--fr-card-active-ink);
+}
+.fr-selection-target-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fr-selection-target-chevron {
+  flex: none;
+  color: var(--fr-card-muted);
+  transition: transform 160ms var(--fr-card-ease);
+}
+.fr-selection-target.is-open .fr-selection-target-chevron {
+  color: var(--fr-card-active-ink);
+  transform: rotate(180deg);
+}
+.fr-selection-target.is-overridden .fr-selection-target-chevron {
+  color: var(--fr-card-active-ink);
+}
+.fr-selection-target-menu {
+  position: fixed;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  max-height: var(--fr-target-menu-max-height, 288px);
+  overflow: hidden;
+  border: 1px solid var(--fr-card-line);
+  border-radius: 10px;
+  background: var(--fr-card-bg);
+  color: var(--fr-card-ink);
+  box-shadow: 0 12px 32px rgba(22, 27, 38, .16), 0 2px 6px rgba(22, 27, 38, .06);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.fr-selection-target-search-wrap {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--fr-card-line);
+  background: var(--fr-card-toolbar);
+}
+.fr-selection-target-search-icon {
+  flex: none;
+  color: var(--fr-card-muted);
+}
+.fr-selection-target-search {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fr-card-ink);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.fr-selection-target-search::placeholder { color: var(--fr-card-muted); }
+.fr-selection-target-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(93, 102, 120, .35) transparent;
+}
+.fr-selection-target-option {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fr-card-ink);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.3;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color 120ms var(--fr-card-ease), color 120ms var(--fr-card-ease);
+}
+.fr-selection-target-option.is-highlighted,
+.fr-selection-target-option:hover {
+  background: var(--fr-card-hover);
+}
+.fr-selection-target-option.is-selected {
+  background: var(--fr-card-active-bg);
+  color: var(--fr-card-active-ink);
+  font-weight: 600;
+}
+.fr-selection-target-option:focus-visible {
+  outline: 2px solid var(--fr-card-focus);
+  outline-offset: -2px;
+}
+.fr-selection-target-option-names {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+}
+.fr-selection-target-option-primary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fr-selection-target-option-secondary {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fr-card-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.fr-selection-target-option.is-selected .fr-selection-target-option-secondary {
+  color: color-mix(in srgb, var(--fr-card-active-ink) 72%, var(--fr-card-muted));
+}
+.fr-selection-target-default-badge {
+  flex: none;
+  padding: 2px 5px;
+  border: 1px solid var(--fr-card-line);
+  border-radius: 5px;
+  background: var(--fr-card-toolbar);
+  color: var(--fr-card-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+.fr-selection-target-check {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--fr-card-active-ink);
+}
+.fr-selection-target-empty {
+  padding: 18px 10px;
+  color: var(--fr-card-muted);
+  font-size: 12px;
+  text-align: center;
+}
+.fr-tooltip-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 12px 14px; scrollbar-color: rgba(93, 102, 120, .35) transparent; scrollbar-width: thin; }
+.fr-translation-container { display: grid; gap: 10px; }
+.fr-loading-state, .fr-error-state { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 112px; color: var(--fr-card-muted); font-size: 13px; }
+.fr-error-state { align-items: stretch; flex-direction: column; gap: 0; padding: 10px 8px 12px; color: var(--fr-card-ink); }
+.fr-error-state h3 { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.5; }
+.fr-error-state p { margin: 9px 0 0; color: var(--fr-card-muted); font-size: 13px; line-height: 1.65; }
 .fr-recovery-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin-top: 20px; }
-.fr-error-state button { min-height: 36px; border: 0; border-radius: 8px; padding: 8px 14px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; transition: background-color 120ms cubic-bezier(.22, 1, .36, 1), transform 120ms cubic-bezier(.22, 1, .36, 1); }
+.fr-error-state button { min-height: 36px; border: 0; border-radius: 8px; padding: 8px 14px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; transition: background-color 120ms var(--fr-card-ease), transform 120ms var(--fr-card-ease); }
 .fr-error-state .fr-recovery-primary { color: #fff; background: linear-gradient(135deg, #f45686, #e53268); box-shadow: 0 4px 12px rgba(233, 50, 103, .20); font-weight: 600; }
 .fr-error-state .fr-recovery-primary:hover:not(:disabled) { background: linear-gradient(135deg, #eb4677, #d6265c); box-shadow: 0 5px 14px rgba(220, 45, 99, .26); }
 .fr-error-state .fr-recovery-primary:active:not(:disabled) { transform: scale(.985); }
 .fr-error-state .fr-recovery-primary:disabled { opacity: .55; cursor: default; }
-.fr-recovery-more > summary { display: flex; align-items: center; gap: 6px; min-height: 36px; color: #5b6476; font-size: 12px; list-style: none; cursor: pointer; }
+.fr-recovery-more > summary { display: flex; align-items: center; gap: 6px; min-height: 36px; color: var(--fr-card-muted); font-size: 12px; list-style: none; cursor: pointer; }
 .fr-recovery-more > summary::-webkit-details-marker { display: none; }
 .fr-recovery-more[open] > summary .fr-ui-icon { transform: rotate(180deg); }
 .fr-recovery-more > button { margin-top: 6px; }
-.fr-dark-theme .fr-error-state { color: #f3f5fa; }
-.fr-dark-theme .fr-error-state p, .fr-dark-theme .fr-recovery-more > summary { color: #b5bdcc; }
 .fr-error-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-width: 0; max-width: 100%; }
 .fr-error-actions button { max-width: 100%; }
 .fr-error-actions button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .fr-error-actions button:disabled { opacity: .55; cursor: default; }
-.fr-loading-spinner { width: 18px; height: 18px; border: 2px solid #f5bfd3; border-top-color: #ef4b86; border-radius: 50%; animation: fr-spin .7s linear infinite; }
+.fr-loading-spinner { width: 18px; height: 18px; border: 2px solid rgba(239, 71, 118, .22); border-top-color: var(--fr-card-brand); border-radius: 50%; animation: fr-spin .7s linear infinite; }
 .fr-loading-spinner.fr-static { animation: none; }
 @keyframes fr-spin { to { transform: rotate(360deg); } }
-.fr-word-learning-card { padding: 1px 1px 0; color: #39363d; }
-.fr-word-card-loading { display: flex; align-items: center; gap: 7px; min-height: 22px; margin-bottom: 8px; color: #77747c; font-size: 11px; line-height: 1.5; }
+.fr-word-learning-card { padding: 1px 1px 0; color: var(--fr-card-ink); }
+.fr-word-card-loading { display: flex; align-items: center; gap: 7px; min-height: 22px; margin-bottom: 8px; color: var(--fr-card-muted); font-size: 11px; line-height: 1.5; }
 .fr-word-card-loading .fr-loading-spinner { flex: 0 0 auto; width: 12px; height: 12px; }
-.fr-word-support-loading { margin: 4px 0; color: #77747c; font-size: 11px; line-height: 1.5; }
+.fr-word-support-loading { margin: 4px 0; color: var(--fr-card-muted); font-size: 11px; line-height: 1.5; }
 .fr-word-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 0; }
 .fr-word-heading > div:first-child { min-width: 0; }
-.fr-word-heading h3 { margin: 0; color: #292832; font-size: 27px; font-weight: 700; letter-spacing: -.035em; line-height: 1.08; overflow-wrap: anywhere; user-select: text; }
-.fr-word-normalized { display: block; margin-top: 5px; color: #5b6476; font-size: 11px; }
+.fr-word-heading h3 { margin: 0; color: var(--fr-card-ink); font-size: 26px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; overflow-wrap: anywhere; user-select: text; }
+.fr-word-normalized { display: block; margin-top: 5px; color: var(--fr-card-muted); font-size: 11px; }
 .fr-word-heading-actions { display: flex; flex: none; align-items: center; gap: 4px; }
-.fr-word-heading-audio { background: #f6f7f9; color: #5b6476; }
-.fr-word-pronunciations { display: flex; flex-wrap:wrap; gap: 4px 14px; margin-top: 7px; padding-bottom: 8px; border-bottom: 1px solid #e3e6ed; }
+.fr-word-heading-audio { background: var(--fr-card-toolbar); color: var(--fr-card-muted); }
+.fr-word-pronunciations { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 7px; padding-bottom: 8px; border-bottom: 1px solid var(--fr-card-line); }
 .fr-word-pronunciation { display: flex; align-items: center; gap: 5px; min-height: 26px; padding: 0; }
 .fr-word-pronunciation:last-child { border-bottom: 0; }
-.fr-word-pronunciation-label { color: #5b6476; font-size: 11px; font-weight: 500; }
-.fr-word-ipa { color: #3b4252; font-family: Georgia, "Times New Roman", serif; font-size: 14px; }
-.fr-word-pronunciation .fr-text-audio-btn { width:24px; height:24px; }
-.fr-word-translation { display:flow-root; margin-top: 9px; padding: 0 0 10px; border-bottom: 1px solid #e3e6ed; color: #161b26; }
-.fr-word-translation-header { float:inline-end; margin-inline-start:8px; }
+.fr-word-pronunciation-label { color: var(--fr-card-muted); font-size: 11px; font-weight: 500; }
+.fr-word-ipa { color: var(--fr-card-source-ink); font-family: Georgia, "Times New Roman", serif; font-size: 14px; }
+.fr-word-pronunciation .fr-text-audio-btn { width: 24px; height: 24px; }
+.fr-word-translation { display: flow-root; margin-top: 9px; padding: 0 0 10px; border-bottom: 1px solid var(--fr-card-line); color: var(--fr-card-ink); }
+.fr-word-translation-header { float: inline-end; margin-inline-start: 8px; }
 .fr-word-translation .fr-text-label { margin: 0; }
-.fr-word-translation pre { overflow-wrap: anywhere; margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 16px; font-weight: 600; line-height: 1.6; user-select: text; }
-.fr-word-translation-loading, .fr-word-empty { margin-top: 12px; color: #5b6476; font-size: 12px; }
-.fr-word-meaning-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: #5b6476; font-size: 11px; font-weight: 600; }
-.fr-word-meaning-toolbar button { border: 0; padding: 3px 0; background: transparent; color: #d4235a; cursor: pointer; font: inherit; font-weight: 600; }
-.fr-word-meaning-toolbar button:hover, .fr-word-meaning-toolbar button:focus-visible { color: #b51c4d; text-decoration: underline; outline: none; }
+.fr-word-translation pre { overflow-wrap: anywhere; margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 15.5px; font-weight: 600; line-height: 1.6; user-select: text; }
+.fr-word-translation-loading, .fr-word-empty { margin-top: 12px; color: var(--fr-card-muted); font-size: 12px; }
+.fr-word-meaning-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: var(--fr-card-muted); font-size: 11px; font-weight: 600; }
+.fr-word-meaning-toolbar button { border: 0; padding: 3px 0; background: transparent; color: var(--fr-card-active-ink); cursor: pointer; font: inherit; font-weight: 600; }
+.fr-word-meaning-toolbar button:hover, .fr-word-meaning-toolbar button:focus-visible { text-decoration: underline; outline: none; }
 .fr-word-meanings { display: grid; gap: 16px; margin-top: 14px; }
 .fr-word-meaning-toolbar + .fr-word-meanings { margin-top: 8px; }
-.fr-word-meaning { color: #172033; font-size: 12.5px; line-height: 1.55; }
-.fr-word-meaning > strong { display: inline-flex; padding: 2px 7px; border: 1px solid #e7eaf1; border-radius: 6px; background: #f7f8fb; color: #d4235a; font-size: 11px; font-weight: 600; }
+.fr-word-meaning { color: var(--fr-card-ink); font-size: 12.5px; line-height: 1.55; }
+.fr-word-meaning > strong { display: inline-flex; padding: 2px 7px; border: 1px solid var(--fr-card-line); border-radius: 6px; background: var(--fr-card-toolbar); color: var(--fr-card-active-ink); font-size: 11px; font-weight: 600; }
 .fr-word-meaning ol { margin: 7px 0 0; padding: 0; list-style: none; counter-reset: definition; }
 .fr-word-meaning li { position: relative; padding-left: 21px; }
-.fr-word-meaning li::before { position: absolute; top: 0; left: 0; width: 14px; color: #5b6476; content: counter(definition); counter-increment: definition; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.fr-word-meaning li::before { position: absolute; top: 0; left: 0; width: 14px; color: var(--fr-card-muted); content: counter(definition); counter-increment: definition; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
 .fr-word-meaning li + li { margin-top: 9px; }
 .fr-word-definition-en, .fr-word-example-en { display: block; }
-.fr-word-definition-zh, .fr-word-example-zh { display: block; margin-top: 3px; color: #5b6476; font-size: 12px; }
-.fr-word-meaning em { display: block; margin-top: 4px; padding-left: 8px; border-left: 2px solid #e3e6ed; color: #5b6476; font-size: 11.5px; font-style: normal; line-height: 1.5; }
-.fr-word-card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; margin-top: 16px; padding-top: 10px; border-top: 1px solid #e3e6ed; color: #5b6476; font-size: 11px; }
-.fr-word-card-footer a { color: #9e5d71; text-decoration: none; }
+.fr-word-definition-zh, .fr-word-example-zh { display: block; margin-top: 3px; color: var(--fr-card-muted); font-size: 12px; }
+.fr-word-meaning em { display: block; margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--fr-card-line-strong); color: var(--fr-card-muted); font-size: 11.5px; font-style: normal; line-height: 1.5; }
+.fr-word-card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--fr-card-line); color: var(--fr-card-muted); font-size: 11px; }
+.fr-word-card-footer a { color: var(--fr-card-active-ink); text-decoration: none; }
 .fr-word-card-footer a:hover, .fr-word-card-footer a:focus-visible { text-decoration: underline; }
-.fr-word-fallback-note, .fr-inline-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: #a56578; font-size: 11px; }
-.fr-word-fallback-note { padding: 6px 8px; border-radius: 7px; background: #fff8fa; }
+.fr-word-fallback-note, .fr-inline-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--fr-card-active-ink); font-size: 11px; }
+.fr-word-fallback-note { padding: 6px 8px; border-radius: 7px; background: var(--fr-card-active-bg); }
 .fr-inline-error button, .fr-word-fallback-note button { border: 1px solid currentColor; border-radius: 6px; padding: 2px 7px; background: transparent; color: inherit; cursor: pointer; font-size: 11px; }
 .fr-inline-error { flex-wrap: wrap; }
 .fr-inline-error .fr-error-actions { margin-left: auto; justify-content: flex-end; }
 .fr-word-fallback-note button { flex-shrink: 0; white-space: nowrap; }
 .fr-text-block { min-width: 0; }
-.fr-text-block + .fr-text-block { padding-top: 4px; border-top: 1px solid var(--fr-card-line); }
-.fr-original-text { color: #5d5a66; }
-.fr-inline-code { padding: 1px 4px; border-radius: 4px; background: rgba(127, 127, 127, .14); color: inherit; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .92em; white-space: pre-wrap; }
-.fr-translation-result { color: #39373d; }
-.fr-text-block-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
-.fr-text-label { margin: 0; color: var(--fr-card-muted); font-size: 11px; font-weight: 600; }
-.fr-text-actions { display: flex; flex: none; align-items: center; gap: 1px; }
-.fr-text-copy-btn { display: inline-flex; align-items: center; justify-content: center; width:26px; height:26px; padding:0; border:1px solid transparent; border-radius:5px; background:transparent; color:#85858e; cursor:pointer; font:inherit; line-height:1; }
-.fr-text-copy-btn span, .fr-word-translation-header > .fr-text-label { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
-.fr-text-copy-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.fr-text-copy-btn:hover, .fr-text-copy-btn:focus-visible { border-color: rgba(239, 71, 118, .32); background: #fff0f5; color: #d4235a; outline: none; }
-.fr-text-copy-btn.fr-copied { border-color: rgba(239, 71, 118, .26); background: #fff0f5; color: #d4235a; }
+.fr-text-block + .fr-text-block { padding-top: 10px; border-top: 1px solid var(--fr-card-line); }
+.fr-original-text { color: var(--fr-card-source-ink); }
+.fr-inline-code { padding: 1px 5px; border-radius: 5px; background: rgba(127, 134, 148, .14); color: inherit; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .91em; white-space: pre-wrap; }
+.fr-translation-result { color: var(--fr-card-ink); }
+.fr-text-block-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.fr-text-label { margin: 0; color: var(--fr-card-muted); font-size: 11.5px; font-weight: 600; letter-spacing: .01em; }
+.fr-text-actions { display: flex; flex: none; align-items: center; gap: 2px; }
+.fr-text-copy-btn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fr-card-muted); cursor: pointer; font: inherit; line-height: 1; transition: background-color 120ms var(--fr-card-ease), border-color 120ms var(--fr-card-ease), color 120ms var(--fr-card-ease), transform 120ms var(--fr-card-ease); }
+.fr-text-copy-btn span, .fr-word-translation-header > .fr-text-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.fr-text-copy-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; }
+.fr-text-copy-btn:hover, .fr-text-copy-btn:focus-visible { border-color: var(--fr-card-active-border); background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); outline: none; }
+.fr-text-copy-btn:active:not(:disabled) { transform: scale(.95); }
+.fr-text-copy-btn.fr-copied { border-color: var(--fr-card-active-border); background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); }
 .fr-text-copy-btn:disabled { cursor: not-allowed; opacity: .42; }
-.fr-text-audio-btn { position: static; display: grid; flex: none; width:26px; height:26px; padding:0; place-items:center; border:1px solid transparent; border-radius:6px; background:transparent; color:#5d6678; }
-.fr-text-audio-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.fr-text-audio-btn:hover, .fr-text-audio-btn:focus-visible { border-color: rgba(239, 71, 118, .28); background: #fff0f5; color: #d4235a; outline: none; }
-.fr-text-block pre { overflow-wrap:anywhere; margin:0; white-space:pre-wrap; word-break:break-word; font:inherit; font-size:14px; line-height:1.7; user-select:text; }
-.fr-original-text pre { font-size: 13px; }
-.fr-playing-status { flex: none; box-sizing: border-box; min-height: 38px; padding: 5px 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap:6px 8px; border-top: 1px solid var(--fr-card-line); background: inherit; color: var(--fr-card-muted); font-size: 12px; line-height: 1.4; }
+.fr-text-audio-btn { position: static; display: grid; flex: none; width: 26px; height: 26px; padding: 0; place-items: center; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fr-card-muted); transition: background-color 120ms var(--fr-card-ease), border-color 120ms var(--fr-card-ease), color 120ms var(--fr-card-ease), transform 120ms var(--fr-card-ease); }
+.fr-text-audio-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.fr-text-audio-btn:hover, .fr-text-audio-btn:focus-visible { border-color: var(--fr-card-active-border); background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); outline: none; }
+.fr-text-audio-btn:active { transform: scale(.95); }
+.fr-text-block pre { overflow-wrap: anywhere; margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 14.5px; line-height: 1.68; user-select: text; }
+.fr-original-text pre { font-size: 13px; line-height: 1.64; }
+.fr-playing-status { flex: none; box-sizing: border-box; min-height: 38px; padding: 5px 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; border-top: 1px solid var(--fr-card-line); background: var(--fr-card-toolbar); color: var(--fr-card-muted); font-size: 12px; line-height: 1.4; }
 .fr-playing-status.is-idle { display: none; }
-.fr-playing-status button { flex: none; min-height: 27px; border: 1px solid #f0b0c6; border-radius: 7px; padding: 3px 8px; color: #d4235a; font: inherit; line-height: 1.2; }
-.fr-playing-label { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fr-playback-controls { display:flex; flex-wrap:wrap; flex:0 1 auto; max-width:100%; margin-inline-start:auto; align-items:center; justify-content:flex-end; gap:5px; }
-.fr-playback-time { font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.fr-playing-status .fr-seek-btn { display:grid; place-items:center; width:27px; height:27px; padding:0; border-color:transparent; color:inherit; }
-.fr-seek-btn svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
-.fr-seek-btn text { fill:currentColor; stroke:none; font:10px system-ui; text-anchor:middle; }
-.fr-playing-status .fr-seek-btn:hover:not(:disabled) { background:color-mix(in srgb,currentColor 10%,transparent); }
-.fr-playing-status button:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
-.fr-playing-status .fr-seek-btn:disabled { opacity:.35; cursor:default; }
-.fr-copy-success-toast { position: fixed; right: 18px; bottom: 18px; padding: 9px 13px; border-radius: 9px; background: #2c2c35; color: #fff; font-size: 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
-.fr-action-toast { position: fixed; right: 18px; bottom: 18px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: max-content; overflow: auto; padding: 9px 13px; border-radius: 9px; background: #2c2c35; color: #fff; font-size: 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
+.fr-playing-status button { flex: none; min-height: 26px; border: 1px solid var(--fr-card-active-border); border-radius: 7px; padding: 3px 9px; background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); font: inherit; font-weight: 500; line-height: 1.2; }
+.fr-playing-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-playback-controls { display: flex; flex-wrap: wrap; flex: 0 1 auto; max-width: 100%; margin-inline-start: auto; align-items: center; justify-content: flex-end; gap: 5px; }
+.fr-playback-time { font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fr-playing-status .fr-seek-btn { display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border-color: transparent; background: transparent; color: inherit; }
+.fr-seek-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.fr-seek-btn text { fill: currentColor; stroke: none; font: 10px system-ui; text-anchor: middle; }
+.fr-playing-status .fr-seek-btn:hover:not(:disabled) { background: var(--fr-card-hover); }
+.fr-playing-status button:focus-visible { outline: 2px solid var(--fr-card-focus); outline-offset: 2px; }
+.fr-playing-status .fr-seek-btn:disabled { opacity: .35; cursor: default; }
+.fr-copy-success-toast { position: fixed; right: 18px; bottom: 18px; padding: 9px 13px; border-radius: 9px; background: #1c2028; color: #f1f3f7; font-size: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .24); }
+.fr-action-toast { position: fixed; right: 18px; bottom: 18px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: max-content; overflow: auto; padding: 9px 13px; border-radius: 9px; background: #1c2028; color: #f1f3f7; font-size: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .24); }
 .fr-action-toast > span { min-width: 0; max-height: var(--fr-notice-content-height); overflow: auto; overflow-wrap: anywhere; }
-.fr-action-toast button { flex: none; padding: 0; border: 0; color: #ffc2d5; background: transparent; cursor: pointer; font: inherit; font-weight: 700; }
+.fr-action-toast button { flex: none; padding: 0; border: 0; color: #ff85ab; background: transparent; cursor: pointer; font: inherit; font-weight: 700; }
 .fr-action-toast button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 .fr-dark-theme {
-  --fr-card-toolbar: #1e2430;
-  --fr-card-line: #272e3d;
-  --fr-card-muted: #9aa4b5;
-  --fr-card-active-ink: #ff7fa3;
-  --fr-card-active-bg: rgba(239, 71, 118, .18);
-  --fr-card-focus: #ff7fa3;
-  border-color: #272e3d;
-  background: #171b24;
-  color: #f0f3f8;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, .42);
+  --fr-card-bg: #1c2028;
+  --fr-card-toolbar: #232833;
+  --fr-card-hover: #2b313e;
+  --fr-card-line: #2f3542;
+  --fr-card-line-strong: #434b5c;
+  --fr-card-ink: #f1f3f7;
+  --fr-card-source-ink: #c6cedd;
+  --fr-card-muted: #a5aebf;
+  --fr-card-brand: #f46590;
+  --fr-card-active-ink: #ff85ab;
+  --fr-card-active-bg: rgba(244, 101, 144, .16);
+  --fr-card-active-border: rgba(244, 101, 144, .30);
+  --fr-card-focus: #ff85ab;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .48), 0 2px 8px rgba(0, 0, 0, .24);
 }
-.fr-dark-theme .fr-selection-target { background: #1e2430; }
-.fr-dark-theme .fr-selection-target:hover { background: color-mix(in srgb, var(--fr-card-active-bg) 60%, #1e2430); }
-.fr-dark-theme .fr-selection-target.is-overridden { background: var(--fr-card-active-bg); }
-.fr-dark-theme .fr-selection-target-select option { background: #1e2430; color: #f0f3f8; }
-.fr-dark-theme :is(.fr-text-copy-btn, .fr-text-audio-btn) { border-color:transparent; background:transparent; color:#9aa4b5; }
-.fr-dark-theme :is(.fr-text-copy-btn, .fr-text-audio-btn):is(:hover, :focus-visible) { border-color: rgba(255, 127, 163, .36); background: rgba(239, 71, 118, .18); color: #ff7fa3; }
-.fr-dark-theme .fr-text-copy-btn.fr-copied { border-color: rgba(255, 127, 163, .28); background: rgba(239, 71, 118, .18); color: #ff7fa3; }
-.fr-dark-theme .fr-playing-status { border-color:#272e3d; color:#9aa4b5; }
-.fr-dark-theme .fr-original-text { color: #cbd2df; }
-.fr-dark-theme .fr-translation-result { color: #f0f3f8; }
-.fr-dark-theme .fr-word-learning-card { background: transparent; }
-.fr-dark-theme :is(.fr-word-heading, .fr-word-pronunciations, .fr-word-translation, .fr-word-card-footer) { border-color: #272e3d; }
-.fr-dark-theme .fr-word-heading h3, .fr-dark-theme .fr-word-meaning, .fr-dark-theme .fr-word-translation { color: #f0f3f8; }
-.fr-dark-theme .fr-word-normalized, .fr-dark-theme .fr-word-card-footer { color: #9aa4b5; }
-.fr-dark-theme .fr-word-meaning-toolbar { color: #9aa4b5; }
-.fr-dark-theme .fr-word-meaning-toolbar button { color: #ff7fa3; }
-.fr-dark-theme .fr-word-heading-audio { background: #1e2430; color: #cbd2df; }
-.fr-dark-theme .fr-word-pronunciation { border-color: #272e3d; }
-.fr-dark-theme .fr-word-pronunciation-label { color: #9aa4b5; }
-.fr-dark-theme .fr-word-ipa { color: #e2e7f0; }
-.fr-dark-theme .fr-word-meaning > strong { border-color: #363f52; background: #1e2430; color: #ff7fa3; }
-.fr-dark-theme .fr-word-meaning em { border-color: #363f52; }
-.fr-dark-theme .fr-word-meaning em, .fr-dark-theme :is(.fr-word-definition-zh, .fr-word-example-zh, .fr-word-translation-loading, .fr-word-empty) { color: #9aa4b5; }
-.fr-dark-theme .fr-word-fallback-note { background: rgba(239, 71, 118, .14); }
+.fr-selection-target-menu.fr-dark-theme {
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .54), 0 2px 8px rgba(0, 0, 0, .28);
+}
 /* 保持桌面紧凑；触摸操作用完整命中区，点模式仍只显示小点，不挤占正文。 */
-.fr-touch-selection .fr-selection-indicator { width:44px; height:44px; border-radius:12px; touch-action:manipulation; }
-.fr-touch-selection .fr-selection-indicator--dot { background:transparent; box-shadow:none; }
-.fr-touch-selection .fr-selection-indicator--dot::after { content:''; position:absolute; inset:18px; border-radius:50%; background:#ef4b86; }
-.fr-touch-selection .fr-translation-tooltip button, .fr-touch-selection .fr-action-toast button, .fr-touch-selection .fr-selection-target { min-width:44px; min-height:44px; touch-action:manipulation; }
-.fr-touch-selection .fr-study-navigation { touch-action:none; }
-.fr-touch-selection .fr-tooltip-brand-icon { margin-block-start: 13px; }
-.fr-touch-selection .fr-popup-resize-handle { display:none; }
-.fr-touch-selection .fr-playing-status { height:auto; min-height:52px; flex-wrap:wrap; }
-.fr-touch-selection .fr-tooltip-content { -webkit-overflow-scrolling:touch; }
-.fr-touch-selection .fr-copy-success-toast { right:max(12px, env(safe-area-inset-right)); bottom:max(12px, env(safe-area-inset-bottom)); }
+.fr-touch-selection .fr-selection-indicator { width: 44px; height: 44px; border-radius: 12px; touch-action: manipulation; }
+.fr-touch-selection .fr-selection-indicator--dot { background: transparent; box-shadow: none; }
+.fr-touch-selection .fr-selection-indicator--dot::after { content: ''; position: absolute; inset: 18px; border-radius: 50%; background: #ef4776; }
+.fr-touch-selection .fr-translation-tooltip button, .fr-touch-selection .fr-action-toast button, .fr-touch-selection .fr-selection-target-trigger, .fr-touch-selection .fr-selection-target-option { min-width: 44px; min-height: 44px; touch-action: manipulation; }
+.fr-touch-selection .fr-selection-target-search { font-size: 16px; }
+.fr-touch-selection .fr-study-navigation { touch-action: none; }
+.fr-touch-selection .fr-popup-resize-handle { display: none; }
+.fr-touch-selection .fr-playing-status { height: auto; min-height: 52px; flex-wrap: wrap; }
+.fr-touch-selection .fr-tooltip-content { -webkit-overflow-scrolling: touch; }
+.fr-touch-selection .fr-copy-success-toast { right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); }
 @media (any-pointer: coarse) {
-  .fr-translation-tooltip button, .fr-action-toast button, .fr-selection-target { min-width:44px; min-height:44px; touch-action:manipulation; }
-  .fr-tooltip-brand-icon { margin-block-start: 13px; }
-  .fr-playing-status { height:auto; min-height:52px; flex-wrap:wrap; }
+  .fr-translation-tooltip button, .fr-action-toast button, .fr-selection-target-trigger, .fr-selection-target-option { min-width: 44px; min-height: 44px; touch-action: manipulation; }
+  .fr-selection-target-search { font-size: 16px; }
+  .fr-playing-status { height: auto; min-height: 52px; flex-wrap: wrap; }
 }
 /* 极矮时标题、正文和语音栏共用外框滚动；不替换或隐藏已聚焦的阅读输入。 */
-.fr-translation-tooltip.fr-short-viewport { overflow-y:auto; border-block-width:0; overscroll-behavior:contain; }
-.fr-short-viewport .fr-study-navigation { padding-block:var(--fr-pad, 4px); border-bottom:0; touch-action:auto; }
+.fr-translation-tooltip.fr-short-viewport { overflow-y: auto; border-block-width: 0; overscroll-behavior: contain; }
+.fr-short-viewport .fr-study-navigation { padding-block: var(--fr-pad, 4px); border-bottom: 0; touch-action: auto; }
 .fr-compact-toolbar .fr-study-toolbar, .fr-short-viewport .fr-study-toolbar {
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -3430,9 +3891,11 @@ onBeforeUnmount(() => {
 }
 .fr-short-viewport .fr-study-toolbar { touch-action: auto; }
 :is(.fr-compact-toolbar, .fr-short-viewport) .fr-study-toolbar button { flex: none; max-width: none; white-space: nowrap; }
-.fr-short-viewport .fr-close-btn { min-width:44px; min-height:44px; }
-.fr-short-viewport .fr-tooltip-content, .fr-short-viewport :deep(.fr-reading), .fr-short-viewport :deep(.fr-reading-scroll) { flex:none; height:auto; max-height:none; overflow:visible; }
-.fr-short-viewport .fr-popup-resize-handle { display:none; }
-@media (prefers-reduced-motion: reduce) { .fr-selection-indicator, .fr-loading-spinner { transition: none; animation: none; } }
+.fr-short-viewport .fr-close-btn { min-width: 44px; min-height: 44px; }
+.fr-short-viewport .fr-tooltip-content, .fr-short-viewport :deep(.fr-reading), .fr-short-viewport :deep(.fr-reading-scroll) { flex: none; height: auto; max-height: none; overflow: visible; }
+.fr-short-viewport .fr-popup-resize-handle { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .fr-selection-indicator, .fr-translation-tooltip.fr-tooltip-animated, .fr-loading-spinner, .fr-study-toolbar button, .fr-action-btn, .fr-close-btn, .fr-selection-target-trigger, .fr-selection-target-chevron, .fr-selection-target-option, .fr-text-copy-btn, .fr-text-audio-btn { transition: none; animation: none; }
+}
 
 </style>

@@ -267,7 +267,7 @@ async function mountReading(service = 'openai') {
     async function choose(index: number) {
         // SelectionTranslator owns main's visible action navigation; its real
         // ReadingPanel receives the action through the public initialAction prop.
-        const label = ['读懂', '词性与句法', '用法', '练习'][index];
+        const label = ['读懂', '句法', '用法', '练习'][index];
         expect(label).toBeTypeOf('string');
         click('.fr-study-toolbar button', label); await settle();
     }

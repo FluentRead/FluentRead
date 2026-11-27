@@ -719,11 +719,11 @@ onBeforeUnmount(() => { closeTools(); recordsGeneration += 1; restoreEpoch += 1;
 </script>
 
 <style scoped>
-.fr-reading, .fr-reading-controls { --fr-reading-line: #eee8ec; --fr-reading-muted: #756a74; --fr-reading-button: #826573; --fr-reading-soft: #faf7f9; color: #35333c; font: 13px/1.7 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-.fr-reading { display: flex; flex-direction: column; height: 100%; min-height: 0; box-sizing: border-box; padding: 6px 14px 10px; overflow: hidden; }
-.fr-reading-controls { display: flex; align-items: center; gap: 3px; }
-.fr-reading-navigation { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; color: var(--fr-reading-muted); font-size: 11px; }
-.fr-reading-navigation button { color: #a64b6e; }
+.fr-reading, .fr-reading-controls { --fr-reading-line: #e7eaf1; --fr-reading-muted: #5d6678; --fr-reading-button: #d4235a; --fr-reading-soft: #f7f8fb; --fr-reading-menu: #ffffff; color: #172033; font: 13px/1.7 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif; }
+.fr-reading { display: flex; flex-direction: column; height: 100%; min-height: 0; box-sizing: border-box; padding: 8px 14px 10px; overflow: hidden; }
+.fr-reading-controls { display: flex; align-items: center; gap: 2px; }
+.fr-reading-navigation { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; color: var(--fr-reading-muted); font-size: 11.5px; }
+.fr-reading-navigation button { color: var(--fr-reading-button); }
 .fr-reading-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 2px 5px 4px 0; }
 .fr-reading-result { position: relative; overflow-anchor: none; }
 /* Overlay 滚动条不占 scrollbar-gutter；留出其命中区域与控件焦点轮廓。 */
@@ -790,16 +790,17 @@ onBeforeUnmount(() => { closeTools(); recordsGeneration += 1; restoreEpoch += 1;
 .fr-reading-question p { margin: 0; white-space: pre-wrap; }
 .fr-reading-answer { user-select: text; overflow-wrap: anywhere; }
 .fr-reading-footer { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 8px 0 0; font-size: 11px; }
-.fr-reading-followup { flex-shrink: 0; display: flex; gap: 6px; margin-top: 6px; padding: 3px 3px 3px 10px; border: 1px solid #eae2e7; border-radius: 11px; }
+.fr-reading-followup { flex-shrink: 0; display: flex; gap: 6px; margin-top: 6px; padding: 3px 3px 3px 10px; border: 1px solid var(--fr-reading-line); border-radius: 10px; background: var(--fr-reading-soft); }
 .fr-reading-followup input { min-width: 0; flex: 1; width: 100%; border: 0; outline: none; color: inherit; background: transparent; font-size: 12px; user-select: text; }
-.fr-reading-followup input::placeholder { color: var(--fr-reading-muted); font-size: 11px; }
-.fr-reading-followup button { background: #b85579; color: white; width: 28px; height: 28px; line-height: 20px; }
-.fr-dark-theme .fr-reading, .fr-dark-theme .fr-reading-controls { --fr-reading-line: #514651; --fr-reading-muted: #b6a9b5; --fr-reading-button: #e4a0bc; --fr-reading-soft: #352f38; --fr-reading-menu: #29242d; color: #e6e0e8; }
-.fr-dark-theme .fr-reading-actions button { color: #bdb0c1; }
-.fr-dark-theme .fr-reading-actions button[aria-pressed='true'] { border-bottom-color: #e4a0bc; color: #f1b6ce; }
-.fr-dark-theme .fr-reading-followup { border-color: #554651; }
-.fr-dark-theme .fr-reading-error { background: #482e35; color: #f5acb6; }
-.fr-dark-theme .fr-reading-navigation button, .fr-dark-theme .fr-reading-session small span, .fr-dark-theme .fr-reading-question { color: #e4a0bc; }
+.fr-reading-followup input::placeholder { color: var(--fr-reading-muted); font-size: 11.5px; }
+.fr-reading-followup button { background: #eb3a70; color: white; width: 28px; height: 28px; border-radius: 7px; line-height: 20px; }
+.fr-dark-theme .fr-reading, .fr-dark-theme .fr-reading-controls { --fr-reading-line: #2f3542; --fr-reading-muted: #a5aebf; --fr-reading-button: #ff85ab; --fr-reading-soft: #232833; --fr-reading-menu: #1c2028; color: #f1f3f7; }
+.fr-dark-theme .fr-reading-actions button { color: #a5aebf; }
+.fr-dark-theme .fr-reading-actions button[aria-pressed='true'] { border-bottom-color: #f46590; color: #ff85ab; }
+.fr-dark-theme .fr-reading-followup { border-color: #2f3542; background: #232833; }
+.fr-dark-theme .fr-reading-followup button { background: #e6376b; }
+.fr-dark-theme .fr-reading-error { background: #3b2029; color: #f5a3b8; }
+.fr-dark-theme .fr-reading-navigation button, .fr-dark-theme .fr-reading-session small span, .fr-dark-theme .fr-reading-question { color: #ff85ab; }
 @media (max-height: 420px) { .fr-reading-toolbar { padding-bottom: 4px; } .fr-reading-followup { margin-top: 4px; } }
 /* 避免 Safari 聚焦小字号追问框时自动放大、滚动宿主页并收起卡片。 */
 @media (any-pointer: coarse) {

@@ -1,0 +1,4 @@
+interface:
+  display_name: "FluentRead 浏览器翻译测试"
+  short_description: "在不抢占前台焦点的隔离浏览器中验证网页翻译"
+  default_prompt: "使用 $fluentread-browser-translation-test，在不抢占前台焦点的隔离浏览器中验证 FluentRead 的悬浮和全文翻译、恢复与真实站点矩阵。"

@@ -580,7 +580,16 @@
       "tests/bilibiliAudio.test.ts",
       "tests/bilibiliAiSource.test.ts",
       "tests/deepSlimLayer1Layer2.test.ts",
-      "tests/dependencyGraph.test.ts"
+      "tests/dependencyGraph.test.ts",
+      "tests/checkStagedFast.test.ts",
+      "tests/configCatalogSplit.test.ts",
+      "tests/devVerify.test.ts",
+      "tests/findModule.test.ts",
+      "tests/scaffoldFeatureMessages.test.ts",
+      "tests/syncRegistries.test.ts",
+      "tests/uiI18nBarrelDecoupling.test.ts",
+      "tests/verifyUserscriptStandaloneBudget.test.ts",
+      "tests/wxtConfigHelpers.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",

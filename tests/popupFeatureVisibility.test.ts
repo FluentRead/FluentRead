@@ -142,7 +142,7 @@ describe('popup feature visibility', () => {
         const popup = source('src/app/popup/PopupApp.vue');
         const onboarding = source('src/ui/components/UiLanguageOnboarding.vue');
         const styles = source('src/app/popup/popup.css');
-        const i18n = source('src/ui/i18n.ts');
+        const i18n = source('src/ui/i18n/runtime.ts');
         const legacyDom = source('src/ui/i18n/legacyDom.ts');
 
         expect(popup).toContain('uiLanguageSetupCompleted');
@@ -167,7 +167,7 @@ describe('popup feature visibility', () => {
         expect(styles).toContain('.popup-shell.language-onboarding-shell { overflow-x: hidden; }');
         expect(styles).toContain('.popup-shell { max-height: 560px; overflow-y: auto;');
         expect(onboarding).toContain('.language-onboarding {\n  position: relative;');
-        expect(i18n).toContain("import {createUiI18nDirective, observeUiDocument} from './i18n/legacyDom';");
+        expect(i18n).toContain("import {createUiI18nDirective, observeUiDocument} from './legacyDom';");
         expect(i18n).toContain('const directive = createUiI18nDirective(context);');
         expect(i18n).toContain('observeUiDocument(uiRoot, context)');
         expect(legacyDom).toContain('function isRelevantUiMutation');
@@ -309,7 +309,10 @@ describe('popup feature visibility', () => {
             'src/app/document-translation/DocumentApp.vue',
             'src/features/settings/model/navigation.ts',
             'src/features/settings/ui/SettingsSections.vue',
-            'src/core/config/catalog.ts',
+            'src/core/config/catalog/options.ts',
+            'src/core/config/catalog/regions.ts',
+            'src/core/config/catalog/services.ts',
+            'src/core/config/catalog/targetLanguageLabels.ts',
             'src/features/video-subtitle/content/runtime.ts',
         ].map(source);
         const localizedCatalogs = [

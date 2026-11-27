@@ -86,7 +86,7 @@ jobs:
         run: node scripts/testing/run-resource-safe.mjs -- node --test --test-concurrency=1 tests/*.test.mjs
       - name: Run architecture gates, affected behavior and changed strict coverage once
         id: affected
-        run: node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-affected-tests.mjs --report coverage/affected-plan/plan.json
+        run: node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-affected-tests.mjs --report coverage/affected-plan/plan.json --summary
       - name: Check extension and shared Vue types
         if: steps.affected.outputs.extension_changed == 'true'
         run: node scripts/testing/run-ci-typecheck.mjs

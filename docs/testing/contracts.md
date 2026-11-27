@@ -122,7 +122,11 @@ node scripts/verify-userscript-build.mjs  # userscript 元数据与产物边界
 
 影响规划以 PR 基线到实际检出提交的 Git diff 为准，跟踪静态 import、使用明确路径的动态 import、barrel、CSS、夹具路径，以及现有组件测试直接读取 SFC 的文件路径；删除和重命名的旧路径同样参与追踪。测试归类复用 `tests/test-matrix.json`，架构组只执行一次。单纯新增测试登记或覆盖率清单保持定向范围；共享依赖、TypeScript/Vitest 执行环境变化则显式扩大到全部受影响行为套件，计划记录扩大原因。改动的严格覆盖模块没有可追踪行为测试时检查失败，不能以空选择通过。
 
+`package.json` 按字段分级：只有 `dependencies`、`devDependencies`、`optionalDependencies`、`peerDependencies`、`peerDependenciesMeta`、`workspaces`、`engines`、`packageManager`、`pnpm`、`overrides`、`resolutions`、`type`、`imports`、`exports` 变化才扩大到全部行为测试。仅新增或修改 `scripts`、`version` 与描述性字段不影响用例集合，保持依赖图收敛范围；基线缺失或任一侧 JSON 不可解析时退回全量扩大，不静默缩小验证范围。
+
 模板夹具路径按固定子目录和静态后缀匹配已知 Git 路径，例如 `./fixtures/page-context/${name}.html`；解析器不执行插值，不把 `src/${name}` 等仅含项目根的路径扩大为全源码。删除和重命名的旧路径仍参与匹配。无法确定子目录的动态读取，应在消费者中明确保留目录依赖；新增动态路径应同时检查真正消费者入选和无关目录未入选。
+
+只有以 `./` 或 `../` 开头的字符串才按相对模块路径解析，裸 `.` 与 `..` 不作为路径——源码里出现 `'.'` 这类普通字面量（标点映射表、扩展名拼接）时，若误判为相对路径会解析成所在目录，再由目录回退把整层源码算作依赖，使验证范围无谓扩大到全量。同理，`'/src/'`、`'src/'`、`'docs/'`、`'@/src/'` 这类**前缀声明**（用于 `startsWith` 判断或架构规则文本）不指向具体文件，不计依赖；目录回退只在落到项目根以下的真实子目录（如 `tests/fixtures`）时生效，不回退到 `src`、`docs` 等顶层根。
 
 严格覆盖率只统计此次改动并已纳入显式清单的源码，以及此次新纳入清单的已有源码；生成的临时配置继承真实测试插件与资源设置，并保留 statements/branches/functions/lines 四项 100% 门槛，逐文件检查。测试本身或纯文档变化没有覆盖源码目标时，执行所选行为测试并明确记录覆盖率未执行。计划与 coverage summary 作为 7 天 CI 证据保存；这些结果不代表全项目行为覆盖、真实浏览器、Firefox 实机或在线供应商验证。依赖图选择不能替代新增功能测试与必要的人工浏览器专项。
 
@@ -132,6 +136,18 @@ node scripts/verify-userscript-build.mjs  # userscript 元数据与产物边界
 node scripts/testing/run-affected-tests.mjs --base origin/main --plan-only --report coverage/affected-plan/plan.json
 node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-affected-tests.mjs --base origin/main
 ```
+
+四维门槛失败时，Vitest 只报告文件名与百分比，不指出具体行。用缺口定位器读取同一份 istanbul 产物，可直接得到未执行语句、未调用函数和未走到的分支出口（含 `if` 真假、`||` 左右操作数等语义）及对应源码行：
+
+```bash
+pnpm test:coverage:gaps                        # 默认读 coverage/affected/coverage-final.json
+pnpm test:coverage:gaps --file pdfLayoutAnalysis.ts --max 50
+pnpm test:coverage:gaps --json                  # 供脚本消费；存在缺口时进程退出码为 1
+```
+
+该工具只读分析，不执行测试、不修改源码，也不替代门禁本身；补齐用例后必须重跑受影响测试确认。
+
+诊断复用与门禁相同的依赖图算法（含 `@/` 别名、barrel、SFC 与动态 import），结论可直接对照计划结果；它只读运行，不改变选择结果。
 
 没有受影响测试时，入口明确跳过执行，不向 Vitest 传空筛选而误跑全量。缺失 Git 基线、无效覆盖清单、测试失败或子进程终止均使入口失败。源码头审计仅忽略 Finder 的精确 `.DS_Store` 文件名；隐藏源码、相似文件名和未知资产仍遵循原规则。
 

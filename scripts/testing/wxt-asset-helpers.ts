@@ -119,6 +119,7 @@ export function resolveExtensionBuildBudget(
         700, // imageSegmentationRetryBudget
         8_100, // imageClippedGlyphBudget
         60_000, // designSystemAndEfficiencyBudget
+        45_000, // settingsCenterRefactorAndI18nBudget
     ];
 
     return featureAdjustments.reduce((total, delta) => total + delta, baseBudget);

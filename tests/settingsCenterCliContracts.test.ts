@@ -28,22 +28,18 @@ function bindings(names: string[], globals: Record<string, unknown> = {}): Recor
 }
 
 describe('settings center CLI production contracts', () => {
-    it('keeps six continuous panel names and both ordering contracts aligned with the actual InterfaceSettings template', () => {
+    it('keeps five continuous panel names and both ordering contracts aligned with the actual InterfaceSettings template', () => {
         const panelOrder = productionInterfacePanelNames();
         const contract = bindings(['expectedInterfaceGroups']);
-        expect(panelOrder).toHaveLength(6);
-        expect(new Set(panelOrder).size).toBe(6);
-        expect(panelOrder.indexOf('video-learning')).toBe(panelOrder.indexOf('layout') + 1);
-        expect(panelOrder.indexOf('font')).toBe(panelOrder.indexOf('video-learning') + 1);
-        // The real source moved sentence-learning appearance after layout; the
-        // seven group headings retain their exact membership and adjacency.
-        expect(contract.expectedInterfaceGroups).toHaveLength(7);
-        expect(new Set(contract.expectedInterfaceGroups).size).toBe(7);
+        expect(panelOrder).toHaveLength(5);
+        expect(new Set(panelOrder).size).toBe(5);
+        expect(panelOrder).toEqual(['translation', 'skin', 'motion', 'layout', 'font']);
+        expect(contract.expectedInterfaceGroups).toHaveLength(5);
+        expect(new Set(contract.expectedInterfaceGroups).size).toBe(5);
         const layout = productionChineseCopy('settings.interface.popupLayout.label');
-        const learning = productionChineseCopy('video.learningAppearance.title');
         const font = productionChineseCopy('settings.interface.font.label');
-        expect(contract.expectedInterfaceGroups.indexOf(learning)).toBe(contract.expectedInterfaceGroups.indexOf(layout) + 1);
-        expect(contract.expectedInterfaceGroups.indexOf(font)).toBe(contract.expectedInterfaceGroups.indexOf(learning) + 1);
+        expect(contract.expectedInterfaceGroups).toContain(layout);
+        expect(contract.expectedInterfaceGroups.at(-1)).toBe(font);
         expect(bindings(['expectedInterfacePanelOrder']).expectedInterfacePanelOrder).toEqual(panelOrder);
     });
 

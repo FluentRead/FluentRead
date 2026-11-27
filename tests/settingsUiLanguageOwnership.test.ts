@@ -18,7 +18,7 @@ async function invalidate(h: NonNullable<typeof harness>, reason: string) {
 describe('实际 SettingsSections → UiLanguageSelector 活跃归属', () => {
   it('v-show 隐藏 general 保留同一 Selector 实例，但实际父 props.active=false 且控件禁用', async () => {
     const h = await create(), child = h.selector();expect(child.props.active).toBe(true);expect(child.props.compact).toBe(true);await h.open();const old = h.handles();await hide(h)
-    expect(h.selector()).toBe(child);expect(h.selector().props.active).toBe(false);expect(h.document.querySelector('.settings-section-continuation')?.getAttribute('style')).toContain('display:none')
+    expect(h.selector()).toBe(child);expect(h.selector().props.active).toBe(false);expect(h.document.querySelector('#settings-general')?.getAttribute('style')).toContain('display:none')
     expect(h.document.querySelector('[data-language-control]')?.hasAttribute('disabled')).toBe(true);old.onVisibleChange(true);await old.onChange('en-US');await settle();expect(h.requests).toHaveLength(0)
   })
   it('隐藏再重开不复活旧 change/关闭事件，新菜单的选择仍可保存', async () => {

@@ -85,8 +85,8 @@ describe('后台 feature handlers', () => {
                     await options.handle({type: 'openOptionsPage', section: 'settings-services', service});
                     expect(create).toHaveBeenLastCalledWith({url: `chrome-extension://fixture/options.html?service=${encodeURIComponent(service)}#settings-services`});
                 }
-                await options.handle({type: 'openOptionsPage', section: 'settings-interface', target: 'video-sentence-learning-appearance'});
-                expect(create).toHaveBeenLastCalledWith({url: 'chrome-extension://fixture/options.html?target=video-sentence-learning-appearance#settings-interface'});
+                await options.handle({type: 'openOptionsPage', section: 'settings-video', target: 'video-sentence-learning-appearance'});
+                expect(create).toHaveBeenLastCalledWith({url: 'chrome-extension://fixture/options.html?target=video-sentence-learning-appearance#settings-video'});
             }
             expect(openOptionsPage).toHaveBeenCalledTimes(2);
             getManifest.mockReturnValueOnce({} as never);
@@ -1349,12 +1349,12 @@ it('opens validated learning-memory and material tabs without accepting arbitrar
 it('opens only registered form targets belonging to the requested settings section', async () => {
     const openDefaultPage = vi.fn(async () => undefined), openSection = vi.fn(async () => undefined);
     const handler = createOpenOptionsPageHandler({openDefaultPage, openSection});
-    await handler.handle({type: OPEN_OPTIONS_PAGE_MESSAGE_TYPE, section: 'settings-interface', target: 'video-sentence-learning-appearance'});
-    expect(openSection).toHaveBeenLastCalledWith('settings-interface', undefined, 'video-sentence-learning-appearance');
+    await handler.handle({type: OPEN_OPTIONS_PAGE_MESSAGE_TYPE, section: 'settings-video', target: 'video-sentence-learning-appearance'});
+    expect(openSection).toHaveBeenLastCalledWith('settings-video', undefined, 'video-sentence-learning-appearance');
     for (const target of [null, {}, 'unknown', 'video-sentence-learning-appearance&redirect=https://example.com']) {
-        await expect(handler.handle({type: OPEN_OPTIONS_PAGE_MESSAGE_TYPE, section: 'settings-interface', target})).rejects.toThrow('无效的设置目标');
+        await expect(handler.handle({type: OPEN_OPTIONS_PAGE_MESSAGE_TYPE, section: 'settings-video', target})).rejects.toThrow('无效的设置目标');
     }
-    await expect(handler.handle({type: OPEN_OPTIONS_PAGE_MESSAGE_TYPE, section: 'settings-video', target: 'video-sentence-learning-appearance'})).rejects.toThrow('无效的设置目标');
+    await expect(handler.handle({type: OPEN_OPTIONS_PAGE_MESSAGE_TYPE, section: 'settings-interface', target: 'video-sentence-learning-appearance'})).rejects.toThrow('无效的设置目标');
     await expect(handler.handle({type: OPEN_OPTIONS_PAGE_MESSAGE_TYPE, target: 'video-sentence-learning-appearance'})).rejects.toThrow('无效的设置目标');
     expect(openSection).toHaveBeenCalledOnce(); expect(openDefaultPage).not.toHaveBeenCalled();
 });

@@ -75,6 +75,7 @@ function configureSectionPorts(data: Record<string, any>, {template = false, req
         '@/src/features/settings/ui/SiteRulePreview.vue', '@/src/features/settings/ui/VideoLocalModelSettings.vue',
         '@/src/features/settings/ui/LocalTtsSettings.vue', '@/src/features/settings/ui/VideoSubtitleAppearanceSettings.vue',
         '@/src/features/settings/ui/VideoSubtitleShortcutSettings.vue',
+        '@/src/features/settings/ui/VideoSentenceLearningAppearanceSettings.vue', '@/src/features/settings/ui/SentenceHighlightStyleSettings.vue',
         '@/src/features/settings/ui/InterfaceSettings.vue', '@/src/features/settings/ui/AreaTranslationSettings.vue',
         '@/src/features/settings/ui/InputTranslationSettings.vue', '@/src/features/settings/ui/ParagraphCopySettings.vue',
         '@/src/features/settings/ui/SectionTranslationSettings.vue', '@/src/features/settings/ui/ParagraphHandlingSettings.vue',
@@ -472,7 +473,7 @@ describe('设置主表单实际组件异步归属', () => {
     });
     it('快速设置更新共用一次标签页查询，发送最新状态，过滤非法 ID', async () => {
         const {state, query, send} = await mountSections();const tabs = deferred<{id?: number}[]>();query.mockReturnValueOnce(tabs.promise);
-        for (let i = 0; i < 100; i++) state.floatingBallEnabled = i % 2 === 0;
+        for (let i = 0; i < 100; i++) {state.config.disableFloatingBall = i % 2 !== 0; state.broadcastFeatureState(['toggleFloatingBall']);}
         state.imageTranslationEnabled = true;state.config.on = false;state.handlePluginStateChange(false);await settle();
         expect(query).toHaveBeenCalledOnce();tabs.resolve([{id: 0}, {id: -1}, {}, {id: 3}]);await settle();
         expect(send.mock.calls.filter(([id]) => id === 0)).toHaveLength(4);
@@ -483,8 +484,8 @@ describe('设置主表单实际组件异步归属', () => {
     });
     it('拒绝查询后释放任务，随后仍能广播；卸载后的结果不继续发消息', async () => {
         const {state, query, send} = await mountSections();query.mockRejectedValueOnce(new Error('tabs unavailable'));
-        state.floatingBallEnabled = true;await settle();expect(send).not.toHaveBeenCalled();
-        query.mockResolvedValueOnce([{id: 1}]);state.floatingBallEnabled = false;await settle();expect(send).toHaveBeenCalledOnce();
+        state.config.disableFloatingBall = false;state.broadcastFeatureState(['toggleFloatingBall']);await settle();expect(send).not.toHaveBeenCalled();
+        query.mockResolvedValueOnce([{id: 1}]);state.config.disableFloatingBall = true;state.broadcastFeatureState(['toggleFloatingBall']);await settle();expect(send).toHaveBeenCalledOnce();
         const tabs = deferred<{id?: number}[]>();query.mockReturnValueOnce(tabs.promise);state.imageTranslationEnabled = true;await settle();
         app?.unmount();app = undefined;tabs.resolve([{id: 1}]);await settle();expect(send).toHaveBeenCalledOnce();
     });
@@ -493,7 +494,8 @@ describe('设置主表单实际组件异步归属', () => {
             on: true, selectionTranslatorMode: 'bilingual', disableSelectionTranslator: false,
         }});
         for (let i = 0; i < 10; i++) {
-            state.floatingBallEnabled = i % 2 === 0;
+            state.config.disableFloatingBall = i % 2 !== 0;
+            state.broadcastFeatureState(['toggleFloatingBall']);
             state.imageTranslationEnabled = i % 2 === 0;
             state.config.translationProgressPanelEnabled = i % 2 === 0;
             state.handleTranslationProgressPanelChange(i % 2 === 0);
@@ -539,7 +541,6 @@ describe('设置主表单实际组件异步归属', () => {
         expect(state.config.documentModel.chatgptPlan).toBe('saved-document-model');expect(state.selectedConfigurationService).toBe('freeTranslation');
         expect(state.availableServiceOptions.some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
         expect(state.textServiceGroups.flatMap((group: {options: {value: string}[]}) => group.options).some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
-        expect(state.videoServiceOptions.some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
         expect(state.platformAvailableServiceOptions.some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
         const saved = state.setDefaultConfigurationService;saved('chatgptPlan');state.setDefaultConfigurationService('chatgptPlan');await settle();
         expect(JSON.stringify(state.config)).toBe(before);expect(patch).not.toHaveBeenCalled();
@@ -571,10 +572,11 @@ describe('设置主表单实际组件异步归属', () => {
         expect(warning?.textContent).toContain(state.selectedTextServiceUnavailableMessage);
         props.activeSection = 'settings-video';await settle();
         const video = displayDocument!.querySelector('#settings-video')!;
-        const videoOption = video.querySelector('el-select[aria-label="视频字幕翻译服务"] el-option[disabled]');
-        expect(videoOption).not.toBeNull();expect(videoOption!.getAttribute('label')).toBe('ChatGPT 套餐');
-        expect(videoOption!.getAttribute('label')).not.toContain('Chrome');
-        expect(video.querySelector('.capability-warning')?.textContent).toBe(state.selectedVideoServiceUnavailableMessage);
+        const videoWarning = video.querySelector('.video-service-warning[role="status"]');
+        expect(videoWarning).not.toBeNull();
+        expect(videoWarning!.textContent).toContain('ChatGPT 套餐');
+        expect(videoWarning!.textContent).not.toContain('Chrome');
+        expect(videoWarning!.textContent).toContain(state.selectedVideoServiceUnavailableMessage);
         expect(JSON.stringify(state.config)).toBe(before);expect(patch).not.toHaveBeenCalled();
         expect(state.config.service).toBe('chatgptPlan');expect(state.config.videoService).toBe('chatgptPlan');
         expect(state.config.model.chatgptPlan).toBe('saved-account-model');expect(state.config.documentModel.chatgptPlan).toBe('saved-document-model');
@@ -1404,33 +1406,23 @@ describe('设置父模板实际功能事件', () => {
         app!.unmount();app = undefined;expect(f.media.onchange).toBeNull();
     });
     it('全局暂停保留各功能偏好，悬浮球和进度开关仅广播自身状态', async () => {
-        const f = await settingsUiFixture('settings-general', {on: true, disableFloatingBall: false, selectionTranslatorMode: 'bilingual', translationProgressPanelEnabled: true, enableAIContext: false});
+        const f = await settingsUiFixture('settings-translation', {on: true, disableFloatingBall: false, selectionTranslatorMode: 'bilingual', translationProgressPanelEnabled: true, enableAIContext: false});
         f.query.mockResolvedValue([{id: 8}]);
         await f.emit('el-switch:popup.aiContext.settingsTitle', 'update:modelValue', true);expect(f.state.config.enableAIContext).toBe(true);expect(f.query).not.toHaveBeenCalled();
-        expect((await f.port('el-switch:settings.general.floatingBall')).attrs.modelValue).toBe(true);
-        await f.emit('el-switch:settings.general.floatingBall', 'update:modelValue', false);expect(f.state.config.disableFloatingBall).toBe(true);expect(f.send).toHaveBeenLastCalledWith(8, {type:'toggleFloatingBall',isEnabled:false});
         f.send.mockClear();await f.emit('el-switch:settings.general.progressPanel','update:modelValue',false);await f.emit('el-switch:settings.general.progressPanel','change',false);
         expect(f.state.config.translationProgressPanelEnabled).toBe(false);expect(f.send).toHaveBeenCalledOnce();expect(f.send).toHaveBeenCalledWith(8,{type:'toggleTranslationProgressPanel',isEnabled:false});
+        f.props.activeSection = 'settings-general';await settle();
         f.send.mockClear();await f.emit('feature:settings.general.masterTitle','update:modelValue',false);
-        expect(f.state.config.on).toBe(false);expect(f.state.config.selectionTranslatorMode).toBe('bilingual');expect(f.state.config.disableFloatingBall).toBe(true);expect(f.send.mock.calls.map(call=>call[1])).toEqual([{type:'toggleFloatingBall',isEnabled:false},{type:'updateSelectionTranslatorMode',mode:'disabled'},{type:'toggleSelectionAreaTranslator',isEnabled:false}]);
+        expect(f.state.config.on).toBe(false);expect(f.state.config.selectionTranslatorMode).toBe('bilingual');expect(f.state.config.disableFloatingBall).toBe(false);expect(f.send.mock.calls.map(call=>call[1])).toEqual([{type:'toggleFloatingBall',isEnabled:false},{type:'updateSelectionTranslatorMode',mode:'disabled'},{type:'toggleSelectionAreaTranslator',isEnabled:false}]);
     });
     it('当前默认服务和功能分配入口定位编辑连接而不改默认配置', async () => {
         const f = await settingsUiFixture('settings-general', {service:'microsoft'}), navigate = vi.fn();f.props.onNavigateSection=navigate;await settle();f.patch.mockClear();
         f.document.querySelector('[data-testid="configure-default-translation-service"]')!.dispatchEvent(new f.domWindow.Event('click'));await settle();
         expect(navigate).toHaveBeenLastCalledWith('settings-services','connections');expect(f.state.selectedConfigurationService).toBe('microsoft');
         await f.emit('assignment:', 'configure-service', 'openai');expect(f.state.selectedConfigurationService).toBe('openai');expect(f.state.config.service).toBe('microsoft');expect(f.patch).not.toHaveBeenCalled();
-        for(const [id,section]of [['open-translation-style-settings','settings-interface'],['open-translation-settings','settings-translation']]){
-            f.document.querySelector(`[data-testid="${id}"]`)!.dispatchEvent(new f.domWindow.Event('click'));await settle();expect(navigate).toHaveBeenLastCalledWith(section,undefined);
-        }
-        f.document.querySelector('[data-testid="open-floating-ball-settings"]')!.dispatchEvent(new f.domWindow.Event('click'));await settle();expect(navigate).toHaveBeenLastCalledWith('settings-translation','floating-ball-settings');expect(f.patch).not.toHaveBeenCalled();
     });
-    it.each(['openai',''])('写作入口根据独立服务 %s 或网页默认定位连接', async service => {
-        const f=await settingsUiFixture('settings-writing',{service:'microsoft',writing:{service}}),navigate=vi.fn();f.props.onNavigateSection=navigate;f.patch.mockClear();
-        await f.emit('writing:','configure-service');expect(f.state.selectedConfigurationService).toBe(service||'microsoft');expect(navigate).toHaveBeenCalledWith('settings-services','connections');expect(f.patch).not.toHaveBeenCalled();
-    });
-    it('阅读样式入口定位正确锚点，悬浮与全文方案事件保留同一配置列表',async()=>{
-        const f=await settingsUiFixture('settings-translation'),navigate=vi.fn();f.props.onNavigateSection=navigate;
-        await f.emit('reading:','configure-style');expect(navigate).toHaveBeenCalledWith('settings-interface','translation-sentence-highlight-style');
+    it('悬浮与全文方案事件保留同一配置列表，多段与排除语言正常写回',async()=>{
+        const f=await settingsUiFixture('settings-translation');
         const hover={id:'hover-one',enabled:true,action:'hover',hotkey:'Alt+J',service:'google',model:'',targetLanguage:'',displayMode:'inherit',fullPageMode:'inherit'};
         f.patch.mockClear();await f.emit('profiles:hover','update:profiles',[hover]);expect(f.patch).toHaveBeenCalledOnce();expect(f.state.config.quickTranslationProfiles).toEqual([hover]);
         const full={...hover,id:'full-one',action:'full-page',hotkey:'Alt+K'};
@@ -1485,8 +1477,8 @@ describe('交互延迟控件的配置与页面归属',()=>{
 
 describe('设置父模板分区字段与编辑确认',()=>{
     it('划词展示与触发偏好独立保存，模式切换同步即时页面状态',async()=>{
-        const f=await settingsUiFixture('settings-selection',{selectionTranslatorMode:'bilingual',selectionTranslatorTrigger:'hover',to:'en'}),navigate=vi.fn();f.props.onNavigateSection=navigate;
-        await f.emit('selection:','navigate','settings-general');expect(navigate).toHaveBeenCalledWith('settings-general',undefined);
+        const f=await settingsUiFixture('settings-selection',{selectionTranslatorMode:'bilingual',selectionTranslatorTrigger:'hover',to:'en'});
+        await f.port('selection:');
         await f.choose('划词显示内容','仅译文');expect(f.state.config.selectionTranslatorMode).toBe('translation-only');expect(f.state.config.disableSelectionTranslator).toBe(false);
         await f.emit('el-switch:继续阅读时自动收起','update:modelValue',false);expect(f.state.config.selectionTranslatorAutoDismiss).toBe(false);
         await f.emit('el-switch:中英双向划词','update:modelValue',false);expect(f.state.config.selectionTranslatorBidirectional).toBe(false);
@@ -1495,13 +1487,12 @@ describe('设置父模板分区字段与编辑确认',()=>{
         expect(f.state.config.harness.hoverDelay).toBe(900);expect(f.state.config.selectionTranslatorDelay).toBe(prior);
     });
     it('视频关闭保留独立服务、原语种、人工字幕和词库偏好，恢复时继续可编辑',async()=>{
-        const f=await settingsUiFixture('settings-video',{service:'google',videoTranslationEnabled:true,glossaryEnabled:true});
-        await f.emit('el-select:视频字幕翻译服务','update:modelValue','microsoft');expect(f.state.config.videoService).toBe('microsoft');expect(f.state.config.service).toBe('google');
+        const f=await settingsUiFixture('settings-video',{service:'google',videoService:'microsoft',videoTranslationEnabled:true,glossaryEnabled:true});
         await f.emit('el-select:视频原语言','update:modelValue','ja');expect(f.state.config.videoSourceLanguage).toBe('ja');
         await f.emit('el-switch:会议平台自动开启双语字幕','update:modelValue',true);expect(f.state.config.videoMeetingAutoEnabled).toBe(true);
         await f.emit('el-switch:优先使用人工字幕','update:modelValue',false);expect(f.state.config.videoPreferHumanSubtitles).toBe(false);
         await f.emit('glossary:','update:modelValue',[]);expect(f.state.config.videoGlossaryIds).toEqual([]);
-        await f.emit('feature:视频字幕翻译','update:modelValue',false);expect(f.state.config.videoTranslationEnabled).toBe(false);expect((await f.port('el-select:视频原语言')).attrs.disabled).toBe(true);
+        await f.emit('feature:视频字幕翻译','update:modelValue',false);expect(f.state.config.videoTranslationEnabled).toBe(false);
         expect(f.state.config).toMatchObject({videoService:'microsoft',videoSourceLanguage:'ja',videoMeetingAutoEnabled:true,videoPreferHumanSubtitles:false,videoGlossaryIds:[]});
         await f.emit('feature:视频字幕翻译','update:modelValue',true);expect((await f.port('el-select:视频原语言')).attrs.disabled).toBe(false);expect(f.query).not.toHaveBeenCalled();
     });
@@ -1522,8 +1513,8 @@ describe('设置父模板分区字段与编辑确认',()=>{
         await f.emit('area:','update:enabled',true);expect(f.state.config.selectionAreaEnabled).toBe(true);expect(f.patch).toHaveBeenCalledOnce();
         expect(f.send).toHaveBeenLastCalledWith(8,{type:'toggleSelectionAreaTranslator',isEnabled:true});
     });
-    it('高级识别开关只保存范围、标题和侧栏策略，不立即重新翻译',async()=>{
-        const f=await settingsUiFixture('settings-advanced',{translationScope:'content',pageTitleTranslationEnabled:false,sidebarTranslationEnabled:false});
+    it('页面识别开关只保存范围、标题和侧栏策略，不立即重新翻译',async()=>{
+        const f=await settingsUiFixture('settings-translation',{translationScope:'content',pageTitleTranslationEnabled:false,sidebarTranslationEnabled:false});
         for(const [label,value,key]of [['settings.pageRecognition.allNodes','all','translationScope'],['settings.pageRecognition.pageTitle',true,'pageTitleTranslationEnabled'],['settings.pageRecognition.sidebar',true,'sidebarTranslationEnabled']] as const){
             f.patch.mockClear();await f.emit(`el-switch:${label}`,'update:modelValue',value);expect(f.state.config[key]).toBe(value);expect(f.patch).toHaveBeenCalledOnce();
         }

@@ -72,11 +72,11 @@ describe('完整句学习独立外观配置边界', () => {
         expect(diff.groups.find(group => group.id === 'videoSubtitles')?.changes.some(change => change.key === 'videoSentenceLearningAppearance' && change.label === '完整句学习外观')).toBe(true);
     });
 
-    it('界面中心有独立可搜索分类与深链接，不路由到字幕显示样式', () => {
-        expect(resolveSettingsPanel('settings-interface', 'video-sentence-learning-appearance')).toBe('video-learning');
-        expect(settingsPagePanels['settings-interface'].find(panel => panel.id === 'video-learning')).toMatchObject({labelKey: 'video.learningAppearance.title', targetIds: ['video-sentence-learning-appearance']});
+    it('视频字幕页有独立可搜索分类与深链接，不路由到字幕显示样式', () => {
+        expect(resolveSettingsPanel('settings-video', 'video-sentence-learning-appearance')).toBe('video-learning');
+        expect(settingsPagePanels['settings-video'].find(panel => panel.id === 'video-learning')).toMatchObject({labelKey: 'options.panel.videoLearning', targetIds: ['video-sentence-learning-appearance']});
         for (const query of ['完整句学习外观', '面板宽度', '拖动位置']) {
-            expect(filterSettingsSearchTargets(query)).toEqual([expect.objectContaining({sectionId: 'settings-interface', targetId: 'video-sentence-learning-appearance'})]);
+            expect(filterSettingsSearchTargets(query)).toEqual([expect.objectContaining({sectionId: 'settings-video', targetId: 'video-sentence-learning-appearance'})]);
         }
         expect(resolveSettingsPanel('settings-video', 'appearance')).toBe('appearance');
     });

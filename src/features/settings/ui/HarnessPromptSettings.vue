@@ -5,27 +5,25 @@
  * 模块边界：仅编辑传入的 HarnessPreferences，保存沿用设置页配置流程；不调用模型，不翻译或执行用户提示词内容。
  -->
 <template>
-  <SettingsGroup title="自定义指令" description="调整 AI 讲解的回答方式；不影响普通翻译和词典查词" data-settings-anchor="instructions" data-settings-anchor-label="自定义指令">
-    <div class="harness-prompts">
-      <div class="harness-prompt-body">
-        <SegmentedControl v-model="selected" :options="promptOptions" label="选择提示词" />
-        <div class="harness-prompt-toolbar">
-          <small>选中文字和追问内容会自动提供，无需写入提示词；留空使用默认提示词</small>
-          <button type="button" @click="restore">恢复默认</button>
-        </div>
-        <textarea ref="editor" v-model="prompt" data-i18n-ignore :maxlength="HARNESS_PROMPT_MAX_LENGTH"
-          :placeholder="defaultPrompt" :aria-label="translateLegacy('提示词内容')" spellcheck="false" />
-        <div class="harness-prompt-variables">
-          <span>点击插入占位符</span>
-          <button v-for="variable in HARNESS_PROMPT_VARIABLES" :key="variable.token" type="button"
-            @mousedown.prevent @click="insertVariable(variable.token)">
-            <code data-i18n-ignore>{{ variable.token }}</code><span>{{ translateLegacy(variable.label) }}</span>
-          </button>
-        </div>
-        <small class="harness-prompt-count" data-i18n-ignore>{{ prompt.length }} / {{ HARNESS_PROMPT_MAX_LENGTH }}</small>
+  <div class="harness-prompts">
+    <div class="harness-prompt-body">
+      <SegmentedControl v-model="selected" :options="promptOptions" label="选择提示词" />
+      <div class="harness-prompt-toolbar">
+        <small>选中文字和追问内容会自动提供，留空使用默认提示词</small>
+        <button type="button" @click="restore">恢复默认</button>
       </div>
+      <textarea ref="editor" v-model="prompt" data-i18n-ignore :maxlength="HARNESS_PROMPT_MAX_LENGTH"
+        :placeholder="defaultPrompt" :aria-label="translateLegacy('提示词内容')" spellcheck="false" />
+      <div class="harness-prompt-variables">
+        <span>点击插入占位符</span>
+        <button v-for="variable in HARNESS_PROMPT_VARIABLES" :key="variable.token" type="button"
+          @mousedown.prevent @click="insertVariable(variable.token)">
+          <code data-i18n-ignore>{{ variable.token }}</code><span>{{ translateLegacy(variable.label) }}</span>
+        </button>
+      </div>
+      <small class="harness-prompt-count" data-i18n-ignore>{{ prompt.length }} / {{ HARNESS_PROMPT_MAX_LENGTH }}</small>
     </div>
-  </SettingsGroup>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -33,7 +31,6 @@ import {computed, nextTick, ref} from 'vue';
 import {getDefaultHarnessPrompt, resolveHarnessPrompt} from '@/src/core/harness/prompts';
 import {HARNESS_ACTIONS, HARNESS_PROMPT_MAX_LENGTH, HARNESS_PROMPT_VARIABLES, type HarnessPromptKind, type HarnessActionId, type HarnessPreferences} from '@/src/core/config/harness';
 import {useUiI18n} from '@/src/ui/i18n';
-import SettingsGroup from './components/SettingsGroup.vue';
 import SegmentedControl from './components/SegmentedControl.vue';
 import {useSettingsActionContext} from '../model/useSettingsActionContext';
 

@@ -603,15 +603,18 @@ h1 { margin-bottom: 6px; font-size: var(--fr-text-2xl, 24px); line-height: 1.3; 
   content: ''; width: 7px; height: 7px; flex: none; margin-left: auto;
   border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg);
 }
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary:not(:has(.advanced-chevron, .details-chevron, .credential-guide-chevron)):has(> small)::after {
+  margin-left: 4px;
+}
 .settings-app .workspace .settings-card details[open]:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary::after { transform: rotate(45deg); }
 .settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary:hover { background: var(--surface-soft); }
 .settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .settings-app .workspace .settings-card details[open]:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary { margin-bottom: 12px; }
 /* 设置分组内的折叠行与普通设置行齐平：不再画成嵌在分组里的独立圆角框。 */
-.settings-app .workspace .settings-card .settings-group-body :is(.translation-cache-limits, .request-retry-settings) > summary { padding: var(--fr-settings-row-padding-block, 14px) var(--fr-card-padding-inline, 20px); border: 0; border-radius: 0; font-weight: 550; }
-.settings-app .workspace .settings-card .settings-group-body :is(.translation-cache-limits, .request-retry-settings)[open] > summary { margin-bottom: 0; border-bottom: 1px solid var(--line); }
+.settings-app .workspace .settings-card .settings-group-body :is(.translation-cache-limits, .request-retry-settings, .settings-inline-disclosure, .floating-ball-advanced, .input-translation-advanced, .writing-advanced) > summary { padding: var(--fr-settings-row-padding-block, 14px) var(--fr-card-padding-inline, 20px); border: 0; border-radius: 0; font-weight: 550; }
+.settings-app .workspace .settings-card .settings-group-body :is(.translation-cache-limits, .request-retry-settings, .settings-inline-disclosure, .floating-ball-advanced, .input-translation-advanced, .writing-advanced)[open] > summary { margin-bottom: 0; border-bottom: 1px solid var(--line); }
 /* 内嵌摘要贴着卡片裁剪边界，焦点向内描绘，避免两侧和底边被 settings-group-body 裁掉。 */
-.settings-app .workspace .settings-card .settings-group-body :is(.translation-cache-limits, .request-retry-settings) > summary:focus-visible { outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand)); outline-offset: -4px; }
+.settings-app .workspace .settings-card .settings-group-body :is(.translation-cache-limits, .request-retry-settings, .settings-inline-disclosure, .floating-ball-advanced, .input-translation-advanced, .writing-advanced) > summary:focus-visible { outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand)); outline-offset: -4px; }
 .settings-app .settings-card summary :is(.advanced-chevron, .details-chevron) { width: 18px; height: 18px; color: var(--muted); opacity: 1; }
 .settings-app .settings-card .translation-appearance-disclosure { border-bottom: 1px solid var(--line); background: var(--surface); }
 .settings-app .settings-card .translation-appearance-chevron { color: var(--muted); }

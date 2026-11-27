@@ -591,7 +591,7 @@ let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 const darkMode = window.matchMedia('(prefers-color-scheme: dark)');
 const drawerSettingsSection: Record<DrawerName, SettingsSection> = {
   services: 'settings-services',
-  aiContext: 'settings-general',
+  aiContext: 'settings-translation',
   hover: 'settings-translation',
   selection: 'settings-selection',
   appearance: 'settings-interface',

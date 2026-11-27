@@ -17,13 +17,18 @@
   min-width: 0;
 }
 
+.general-settings-section :deep(.settings-item:has(.general-service-control)) {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 440px);
+}
+
 .general-settings-section .general-service-control {
   flex-wrap: wrap;
   gap: 8px;
+  max-width: 440px;
 }
 
 .general-settings-section .general-service-control :deep(.el-select) {
-  flex: 1 1 180px;
+  flex: 1 1 200px;
   width: auto;
 }
 
@@ -124,6 +129,8 @@
 .settings-inline-link { padding: 0; font-size: inherit; font-weight: 700; }
 
 @media (max-width: 480px) {
+  .general-settings-section :deep(.settings-item:has(.general-service-control)) { grid-template-columns: minmax(0, 1fr); }
+  .general-settings-section .general-service-control,
   .service-default-control { max-width: none; }
 }
 
@@ -225,6 +232,19 @@
 .request-retry-settings { border-top: 1px solid var(--line); }
 .request-retry-settings > summary { padding: 14px 20px; color: var(--ink); font-size: 13px; cursor: pointer; }
 .request-retry-settings[open] > summary { border-bottom: 1px solid var(--line); }
+
+.settings-inline-disclosure { border-top: 1px solid var(--line); }
+.settings-inline-disclosure > summary {
+  display: flex; align-items: center; justify-content: flex-start; gap: 8px;
+  padding: var(--fr-settings-row-padding-block, 14px) var(--fr-card-padding-inline, 20px) !important;
+  border: 0 !important; border-radius: 0 !important;
+  color: var(--ink); font-size: 13px; font-weight: 550; cursor: pointer;
+}
+.settings-inline-disclosure > summary small { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 450; }
+.settings-inline-disclosure[open] > summary { margin-bottom: 0 !important; border-bottom: 1px solid var(--line) !important; }
+.settings-inline-disclosure > :deep(.settings-item + .settings-item) { border-top: 1px solid var(--line); }
+.video-service-warning { margin: 0; padding: 10px 20px; border-top: 1px solid var(--line); color: var(--fr-warning); font-size: 12px; line-height: 1.5; }
+.video-local-group { border: 0 !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
 .task-scheduler-group :deep(.settings-group-body) {
   padding: 12px;
   background: transparent;

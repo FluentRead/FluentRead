@@ -216,7 +216,7 @@ export const ruRUMessages = {
     "featureServices.open": "Сервисы по функциям",
     "options.center": "Настройки",
     "options.categories": "Разделы страницы",
-    "options.search": "Поиск по всем настройкам",
+    "options.search": "Поиск настроек",
     "options.open": "Открыть",
     "options.panel.hover": "При наведении",
     "options.panel.input": "Поля ввода",

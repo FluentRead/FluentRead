@@ -14,8 +14,9 @@ import {canonicalizeHotkey, parseHotkey, resolveConfiguredHotkey} from '@/src/co
 import {useUiI18n} from '@/src/ui/i18n';
 
 const selectionShortcutTriggers = new Set(['Control', 'Alt', 'Shift', 'custom']);
-type ShortcutKind = 'page' | 'hover' | 'selection';
-const kinds: readonly ShortcutKind[] = ['page', 'hover', 'selection'];
+type DialogShortcutKind = 'page' | 'hover' | 'selection';
+type ShortcutKind = DialogShortcutKind | 'input';
+const kinds: readonly DialogShortcutKind[] = ['page', 'hover', 'selection'];
 
 export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (kind: ShortcutKind) => boolean = () => true,
     isApplyingExternalConfig: () => boolean = () => false) {
@@ -31,8 +32,8 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
         hover: {mode: 'hotkey', custom: 'customHotkey', fallback: 'Control', visible: showCustomMouseHotkeyDialog, previous: previousMouseHotkey},
         selection: {mode: 'selectionTranslatorTrigger', custom: 'customSelectionTranslatorHotkey', fallback: 'icon', visible: showCustomSelectionHotkeyDialog, previous: previousSelectionTrigger},
     } as const;
-    const owners: Record<ShortcutKind, {config: Config; mode: string; custom: string} | null> = {page: null, hover: null, selection: null};
-    const timers: Record<ShortcutKind, ReturnType<typeof setTimeout> | null> = {page: null, hover: null, selection: null};
+    const owners: Record<DialogShortcutKind, {config: Config; mode: string; custom: string} | null> = {page: null, hover: null, selection: null};
+    const timers: Record<DialogShortcutKind, ReturnType<typeof setTimeout> | null> = {page: null, hover: null, selection: null};
     let disposed = false;
     const available = (kind: ShortcutKind): boolean => !disposed && isActive(kind);
 
@@ -63,15 +64,15 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
         }
         return '';
     }
-    function clearTimer(kind: ShortcutKind): void {
+    function clearTimer(kind: DialogShortcutKind): void {
         if (timers[kind] !== null) clearTimeout(timers[kind]!);
         timers[kind] = null;
     }
-    function setMode(kind: ShortcutKind, value: string): void {
+    function setMode(kind: DialogShortcutKind, value: string): void {
         config.value[drafts[kind].mode] = value;
         if (kind === 'selection') config.value.selectionTranslatorHotkey = selectionShortcutTriggers.has(value) ? value : 'none';
     }
-    function closeDraft(kind: ShortcutKind, restore: boolean): void {
+    function closeDraft(kind: DialogShortcutKind, restore: boolean): void {
         const draft = drafts[kind], owner = owners[kind], previous = draft.previous.value;
         clearTimer(kind);
         draft.visible.value = false;
@@ -81,7 +82,7 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
         if (restore && owner?.config === config.value && previous !== null
             && config.value[draft.mode] === 'custom' && !config.value[draft.custom]) setMode(kind, previous);
     }
-    function openDialog(kind: ShortcutKind): void {
+    function openDialog(kind: DialogShortcutKind): void {
         if (!available(kind)) return;
         clearTimer(kind);
         const draft = drafts[kind];
@@ -91,7 +92,7 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
         }
         draft.visible.value = true;
     }
-    function changeMode(kind: ShortcutKind, value: string): void {
+    function changeMode(kind: DialogShortcutKind, value: string): void {
         if (!available(kind)) return;
         const draft = drafts[kind];
         const hotkey = kind === 'selection'
@@ -120,14 +121,14 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
                 && config.value[draft.mode] === owner.mode && !config.value[draft.custom]) openDialog(kind);
         }, 100);
     }
-    function displayName(kind: ShortcutKind): string {
+    function displayName(kind: DialogShortcutKind): string {
         const value = config.value[drafts[kind].custom];
         if (!value) return '';
         if (value === 'none') return translateLegacy('已禁用');
         const parsed = parseHotkey(value);
         return parsed.isValid ? parsed.displayName : value;
     }
-    function confirm(kind: ShortcutKind, hotkey: string): void {
+    function confirm(kind: DialogShortcutKind, hotkey: string): void {
         if (!available(kind) || owners[kind]?.config !== config.value || quickTranslationConflictMessage(hotkey)) return;
         config.value[drafts[kind].custom] = hotkey === 'none' ? '' : hotkey;
         setMode(kind, hotkey === 'none' ? (kind === 'selection' ? 'icon' : 'none') : 'custom');
@@ -158,7 +159,7 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
     onScopeDispose(() => {disposed = true; for (const kind of kinds) closeDraft(kind, true);});
 
     function handleInputBoxTranslationTriggerChange(value: string): void {
-        if (!available('page')) return;
+        if (!available('input')) return;
         const hotkey = inputBoxTranslationTriggerHotkey(value, config.value.customInputBoxTranslationHotkey);
         if (value === 'custom' && !hotkey) return;
         const conflictMessage = hotkey ? quickTranslationConflictMessage(hotkey, true) : '';

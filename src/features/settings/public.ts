@@ -5,5 +5,6 @@
  * 模块边界：只导出展示契约，不公开设置运行时、持久化逻辑或其他内部组件。
  */
 export {default as SettingsGroup} from './ui/components/SettingsGroup.vue';
+export {default as SettingsDisclosure} from './ui/components/SettingsDisclosure.vue';
 export {default as SettingsItem} from './ui/components/SettingsItem.vue';
 export {default as SettingsPreviewLayout} from './ui/components/SettingsPreviewLayout.vue';

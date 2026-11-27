@@ -139,11 +139,13 @@ describe('信息高亮真实偏好组件', () => {
     expect(state.hotkeyConflict('Alt+K')).toBe('informationHighlight.hotkey.conflict')
     props.config.paragraphCopyEnabled = true; props.config.paragraphCopyHotkey = 'custom'; props.config.customParagraphCopyHotkey = 'Alt+P'
     expect(state.hotkeyConflict('Alt+P')).toBe('informationHighlight.hotkey.conflict')
+    props.config.videoSubtitleModeHotkeyEnabled = true; props.config.videoSubtitleModeHotkey = 'custom'; props.config.customVideoSubtitleModeHotkey = 'Alt+M'
+    expect(state.hotkeyConflict('Alt+M')).toBe('informationHighlight.hotkey.conflict')
   })
   it('偏好更换、视图关闭又重开和卸载时，缓存控件不能借用新配置', async () => {
-    await mount('InformationHighlightPreferences'); const oldMode = state.actions.mode, oldDensity = state.densityChoices[0].choose
+    await mount('InformationHighlightPreferences'); const oldMode = state.actions.mode, oldClickToTranslate = state.actions.clickToTranslate, oldDensity = state.densityChoices[0].choose
     props.config.informationHighlight = {...props.config.informationHighlight, color: 'blue'}
-    oldMode('surprisal-local'); oldDensity(); expect(props.config.informationHighlight.mode).toBe('keywords'); expect(props.config.informationHighlight.density).toBe('medium')
+    oldMode('surprisal-local'); oldClickToTranslate(true); oldDensity(); expect(props.config.informationHighlight.mode).toBe('keywords'); expect(props.config.informationHighlight.clickToTranslate).toBeUndefined(); expect(props.config.informationHighlight.density).toBe('medium')
     await settle(); const color = state.colorChoices.find((item: any) => item.value === 'mint').choose; props.active = false; await settle(); props.active = true; await settle(); color()
     expect(props.config.informationHighlight.color).toBe('blue'); const style = state.styleChoices.find((item: any) => item.value === 'underline').choose; app.unmount(); style(); expect(props.config.informationHighlight.style).toBe('background')
   })

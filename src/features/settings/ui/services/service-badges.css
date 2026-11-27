@@ -26,6 +26,6 @@
 .service-badge--default {
   flex-shrink: 0;
   border-color: color-mix(in srgb, var(--brand, #ef4776) 35%, var(--line, #e3e6ed));
-  color: var(--brand-strong, #cc2655);
+  color: var(--brand-strong, #d4235a);
   background: var(--brand-soft, #fff1f5);
 }

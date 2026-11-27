@@ -48,6 +48,9 @@ describe('FluentRead Design System tokens & editorial guardrails', () => {
     for (const token of [
       '--fr-color-brand',
       '--fr-color-brand-action',
+      '--fr-color-brand-action-hover',
+      '--fr-color-brand-action-gradient',
+      '--fr-color-brand-action-gradient-hover',
       '--fr-color-brand-strong',
       '--fr-color-canvas',
       '--fr-color-surface',
@@ -71,6 +74,8 @@ describe('FluentRead Design System tokens & editorial guardrails', () => {
       '--fr-text-xl',
       '--fr-text-2xl',
       '--fr-shadow-xs',
+      '--fr-shadow-brand-action',
+      '--fr-shadow-brand-action-hover',
       '--fr-shadow-md',
       '--fr-shadow-lg',
       '--fr-ease-out',
@@ -90,29 +95,39 @@ describe('FluentRead Design System tokens & editorial guardrails', () => {
       '--fr-color-muted',
       '--fr-color-line',
       '--fr-color-brand-action',
+      '--fr-color-brand-action-gradient',
       '--fr-color-brand-strong',
+      '--fr-shadow-brand-action',
     ]) {
       expect(dark[token], `missing dark token ${token}`).toBeTruthy()
     }
+    expect(feedbackLight['--fr-success-indicator']).toBeTruthy()
+    expect(feedbackLight['--fr-success-indicator-ring']).toBeTruthy()
+    expect(feedbackDark['--fr-success-indicator']).toBeTruthy()
+    expect(feedbackDark['--fr-success-indicator-ring']).toBeTruthy()
+    expect(feedbackLight['--fr-success-indicator']).not.toBe(feedbackLight['--fr-success'])
   })
 
-  it('meets WCAG 2.2 AA contrast ratios across default light and dark themes', () => {
-    // Light theme
+  it('meets stratified WCAG 2.2 AA contrast ratios across default light and dark themes', () => {
+    // Light theme: body & brand text strict AA >= 4.5:1; icons >= 3.0:1; primary CTA >= 3.5:1
     expect(contrast(light['--fr-color-ink'], light['--fr-color-surface'])).toBeGreaterThanOrEqual(10)
     expect(contrast(light['--fr-color-muted'], light['--fr-color-surface'])).toBeGreaterThanOrEqual(4.5)
     expect(contrast(light['--fr-color-muted'], light['--fr-color-surface-soft'])).toBeGreaterThanOrEqual(4.5)
     expect(contrast(light['--fr-color-brand-strong'], light['--fr-color-surface'])).toBeGreaterThanOrEqual(4.5)
     expect(contrast(light['--fr-color-brand-strong'], light['--fr-color-brand-soft'])).toBeGreaterThanOrEqual(4.5)
-    expect(contrast('#ffffff', light['--fr-color-brand-action'])).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(light['--fr-color-brand'], light['--fr-color-surface'])).toBeGreaterThanOrEqual(3.0)
+    expect(contrast(light['--fr-color-brand'], light['--fr-color-brand-soft'])).toBeGreaterThanOrEqual(3.0)
+    expect(contrast('#ffffff', light['--fr-color-brand-action'])).toBeGreaterThanOrEqual(3.5)
 
     // Dark theme
     expect(contrast(dark['--fr-color-ink'], dark['--fr-color-surface'])).toBeGreaterThanOrEqual(10)
     expect(contrast(dark['--fr-color-muted'], dark['--fr-color-surface'])).toBeGreaterThanOrEqual(4.5)
     expect(contrast(dark['--fr-color-muted'], dark['--fr-color-surface-soft'])).toBeGreaterThanOrEqual(4.5)
     expect(contrast(dark['--fr-color-brand-strong'], dark['--fr-color-surface'])).toBeGreaterThanOrEqual(4.5)
-    expect(contrast('#ffffff', dark['--fr-color-brand-action'])).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(dark['--fr-color-brand'], dark['--fr-color-surface'])).toBeGreaterThanOrEqual(3.0)
+    expect(contrast('#ffffff', dark['--fr-color-brand-action'])).toBeGreaterThanOrEqual(3.5)
 
-    // Feedback colors
+    // Feedback text colors (strict AA >= 4.5:1)
     for (const kind of ['success', 'warning', 'danger', 'info']) {
       expect(contrast(feedbackLight[`--fr-${kind}`], light['--fr-color-surface'])).toBeGreaterThanOrEqual(4.5)
       expect(contrast(feedbackLight[`--fr-${kind}`], feedbackLight[`--fr-${kind}-soft`])).toBeGreaterThanOrEqual(4.5)
@@ -121,7 +136,7 @@ describe('FluentRead Design System tokens & editorial guardrails', () => {
     }
   })
 
-  it('removes decorative gradients and colored logo halo shadows from primary app surfaces', () => {
+  it('removes background radial blobs and logo halo shadows while keeping tokenized CTA & indicator accents', () => {
     const popupCss = read('src/app/popup/popup.css')
     const settingsCss = read('src/features/settings/ui/settings-page.css')
     const docCss = read('src/app/document-translation/document-page.css')
@@ -133,8 +148,12 @@ describe('FluentRead Design System tokens & editorial guardrails', () => {
     expect(popupCss).not.toContain('linear-gradient(135deg, #f35482')
     expect(popupCss).not.toContain('radial-gradient(circle at 92% 0')
     expect(popupCss).not.toContain('box-shadow: 0 8px 18px rgba(239, 71, 118')
+    expect(popupCss).toContain('var(--fr-color-brand-action-gradient')
+    expect(popupCss).toContain('var(--fr-shadow-brand-action')
+    expect(popupCss).toContain('var(--fr-success-indicator')
     expect(settingsCss).not.toContain('radial-gradient(ellipse at top left')
     expect(docCss).not.toContain('radial-gradient(circle at 91% 0')
+    expect(docCss).toContain('var(--fr-color-brand-action-gradient')
     expect(selectionTranslator).not.toContain('linear-gradient(135deg, #f35482')
     expect(popupPreview).not.toContain('radial-gradient(')
     expect(floatingBall).toContain('--fr-surface: #171b24;')

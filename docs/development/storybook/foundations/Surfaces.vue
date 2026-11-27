@@ -20,7 +20,7 @@ const spaces = [
   <div class="fr-story-stack">
     <section>
       <h2>同心圆角阶梯（5 级收敛）</h2>
-      <p class="fr-story-note">内层控件圆角始终小于等于外层容器圆角减去内边距，消除零散圆角。静态面板平涂无阴影，以 1px 边框建立层级。</p>
+      <p class="fr-story-note">内层控件圆角始终小于等于外层容器圆角减去内边距，消除零散圆角。默认皮肤主卡片使用极克制轻阴影提升透气感，传统色皮肤保持纯色平涂。</p>
       <div class="fr-story-grid">
         <article v-for="item in radii" :key="item.token" class="fr-story-tile" :style="{ borderRadius: `var(${item.token})` }">
           <h3>{{ item.value }}</h3>

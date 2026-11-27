@@ -122,7 +122,7 @@ defineExpose({
   background: var(--surface, #fff);
 }
 .fluentread-select .el-select__wrapper.is-focused:not(.is-disabled) {
-  border-color: var(--brand-strong, #cc2655);
+  border-color: var(--brand-strong, #d4235a);
   background: var(--surface, #fff);
   box-shadow: var(--fr-focus-ring);
 }

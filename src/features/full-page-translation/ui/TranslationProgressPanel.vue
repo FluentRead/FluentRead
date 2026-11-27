@@ -229,7 +229,7 @@ onBeforeUnmount(() => {
   gap: 2px;
   width: 22px;
   height: 22px;
-  color: #cc2655;
+  color: #ef4776;
 }
 
 .fr-translation-progress.fr-compact {
@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
 }
 
 .fr-progress-counts b {
-  color: #cc2655;
+  color: #d4235a;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
 }
@@ -346,7 +346,7 @@ onBeforeUnmount(() => {
 }
 
 .fr-progress-dismiss:focus-visible {
-  outline: 2px solid #cc2655;
+  outline: 2px solid #d4235a;
   outline-offset: -2px;
 }
 
@@ -363,9 +363,9 @@ onBeforeUnmount(() => {
 .fr-progress-actions { display: grid; grid-area: 2 / 1 / auto / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .fr-progress-action { min-height: 32px; border: 1px solid #d5dbe6; border-radius: 8px; padding: 3px 8px; background: #ffffff; color: #161b26; cursor: pointer; font: inherit; font-weight: 500; overflow-wrap: anywhere; transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease; }
 .fr-progress-action:active:not(:disabled) { transform: scale(.98); }
-.fr-progress-action:first-child { border-color: transparent; background: #fff1f5; color: #cc2655; font-weight: 600; }
+.fr-progress-action:first-child { border-color: transparent; background: #fff0f5; color: #d4235a; font-weight: 600; }
 .fr-progress-action:disabled { opacity: .45; cursor: default; }
-.fr-progress-action:focus-visible { outline: 2px solid #cc2655; outline-offset: 2px; }
+.fr-progress-action:focus-visible { outline: 2px solid #d4235a; outline-offset: 2px; }
 .fr-idle .fr-progress-indicator i { animation: none; }
 
 .fr-dark {

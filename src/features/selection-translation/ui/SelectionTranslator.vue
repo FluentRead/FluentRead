@@ -3101,12 +3101,12 @@ onBeforeUnmount(() => {
 .fr-translation-tooltip, .fr-translation-tooltip * { box-sizing: border-box; }
 .fr-translation-tooltip { position: fixed; display: flex; flex-direction: column; width: min(388px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 20px)); overflow: hidden; border: 1px solid rgba(22, 27, 38, .12); border-radius: 12px; background: #fff; box-shadow: 0 6px 20px rgba(17, 24, 39, .12); -webkit-user-select: none; user-select: none; }
 .fr-translation-tooltip {
-  --fr-card-toolbar: #f6f7f9;
-  --fr-card-line: #e3e6ed;
-  --fr-card-muted: #5b6476;
-  --fr-card-active-ink: #cc2655;
-  --fr-card-active-bg: #fff1f5;
-  --fr-card-focus: #cc2655;
+  --fr-card-toolbar: #f7f8fb;
+  --fr-card-line: #e7eaf1;
+  --fr-card-muted: #5d6678;
+  --fr-card-active-ink: #d4235a;
+  --fr-card-active-bg: #fff0f5;
+  --fr-card-focus: #d4235a;
 }
 .fr-popup-manipulating, .fr-popup-manipulating * { cursor: grabbing !important; user-select: none !important; }
 .fr-popup-resize-handle { position: absolute; z-index: 2; touch-action: none; }
@@ -3269,8 +3269,8 @@ onBeforeUnmount(() => {
 .fr-error-state p { margin: 9px 0 0; color: #788196; font-size: 13px; line-height: 1.7; }
 .fr-recovery-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin-top: 20px; }
 .fr-error-state button { min-height: 36px; border: 0; border-radius: 8px; padding: 8px 14px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; transition: background-color 120ms cubic-bezier(.22, 1, .36, 1), transform 120ms cubic-bezier(.22, 1, .36, 1); }
-.fr-error-state .fr-recovery-primary { color: #fff; background: #d62d5e; font-weight: 600; }
-.fr-error-state .fr-recovery-primary:hover:not(:disabled) { background: #bf2352; }
+.fr-error-state .fr-recovery-primary { color: #fff; background: linear-gradient(135deg, #f45686, #e53268); box-shadow: 0 4px 12px rgba(233, 50, 103, .20); font-weight: 600; }
+.fr-error-state .fr-recovery-primary:hover:not(:disabled) { background: linear-gradient(135deg, #eb4677, #d6265c); box-shadow: 0 5px 14px rgba(220, 45, 99, .26); }
 .fr-error-state .fr-recovery-primary:active:not(:disabled) { transform: scale(.985); }
 .fr-error-state .fr-recovery-primary:disabled { opacity: .55; cursor: default; }
 .fr-recovery-more > summary { display: flex; align-items: center; gap: 6px; min-height: 36px; color: #5b6476; font-size: 12px; list-style: none; cursor: pointer; }
@@ -3308,12 +3308,12 @@ onBeforeUnmount(() => {
 .fr-word-translation pre { overflow-wrap: anywhere; margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 16px; font-weight: 600; line-height: 1.6; user-select: text; }
 .fr-word-translation-loading, .fr-word-empty { margin-top: 12px; color: #5b6476; font-size: 12px; }
 .fr-word-meaning-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: #5b6476; font-size: 11px; font-weight: 600; }
-.fr-word-meaning-toolbar button { border: 0; padding: 3px 0; background: transparent; color: #cc2655; cursor: pointer; font: inherit; font-weight: 600; }
-.fr-word-meaning-toolbar button:hover, .fr-word-meaning-toolbar button:focus-visible { color: #a61e45; text-decoration: underline; outline: none; }
+.fr-word-meaning-toolbar button { border: 0; padding: 3px 0; background: transparent; color: #d4235a; cursor: pointer; font: inherit; font-weight: 600; }
+.fr-word-meaning-toolbar button:hover, .fr-word-meaning-toolbar button:focus-visible { color: #b51c4d; text-decoration: underline; outline: none; }
 .fr-word-meanings { display: grid; gap: 16px; margin-top: 14px; }
 .fr-word-meaning-toolbar + .fr-word-meanings { margin-top: 8px; }
-.fr-word-meaning { color: #161b26; font-size: 12.5px; line-height: 1.55; }
-.fr-word-meaning > strong { display: inline-flex; padding: 2px 7px; border: 1px solid #e3e6ed; border-radius: 6px; background: #f6f7f9; color: #cc2655; font-size: 11px; font-weight: 600; }
+.fr-word-meaning { color: #172033; font-size: 12.5px; line-height: 1.55; }
+.fr-word-meaning > strong { display: inline-flex; padding: 2px 7px; border: 1px solid #e7eaf1; border-radius: 6px; background: #f7f8fb; color: #d4235a; font-size: 11px; font-weight: 600; }
 .fr-word-meaning ol { margin: 7px 0 0; padding: 0; list-style: none; counter-reset: definition; }
 .fr-word-meaning li { position: relative; padding-left: 21px; }
 .fr-word-meaning li::before { position: absolute; top: 0; left: 0; width: 14px; color: #5b6476; content: counter(definition); counter-increment: definition; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
@@ -3341,17 +3341,17 @@ onBeforeUnmount(() => {
 .fr-text-copy-btn { display: inline-flex; align-items: center; justify-content: center; width:26px; height:26px; padding:0; border:1px solid transparent; border-radius:5px; background:transparent; color:#85858e; cursor:pointer; font:inherit; line-height:1; }
 .fr-text-copy-btn span, .fr-word-translation-header > .fr-text-label { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .fr-text-copy-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.fr-text-copy-btn:hover, .fr-text-copy-btn:focus-visible { border-color: rgba(204, 38, 85, .32); background: #fff1f5; color: #cc2655; outline: none; }
-.fr-text-copy-btn.fr-copied { border-color: rgba(204, 38, 85, .24); background: #fff1f5; color: #cc2655; }
+.fr-text-copy-btn:hover, .fr-text-copy-btn:focus-visible { border-color: rgba(239, 71, 118, .32); background: #fff0f5; color: #d4235a; outline: none; }
+.fr-text-copy-btn.fr-copied { border-color: rgba(239, 71, 118, .26); background: #fff0f5; color: #d4235a; }
 .fr-text-copy-btn:disabled { cursor: not-allowed; opacity: .42; }
-.fr-text-audio-btn { position: static; display: grid; flex: none; width:26px; height:26px; padding:0; place-items:center; border:1px solid transparent; border-radius:6px; background:transparent; color:#5b6476; }
+.fr-text-audio-btn { position: static; display: grid; flex: none; width:26px; height:26px; padding:0; place-items:center; border:1px solid transparent; border-radius:6px; background:transparent; color:#5d6678; }
 .fr-text-audio-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.fr-text-audio-btn:hover, .fr-text-audio-btn:focus-visible { border-color: rgba(204, 38, 85, .28); background: #fff1f5; color: #cc2655; outline: none; }
+.fr-text-audio-btn:hover, .fr-text-audio-btn:focus-visible { border-color: rgba(239, 71, 118, .28); background: #fff0f5; color: #d4235a; outline: none; }
 .fr-text-block pre { overflow-wrap:anywhere; margin:0; white-space:pre-wrap; word-break:break-word; font:inherit; font-size:14px; line-height:1.7; user-select:text; }
 .fr-original-text pre { font-size: 13px; }
 .fr-playing-status { flex: none; box-sizing: border-box; min-height: 38px; padding: 5px 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap:6px 8px; border-top: 1px solid var(--fr-card-line); background: inherit; color: var(--fr-card-muted); font-size: 12px; line-height: 1.4; }
 .fr-playing-status.is-idle { display: none; }
-.fr-playing-status button { flex: none; min-height: 27px; border: 1px solid #e8a4bc; border-radius: 7px; padding: 3px 8px; color: #cc2655; font: inherit; line-height: 1.2; }
+.fr-playing-status button { flex: none; min-height: 27px; border: 1px solid #f0b0c6; border-radius: 7px; padding: 3px 8px; color: #d4235a; font: inherit; line-height: 1.2; }
 .fr-playing-label { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .fr-playback-controls { display:flex; flex-wrap:wrap; flex:0 1 auto; max-width:100%; margin-inline-start:auto; align-items:center; justify-content:flex-end; gap:5px; }
 .fr-playback-time { font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }

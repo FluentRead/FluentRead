@@ -18,7 +18,7 @@
       </div>
     </template>
     <div v-if="config.bilingualSentenceHighlightEnabled" class="sentence-highlight-settings">
-      <p v-if="config.display !== 1" class="sentence-highlight-bilingual-note" role="status">
+      <p v-if="config.display === 0" class="sentence-highlight-bilingual-note" role="status">
         {{ t('settings.translationStyle.bilingualOnly') }}
         <button type="button" @click="config.display = 1">{{ t('settings.translationStyle.switchToBilingual') }}</button>
       </p>

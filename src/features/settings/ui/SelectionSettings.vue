@@ -70,10 +70,13 @@ const enabled = computed({get: () => props.config.selectionTranslatorMode !== 'd
   props.config.selectionTranslatorMode = value ? previousMode.value : 'disabled';
   props.config.disableSelectionTranslator = !value;
 }});
-const ttsStatusLabel = computed(() => {
-  const mode = normalizeLocalTtsMode(props.config.selectionTtsMode);
-  return t(`settings.localTts.${mode === 'online-first' ? 'onlineFirst' : mode === 'local-first' ? 'localFirst' : mode === 'online-only' ? 'onlineOnly' : 'localOnly'}`);
-});
+const LOCAL_TTS_MODE_KEYS = {
+  'online-first': 'onlineFirst',
+  'local-first': 'localFirst',
+  'online-only': 'onlineOnly',
+  'local-only': 'localOnly',
+} as const;
+const ttsStatusLabel = computed(() => t(`settings.localTts.${LOCAL_TTS_MODE_KEYS[normalizeLocalTtsMode(props.config.selectionTtsMode)]}`));
 </script>
 <style scoped>
 .selection-settings :deep(.speech-settings) {

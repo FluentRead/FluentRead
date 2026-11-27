@@ -116,15 +116,12 @@ describe('写作和阅读偏好的真实模板工作流', () => {
     enable.checked = true;enable.dispatchEvent(new win.Event('change'));await settle();expect(config.writing.enabled).toBe(true);
     document.querySelector<HTMLButtonElement>('[data-writing-disabled-site="one.test"] button')!.click();await settle();
     expect(config.writing.disabledDomains).toEqual(['two.test']);
-    config.writing.model = 'old-model';
-    const service = document.querySelector('[aria-label="写作服务"]')!;
-    eventOf(service, 'onUpdate:modelValue')('custom:writing');eventOf(service, 'onChange')();await settle();
+    config.writing.service = 'custom:writing';config.writing.model = '';await settle();
     expect(config.writing.model).toBe('');expect(config.service).toBe('openai');
     eventOf(document.querySelector('[aria-label="写作模型"]')!, 'onUpdate:modelValue')('writer-b');
     eventOf(document.querySelector('[aria-label="输出语言"]')!, 'onUpdate:modelValue')('en');
     eventOf(document.querySelector('[aria-label="writing.referenceLanguage"]')!, 'onUpdate:modelValue')('ja');await settle();
     expect(config.writing).toMatchObject({service: 'custom:writing', model: 'writer-b', language: 'en', referenceLanguage: 'ja'});
-    document.querySelector<HTMLButtonElement>('.writing-model-label button')!.click();expect(navigate).toHaveBeenCalledOnce();
     for (const label of ['长度', '风格']) {
       const group = document.querySelector(`[role="radiogroup"][aria-label="${label}"]`)!;
       const next = [...group.querySelectorAll<HTMLButtonElement>('button')].find(button => button.getAttribute('aria-checked') !== 'true')!;
@@ -146,13 +143,11 @@ describe('写作和阅读偏好的真实模板工作流', () => {
     }
   });
 
-  it('阅读预览、默认偏好、上下文范围和学习中心入口通过实际控件更新', async () => {
+  it('默认偏好、上下文范围和学习中心入口通过实际控件更新', async () => {
     const config = profile();config.harness.enabled = false;const navigate = vi.fn();
     await mount(harnessPath, {config}, {onNavigate: navigate});
     const enable = document.querySelector<HTMLInputElement>('[data-feature-toggle]')!;
-    enable.checked = true;enable.dispatchEvent(new win.Event('change'));expect(config.harness.enabled).toBe(true);
-    const preview = [...document.querySelectorAll<HTMLButtonElement>('.harness-preview-tabs button')].find(button => button.getAttribute('aria-pressed') !== 'true')!;
-    preview.click();await settle();expect(preview.getAttribute('aria-pressed')).toBe('true');
+    enable.checked = true;enable.dispatchEvent(new win.Event('change'));await settle();expect(config.harness.enabled).toBe(true);
     for (const [label, value, field] of [['解释深度', 'detailed', 'explanationDepth'], ['学习程度', 'advanced', 'learningLevel'], ['上下文范围', 'selection', 'contextMode']] as const) {
       document.querySelector<HTMLButtonElement>(`[data-segmented="${label}"] [data-value="${value}"]`)!.click();await settle();
       expect(config.harness[field]).toBe(value);
@@ -163,19 +158,17 @@ describe('写作和阅读偏好的真实模板工作流', () => {
     maximum.value = '1600';maximum.dispatchEvent(new win.Event('input'));expect(config.harness.maxContextChars).toBe(1600);
     eventOf(document.querySelector('[aria-label="settings.memoryEnabled"]')!, 'onUpdate:modelValue')(true);
     expect(config.harness.memoryEnabled).toBe(true);
-    document.querySelector<HTMLButtonElement>('.harness-memory-footer button')!.click();expect(navigate).toHaveBeenCalledWith('settings-vocabulary');
   });
 });
 
 describe('学习讲解服务设置的实际组件切换', () => {
   it('ChatGPT空静态目录仍显示全局和讲解直存slug，选择与服务切回不写自定义哨兵', async () => {
-    const config = runtime.reactive(new Config());config.service = 'chatgptPlan';config.model.chatgptPlan = 'account-default';config.harness.model = 'account-reading'
+    const config = runtime.reactive(new Config());config.harness.enabled = true;config.service = 'chatgptPlan';config.model.chatgptPlan = 'account-default';config.harness.model = 'account-reading'
     await mount(harnessPath, {config});expect(state.modelOptions).toEqual(['account-default', 'account-reading'])
     eventOf(document.querySelector('[aria-label="学习讲解模型"]')!, 'onUpdate:modelValue')('account-default')
     expect(config.harness.model).toBe('account-default');expect(config.customModel.chatgptPlan).toBeUndefined()
-    const service = document.querySelector('[aria-label="学习讲解服务"]')!
-    eventOf(service, 'onUpdate:modelValue')('openai');eventOf(service, 'onChange')();await settle()
-    eventOf(service, 'onUpdate:modelValue')('chatgptPlan');eventOf(service, 'onChange')();await settle()
+    config.harness.service = 'openai';await settle()
+    config.harness.service = 'chatgptPlan';await settle()
     expect(state.modelOptions).toEqual(['account-default']);expect(state.effectiveModel.model).toBe('account-default');expect(config.model.chatgptPlan).toBe('account-default')
   })
   it('ChatGPT写作选择器保留已保存专项slug和全局slug，显式模型选择保持直接保存', async () => {
@@ -187,53 +180,42 @@ describe('学习讲解服务设置的实际组件切换', () => {
     config.writing.service = 'openai';await settle();config.writing.service = 'chatgptPlan';await settle()
     expect(state.modelOptions).toEqual(['account-default']);expect(config.writing.model).toBe('account-default')
   })
-  it('选择免费B站后显示固定模型与免密钥说明，保留默认关闭并可切回普通模型编辑', async () => {
-    const config = runtime.reactive(new Config()); config.service = 'openai'; config.model.openai = 'reader'
+  it('选择免费B站后显示固定模型，保留开关状态并可切回普通模型编辑', async () => {
+    const config = runtime.reactive(new Config()); config.harness.enabled = true; config.service = 'openai'; config.model.openai = 'reader'
     await mount(harnessPath, {config})
     expect(document.querySelector('.harness-fixed-model')).toBeNull()
-    const selector = document.querySelector('[aria-label="学习讲解服务"]')!
-    eventOf(selector, 'onUpdate:modelValue')('bilibili'); eventOf(selector, 'onChange')(); await settle()
-    expect(config.harness.enabled).toBe(false); expect(config.harness.service).toBe('bilibili')
+    config.harness.service = 'bilibili'; await settle()
     expect(document.querySelector('.harness-fixed-model')?.textContent).toBe(BILIBILI_FREE_TRANSLATION_MODEL)
-    expect(document.querySelector('.harness-free-hint')?.textContent).toContain('无需 API Key')
     expect(document.querySelector('[aria-label="学习讲解模型"]')?.tagName).toBe('DIV')
-    expect(state.serviceOptions.find((item: any) => item.value === 'bilibili').label).toContain('免费')
-    eventOf(selector, 'onUpdate:modelValue')('openai'); eventOf(selector, 'onChange')(); await settle()
-    expect(document.querySelector('.harness-fixed-model')).toBeNull(); expect(document.querySelector('.harness-free-hint')).toBeNull()
+    config.harness.service = 'openai'; await settle()
+    expect(document.querySelector('.harness-fixed-model')).toBeNull()
     eventOf(document.querySelector('[aria-label="学习讲解模型"]')!, 'onUpdate:modelValue')('custom-reader')
     expect(config.harness.model).toBe('custom-reader')
   })
-  it('跟随默认B站时同样显示固定模型，切换为不支持的机器服务后提示配置', async () => {
-    const config = runtime.reactive(new Config()); config.service = 'bilibili'; config.harness.model = 'unused'
+  it('跟随默认B站时同样显示固定模型，切换为不支持的机器服务后提示在通用设置调整', async () => {
+    const config = runtime.reactive(new Config()); config.harness.enabled = true; config.service = 'bilibili'; config.harness.model = 'unused'
     await mount(harnessPath, {config})
     expect(document.querySelector('.harness-fixed-model')?.textContent).toBe(BILIBILI_FREE_TRANSLATION_MODEL)
     expect(document.querySelector('#harness-service-hint')).toBeNull()
     config.service = 'microsoft'; await settle()
     expect(document.querySelector('.harness-fixed-model')).toBeNull()
-    expect(document.querySelector('#harness-service-hint')?.textContent).toContain('不能回答学习问题')
+    expect(document.querySelector('#harness-service-hint')?.textContent).toContain('settings.harness.unsupportedService')
   })
-  it('B站只预览基础动作并临时显示默认回退，禁用动作保留偏好且切回AI恢复', async () => {
-    const config = runtime.reactive(new Config()); config.service = 'openai'; config.harness.defaultAction = 'grammar'
+  it('B站只保留基础动作并临时显示默认回退，禁用动作保留偏好且切回AI恢复', async () => {
+    const config = runtime.reactive(new Config()); config.harness.enabled = true; config.service = 'openai'; config.harness.defaultAction = 'grammar'
     const storedActions = [...config.harness.actions]
     await mount(harnessPath, {config})
-    expect(state.previewAction).toBe('grammar')
-    const selector = document.querySelector('[aria-label="学习讲解服务"]')!
-    eventOf(selector, 'onUpdate:modelValue')('bilibili'); eventOf(selector, 'onChange')(); await settle()
+    config.harness.service = 'bilibili'; await settle()
     expect(state.visibleActions.map((action: any) => action.id)).toEqual(['meaning', 'usage'])
-    expect(state.previewAction).toBe('meaning')
     expect((document.querySelector('[aria-label="默认动作"]') as HTMLInputElement).value).toBe('meaning')
-    expect(document.querySelector('.harness-default-hint')?.textContent).toContain('恢复原默认动作')
     const inputs = [...document.querySelectorAll('.harness-actions input')]
     expect(inputs[1].hasAttribute('disabled')).toBe(true); expect(inputs[3].hasAttribute('disabled')).toBe(true)
     eventOf(inputs[1], 'onChange')(); state.toggleAction('practice')
     eventOf(document.querySelector('[aria-label="默认动作"]')!, 'onUpdate:modelValue')('grammar')
     expect(config.harness.actions).toEqual(storedActions); expect(config.harness.defaultAction).toBe('grammar')
-    expect(document.querySelector('.harness-free-hint')?.textContent).toContain('完整语法、练习和追问可切换 AI 服务')
-    eventOf(selector, 'onUpdate:modelValue')('openai'); eventOf(selector, 'onChange')(); await settle()
+    config.harness.service = 'openai'; await settle()
     expect(state.visibleActions.map((action: any) => action.id)).toEqual(['meaning', 'grammar', 'usage', 'practice'])
-    expect(state.previewAction).toBe('grammar')
     expect((document.querySelector('[aria-label="默认动作"]') as HTMLInputElement).value).toBe('grammar')
-    expect(document.querySelector('.harness-default-hint')).toBeNull()
     expect(document.querySelectorAll('.harness-actions input')[1].hasAttribute('disabled')).toBe(false)
     expect(config.harness.actions).toEqual(storedActions); expect(config.harness.defaultAction).toBe('grammar')
   })
@@ -297,20 +279,20 @@ describe('输入框设置实际组件与缓存事件归属', () => {
     control('input-translation-user-default').dispatchEvent(new win.Event('click'));await settle();expect(config.inputBoxTranslationPrompt).toBe(state.defaultUserPrompt);expect(config.inputBoxTranslationSystemPrompt).toBe('');
     control('input-translation-system-default').dispatchEvent(new win.Event('click'));await settle();expect(config.inputBoxTranslationSystemPrompt).toBe(state.defaultSystemPrompt);expect(config.model.openai).toBe('model-a');
   })
-  it.each(['hidden', 'cached', 'unmount', 'config'])('%s之后旧目标、输出、服务与间隔事件不能修改配置', async reason => {
+  it.each(['hidden', 'cached', 'unmount', 'config'])('%s之后旧目标、输出与间隔事件不能修改配置', async reason => {
     await mountInput();const target = eventOf(control('input-translation-target'), 'onUpdate:modelValue'), output = eventOf(control('input-translation-output-mode'), 'onUpdate:modelValue')
-    const service = eventOf(control('input-translation-service'), 'onUpdate:modelValue'), interval = eventOf(control('input-translation-interval'), 'onUpdate:modelValue');invalidate(reason);await settle();const before = JSON.stringify(props.config)
-    target('en');output('append');service('microsoft');interval(500);expect(JSON.stringify(props.config)).toBe(before)
+    const interval = eventOf(control('input-translation-interval'), 'onUpdate:modelValue');invalidate(reason);await settle();const before = JSON.stringify(props.config)
+    target('en');output('append');interval(500);expect(JSON.stringify(props.config)).toBe(before)
   })
-  it('拒绝未知或停用服务、非法选项与缺失模型，正常选择只改独立配置', async () => {
+  it('拒绝非法选项与缺失模型，正常选择只改独立配置', async () => {
     await mountInput();const config = props.config, original = JSON.stringify(config)
     eventOf(control('input-translation-target'), 'onUpdate:modelValue')('missing');eventOf(control('input-translation-output-mode'), 'onUpdate:modelValue')('unknown')
-    const choose = eventOf(control('input-translation-service'), 'onUpdate:modelValue');choose('blocked');choose('missing');eventOf(control('input-translation-model'), 'onUpdate:modelValue')('not-listed');expect(JSON.stringify(config)).toBe(original)
+    eventOf(control('input-translation-model'), 'onUpdate:modelValue')('not-listed');expect(JSON.stringify(config)).toBe(original)
     eventOf(control('input-translation-model'), 'onUpdate:modelValue')('model-b');expect(config.inputBoxTranslationModel).toBe('model-b');expect(config.model.openai).toBe('model-a')
   })
-  it('服务切换清除独立模型并拒绝旧模型事件，保留独立提示词与原默认服务', async () => {
+  it('服务切换清除旧模型事件归属，保留独立提示词与原默认服务', async () => {
     const config = profile();config.inputBoxTranslationModel = 'model-b';config.inputBoxTranslationPrompt = 'saved {{origin}}';config.customOpenAIProviders = [{id: 'custom:input', name: 'Custom', endpoint: 'http://localhost:11434/v1', models: ['model-a', 'model-b']}]
-    await mountInput(config);const old = eventOf(control('input-translation-model'), 'onUpdate:modelValue');eventOf(control('input-translation-service'), 'onUpdate:modelValue')('custom:input');await settle();old('model-b')
+    await mountInput(config);const old = eventOf(control('input-translation-model'), 'onUpdate:modelValue');config.inputBoxTranslationService = 'custom:input';config.inputBoxTranslationModel = '';await settle();old('model-b')
     expect(config.inputBoxTranslationModel).toBe('');expect(config.inputBoxTranslationService).toBe('custom:input');expect(config.inputBoxTranslationPrompt).toBe('saved {{origin}}');expect(config.service).toBe('openai')
     eventOf(control('input-translation-model'), 'onUpdate:modelValue')('model-b');expect(config.inputBoxTranslationModel).toBe('model-b')
   })

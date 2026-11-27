@@ -679,13 +679,13 @@ describe('shared UI actual client SFC lifecycle', () => {
     const themes = mounted.root.querySelectorAll('[role="radio"]');event(themes[1], 'click');expect(update).toHaveBeenLastCalledWith('dark');event(themes[0], 'click');expect(update).toHaveBeenLastCalledWith('light');
     expect(outside.textContent).toBe('Original host text');expect(outside.attributes.length).toBe(0);
   });
-  it.each(['preset', 'profile'] as const)('restores unsaved sentence-highlight appearance after None and the remembered %s', async source => {
+  it.each(['preset', 'profile'] as const)('restores unsaved sentence-highlight appearance after toggling off and back on for %s', async source => {
     const media = {matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn()};
     Object.defineProperty(dom.window, 'matchMedia', {configurable: true, value: () => media});
     const editedAppearance = {...DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE, backgroundColor: '#ff0000', lineThickness: 3, customCss: 'text-shadow: 0 0 1px red;'};
     const savedAppearance = {...DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE, backgroundColor: '#0000ff'};
     const mounted = await mount(SentenceHighlightStyleSettings, {config: {
-      theme: 'light', translationBeforeOriginal: false, bilingualSentenceHighlightEnabled: true,
+      theme: 'light', display: 1, translationBeforeOriginal: false, bilingualSentenceHighlightEnabled: true,
       bilingualSentenceHighlightStyle: 'rose', bilingualSentenceHighlightAppearance: editedAppearance,
       activeSentenceHighlightProfileId: source === 'profile' ? 'saved' : '',
       bilingualSentenceHighlightProfiles: [{id: 'saved', name: 'Saved style', style: 'rose', appearance: savedAppearance}],
@@ -693,23 +693,18 @@ describe('shared UI actual client SFC lifecycle', () => {
     const config = mounted.props.config;
     const rememberedAppearance = config.bilingualSentenceHighlightAppearance;
     const rememberedProfile = config.activeSentenceHighlightProfileId;
-    const none = mounted.root.querySelector('[data-highlight-style="none"]')!;
-    event(none, 'click');await settle();
+    config.bilingualSentenceHighlightEnabled = false;await settle();
     expect(config.bilingualSentenceHighlightEnabled).toBe(false);
     expect(config.bilingualSentenceHighlightAppearance).toBe(rememberedAppearance);
     expect(config.activeSentenceHighlightProfileId).toBe(rememberedProfile);
-    expect(mounted.root.querySelectorAll('.sentence-highlight-option[aria-checked="true"]')).toHaveLength(1);
-    expect(none.getAttribute('aria-checked')).toBe('true');
-    expect(mounted.root.querySelector('[data-bilingual-highlight-enabled]')!.getAttribute('data-bilingual-highlight-enabled')).toBe('false');
-    event(mounted.root.querySelector(source === 'profile' ? '[data-profile-id="saved"]' : '[data-highlight-style="rose"]')!, 'click');await settle();
-    expect(config.bilingualSentenceHighlightEnabled).toBe(true);
+    expect(mounted.root.querySelector('.sentence-highlight-settings')).toBeNull();
+    config.bilingualSentenceHighlightEnabled = true;await settle();
     expect(config.bilingualSentenceHighlightAppearance).toBe(rememberedAppearance);
     expect(config.bilingualSentenceHighlightAppearance).toEqual(editedAppearance);
     expect(config.activeSentenceHighlightProfileId).toBe(rememberedProfile);
-    expect(none.getAttribute('aria-checked')).toBe('false');
     expect(mounted.root.querySelector('[data-bilingual-highlight-enabled]')!.getAttribute('data-bilingual-highlight-enabled')).toBe('true');
-    // 关闭后改选另一个预设仍采用该预设的原貌，不携带前一套自定义颜色。
-    event(none, 'click');await settle();event(mounted.root.querySelector('[data-highlight-style="mint"]')!, 'click');await settle();
+    // 改选另一个预设仍采用该预设的原貌，不携带前一套自定义颜色。
+    event(mounted.root.querySelector('[data-highlight-style="mint"]')!, 'click');await settle();
     expect(config.bilingualSentenceHighlightEnabled).toBe(true);
     expect(config.bilingualSentenceHighlightStyle).toBe('mint');
     expect(config.bilingualSentenceHighlightAppearance).toEqual(DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE);

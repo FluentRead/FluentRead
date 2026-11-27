@@ -9,28 +9,42 @@ function projectPath(...parts: string[]): string {
     return resolve(PROJECT_ROOT, ...parts);
 }
 
+const listedFilesCache = new Map<string, string[]>();
+const sourceCache = new Map<string, string>();
+const specifiersCache = new Map<string, string[]>();
+const staticRuntimeImportsCache = new Map<string, string[]>();
+const resolvedImportCache = new Map<string, string | null>();
+
 function listSourceFiles(directory: string): string[] {
+    const cached = listedFilesCache.get(directory);
+    if (cached) return cached;
     const root = projectPath(directory);
     const files: string[] = [];
 
     const visit = (current: string) => {
         // 步骤 1：递归读取目录，只收集会参与 TypeScript/Vue 依赖图的源码。
-        for (const name of readdirSync(current)) {
-            const absolute = resolve(current, name);
-            if (statSync(absolute).isDirectory()) {
+        for (const entry of readdirSync(current, {withFileTypes: true})) {
+            const absolute = resolve(current, entry.name);
+            if (entry.isDirectory()) {
                 visit(absolute);
-            } else if (/\.(?:cts|mts|ts|tsx|vue)$/.test(name) && !name.endsWith('.d.ts')) {
+            } else if (/\.(?:cts|mts|ts|tsx|vue)$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {
                 files.push(absolute);
             }
         }
     };
 
     visit(root);
-    return files.sort();
+    files.sort();
+    listedFilesCache.set(directory, files);
+    return files;
 }
 
 function readSource(path: string): string {
-    return readFileSync(path, 'utf8');
+    const cached = sourceCache.get(path);
+    if (cached !== undefined) return cached;
+    const content = readFileSync(path, 'utf8');
+    sourceCache.set(path, content);
+    return content;
 }
 
 function sourceBody(path: string): string {
@@ -43,12 +57,16 @@ function relativePath(path: string): string {
     return relative(PROJECT_ROOT, path).split(sep).join('/');
 }
 
-function importSpecifiers(source: string): string[] {
+function parseScriptAst(filename: string, source: string): ts.SourceFile {
     // Vue 文件只把 script 区域交给 TypeScript；模板文字和样式不能伪装成依赖边。
     const script = source.includes('<script')
         ? [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/giu)].map((match) => match[1]).join('\n')
         : source;
-    const sourceFile = ts.createSourceFile('dependency-graph.tsx', script, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    return ts.createSourceFile(filename, script, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+}
+
+function importSpecifiers(source: string): string[] {
+    const sourceFile = parseScriptAst('dependency-graph.tsx', source);
     const imports = new Set<string>();
 
     const addStringLiteral = (node: ts.Node | undefined) => {
@@ -70,13 +88,56 @@ function importSpecifiers(source: string): string[] {
     return [...imports];
 }
 
+function fileImportSpecifiers(file: string): string[] {
+    const cached = specifiersCache.get(file);
+    if (cached) return cached;
+    // 单次 AST 解析同时产出全部依赖与静态运行时导入，避免六个架构用例重复扫描全仓库。
+    const sourceFile = parseScriptAst(file, readSource(file));
+    const allImports = new Set<string>();
+    const staticRuntimeImports: string[] = [];
+
+    const addStringLiteral = (node: ts.Node | undefined) => {
+        if (node && ts.isStringLiteralLike(node)) allImports.add(node.text);
+    };
+    for (const statement of sourceFile.statements) {
+        if (ts.isImportDeclaration(statement) && !statement.importClause?.isTypeOnly && ts.isStringLiteral(statement.moduleSpecifier)) {
+            staticRuntimeImports.push(statement.moduleSpecifier.text);
+        }
+    }
+    const visit = (node: ts.Node) => {
+        if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+            addStringLiteral(node.moduleSpecifier);
+        } else if (ts.isCallExpression(node)
+            && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+            addStringLiteral(node.arguments[0]);
+        } else if (ts.isImportTypeNode(node)
+            && ts.isLiteralTypeNode(node.argument)) {
+            addStringLiteral(node.argument.literal);
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+    const result = [...allImports];
+    specifiersCache.set(file, result);
+    staticRuntimeImportsCache.set(file, staticRuntimeImports);
+    return result;
+}
+
+function fileStaticRuntimeImports(file: string): string[] {
+    if (!staticRuntimeImportsCache.has(file)) fileImportSpecifiers(file);
+    return staticRuntimeImportsCache.get(file)!;
+}
+
 function resolveProjectImport(fromFile: string, specifier: string): string | null {
+    const key = `${fromFile}\0${specifier}`;
+    if (resolvedImportCache.has(key)) return resolvedImportCache.get(key)!;
     let unresolved: string;
     if (specifier.startsWith('@/')) {
         unresolved = projectPath(specifier.slice(2));
     } else if (specifier.startsWith('.')) {
         unresolved = resolve(dirname(fromFile), specifier);
     } else {
+        resolvedImportCache.set(key, null);
         return null;
     }
 
@@ -93,8 +154,12 @@ function resolveProjectImport(fromFile: string, specifier: string): string | nul
         resolve(unresolved, 'index.cts'),
         resolve(unresolved, 'index.vue'),
     ]) {
-        if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+        if (existsSync(candidate) && statSync(candidate).isFile()) {
+            resolvedImportCache.set(key, candidate);
+            return candidate;
+        }
     }
+    resolvedImportCache.set(key, null);
     return null;
 }
 
@@ -243,7 +308,7 @@ describe('architecture module boundaries', () => {
         const sourceSet = new Set(files);
         const graph = new Map(files.map((file) => [
             file,
-            importSpecifiers(readSource(file))
+            fileImportSpecifiers(file)
                 .map((specifier) => resolveProjectImport(file, specifier))
                 .filter((target): target is string => Boolean(target) && sourceSet.has(target as string)),
         ]));
@@ -280,7 +345,7 @@ describe('architecture module boundaries', () => {
 
         for (const file of listSourceFiles('src')) {
             const path = relativePath(file);
-            for (const specifier of importSpecifiers(readSource(file))) {
+            for (const specifier of fileImportSpecifiers(file)) {
                 if (!specifier.startsWith('@/entrypoints/')) continue;
 
                 // 步骤 1：app composition root 负责把 WXT/provider/config 依赖静态注入纯 service。
@@ -319,7 +384,7 @@ describe('architecture module boundaries', () => {
     it('feature 的运行时和类型契约都不反向依赖 app 组装层', () => {
         const violations: string[] = [];
         for (const file of listSourceFiles('src/features')) {
-            for (const specifier of importSpecifiers(readSource(file))) {
+            for (const specifier of fileImportSpecifiers(file)) {
                 const target = resolveProjectImport(file, specifier);
                 if (target && relativePath(target).startsWith('src/app/')) {
                     violations.push(`${relativePath(file)} -> ${specifier}`);
@@ -337,7 +402,7 @@ describe('architecture module boundaries', () => {
             const absolute = projectPath(directory);
             try {
                 for (const file of listSourceFiles(directory)) {
-                    for (const specifier of importSpecifiers(readSource(file))) {
+                    for (const specifier of fileImportSpecifiers(file)) {
                         if (specifier.startsWith('@/entrypoints/') || forbidden.test(specifier)) {
                             violations.push(`${relativePath(file)} -> ${specifier}`);
                         }
@@ -360,7 +425,7 @@ describe('architecture module boundaries', () => {
             const owner = path.split('/')[2];
             if (!owner) continue;
 
-            for (const specifier of importSpecifiers(readSource(file))) {
+            for (const specifier of fileImportSpecifiers(file)) {
                 const target = resolveProjectImport(file, specifier);
                 const targetPath = target ? relativePath(target) : '';
                 const match = targetPath.match(/^src\/features\/([^/]+)\//);
@@ -376,10 +441,10 @@ describe('architecture module boundaries', () => {
         expect(sourceBody('entrypoints/document/main.ts')).toBe(
             "import {mountDocumentTranslationApp} from '@/src/app/document-translation/page';\n\nmountDocumentTranslationApp('#app');\n",
         );
-        const documentUiImports = importSpecifiers(readSource(projectPath('src/app/document-translation/DocumentApp.vue')))
+        const documentUiImports = fileImportSpecifiers(projectPath('src/app/document-translation/DocumentApp.vue'))
             .filter((specifier) => specifier.startsWith('@/src/'));
         const featureEntrypointImports = listSourceFiles('src/features/document-translation')
-            .flatMap((file) => importSpecifiers(readSource(file)))
+            .flatMap((file) => fileImportSpecifiers(file))
             .filter((specifier) => specifier.startsWith('@/entrypoints/'));
 
         expect(documentUiImports).toEqual(['@/src/app/document-translation']);
@@ -391,7 +456,7 @@ describe('architecture module boundaries', () => {
 
         for (const file of listSourceFiles('entrypoints')) {
             const path = relativePath(file);
-            for (const specifier of importSpecifiers(readSource(file))) {
+            for (const specifier of fileImportSpecifiers(file)) {
                 if (!specifier.startsWith('@/src/')) continue;
                 if (specifier.startsWith('@/src/app/')) continue;
                 violations.push(`${path} -> ${specifier}`);
@@ -420,14 +485,7 @@ describe('architecture module boundaries', () => {
         const violations: string[] = [];
         for (const file of listSourceFiles('src')) {
             const path = relativePath(file);
-            const source = readSource(file);
-            const script = source.includes('<script')
-                ? [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/giu)].map((match) => match[1]).join('\n')
-                : source;
-            const sourceFile = ts.createSourceFile(path, script, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-            for (const statement of sourceFile.statements) {
-                if (!ts.isImportDeclaration(statement) || statement.importClause?.isTypeOnly) continue;
-                const specifier = (statement.moduleSpecifier as ts.StringLiteral).text;
+            for (const specifier of fileStaticRuntimeImports(file)) {
                 if (!onDemand.test(specifier)) continue;
                 if (!allowed.get(path)?.test(specifier)) violations.push(`${path} -> ${specifier}`);
             }
@@ -446,7 +504,7 @@ describe('architecture module boundaries', () => {
                 const file = pending.pop()!;
                 if (visited.has(file)) continue;
                 visited.add(file);
-                for (const specifier of importSpecifiers(readSource(file))) {
+                for (const specifier of fileImportSpecifiers(file)) {
                     const dependency = resolveProjectImport(file, specifier);
                     if (dependency) pending.push(dependency);
                 }

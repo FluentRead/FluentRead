@@ -8,6 +8,7 @@ import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {cloneTranslationElementInert} from '@/src/core/translation/inertClone';
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {getSupplementalLanguageCandidate} from '@/src/core/language/supplement';
+import {allowsPageSourceLanguage, type FullPageTranslationConfigSnapshot} from './translationConfigSnapshot';
 import type {TranslationScope} from '@/src/core/translation/public';
 import {
     collectLiveTranslationTextSlots,
@@ -94,13 +95,11 @@ export interface AcceptedUnchangedCompletion {
     targetLanguage: string;
     completedAtUnixMs: number;
 }
-interface CompletionConfig {
+interface CompletionConfig extends Pick<FullPageTranslationConfigSnapshot,
+    'service' | 'sourceLanguage' | 'sourceLanguageOnly' | 'targetLanguage' | 'excludedLanguages'> {
     sessionId: number;
     renderCommitGeneration: number;
     configIdentity: string;
-    service: string;
-    targetLanguage: string;
-    excludedLanguages?: readonly string[];
 }
 export function createAcceptedUnchangedCompletion(owner: HTMLElement, candidate: TranslationCandidate,
     state: TranslationState, generation: number, sources: readonly string[], outputs: readonly string[],
@@ -116,6 +115,7 @@ export function createAcceptedUnchangedCompletion(owner: HTMLElement, candidate:
         // 三美元公式会由请求链在本地回填，不能据此认证 provider 的相同结果。
         sources[0]!.includes('$$$') ||
         !hasDistinctTranslation('', outputs[0]) || hasDistinctTranslation(sources[0]!, outputs[0]) ||
+        !allowsPageSourceLanguage(config, sources[0]!) ||
         shouldSkipTranslationForTarget(sources[0]!, config.targetLanguage, config.excludedLanguages) ||
         // 长未知正文可能由补充预检在本地回填，单凭同值结果不能证明 provider 已返回。
         getSupplementalLanguageCandidate(sources[0]!) !== undefined ||

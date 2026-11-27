@@ -441,6 +441,9 @@
         <SettingsItem label="全文翻译范围" help="“按阅读进度”预翻译可视区域附近的内容；“立即翻译到网页底部”处理已加载的整页及后续新增内容，无需自动滚动，可能增加无限滚动页面的请求量和费用；下次启动全文翻译时生效">
           <SegmentedControl v-model="config.fullPageTranslationMode" :options="fullPageTranslationModeOptions" label="全文翻译范围" />
         </SettingsItem>
+        <SettingsItem :label="translateLegacy('只翻译指定源语言')" :description="translateLegacy('在扩展弹窗选择具体源语言后生效，语言无法确认的文字保留原文。')">
+          <el-switch v-model="config.pageSourceLanguageOnly" class="settings-toggle" :disabled="config.from === 'auto'" :aria-label="translateLegacy('只翻译指定源语言')" />
+        </SettingsItem>
 
         <QuickTranslationProfiles :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'page')" :config="config" action="full-page" :profiles="config.quickTranslationProfiles"
           @update:profiles="config.quickTranslationProfiles = $event" />

@@ -32,6 +32,7 @@ export function isFrameTranslationState(value: unknown): value is FrameTranslati
     const config = state.translationConfig;
     if (!config || typeof config !== 'object') return false;
     return ['service', 'model', 'sourceLanguage', 'targetLanguage'].every(key => typeof config[key as keyof typeof config] === 'string')
+        && (config.sourceLanguageOnly === undefined || config.sourceLanguageOnly === true)
         && ['thinking', 'useCache', 'enableAIContext', 'enableAIMultiSegment'].every(key => typeof config[key as keyof typeof config] === 'boolean')
         && (config.enableNativeBatch === undefined || typeof config.enableNativeBatch === 'boolean')
         && (config.aiMultiSegmentMaxSegments === undefined || (Number.isInteger(config.aiMultiSegmentMaxSegments)

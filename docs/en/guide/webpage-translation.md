@@ -24,6 +24,8 @@ Identical paragraphs on the same page share results when their translation reque
 
 Passages already in the target or an excluded language usually keep their source text. Results matching the source are not duplicated. Simplified and Traditional Chinese can still convert when their characters differ. Language detection can be wrong; check source-language and site settings for missing translations.
 
+To translate only one source language on a webpage, select a specific source language in the extension popup, then enable **Translate only the selected source language** under **Settings → Translation → Full-page translation**. Page, section, and hover translation keep short or mixed text as written when its language cannot be confirmed.
+
 <details class="guide-details">
 <summary>See the actual webpage translation</summary>
 

@@ -23,6 +23,7 @@ const runtime = vi.hoisted(() => ({
         modelThinking: {} as Record<string, Record<string, boolean>>,
         from: 'auto',
         to: 'de',
+        pageSourceLanguageOnly: false,
         excludedLanguages: [] as string[],
         useCache: true,
         enableAIContext: false,
@@ -106,11 +107,32 @@ beforeEach(() => {
     runtime.nextError = undefined;
     runtime.pending = null;
     runtime.preflight.mockReset().mockResolvedValue(false);
-    Object.assign(runtime.config, {service: 'microsoft', from: 'auto', to: 'de', excludedLanguages: [], enableAIMultiSegment: false,
+    Object.assign(runtime.config, {service: 'microsoft', from: 'auto', to: 'de', pageSourceLanguageOnly: false, excludedLanguages: [], enableAIMultiSegment: false,
         enableAIContext: false, glossaryEnabled: false, glossaryLibraries: []});
 });
 
 describe('原始槽的补充证据与快照', () => {
+    it.each(['microsoft', 'openai'])('only sends positively identified source slots to %s after opt-in (#854)', async service => {
+        Object.assign(runtime.config, {service, from: 'en', to: 'de', pageSourceLanguageOnly: true});
+        const snapshot = captureFullPageTranslationConfig();
+        runtime.config.pageSourceLanguageOnly = false;
+        const mixed = japanese + ' ' + english;
+        await expect(translateTextSlots([japanese, english, mixed, 'Open', ''], snapshot))
+            .resolves.toEqual([japanese, `T:${english}`, mixed, 'Open', '']);
+        expect(submitted()).toEqual([english]);
+        expect(runtime.requests[0]?.options.sourceLanguage).toBe('en');
+    });
+
+    it('retains automatic source detection and filters nonmatching marked inline-code requests', async () => {
+        Object.assign(runtime.config, {service: 'freeTranslation', from: 'en', to: 'zh-Hans', pageSourceLanguageOnly: true});
+        const source = '変数 __FRCODE_0123456789abcdef_0__ は同じではありません。';
+        await expect(tryTranslateInlineCodeSentence(source, () => ['translated'], captureFullPageTranslationConfig())).resolves.toBeNull();
+        expect(runtime.requests).toEqual([]);
+        runtime.config.from = 'auto';
+        await expect(translateTextSlots([japanese], captureFullPageTranslationConfig())).resolves.toEqual([`T:${japanese}`]);
+        expect(submitted()).toEqual([japanese]);
+    });
+
     it('自动源语言下日文受标记影响变成混合语时回退，不改变源语言', async () => {
         Object.assign(runtime.config, {service: 'myMemory', from: 'auto', to: 'zh-Hans', glossaryEnabled: false, glossaryLibraries: [], enableAIContext: false});
         const source = '変数 __FRCODE_0123456789abcdef_0__ は同じではありません。';

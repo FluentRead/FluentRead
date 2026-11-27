@@ -406,6 +406,7 @@ export class Config {
     siteAdaptation: SiteAdaptationSettings; // 网站内容范围、保护区域及本地 JSON 适配规则
     from: string;
     to: string;
+    pageSourceLanguageOnly: boolean; // 只翻译可信识别为指定源语言的网页正文
     excludedLanguages: string[]; // 网页全文、悬浮及标题翻译跳过的语言
     excludedTags: string[]; // 网页全文及悬浮翻译跳过的 HTML 标签或 CSS 选择器
     hotkey: string;
@@ -634,6 +635,7 @@ export class Config {
         this.siteAdaptation = normalizeSiteAdaptationSettings(undefined);
         this.from = defaultOption.from;
         this.to = defaultOption.to;
+        this.pageSourceLanguageOnly = false;
         this.excludedLanguages = [];
         this.excludedTags = [];
         this.style = defaultOption.style;
@@ -1302,6 +1304,7 @@ export function normalizeConfig(value: unknown): Config {
         : 0;
     normalized.from = normalizeConfigLanguage(source.from) || defaultOption.from;
     normalized.to = normalizeConfigLanguage(source.to) || defaultOption.to;
+    normalized.pageSourceLanguageOnly = source.pageSourceLanguageOnly === true;
     normalized.excludedLanguages = normalizeExcludedLanguages(source.excludedLanguages);
     normalized.excludedTags = normalizeExcludedTags(source.excludedTags);
     normalized.customInputBoxTranslationHotkey = normalizeCustomInputBoxTranslationHotkey(

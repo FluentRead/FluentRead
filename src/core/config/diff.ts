@@ -635,6 +635,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     floatingBallHotkey: {group: 'translation', label: '全文翻译快捷键', format: (value) => formatEnum(value, FLOATING_HOTKEY_LABELS)},
     customFloatingBallHotkey: {group: 'translation', label: '自定义全文快捷键'},
     quickTranslationProfiles: {group: 'translation', label: '快捷翻译方案', format: formatQuickTranslationProfiles},
+    pageSourceLanguageOnly: {group: 'translation', label: '只翻译指定源语言', format: formatBoolean},
     excludedLanguages: {group: 'translation', label: '不翻译的语言', format: value => Array.isArray(value)
         ? value.map(language => formatEnum(language, LANGUAGE_LABELS)).join('、') || '无' : '无'},
     excludedTags: {group: 'translation', label: '不翻译的标签', format: value => Array.isArray(value)

@@ -19,18 +19,21 @@ concurrency:
   group: extension-quality-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  FLUENTREAD_TEST_MAX_WORKERS: 1
+  FLUENTREAD_TEST_CONCURRENCY: 1
+  FLUENTREAD_DISABLE_BROWSER_RUNNER: 1
+  NODE_OPTIONS: --max-old-space-size=4096
+  # Event values are data, never interpolated into shell source.
+  FLUENTREAD_CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base || 'HEAD^' }}
+
 jobs:
-  extension-quality:
+  plan-and-audit:
     runs-on: ubuntu-latest
-    # A single-worker sample completed 210 of 447 files in 32 minutes; reserve time for the remaining scope and builds.
-    timeout-minutes: 75
-    env:
-      FLUENTREAD_TEST_MAX_WORKERS: 1
-      FLUENTREAD_TEST_CONCURRENCY: 1
-      FLUENTREAD_DISABLE_BROWSER_RUNNER: 1
-      NODE_OPTIONS: --max-old-space-size=4096
-      # Event values are data, never interpolated into shell source.
-      FLUENTREAD_CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base || 'HEAD^' }}
+    timeout-minutes: 20
+    outputs:
+      extension_changed: ${{ steps.plan.outputs.extension_changed }}
+      zotero_changed: ${{ steps.zotero_scope.outputs.zotero_changed }}
     steps:
       - name: Checkout tested commit and diff history
         uses: actions/checkout@v6
@@ -50,15 +53,60 @@ jobs:
         run: |
           pnpm rebuild esbuild
           pnpm exec wxt prepare
-      - name: Restore verified build caches
-        uses: actions/cache@v4
+      - name: Audit test registration and hand-written declarations
+        run: |
+          pnpm test:audit
+          pnpm verify:declarations
+      - name: Check native bridge and verification fixture contracts
+        run: node scripts/testing/run-resource-safe.mjs -- node --test --test-concurrency=1 tests/*.test.mjs
+      - name: Plan affected test and build scope
+        id: plan
+        run: node scripts/testing/run-affected-tests.mjs --plan-only --report coverage/affected-plan/plan.json --summary
+      - name: Detect Zotero integration scope
+        id: zotero_scope
+        run: |
+          base="${FLUENTREAD_CI_BASE:-HEAD^}"
+          if [[ "$base" == -* ]]; then
+            echo "zotero_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$base" =~ ^0+$ ]]; then
+            base="HEAD^"
+          fi
+          if ! resolved="$(git rev-parse --verify "${base}^{commit}" 2>/dev/null)"; then
+            echo "zotero_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only --no-renames "$resolved" -- | grep -Eq '^(integrations/zotero/|tests/config/vitest\.zotero\.config\.ts$|package\.json$|pnpm-(lock|workspace)\.yaml$|\.nvmrc$|tsconfig\.json$|\.github/workflows/extension-quality\.yml$)'; then
+            echo "zotero_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "zotero_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  affected-tests:
+    needs: plan-and-audit
+    runs-on: ubuntu-latest
+    # A single-worker sample completed 210 of 447 files in 32 minutes; reserve time for affected tests and coverage.
+    timeout-minutes: 55
+    steps:
+      - name: Checkout tested commit and diff history
+        uses: actions/checkout@v6
         with:
-          path: |
-            .wxt/cache/extension.tsbuildinfo
-            .wxt/cache/userscript-gzip
-          key: fluentread-build-${{ runner.os }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.json') }}-${{ github.sha }}
-          restore-keys: |
-            fluentread-build-${{ runner.os }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.json') }}-
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+      - name: Set up Node.js and dependency cache
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Prepare build tools and WXT types
+        run: |
+          pnpm rebuild esbuild
+          pnpm exec wxt prepare
       - name: Install audit tools
         run: |
           if ! command -v rg >/dev/null 2>&1; then
@@ -75,48 +123,8 @@ jobs:
             sudo install --mode=0755 "${rg_directory}/${rg_archive}/rg" /usr/local/bin/rg
           fi
           rg --version
-      - name: Audit test registration and hand-written declarations
-        run: |
-          pnpm test:audit
-          pnpm verify:declarations
-      - name: Test, build and verify the Zotero integration
-        run: |
-          pnpm test:zotero
-          pnpm build:zotero
-          pnpm verify:zotero
-      - name: Check native bridge and verification fixture contracts
-        run: node scripts/testing/run-resource-safe.mjs -- node --test --test-concurrency=1 tests/*.test.mjs
       - name: Run architecture gates, affected behavior and changed strict coverage once
-        id: affected
         run: node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-affected-tests.mjs --report coverage/affected-plan/plan.json --summary
-      - name: Check extension and shared Vue types
-        if: steps.affected.outputs.extension_changed == 'true'
-        run: node scripts/testing/run-ci-typecheck.mjs
-      - name: Build Chrome and Firefox archives and verify generated manifests
-        if: steps.affected.outputs.extension_changed == 'true'
-        run: |
-          pnpm zip
-          pnpm zip:firefox
-          pnpm verify:extension-manifests --require-chrome-archive --require-firefox-archives
-      - name: Build and verify the userscript
-        if: steps.affected.outputs.extension_changed == 'true'
-        run: |
-          pnpm build:userscript
-          node scripts/verify-userscript-build.mjs
-      - name: Build and verify the standalone userscript
-        if: steps.affected.outputs.extension_changed == 'true'
-        run: |
-          pnpm build:userscript:standalone
-          node scripts/verify-userscript-standalone-build.mjs
-      - name: Preserve verified extension archives
-        if: success() && steps.affected.outputs.extension_changed == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: verified-extension-archives
-          path: .output/*.zip
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 7
       - name: Preserve affected test plan and coverage evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -127,3 +135,118 @@ jobs:
             coverage/affected/coverage-summary.json
           if-no-files-found: ignore
           retention-days: 7
+
+  typecheck:
+    needs: plan-and-audit
+    if: needs.plan-and-audit.outputs.extension_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+      - name: Set up Node.js and dependency cache
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Prepare build tools and WXT types
+        run: |
+          pnpm rebuild esbuild
+          pnpm exec wxt prepare
+      - name: Restore verified typecheck cache
+        uses: actions/cache@v4
+        with:
+          path: .wxt/cache/extension.tsbuildinfo
+          key: fluentread-typecheck-${{ runner.os }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.json') }}-${{ github.sha }}
+          restore-keys: |
+            fluentread-typecheck-${{ runner.os }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.json') }}-
+      - name: Check extension and shared Vue types
+        run: node scripts/testing/run-ci-typecheck.mjs
+
+  build-and-verify:
+    needs: plan-and-audit
+    if: needs.plan-and-audit.outputs.extension_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+      - name: Set up Node.js and dependency cache
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Prepare build tools and WXT types
+        run: |
+          pnpm rebuild esbuild
+          pnpm exec wxt prepare
+      - name: Restore verified userscript gzip cache
+        uses: actions/cache@v4
+        with:
+          path: .wxt/cache/userscript-gzip
+          key: fluentread-userscript-${{ runner.os }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.json') }}-${{ github.sha }}
+          restore-keys: |
+            fluentread-userscript-${{ runner.os }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.json') }}-
+      - name: Build Chrome and Firefox archives and verify generated manifests
+        run: |
+          pnpm zip
+          pnpm zip:firefox
+          pnpm verify:extension-manifests --require-chrome-archive --require-firefox-archives
+      - name: Build and verify the userscript
+        run: |
+          pnpm build:userscript
+          node scripts/verify-userscript-build.mjs
+      - name: Build and verify the standalone userscript
+        run: |
+          pnpm build:userscript:standalone
+          node scripts/verify-userscript-standalone-build.mjs
+      - name: Preserve verified extension archives
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-extension-archives
+          path: .output/*.zip
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  zotero:
+    needs: plan-and-audit
+    if: needs.plan-and-audit.outputs.zotero_changed == 'true' || needs.plan-and-audit.outputs.extension_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+      - name: Set up Node.js and dependency cache
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Prepare build tools and WXT types
+        run: |
+          pnpm rebuild esbuild
+          pnpm exec wxt prepare
+      - name: Test, build and verify the Zotero integration
+        run: |
+          pnpm test:zotero
+          pnpm build:zotero
+          pnpm verify:zotero

@@ -20,4 +20,5 @@ export interface DevVerifyStep {
 
 export function parseArguments(argv: string[]): DevVerifyOptions;
 export function buildSteps(options: DevVerifyOptions, artifactsDir: string): DevVerifyStep[];
+export function failureExcerpt(tail: string, maxLines?: number): string[];
 export function main(argv?: string[]): Promise<void>;

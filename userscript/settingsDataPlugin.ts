@@ -54,9 +54,11 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
             names: ['TRANSLATION_STYLE_PRESETS', 'TRANSLATION_STYLE_LEGACY_GROUPS', 'TRANSLATION_STYLE_CATEGORIES'],
         });
         targets.set(normalizePath(resolve(root, 'src/core/harness/promptLocales.ts')), {names: ['HARNESS_TRANSLATED_PROMPTS']});
-        targets.set(normalizePath(resolve(root, 'src/core/config/catalog.ts')), {
-            names: ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels', 'currentModelIds', 'cloudCredentialLabels'],
+        targets.set(normalizePath(resolve(root, 'src/core/config/catalog/targetLanguageLabels.ts')), {
+            names: ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels'],
         });
+        targets.set(normalizePath(resolve(root, 'src/core/config/catalog/models.ts')), {names: ['currentModelIds']});
+        targets.set(normalizePath(resolve(root, 'src/core/config/catalog/services.ts')), {names: ['cloudCredentialLabels']});
         targets.set(normalizePath(resolve(root, 'src/core/config/featureServices.ts')), {names: ['featureServiceDefinitions']});
         targets.set(normalizePath(resolve(root, 'src/core/glossary/builtins.ts')), {names: ['BUILTIN_GLOSSARIES']});
         targets.set(normalizePath(resolve(root, 'src/core/config/videoSubtitleAppearance.ts')), {names: ['VIDEO_SUBTITLE_SKINS']});

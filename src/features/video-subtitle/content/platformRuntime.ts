@@ -722,9 +722,13 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             isVisible: () => captionsEnabled(),
             applyMode: (nextMode) => {
                 if (course) {
-                    manualEnabled = nextMode !== 'off';
-                    if (manualEnabled) ports.patch({videoSubtitleVisible: true, videoSubtitleDisplayMode: nextMode});
-                    else ports.patch({videoSubtitleVisible: false});
+                    if (nextMode === 'off') {
+                        manualEnabled = false;
+                        ports.patch({videoSubtitleVisible: false});
+                    } else {
+                        manualEnabled = true;
+                        ports.patch({videoSubtitleVisible: true, videoSubtitleDisplayMode: nextMode});
+                    }
                 } else if (nextMode === 'off') {
                     ports.patch({videoSubtitleVisible: false});
                 } else {

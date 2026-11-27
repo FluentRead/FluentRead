@@ -336,6 +336,8 @@ describe('bounded model runtime and explicit downloads', () => {
         expect(await initialization.runtime.status()).toMatchObject({phase: 'error', errorCode: 'INFORMATION_HIGHLIGHT_MODEL_INITIALIZATION_FAILED', downloaded: true});
         expect(await initialization.runtime.prepare()).toMatchObject({phase: 'ready', errorCode: undefined}); expect(initialization.store.download).not.toHaveBeenCalled();
         const unavailable = fixture(false); unavailable.probe.mockResolvedValue({supported: false, reason: 'unsupported'} as never); await expect(unavailable.runtime.prepare()).rejects.toThrow('unsupported'); await expect(unavailable.runtime.score('a', new AbortController().signal)).rejects.toThrow('unsupported');
+        vi.stubGlobal('WebAssembly', {}); expect(await probeInformationHighlightWebGpu()).toEqual({supported: false, reason: 'ONNX_WASM_JSPI_UNSUPPORTED'});
+        vi.stubGlobal('WebAssembly', {...WebAssembly, Suspending: function () {}, promising: function () {}});
         vi.stubGlobal('navigator', {}); expect(await probeInformationHighlightWebGpu()).toMatchObject({supported: false});
         for (const adapter of [null, {features: new Set()}, {features: new Set(['shader-f16'])}]) {vi.stubGlobal('navigator', {gpu: {requestAdapter: async () => adapter}}); expect((await probeInformationHighlightWebGpu()).supported).toBe(Boolean(adapter?.features.has('shader-f16')));}
         vi.stubGlobal('navigator', {gpu: {requestAdapter: async () => {throw new Error('lost');}}}); expect(await probeInformationHighlightWebGpu()).toMatchObject({supported: false});

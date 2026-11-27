@@ -9,6 +9,7 @@ const SCHEME_PATTERN = /^[a-z][a-z\d+.-]*:/iu;
 const HTTP_SCHEME_PATTERN = /^https?:/iu;
 const HOST_PORT_PATTERN = /^(?:\[[^\]]+\]|[^/?#:@]+):\d+(?:[/?#]|$)/u;
 const DNS_LABEL_PATTERN = /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/u;
+const CLEAN_ASCII_HOSTNAME_PATTERN = /^(?:[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?\.)+[a-z]{2,63}$/u;
 const IPV4_PATTERN = /^(?:\d{1,3}\.){3}\d{1,3}$/u;
 
 export interface AutoTranslatePageConfig {
@@ -58,6 +59,10 @@ function isValidDnsHostname(hostname: string): boolean {
 }
 
 function extractNormalizedHostname(input: string | URL): string | null {
+    if (typeof input === 'string' && input.length > 0 && input.length <= 253
+        && CLEAN_ASCII_HOSTNAME_PATTERN.test(input)) {
+        return input;
+    }
     const url = parseSiteUrl(input);
     if (!url) return null;
     const hostname = url.hostname.toLowerCase().replace(/\.+$/u, '');

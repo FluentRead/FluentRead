@@ -87,6 +87,7 @@ async function startWorker(stream: () => AsyncGenerator<unknown>) {
 }
 beforeEach(() => {
  vi.resetModules(); external.fromPretrained.mockReset(); external.env.useBrowserCache = true; external.env.backends.onnx.wasm=undefined; WorkerPort.instances = [];
+ vi.stubGlobal('WebAssembly', {...WebAssembly, Suspending: function () {}, promising: function () {}});
  vi.stubGlobal('navigator', {language: 'en-US'});
  vi.stubGlobal('fetch',vi.fn(async () => {throw new Error('controlled fixture: external fetch unavailable');}));
 });

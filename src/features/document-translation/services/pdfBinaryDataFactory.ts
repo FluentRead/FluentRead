@@ -28,6 +28,44 @@ export const PDFJS_REMOTE_ASSET_VERSION = typedManifest.version;
 export const PDFJS_REMOTE_ASSET_CACHE = `fluentread-pdfjs-assets-${typedManifest.version}-v1`;
 
 const memoryAssetCache = new Map<string, Uint8Array<ArrayBuffer>>();
+const inFlightMemoryAssets = new Map<string, Promise<Uint8Array<ArrayBuffer>>>();
+const MAX_MEMORY_CACHE_ENTRIES = 64;
+const FETCH_LOCAL_SCHEME_PATTERN = /^(?:https?|chrome-extension|moz-extension|safari-web-extension):/iu;
+
+function readMemoryAsset(key: string): Uint8Array<ArrayBuffer> | undefined {
+    const existing = memoryAssetCache.get(key);
+    if (!existing) return undefined;
+    // 命中后刷新 LRU 顺序，避免常用 CMap/字体被较晚打开的冷门字体挤出。
+    memoryAssetCache.delete(key);
+    memoryAssetCache.set(key, existing);
+    return existing;
+}
+
+function writeMemoryAsset(key: string, bytes: Uint8Array<ArrayBuffer>): void {
+    memoryAssetCache.delete(key);
+    memoryAssetCache.set(key, bytes);
+    while (memoryAssetCache.size > MAX_MEMORY_CACHE_ENTRIES) {
+        const oldestKey = memoryAssetCache.keys().next().value!;
+        memoryAssetCache.delete(oldestKey);
+    }
+}
+
+function fetchLocalBytesViaXhr(url: string): Promise<Uint8Array<ArrayBuffer>> {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.responseType = 'arraybuffer';
+        xhr.onload = () => {
+            if ((xhr.status === 200 || xhr.status === 0) && xhr.response instanceof ArrayBuffer) {
+                resolve(new Uint8Array(xhr.response));
+                return;
+            }
+            reject(new Error(`Local PDF.js asset unavailable: HTTP ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error(`Local PDF.js asset unavailable: ${url}`));
+        xhr.send(null);
+    });
+}
 
 export interface PdfBinaryDataFactoryOptions {
     readonly preferLocalDataAssets?: boolean;
@@ -68,7 +106,11 @@ function getManifestEntry(kind: 'cMapUrl' | 'standardFontDataUrl', filename: str
     return {directory, contentType, entry};
 }
 
-async function fetchLocalBytes(url: string, fetchImpl: typeof fetch): Promise<Uint8Array<ArrayBuffer>> {
+async function fetchLocalBytes(url: string, fetchImpl: typeof fetch, allowXhrFallback: boolean): Promise<Uint8Array<ArrayBuffer>> {
+    // Zotero 等 Gecko 独立应用使用 chrome:// 本地协议，标准 fetch 会直接拒绝；按 PDF.js 原生做法回退 XHR 读取 ArrayBuffer。
+    if (allowXhrFallback && !FETCH_LOCAL_SCHEME_PATTERN.test(url) && typeof XMLHttpRequest === 'function') {
+        return fetchLocalBytesViaXhr(url);
+    }
     const response = await fetchImpl(url);
     if (!response.ok) throw new Error(`Local PDF.js asset unavailable: HTTP ${response.status}`);
     return new Uint8Array(await response.arrayBuffer());
@@ -78,6 +120,7 @@ async function fetchLocalBytes(url: string, fetchImpl: typeof fetch): Promise<Ui
 export function createPdfBinaryDataFactory(options: PdfBinaryDataFactoryOptions = {}): PdfBinaryDataFactoryConstructor {
     const preferLocalDataAssets = options.preferLocalDataAssets === true;
     const getLocale = options.locale ?? detectPreferredMirrorLocale;
+    const allowXhrFallback = !options.localFetch;
     const localFetch = options.localFetch ?? ((...args: Parameters<typeof fetch>) => globalThis.fetch(...args));
 
     return class FluentReadPdfBinaryDataFactory {
@@ -99,7 +142,7 @@ export function createPdfBinaryDataFactory(options: PdfBinaryDataFactoryOptions 
             // 图像解码 WASM 永远只从扩展自身本地目录读取，绝不走网络。
             if (kind === 'wasmUrl') {
                 if (!this.wasmUrl) throw new Error('Ensure that the `wasmUrl` API parameter is provided.');
-                return fetchLocalBytes(`${this.wasmUrl}${filename}`, localFetch);
+                return fetchLocalBytes(`${this.wasmUrl}${filename}`, localFetch, allowXhrFallback);
             }
             if (kind !== 'cMapUrl' && kind !== 'standardFontDataUrl') {
                 throw new Error(`Unsupported PDF.js binary asset kind: ${String(kind)}`);
@@ -107,37 +150,48 @@ export function createPdfBinaryDataFactory(options: PdfBinaryDataFactoryOptions 
 
             const {directory, contentType, entry} = getManifestEntry(kind, filename);
             const memoryKey = `${directory}/${filename}:${entry.sha256}`;
-            const inMemory = memoryAssetCache.get(memoryKey);
+            const inMemory = readMemoryAsset(memoryKey);
             // PDF.js 会将返回的 Uint8Array 底层 buffer transfer 给 Worker，必须返回独立副本以保护内存缓存。
             if (inMemory) return inMemory.slice();
 
-            const localBase = this[kind];
-            if (preferLocalDataAssets && localBase) {
-                try {
-                    const localBytes = await fetchLocalBytes(`${localBase}${filename}`, localFetch);
-                    if (localBytes.byteLength === entry.bytes) {
-                        memoryAssetCache.set(memoryKey, localBytes);
-                        return localBytes.slice();
+            const loadAsset = async (): Promise<Uint8Array<ArrayBuffer>> => {
+                const localBase = this[kind];
+                if (preferLocalDataAssets && localBase) {
+                    try {
+                        const localBytes = await fetchLocalBytes(`${localBase}${filename}`, localFetch, allowXhrFallback);
+                        if (localBytes.byteLength === entry.bytes) {
+                            writeMemoryAsset(memoryKey, localBytes);
+                            return localBytes;
+                        }
+                    } catch {
+                        // 自定义本地目录缺失时回退到受校验的固定版本多镜像下载。
                     }
-                } catch {
-                    // 自定义本地目录缺失时回退到受校验的固定版本多镜像下载。
                 }
-            }
 
-            const relativePath = `${directory}/${filename}`;
-            const bytes = await fetchVerifiedAsset({
-                id: `pdfjs:${relativePath}`,
-                cacheName: PDFJS_REMOTE_ASSET_CACHE,
-                cacheKey: `https://fluentread.app/__optional_assets__/pdfjs/${PDFJS_REMOTE_ASSET_VERSION}/${relativePath}?sha256=${entry.sha256}`,
-                bytes: entry.bytes,
-                sha256: entry.sha256,
-                contentType,
-                urls: buildNpmAssetMirrorUrls('pdfjs-dist', PDFJS_REMOTE_ASSET_VERSION, relativePath, getLocale()),
-                timeoutMs: 12_000,
-            }, options.deps);
+                const relativePath = `${directory}/${filename}`;
+                const bytes = await fetchVerifiedAsset({
+                    id: `pdfjs:${relativePath}`,
+                    cacheName: PDFJS_REMOTE_ASSET_CACHE,
+                    cacheKey: `https://fluentread.app/__optional_assets__/pdfjs/${PDFJS_REMOTE_ASSET_VERSION}/${relativePath}?sha256=${entry.sha256}`,
+                    bytes: entry.bytes,
+                    sha256: entry.sha256,
+                    contentType,
+                    urls: buildNpmAssetMirrorUrls('pdfjs-dist', PDFJS_REMOTE_ASSET_VERSION, relativePath, getLocale()),
+                    timeoutMs: 12_000,
+                }, options.deps);
 
-            if (!options.deps) memoryAssetCache.set(memoryKey, bytes);
-            return bytes.slice();
+                if (!options.deps) writeMemoryAsset(memoryKey, bytes);
+                return bytes;
+            };
+
+            if (options.deps) return (await loadAsset()).slice();
+            const existing = inFlightMemoryAssets.get(memoryKey);
+            if (existing) return existing.then(bytes => bytes.slice());
+            const pending = loadAsset().finally(() => {
+                inFlightMemoryAssets.delete(memoryKey);
+            });
+            inFlightMemoryAssets.set(memoryKey, pending);
+            return pending.then(bytes => bytes.slice());
         }
     };
 }
@@ -145,4 +199,5 @@ export function createPdfBinaryDataFactory(options: PdfBinaryDataFactoryOptions 
 /** 仅供测试清理会话内 PDF.js 纯数据内存缓存。 */
 export function clearPdfBinaryDataMemoryCache(): void {
     memoryAssetCache.clear();
+    inFlightMemoryAssets.clear();
 }

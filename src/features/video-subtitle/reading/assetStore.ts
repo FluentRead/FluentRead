@@ -5,6 +5,7 @@
  * 模块边界：仅处理本 feature 提供的不可变数据清单，不下载或执行代码，不接收字幕，也不修改共享模型下载层。
  */
 import {sha256} from '@noble/hashes/sha256';
+import {demoteMirrorOrigin, orderMirrorUrls, rememberPreferredMirrorOrigin} from '@/src/core/assets/mirrors';
 
 export interface ReadingAssetFile {name: string; size: number; sha256: string; urls: readonly string[]}
 type AssetCache = Pick<Cache, 'match' | 'put' | 'delete'>;
@@ -33,7 +34,10 @@ function abortable<T>(operation: () => Promise<T>, signal: AbortSignal): Promise
 
 async function readVerified(response: Response, file: ReadingAssetFile, signal: AbortSignal, received: () => void = () => undefined): Promise<ArrayBuffer> {
     const body = response.body;
-    if (response.status !== 200 || !body || Number(response.headers.get('Content-Length')) > file.size) {
+    const contentType = response.headers.get('Content-Type') || '';
+    const contentEncoding = response.headers.get('Content-Encoding');
+    if (response.status !== 200 || !body || /text\/html/iu.test(contentType)
+        || (!contentEncoding && Number(response.headers.get('Content-Length')) > file.size)) {
         if (body) void body.cancel().catch(() => undefined);
         throw new Error(`Reading data response invalid: ${file.name}`);
     }
@@ -70,19 +74,21 @@ export function createReadingAssetStore(options: ReadingAssetStoreOptions) {
             || file.urls.some(url => !/^https:\/\/[^/@]+\//u.test(url)))) throw new Error('Invalid reading data manifest');
     const openCache = options.openCache ?? (() => caches.open(cacheName));
     const fetchData = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
-    // 摘要属于缓存键；同名的未来版本不能命中旧内容。命中后仍核对实际字节，避免损坏缓存被视为就绪。
-    const key = (file: ReadingAssetFile) => `${file.urls[0]}?fluent-read-verified=${file.sha256}`;
+    // 规范缓存键独立于镜像排序与界面语言，兼容旧版按 urls[0] 写入的已验证缓存条目。
+    const key = (file: ReadingAssetFile) => `https://fluentread.app/__optional_assets__/reading/${encodeURIComponent(cacheName)}/${file.name}?sha256=${file.sha256}`;
+    const legacyKey = (file: ReadingAssetFile) => `${file.urls[0]}?fluent-read-verified=${file.sha256}`;
     let pending: Promise<ReadonlyMap<string, ArrayBuffer>> | undefined;
 
     const load = async (cache: AssetCache, file: ReadingAssetFile, signal: AbortSignal): Promise<ArrayBuffer> => {
         active(signal);
-        const cached = await cache.match(key(file));
-        if (cached) {
+        for (const candidateKey of [key(file), legacyKey(file)]) {
+            const cached = await cache.match(candidateKey);
+            if (!cached) continue;
             try {return await readVerified(cached, file, signal);}
-            catch {active(signal); await cache.delete(key(file));}
+            catch {active(signal); await cache.delete(candidateKey);}
         }
         let failure: unknown;
-        for (const url of file.urls) {
+        for (const url of orderMirrorUrls(file.urls)) {
             active(signal);
             const source = new AbortController(), abort = () => source.abort(signal.reason);
             signal.addEventListener('abort', abort, {once: true});
@@ -102,11 +108,12 @@ export function createReadingAssetStore(options: ReadingAssetStoreOptions) {
                 };
                 const bytes = await abortable(operation, source.signal);
                 clearTimeout(timer);
+                rememberPreferredMirrorOrigin(url);
                 active(signal);
                 await cache.put(key(file), new Response(bytes, {headers: {'Content-Length': String(file.size)}}));
                 active(signal);
                 return bytes;
-            } catch (error) {active(signal); failure = error;}
+            } catch (error) {active(signal); demoteMirrorOrigin(url); failure = error;}
             finally {clearTimeout(timer); signal.removeEventListener('abort', abort); source.abort();}
         }
         throw new Error(`Reading data sources unavailable: ${file.name}`, {cause: failure});

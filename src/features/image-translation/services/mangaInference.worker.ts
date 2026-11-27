@@ -7,7 +7,7 @@
  */
 import * as ort from 'onnxruntime-web/webgpu';
 import {forceSingleThreadInference, localWasmThreads, paceLocalInference, paceLocalInitialization} from '@/src/shared/onnx/resources';
-import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
+import {assertOnnxWasmRuntimeSupported, configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
 import {createBrowserMangaOcr} from './mangaOcr';
 import {createBrowserMangaInpainter} from './mangaInpainting';
 import type {MangaInferenceMessage, MangaInferenceResponse} from './mangaInferenceClient';
@@ -59,6 +59,7 @@ export function startMangaInferenceWorker(): void {
     };
     async function prepareSeg(progress:(stage:'preparing'|'initializing')=>void,cpu:boolean):Promise<boolean>{
         if(segmenter)return true;
+        assertOnnxWasmRuntimeSupported();
         progress('preparing');let bytes:ArrayBuffer|undefined;
         try{bytes=await loadMangaTextSegmentationAsset();}
         catch(error){throw new SegmentationProtocolError(error instanceof Error?error.message:String(error),{cause:error});}

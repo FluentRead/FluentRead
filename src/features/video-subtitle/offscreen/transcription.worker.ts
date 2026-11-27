@@ -23,7 +23,7 @@ import {
 import {VIDEO_AI_MODEL_REVISION} from '@/src/features/video-subtitle/modelFiles';
 import {parseWhisperChunkTimestamps} from './timestampParser';
 import {buildWhisperTranscriptionGenerationOptions, chooseWhisperSourceLanguage, normalizeWhisperSourceLanguage, type WhisperDetectedLanguage} from './transcriptionOptions';
-import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
+import {assertOnnxWasmRuntimeSupported, configureOnnxWasmBackend, isOnnxJspiUnsupportedError, resolveOnnxWasmAssetPaths, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
 import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 import {prepareWhisperEncoderReuse, prepareWhisperProcessorReuse, withWhisperStoppingCriteria, type WhisperAudioProcessor, type WhisperEncoderReuse, type WhisperEncoderReuseModel, type WhisperProcessorReuse} from './whisperEncoderReuse';
 import type {InferenceBackend} from '@/src/core/messaging/inference';
@@ -186,6 +186,7 @@ async function createLocalTranscriber(
   modelId: string,
   model: ReturnType<typeof normalizeVideoLocalTranscriptionModel>,
 ): Promise<LocalTranscriber> {
+  assertOnnxWasmRuntimeSupported();
   await configureModelCache();
   if (await canUseWebGpu()) {
     let gpuTranscriber: LocalTranscriber | null = null;
@@ -556,7 +557,7 @@ workerScope.onmessage = (event) => {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       };
-      if (error instanceof WebGpuFallbackError || localWasmThreads() > 1) response.retryWithCpu = true;
+      if (!isOnnxJspiUnsupportedError(error) && (error instanceof WebGpuFallbackError || localWasmThreads() > 1)) response.retryWithCpu = true;
       post(response);
     }
   });

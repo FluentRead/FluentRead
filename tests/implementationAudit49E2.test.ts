@@ -115,6 +115,7 @@ function deferred<T>() {
     return {promise, resolve, reject};
 }
 beforeEach(async () => {
+    vi.stubGlobal('WebAssembly', {...WebAssembly, Suspending: function () {}, promising: function () {}});
     vi.stubGlobal('Response', createVirtualModelResponsePort(NativeResponse));
     vi.useFakeTimers({toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout']}); stores.clear(); onDelete = undefined; onPut = undefined; workers.length = 0;
     ocrCanvasWrites.mockClear(); ocrCanvases.length = 0;

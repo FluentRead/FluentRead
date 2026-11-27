@@ -1,11 +1,11 @@
 import {resolveLocalTranslationLanguageCode} from '@/src/core/language/localTranslation';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {supportsHunyuanTranslation} from '@/src/platform/browser/localTranslationSupport';
+import {supportsHunyuanTranslation, supportsOpusTranslation} from '@/src/platform/browser/localTranslationSupport';
 import {readFileSync} from 'node:fs';
 import {prepareWllamaExtensionModule} from '../scripts/testing/wllama-extension-build';
 import * as messages from '@/src/core/i18n/messages/localTranslation';
 import {assertLocalTranslationOutput, hunyuanTranslationPrompt, splitLocalTranslationText} from '@/src/core/translation/localInference';
-import {LOCAL_TRANSLATION_MODEL_IDS as ids, resolveOpusTranslationRepository} from '@/src/core/config/localTranslation';
+import {LOCAL_TRANSLATION_MODEL_IDS as ids, localTranslationErrorKey, resolveOpusTranslationRepository} from '@/src/core/config/localTranslation';
 
 describe('local model language routes and bounded generation', () => {
   it('packages the pinned Hunyuan worker without a blob Worker or runtime evaluation', () => {
@@ -31,6 +31,17 @@ describe('local model language routes and bounded generation', () => {
     expect(supportsHunyuanTranslation()).toBe(false);
     vi.stubGlobal('WebAssembly', undefined);
     expect(supportsHunyuanTranslation()).toBe(false);
+    expect(supportsOpusTranslation()).toBe(false);
+    vi.stubGlobal('WebAssembly', {Suspending: function () {}, promising: function () {}});
+    expect(supportsOpusTranslation()).toBe(true);
+    expect(localTranslationErrorKey(new Error('LOCAL_TRANSLATION_NOT_DOWNLOADED'))).toBe('settings.localTranslation.error.notDownloaded');
+    expect(localTranslationErrorKey(new Error('LOCAL_TRANSLATION_LANGUAGE_UNSUPPORTED'))).toBe('settings.localTranslation.error.language');
+    expect(localTranslationErrorKey(new Error('ONNX_WASM_JSPI_UNSUPPORTED'))).toBe('settings.localTranslation.error.browser');
+    expect(localTranslationErrorKey(new Error('LOCAL_TRANSLATION_BROWSER_UNSUPPORTED'))).toBe('settings.localTranslation.error.browser');
+    expect(localTranslationErrorKey(new Error('LOCAL_TRANSLATION_REPETITION'))).toBe('settings.localTranslation.error.repetition');
+    expect(localTranslationErrorKey(new Error('LOCAL_TRANSLATION_TIMEOUT'))).toBe('settings.localTranslation.error.timeout');
+    expect(localTranslationErrorKey(new Error('LOCAL_TRANSLATION_MODEL_REMOVED'))).toBe('settings.localTranslation.error.removed');
+    expect(localTranslationErrorKey(null)).toBe('settings.localTranslation.trialError');
   });
   it('resolves both directions to distinct small models and rejects unsupported language pairs', () => {
     expect(resolveOpusTranslationRepository(ids.opusZhEn, 'en', 'zh')).toBe('Xenova/opus-mt-en-zh');

@@ -167,6 +167,6 @@ export function localTranslationErrorKey(error: unknown): string {
     if (/LOCAL_TRANSLATION_(REPETITION|OUTPUT_LIMIT|EMPTY)/u.test(message)) return 'settings.localTranslation.error.repetition';
     if (message.includes('LOCAL_TRANSLATION_TIMEOUT') || /超时|超过|timeout/iu.test(message)) return 'settings.localTranslation.error.timeout';
     if (message.includes('LOCAL_TRANSLATION_MODEL_REMOVED')) return 'settings.localTranslation.error.removed';
-    if (message.includes('LOCAL_TRANSLATION_BROWSER_UNSUPPORTED')) return 'settings.localTranslation.error.browser';
+    if (message.includes('LOCAL_TRANSLATION_BROWSER_UNSUPPORTED') || message.includes('ONNX_WASM_JSPI_UNSUPPORTED')) return 'settings.localTranslation.error.browser';
     return 'settings.localTranslation.trialError';
 }

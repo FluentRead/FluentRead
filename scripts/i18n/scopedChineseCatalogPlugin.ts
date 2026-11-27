@@ -1,10 +1,11 @@
 /**
  * @file scripts/i18n/scopedChineseCatalogPlugin.ts
  * 文件职责：在构建非页面扩展入口（内容脚本、受限子 frame、后台脚本）时，自动裁剪不可达的简体中文界面目录条目。
- * 主要内容：先以轻量占位模块跳过完整 zh-CN 及其 15 份子目录的重复解析与打包，再在 generateBundle 阶段用单次线性扫描建立键令牌集、动态前缀集与中文语料切片，仅注入可达条目并通过 JSON.parse 快速初始化。
+ * 主要内容：先以轻量占位模块跳过完整 zh-CN 及其 15 份子目录的重复解析与打包，再在 generateBundle 阶段用 TypeScript AST 解析准确提取解码后的字符串字面量、模板片段、点分键前缀与段内动态前缀，彻底消除正则字面量引号导致的失同步漏裁与段内模板键误裁。
  * 模块边界：仅供 WXT 的 content-script 与 background 构建组使用；所有扩展页面（popup/options/document/sidepanel/learning 等）保留完整 zhCNMessages 共享块。
  */
 
+import ts from 'typescript';
 import type {Plugin} from 'vite';
 import {zhCNMessages} from '../../src/core/i18n/messages/zh-CN';
 
@@ -17,75 +18,103 @@ interface IndexedChineseEntry {
     readonly key: string;
     readonly value: string;
     readonly pluralBase: string | null;
-    readonly prefixes: readonly string[];
+    readonly dotPrefixes: readonly string[];
     readonly hasHan: boolean;
 }
 
 const HAN_PATTERN = /[\u3400-\u9FFF\uF900-\uFAFF]/u;
+const KEY_TOKEN_PATTERN = /[a-zA-Z][a-zA-Z0-9_-]*(?:\.[a-zA-Z0-9_-]+)+/gu;
+const DOT_PREFIX_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*(?:\.[a-zA-Z0-9_-]+)*\.$/u;
+const STEM_PREFIX_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*(?:\.[a-zA-Z0-9_-]+)+$/u;
 
 const indexedEntries: readonly IndexedChineseEntry[] = Object.entries(zhCNMessages).map(([key, value]) => {
     const pluralIndex = key.indexOf('.plural.');
     const pluralBase = pluralIndex > 0 ? key.slice(0, pluralIndex) : null;
-    const prefixes: string[] = [];
+    const dotPrefixes: string[] = [];
     let dot = key.indexOf('.');
     while (dot > 0) {
-        prefixes.push(key.slice(0, dot + 1));
+        dotPrefixes.push(key.slice(0, dot + 1));
         dot = key.indexOf('.', dot + 1);
     }
     return {
         key,
         value,
         pluralBase,
-        prefixes,
+        dotPrefixes,
         hasHan: HAN_PATTERN.test(value),
     };
 });
 
-/** 单次扫描提取点分键令牌、动态拼接前缀与含中文字符串语料，将数千次全文扫描降为 O(n) + O(1) 查表。 */
+/** 通过真实 JS AST 提取所有解码后的字符串字面量、模板片段、点分键与动态拼接前缀，免疫正则字面量中的引号失同步。 */
 function extractBundleLookupIndex(code: string): {
+    readonly exactStrings: ReadonlySet<string>;
     readonly keyTokens: ReadonlySet<string>;
-    readonly dynamicPrefixes: ReadonlySet<string>;
+    readonly dotPrefixes: ReadonlySet<string>;
+    readonly stemPrefixes: readonly string[];
     readonly hanStrings: ReadonlySet<string>;
     readonly hanCorpus: string;
     readonly asciiLiterals: ReadonlySet<string>;
 } {
+    const exactStrings = new Set<string>();
     const keyTokens = new Set<string>();
-    const tokenPattern = /[a-zA-Z][a-zA-Z0-9_-]*(?:\.[a-zA-Z0-9_-]+)+/gu;
-    let tokenMatch = tokenPattern.exec(code);
-    while (tokenMatch) {
-        keyTokens.add(tokenMatch[0]!);
-        tokenMatch = tokenPattern.exec(code);
-    }
-
-    const dynamicPrefixes = new Set<string>();
-    const prefixPattern = /[`'"]([a-zA-Z][a-zA-Z0-9_-]*(?:\.[a-zA-Z0-9_-]+)*\.)(?:[`'"]|\$\{)/gu;
-    let prefixMatch = prefixPattern.exec(code);
-    while (prefixMatch) {
-        dynamicPrefixes.add(prefixMatch[1]!);
-        prefixMatch = prefixPattern.exec(code);
-    }
-
+    const dotPrefixes = new Set<string>();
+    const stemPrefixSet = new Set<string>();
     const hanStrings = new Set<string>();
     const asciiLiterals = new Set<string>();
     const hanSegments: string[] = [];
-    const literalPattern = /"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`((?:\\.|[^`\\])*)`/gu;
-    let literalMatch = literalPattern.exec(code);
-    while (literalMatch) {
-        const raw = literalMatch[1] ?? literalMatch[2] ?? literalMatch[3] ?? '';
-        if (raw.length > 0) {
-            if (HAN_PATTERN.test(raw)) {
-                hanStrings.add(raw);
-                hanSegments.push(raw);
-            } else if (raw.length <= 160) {
-                asciiLiterals.add(raw);
+
+    const recordText = (text: string, allowDynamicPrefix: boolean): void => {
+        if (!text) return;
+        exactStrings.add(text);
+        if (HAN_PATTERN.test(text)) {
+            hanStrings.add(text);
+            hanSegments.push(text);
+        } else if (text.length <= 160) {
+            asciiLiterals.add(text);
+        }
+        KEY_TOKEN_PATTERN.lastIndex = 0;
+        let tokenMatch = KEY_TOKEN_PATTERN.exec(text);
+        while (tokenMatch) {
+            keyTokens.add(tokenMatch[0]!);
+            tokenMatch = KEY_TOKEN_PATTERN.exec(text);
+        }
+        if (DOT_PREFIX_PATTERN.test(text)) {
+            dotPrefixes.add(text);
+        } else if (allowDynamicPrefix && STEM_PREFIX_PATTERN.test(text)) {
+            stemPrefixSet.add(text);
+        }
+    };
+
+    const sourceFile = ts.createSourceFile('bundle.js', code, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS);
+    const visit = (node: ts.Node): void => {
+        if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+            recordText(node.text, false);
+            return;
+        }
+        if (ts.isTemplateExpression(node)) {
+            recordText(node.head.text, true);
+            for (const span of node.templateSpans) {
+                visit(span.expression);
+                recordText(span.literal.text, false);
+            }
+            return;
+        }
+        if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+            if (ts.isStringLiteral(node.left) || ts.isNoSubstitutionTemplateLiteral(node.left)) {
+                recordText(node.left.text, true);
+                visit(node.right);
+                return;
             }
         }
-        literalMatch = literalPattern.exec(code);
-    }
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
 
     return {
+        exactStrings,
         keyTokens,
-        dynamicPrefixes,
+        dotPrefixes,
+        stemPrefixes: [...stemPrefixSet],
         hanStrings,
         hanCorpus: hanSegments.join('\n'),
         asciiLiterals,
@@ -94,19 +123,29 @@ function extractBundleLookupIndex(code: string): {
 
 /** 根据当前构建组的非 i18n 代码筛选所有可能被 translate() 或 translateLegacyText() 命中的中文条目。 */
 export function selectReachableChineseMessages(bundleCode: string): Record<string, string> {
-    const {keyTokens, dynamicPrefixes, hanStrings, hanCorpus, asciiLiterals} = extractBundleLookupIndex(bundleCode);
+    const {exactStrings, keyTokens, dotPrefixes, stemPrefixes, hanStrings, hanCorpus, asciiLiterals} = extractBundleLookupIndex(bundleCode);
     const result: Record<string, string> = {};
 
     for (const entry of indexedEntries) {
-        if (keyTokens.has(entry.key) || (entry.pluralBase !== null && keyTokens.has(entry.pluralBase))) {
+        if (exactStrings.has(entry.key)
+            || keyTokens.has(entry.key)
+            || (entry.pluralBase !== null && (exactStrings.has(entry.pluralBase) || keyTokens.has(entry.pluralBase)))) {
             result[entry.key] = entry.value;
             continue;
         }
         let matchedPrefix = false;
-        for (const prefix of entry.prefixes) {
-            if (dynamicPrefixes.has(prefix)) {
+        for (const prefix of entry.dotPrefixes) {
+            if (dotPrefixes.has(prefix)) {
                 matchedPrefix = true;
                 break;
+            }
+        }
+        if (!matchedPrefix && stemPrefixes.length > 0) {
+            for (const stem of stemPrefixes) {
+                if (entry.key.startsWith(stem)) {
+                    matchedPrefix = true;
+                    break;
+                }
             }
         }
         if (matchedPrefix) {

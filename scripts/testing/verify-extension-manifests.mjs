@@ -338,11 +338,21 @@ async function main() {
     ]);
 
     assert(chromeManifest.manifest_version === 3, 'Chrome 产物必须是 Manifest V3');
+    assert(chromeManifest.minimum_chrome_version === '137', 'Chrome MV3 必须声明 minimum_chrome_version 为 137 以匹配 ONNX JSPI 变体');
     assert(countPermission(chromeManifest, 'offscreen') === 1, 'Chrome MV3 必须且只能声明一次 offscreen 权限');
     assert(chromeArtifacts.includes('offscreen.html'), 'Chrome MV3 缺少 offscreen.html');
     assert(firefoxManifest.manifest_version === 2, 'Firefox 默认产物必须是 Manifest V2');
+    assert(!Object.hasOwn(firefoxManifest, 'minimum_chrome_version'), 'Firefox 清单不得包含 Chromium minimum_chrome_version');
     assert(countPermission(firefoxManifest, 'offscreen') === 0, 'Firefox 不得声明 Chrome-only offscreen 权限');
     assert(firefoxArtifacts.includes('offscreen.html'), 'Firefox 缺少后台 iframe 使用的共享 DOM 页面');
+    assert(chromeFiles.includes('fluent-read-ai/ort-wasm-simd-threaded.jspi.mjs')
+        && chromeFiles.includes('fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm')
+        && !chromeFiles.includes('fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'),
+    'Chrome 产物必须仅打包 ONNX JSPI 变体');
+    assert(firefoxFiles.includes('fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs')
+        && firefoxFiles.includes('fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm')
+        && !firefoxFiles.includes('fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm'),
+    'Firefox 产物必须仅打包 ONNX Asyncify 变体以兼容 ESR 140~152 及 Thunderbird');
     verifyTranslationSidepanelManifest(chromeManifest, chromeFiles, 'Chrome');
     verifyTranslationSidepanelManifest(firefoxManifest, firefoxFiles, 'Firefox');
     assert(!chromeManifest.browser_specific_settings?.gecko, 'Chrome manifest 不得包含 Firefox Gecko metadata');
@@ -415,6 +425,10 @@ async function main() {
         for (const file of PDFJS_DECODER_FILES) {
             assert(extensionArchive.includes(`pdfjs/wasm/${file}`), `Firefox 扩展包缺少本地 PDF.js 解码资源：${file}`);
         }
+        assert(extensionArchive.includes('fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs')
+            && extensionArchive.includes('fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm')
+            && !extensionArchive.includes('fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm'),
+        'Firefox 扩展包必须保留 ONNX Asyncify 变体且不包含 JSPI 变体');
         firefoxArchiveOcrAssets = [
             ...extensionArchive.filter((file) => file.startsWith('fluent-read-ocr/')),
             ...sourceArchive.filter((file) => file.startsWith('public/fluent-read-ocr/')),

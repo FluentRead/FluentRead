@@ -62,6 +62,7 @@ beforeEach(async () => {
     painter = {run: vi.fn().mockResolvedValue(new Float32Array([0.25])), release: vi.fn().mockResolvedValue(undefined)};
     mocks.createOcr.mockReset().mockResolvedValue(ocr);
     mocks.createPainter.mockReset().mockResolvedValue(painter);
+    vi.stubGlobal('WebAssembly', {...WebAssembly, Suspending: function () {}, promising: function () {}});
     scope = {postMessage: vi.fn()};
     vi.stubGlobal('self', scope);
     vi.stubGlobal('navigator', {hardwareConcurrency: 8, gpu: {requestAdapter: vi.fn()}});

@@ -17,7 +17,7 @@ import {
     LOCAL_TTS_MODEL_REVISION,
     LOCAL_TTS_VOICE_PATH,
 } from '@/src/core/config/localTts';
-import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
+import {assertOnnxWasmRuntimeSupported, configureOnnxWasmBackend, resolveOnnxWasmAssetPaths, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
 import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 import {readWorkerRequestId} from '@/src/core/messaging/validation';
 import type {InferenceBackend} from '@/src/core/messaging/offscreen';
@@ -166,6 +166,7 @@ function loadModel(device: LocalTtsDevice): Promise<KokoroTTS> {
 }
 
 async function getModel(): Promise<KokoroTTS> {
+    assertOnnxWasmRuntimeSupported();
     if (modelPromise) return modelPromise;
     const preferred: LocalTtsDevice = (await hasUsableWebGpu()) ? 'webgpu' : 'wasm';
     try {

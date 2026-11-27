@@ -30,6 +30,7 @@ export function verifySafariManifest(manifest) {
         && Object.keys(manifest.background).every(key => key === 'persistent' || key === 'page'),
     'Safari 产物必须使用独立显式 UTF-8 后台页，不能使用自动 scripts 或 service_worker');
     assert(manifest.browser_specific_settings?.safari?.strict_min_version === '26.0', 'Safari 最低版本必须为 26.0');
+    assert(!Object.hasOwn(manifest, 'minimum_chrome_version'), 'Safari 清单不能包含 Chromium minimum_chrome_version');
     assert(!manifest.browser_specific_settings?.gecko && !manifest.oauth2 && !manifest.key, 'Safari 清单不能包含 Firefox/Chrome 身份字段');
     const permissions = manifest.permissions ?? [];
     for (const permission of ['storage', 'alarms', 'declarativeNetRequestWithHostAccess', '<all_urls>']) {

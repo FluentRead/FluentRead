@@ -3,14 +3,14 @@ import {LOCAL_TRANSLATION_MODEL_IDS} from '@/src/core/config/localTranslation';
 
 const mocks = vi.hoisted(() => ({pipeline: vi.fn(), threads: vi.fn(), forceSingleThread: vi.fn(), dispose: vi.fn(),
     env: {backends: {onnx: {}}} as any, artifacts: vi.fn(), matchArtifact: vi.fn(), artifactBlob: vi.fn(),
-    supportsHunyuan: vi.fn(), engine: vi.fn(), configureWasm: vi.fn(), compressedWasm: vi.fn()}));
+    supportsHunyuan: vi.fn(), supportsOpus: vi.fn(), engine: vi.fn(), configureWasm: vi.fn(), compressedWasm: vi.fn()}));
 vi.mock('@huggingface/transformers', () => ({env: mocks.env, pipeline: mocks.pipeline,
     InterruptableStoppingCriteria: class {interrupted = false; interrupt() {this.interrupted = true;}}}));
 vi.mock('@wllama/wllama/esm/index.js', () => ({Wllama: function(...args: unknown[]) {return mocks.engine(...args);}}));
 vi.mock('@/src/shared/onnx/resources', () => ({forceSingleThreadInference: mocks.forceSingleThread, localWasmThreads: mocks.threads,
     paceLocalInference: (run: () => Promise<unknown>) => run(), paceLocalInitialization: (run: () => Promise<unknown>) => run()}));
 vi.mock('@/src/features/local-translation/offscreen/artifactStore', () => ({getTranslationArtifacts: mocks.artifacts, matchTranslationArtifact: mocks.matchArtifact, translationArtifactBlob: mocks.artifactBlob}));
-vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: mocks.supportsHunyuan}));
+vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: mocks.supportsHunyuan, supportsOpusTranslation: mocks.supportsOpus}));
 vi.mock('@/src/shared/onnx/wasmBinary', async () => {
     const actual = await vi.importActual<typeof import('@/src/shared/onnx/wasmBinary')>('@/src/shared/onnx/wasmBinary');
     return {
@@ -21,7 +21,7 @@ vi.mock('@/src/shared/onnx/wasmBinary', async () => {
 });
 
 beforeEach(() => {vi.resetModules();vi.resetAllMocks();mocks.threads.mockReturnValue(1);mocks.env.backends.onnx = {};
-    mocks.artifacts.mockReturnValue([]);mocks.supportsHunyuan.mockReturnValue(true);
+    mocks.artifacts.mockReturnValue([]);mocks.supportsHunyuan.mockReturnValue(true);mocks.supportsOpus.mockReturnValue(true);
     mocks.compressedWasm.mockImplementation((_wasm, _url, create) => create());
     vi.stubGlobal('navigator', {});
     mocks.pipeline.mockResolvedValue(Object.assign(vi.fn(async () => [{translation_text: '你好'}]), {dispose: mocks.dispose}));});
@@ -57,6 +57,14 @@ describe('actual local translation Worker message boundary', () => {
         const scope = await start();
         scope.send({requestId: 1, get type() {throw null;}});
         expect(scope.postMessage).toHaveBeenCalledWith({requestId: 1, success: false, error: 'LOCAL_TRANSLATION_INVALID_REQUEST'});
+        expect(mocks.pipeline).not.toHaveBeenCalled();
+    });
+
+    it('rejects OPUS translation cleanly when browser lacks ONNX JSPI support', async () => {
+        mocks.supportsOpus.mockReturnValue(false);
+        const scope = await start();
+        const response = await reply(scope, {...command, requestId: 2});
+        expect(response).toMatchObject({requestId: 2, success: false, error: 'LOCAL_TRANSLATION_BROWSER_UNSUPPORTED'});
         expect(mocks.pipeline).not.toHaveBeenCalled();
     });
 

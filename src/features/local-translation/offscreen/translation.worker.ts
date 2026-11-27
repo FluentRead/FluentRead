@@ -14,7 +14,7 @@ import {
 } from '@/src/core/config/localTranslation';
 import {assertLocalTranslationOutput, hunyuanTranslationPrompt, splitLocalTranslationText} from '@/src/core/translation/localInference';
 import {getTranslationArtifacts, matchTranslationArtifact, translationArtifactBlob} from './artifactStore';
-import {supportsHunyuanTranslation} from '@/src/platform/browser/localTranslationSupport';
+import {supportsHunyuanTranslation, supportsOpusTranslation} from '@/src/platform/browser/localTranslationSupport';
 import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
 import {readWorkerRequestId} from '@/src/core/messaging/validation';
 import {parseLocalTranslationWorkerRequest, type LocalTranslationWorkerRequest as WorkerRequest, type LocalTranslationWorkerResponse as WorkerResponse} from '../workerProtocol';
@@ -67,6 +67,7 @@ async function dispose(): Promise<void> {
 }
 
 async function getTranslator(request: Extract<WorkerRequest, {type: 'translate'}>): Promise<Translator> {
+    if (!supportsOpusTranslation()) throw new Error('LOCAL_TRANSLATION_BROWSER_UNSUPPORTED');
     const item = getLocalTranslationModel(request.model);
     const repository = item.engine === 'opus'
         ? resolveOpusTranslationRepository(request.model, request.sourceLanguage!, request.targetLanguage!) : request.model;

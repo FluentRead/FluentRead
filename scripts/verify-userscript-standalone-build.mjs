@@ -57,6 +57,7 @@ const bytes = Buffer.byteLength(source);
 // 合入 #1374/#1382/#1415 及 #1421 内联 br 拆分与通用双 br 分段后实测为 3,733,845 字节，无新增依赖或资源，追加 3 kB。
 // 合入 #1416（可配置不翻译的标签与 CSS 选择器组件、核心跳过逻辑及七语界面文案）后实测为 3,742,643 字节，无新增依赖或资源，Greasy Fork 与精简版上限不变，追加 9 kB。
 // 合入 #1437（统一多镜像纯数据校验缓存层及 i18n 空白快速路径）后实测为 3,745,499 字节，超出原上限 499 字节，无新增依赖或资源，Greasy Fork 与精简版上限不变，追加 3 kB。
-const maxBytes = 3_748_000;
+// 合入 #1443（方案 C 轻盈柔光语义令牌与分层对比度样式，含最新 main 增量）后 CI 实测为 3,752,118 字节，超出原上限 4,118 字节，无新增依赖或资源，Greasy Fork 与精简版上限不变，追加 5 kB。
+const maxBytes = 3_753_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

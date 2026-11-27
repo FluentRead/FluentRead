@@ -176,22 +176,41 @@ const classificationCompilerOptions = Object.freeze({module: ts.ModuleKind.ESNex
 const classificationOptions = JSON.stringify([classificationCompilerOptions, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS, ts.ScriptKind.TS]);
 type ModuleClassification = Readonly<{typeOnly: boolean; pureBarrel: boolean}>;
 const moduleClassifications = new Map<string, {source: string; options: string; result: ModuleClassification}>();
+function hasDefiniteRuntimeStatement(sourceFile: ts.SourceFile): boolean {
+    for (const statement of sourceFile.statements) {
+        const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) ?? [] : [];
+        if (modifiers.some(modifier => modifier.kind === ts.SyntaxKind.DeclareKeyword)) continue;
+        if (ts.isFunctionDeclaration(statement) && statement.body) return true;
+        if (ts.isClassDeclaration(statement)) return true;
+        if (ts.isEnumDeclaration(statement) && !modifiers.some(modifier => modifier.kind === ts.SyntaxKind.ConstKeyword)) return true;
+        if (ts.isVariableStatement(statement) || ts.isExportAssignment(statement)) return true;
+        if (ts.isExpressionStatement(statement) || ts.isIfStatement(statement) || ts.isForStatement(statement)
+            || ts.isForOfStatement(statement) || ts.isForInStatement(statement) || ts.isWhileStatement(statement)
+            || ts.isDoStatement(statement) || ts.isSwitchStatement(statement) || ts.isTryStatement(statement)
+            || ts.isThrowStatement(statement)) return true;
+    }
+    return false;
+}
+
 function classifyModule(path: string): ModuleClassification {
     const source = readFileSync(projectPath(path), 'utf8');
     const cached = moduleClassifications.get(path);
     if (cached?.source === source && cached.options === classificationOptions) return cached.result;
-    // 仍按实际输出判断纯声明；只缓存两个布尔结果，不共享可变 AST 或模块执行状态。
-    const emitted = ts.transpileModule(source, {compilerOptions: classificationCompilerOptions}).outputText;
-    const runtime = ts.createSourceFile(path + '.js', emitted, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
-    const typeOnly = runtime.statements.every((statement) => ts.isEmptyStatement(statement)
-        || (ts.isExportDeclaration(statement)
-            && !statement.moduleSpecifier
-            && !!statement.exportClause
-            && ts.isNamedExports(statement.exportClause)
-            && statement.exportClause.elements.length === 0));
+    // 先用单次 AST 判定明确的运行时语句，仅对模糊模块（纯声明/重导出/const enum）调用 transpileModule，保证分类与原输出完全一致。
     const original = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const pureBarrel = original.statements.length > 0
         && original.statements.every((statement) => ts.isExportDeclaration(statement));
+    let typeOnly = false;
+    if (!hasDefiniteRuntimeStatement(original)) {
+        const emitted = ts.transpileModule(source, {compilerOptions: classificationCompilerOptions}).outputText;
+        const runtime = ts.createSourceFile(path + '.js', emitted, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+        typeOnly = runtime.statements.every((statement) => ts.isEmptyStatement(statement)
+            || (ts.isExportDeclaration(statement)
+                && !statement.moduleSpecifier
+                && !!statement.exportClause
+                && ts.isNamedExports(statement.exportClause)
+                && statement.exportClause.elements.length === 0));
+    }
     const result = Object.freeze({typeOnly, pureBarrel});
     moduleClassifications.set(path, {source, options: classificationOptions, result});
     return result;

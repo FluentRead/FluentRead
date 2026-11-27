@@ -35,10 +35,11 @@ function filesForGroup(matrix, group) {
 }
 
 function run(command, args) {
+    const env = !process.stdout.isTTY && process.env.CI === undefined ? {...process.env, CI: '1'} : process.env;
     return new Promise((resolve, reject) => {
         const child = spawn(command, args, {
             cwd: PROJECT_ROOT,
-            env: process.env,
+            env,
             stdio: 'inherit',
             shell: false,
         });

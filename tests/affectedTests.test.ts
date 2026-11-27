@@ -3,8 +3,8 @@ import {mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, 
 import os from 'node:os';
 import path from 'node:path';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {buildDependencyGraph, changedPaths, coverageRuntimeSignature, createPlan, executePlan, scopedCoverageConfig, selectAffected,
-    strictCoveragePaths, testInvocation} from '../scripts/testing/run-affected-tests.mjs';
+import {buildDependencyGraph, changedPaths, coverageRuntimeSignature, createPlan, executePlan, packageJsonRuntimeSignature,
+    scopedCoverageConfig, selectAffected, strictCoveragePaths, testInvocation} from '../scripts/testing/run-affected-tests.mjs';
 
 const coverageConfig = 'tests/config/vitest.coverage.config.ts';
 const temporary: string[] = [];
@@ -112,6 +112,44 @@ describe('affected behavior test planning', () => {
                 coverageFiles: [], globalInputs: [file], reason: 'shared-test-configuration', extensionChanged: true});
         }
     });
+    it('compares only execution-relevant package fields and ignores script, version and key-order edits', () => {
+        const baseline = '{"name":"f","version":"1.0.0","scripts":{"test":"vitest run"},"devDependencies":{"vitest":"^3","vue":"^3"}}';
+        const reordered = '{"version":"2.0.0","name":"g","scripts":{"lint":"eslint ."},"devDependencies":{"vue":"^3","vitest":"^3"}}';
+        expect(packageJsonRuntimeSignature(baseline)).toBe(packageJsonRuntimeSignature(reordered));
+        expect(packageJsonRuntimeSignature(baseline)).not.toBe(
+            packageJsonRuntimeSignature('{"devDependencies":{"vitest":"^3.1","vue":"^3"}}'));
+        // 嵌套数组与空值同样参与比较，避免依赖条件导出被当成无变化。
+        expect(packageJsonRuntimeSignature('{"exports":[{"import":"./a.js"},null]}')).toBe(
+            '{"exports":[{"import":"./a.js"},null]}');
+        expect(() => packageJsonRuntimeSignature('{oops')).toThrow();
+    });
+    it('keeps the shared-input widening for real dependency edits but drops it for script-only edits', () => {
+        const root = directory();git(root, 'init', '-q');git(root, 'config', 'user.email', 'fixture@example.test');git(root, 'config', 'user.name', 'Fixture');
+        for (const [file, source] of Object.entries(files())) save(root, file, source);
+        save(root, 'tests/test-matrix.json', JSON.stringify(matrix));
+        save(root, coverageConfig, "export default {test:{coverage:{include:[]}}}");
+        const manifest = (scripts: object, vitest: string) => JSON.stringify({name: 'fixture', private: true, scripts, devDependencies: {vitest}});
+        save(root, 'package.json', manifest({test: 'vitest run'}, '^3.0.0'));
+        git(root, 'add', '.');git(root, 'commit', '-qm', 'baseline');const base = git(root, 'rev-parse', 'HEAD');
+        save(root, 'package.json', manifest({test: 'vitest run', lint: 'eslint .'}, '^3.0.0'));
+        // 仅新增脚本的执行方式不影响用例集合，仍按依赖图收敛到受影响范围。
+        expect(createPlan(root, base)).toMatchObject({globalInputs: [], reason: 'changed-dependency-graph',
+            testFiles: ['tests/architecture/boundary.test.ts']});
+        save(root, 'package.json', manifest({test: 'vitest run', lint: 'eslint .'}, '^3.1.0'));
+        expect(createPlan(root, base)).toMatchObject({globalInputs: ['package.json'], reason: 'shared-test-configuration'});
+    });
+    it('falls back to full widening when the baseline manifest cannot be read or parsed', () => {
+        const root = directory();git(root, 'init', '-q');git(root, 'config', 'user.email', 'fixture@example.test');git(root, 'config', 'user.name', 'Fixture');
+        for (const [file, source] of Object.entries(files())) save(root, file, source);
+        save(root, 'tests/test-matrix.json', JSON.stringify(matrix));
+        save(root, coverageConfig, "export default {test:{coverage:{include:[]}}}");
+        git(root, 'add', '.');git(root, 'commit', '-qm', 'baseline without manifest');const base = git(root, 'rev-parse', 'HEAD');
+        // 基线没有 package.json 时无法证明语义未变，必须保持全量扩大而不是静默缩小范围。
+        save(root, 'package.json', '{"name":"fixture","scripts":{}}');
+        expect(createPlan(root, base)).toMatchObject({globalInputs: ['package.json']});
+        save(root, 'package.json', '{broken');
+        expect(createPlan(root, base)).toMatchObject({globalInputs: ['package.json']});
+    });
     it('rejects duplicated classification and changed covered code without traceable behavior tests', () => {
         expect(() => selectAffected({files: files(), changed: [], matrix: {groups: {unit: ['tests/a.test.ts'], functional: ['tests/a.test.ts']}}, coveragePaths: []})).toThrow('重复归类');
         expect(() => select(['src/unrelated.ts'], files(), ['src/unrelated.ts'])).toThrow('没有可追踪行为测试');
@@ -120,6 +158,32 @@ describe('affected behavior test planning', () => {
         const graph = buildDependencyGraph({'src/core/index.ts': 'export {}', 'tests/a.test.ts':
             "import a from '../src/core'; import v from 'vue'; const dynamic = `src/${name}.ts`;"});
         expect([...graph.get('tests/a.test.ts')!]).toEqual(['src/core/index.ts']);
+    });
+    it('does not treat bare punctuation literals as relative directory dependencies', () => {
+        // 标点映射表里的 '.' 曾被当成相对路径，再经目录回退把整层源码误算成依赖；
+        // 只含点段的目录写法同样不能吞掉整层源码。
+        const graph = buildDependencyGraph({
+            'src/core/a.ts': "import {b} from './b'; export const marks = {'。': '.', '；': ';', '..': '..'};",
+            'src/core/b.ts': 'export const b = 1;',
+            'src/core/unrelated.ts': 'export const unrelated = 1;',
+            'src/core/nested/c.ts': 'export const c = 1;',
+            'src/core/nested/d.ts': "const root = new URL('../', import.meta.url); const here = './'; export {root, here};",
+        });
+        expect([...graph.get('src/core/a.ts')!]).toEqual(['src/core/b.ts']);
+        expect([...graph.get('src/core/nested/d.ts')!]).toEqual([]);
+    });
+    it('does not widen a prefix literal into whole project roots while keeping real folder readers', () => {
+        // '/src/'、'src/'、'docs/' 常出现在 startsWith 判断与架构规则里，是前缀声明而不是目录读取；
+        // 生产源码（src/）的纯字符串字面量不会伪装成文件依赖，而测试里的真实夹具读取必须继续生效。
+        const graph = buildDependencyGraph({
+            'src/core/marks.ts': "export const roots = ['/src/', 'src/', 'docs/', '@/src/']; export const ok = 'src/core/deep';",
+            'src/core/deep.ts': 'export const deep = 1;',
+            'src/core/unrelated.ts': 'export const unrelated = 1;',
+            'tests/reader.ts': "const page = './fixtures/page.html'; const deep = 'src/core/deep'; export {page, deep};",
+            'tests/fixtures/page.html': '<html></html>',
+        });
+        expect([...graph.get('src/core/marks.ts')!]).toEqual([]);
+        expect([...graph.get('tests/reader.ts')!].sort()).toEqual(['src/core/deep.ts', 'tests/fixtures/page.html']);
     });
     it('reads the strict coverage literal regardless of base configuration spread', () => {
         expect(strictCoveragePaths("export default defineConfig({...base,test:{...base.test,coverage:{include:['src/a.ts','src/a.ts']}}});")).toEqual(['src/a.ts']);
@@ -198,7 +262,7 @@ describe('affected behavior test planning', () => {
         expect(createPlan(root, base)).toMatchObject({changed: [unrelated], testFiles: [],
             coverageFiles: [], extensionChanged: true});
     });
-    it('keeps the actual matrix runtime consumers of all thirteen coverage targets in one architecture and behavior pass', () => {
+    it('keeps the actual matrix runtime consumers of all thirteen coverage targets without dragging unrelated scoped architecture tests', () => {
         const readers = {
             'src/app/background/handlers/configPersistence.ts': 'tests/backgroundConfigPersistenceHandler.test.ts',
             'src/app/background/handlers/configStorage.ts': 'tests/backgroundConfigStorage.test.ts',
@@ -220,12 +284,20 @@ describe('affected behavior test planning', () => {
         const sources = Object.fromEntries(paths.map(file => [file, readFileSync(file, 'utf8')]));
         const graph = buildDependencyGraph(sources);
         const plan = selectAffected({files: sources, changed: targets, matrix: actualMatrix, coveragePaths: targets});
+        const repoWideGates = (actualMatrix.groups.architecture as string[])
+            .filter(file => /^tests\/architecture\/.*\.test\.ts$/u.test(file)).sort();
         expect(plan.coverageFiles).toEqual([...targets].sort());
-        expect(plan.testFiles.filter(file => actualMatrix.groups.architecture.includes(file))).toEqual([...actualMatrix.groups.architecture].sort());
+        expect(plan.alwaysRunArchitecture).toEqual(repoWideGates);
+        for (const gate of repoWideGates) expect(plan.testFiles).toContain(gate);
         for (const [target, reader] of Object.entries(readers)) {
             expect([...graph.get(reader)!], reader).toContain(target);
             expect(plan.testFiles, target).toContain(reader);
         }
+        // 与这十三个后台模块无关的慢速契约测试不得被无条件拉入；显式传入 allArchitecture 时仍可全跑。
+        expect(plan.testFiles).not.toContain('tests/userscriptViteConfig.test.ts');
+        expect(plan.testFiles).not.toContain('tests/firefoxAmoLint.test.ts');
+        const withAllArch = selectAffected({files: sources, changed: targets, matrix: actualMatrix, coveragePaths: targets, allArchitecture: true});
+        expect(withAllArch.alwaysRunArchitecture).toEqual([...actualMatrix.groups.architecture].sort());
         expect(new Set(plan.testFiles).size).toBe(plan.testFiles.length);
     });
 });
@@ -237,10 +309,10 @@ describe('affected behavior test execution', () => {
         await expect(executePlan(directory(), plan, runner)).resolves.toMatchObject({skipped: true});
         expect(runner).not.toHaveBeenCalled();expect(testInvocation({testFiles: [], coverageFiles: []}, '/tmp/config')).toBeNull();
     });
-    it('passes only selected files to the regular Vitest entry', async () => {
+    it('passes only selected files with compact dot reporter to the regular Vitest entry', async () => {
         const runner = vi.fn().mockResolvedValue({code: 0, signal: null});const root = directory();
         await executePlan(root, select(['tests/b.test.ts']), runner);
-        expect(runner).toHaveBeenCalledWith(root, ['exec', 'vitest', 'run', 'tests/architecture/boundary.test.ts', 'tests/b.test.ts']);
+        expect(runner).toHaveBeenCalledWith(root, ['exec', 'vitest', 'run', '--reporter=dot', 'tests/architecture/boundary.test.ts', 'tests/b.test.ts']);
     });
     it('executes a generated config that inherits real plugins and preserves 100 percent thresholds', async () => {
         const root = directory();save(root, 'base.mjs', 'export default {plugins:["actual-plugin"],test:{coverage:{all:true,thresholds:{statements:100,branches:100,functions:100,lines:100}}}};');
@@ -261,7 +333,7 @@ describe('affected behavior test execution', () => {
             return {code: 0, signal: null};
         });
         await executePlan(root, plan, runner);
-        expect(runner.mock.calls[0][1].slice(0, 4)).toEqual(['exec', 'vitest', 'run', '--config']);
+        expect(runner.mock.calls[0][1].slice(0, 5)).toEqual(['exec', 'vitest', 'run', '--reporter=dot', '--config']);
     });
     it('fails on command failure or termination and cleans the generated config in both cases', async () => {
         for (const outcome of [{code: 1, signal: null}, {code: null, signal: 'SIGTERM'}]) {

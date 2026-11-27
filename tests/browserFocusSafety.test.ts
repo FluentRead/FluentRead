@@ -1053,7 +1053,7 @@ describe('browser regression focus safety', () => {
 
         const settingsSource = readScript('scripts/testing/run-settings-center-ui-test.cjs');
         expect(settingsSource).toContain(
-            "['基础配置', ['settings-general', 'settings-services', 'settings-translation', 'settings-interface']]",
+            "['基础配置', ['settings-general', 'settings-services', 'settings-interface']]",
         );
         expect(settingsSource).toContain("[data-service-value^=\"custom:\"]");
         for (const staleSelector of ['data-service-subgroup', '.custom-service-group', 'data-service-section-toggle', '.service-item']) {

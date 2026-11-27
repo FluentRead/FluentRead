@@ -157,7 +157,7 @@ describe('完整句学习组件的调度与异步归属回归', () => {
     const host = await mountRendered();
     sendRuntimeMessage.mockRejectedValueOnce(new Error('Options unavailable'));
     state.openAppearance(); await flush();
-    expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-interface', target: 'video-sentence-learning-appearance'});
+    expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-video', target: 'video-sentence-learning-appearance'});
     sendRuntimeMessage.mockRejectedValueOnce(new Error('Library unavailable'));
     state.openLibrary(); await flush();
     expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-vocabulary'});
@@ -327,7 +327,7 @@ describe('完整句学习组件的调度与异步归属回归', () => {
     const host = await mountRendered();
     const click = async (action: string) => {const button = host.querySelector(`[data-learning-action="${action}"]`) as HTMLButtonElement; expect(button).toBeTruthy(); expect(button.hasAttribute('disabled')).toBe(false); button.dispatchEvent(new document.defaultView!.Event('click', {bubbles: true})); await flush();};
     await click('help'); expect(host.querySelector('[data-learning-help]')).toBeTruthy();
-    await click('appearance'); expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-interface', target: 'video-sentence-learning-appearance'});
+    await click('appearance'); expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-video', target: 'video-sentence-learning-appearance'});
     await click('collapse'); expect(host.querySelector('[data-learning-peek]')?.textContent).toBe(first);
     host.querySelector('[data-learning-peek]')!.dispatchEvent(new document.defaultView!.Event('click', {bubbles: true})); await flush(); expect(state.expanded).toBe(true);
     await click('next'); await advance(120); expect(state.sentence.text).toBe(second);

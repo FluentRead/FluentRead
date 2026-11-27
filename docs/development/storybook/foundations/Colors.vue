@@ -4,9 +4,9 @@ import { TinyColor } from '@ctrl/tinycolor'
 
 withDefaults(defineProps<{ contrast?: boolean }>(), { contrast: false })
 const groups = [
-  { title: '品牌与操作', tokens: ['--brand', '--fr-color-brand-action', '--brand-strong', '--brand-soft'] },
+  { title: '品牌与操作', tokens: ['--brand', '--fr-color-brand-action', '--fr-color-brand-action-gradient', '--brand-strong', '--brand-soft'] },
   { title: '中性画布、表面与文字', tokens: ['--fr-color-canvas', '--surface', '--surface-soft', '--fr-color-surface-hover', '--ink', '--muted', '--line', '--fr-color-line-strong'] },
-  { title: '状态反馈', tokens: ['--fr-success', '--fr-success-soft', '--fr-warning', '--fr-warning-soft', '--fr-danger', '--fr-danger-soft', '--fr-info', '--fr-info-soft'] },
+  { title: '状态反馈与指示灯', tokens: ['--fr-success', '--fr-success-soft', '--fr-success-indicator', '--fr-warning', '--fr-warning-soft', '--fr-danger', '--fr-danger-soft', '--fr-info', '--fr-info-soft'] },
 ]
 const pairs = ['--ink', '--muted', '--brand-strong', '--fr-success', '--fr-warning', '--fr-danger', '--fr-info']
 const values = ref<Record<string, string>>({})
@@ -57,7 +57,7 @@ onBeforeUnmount(() => observer?.disconnect())
           <td>{{ ratio(token, '--surface') === null ? '无法计算' : (ratio(token, '--surface')! >= 4.5 && (ratio(token, '--surface-soft') ?? 0) >= 4.5) ? '双表面达标' : ratio(token, '--surface')! >= 4.5 ? '主表面达标' : '低于参考值' }}</td>
         </tr></tbody>
       </table>
-      <p class="fr-story-note">主操作按钮文字（#ffffff）配 --fr-color-brand-action（浅色 #d62d5e = 4.69:1，深色 #d93464 = 4.54:1）同样满足 WCAG AA。</p>
+      <p class="fr-story-note">分层对比度策略：小字文本严格满足 WCAG 2.2 AA（≥4.5:1）；图形图标复用 Logo 同色 --brand（≥3.0:1）；主操作按钮白字配 --fr-color-brand-action（浅色 #eb3a70 = 3.91:1，深色 #e6376b = 4.10:1）及同色微渐变兼顾醒目与轻盈。</p>
     </template>
   </div>
 </template>

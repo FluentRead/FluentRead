@@ -50,7 +50,7 @@ const { t } = useUiI18n()
 .library-select { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; min-height: 44px; padding: 6px 4px 6px 8px; border: 0; background: transparent; color: var(--ink, #161b26); text-align: left; cursor: pointer; border-radius: var(--fr-control-radius, 8px); }
 .library-remove { display: grid; flex: none; place-items: center; width: 32px; height: 36px; margin-inline-end: 4px; padding: 0; border: 0; border-radius: var(--fr-radius-xs, 6px); color: var(--muted, #5b6476); opacity: .45; background: transparent; cursor: pointer; transition: opacity var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease); }
 .library-item:is(:hover, :focus-within) .library-remove:not(:disabled) { opacity: 1; }
-.library-remove:hover:not(:disabled) { color: var(--brand-strong, #cc2655); background: var(--brand-soft); }
+.library-remove:hover:not(:disabled) { color: var(--brand-strong, #d4235a); background: var(--brand-soft); }
 .library-remove:disabled { opacity: .25; cursor: default; }
 .library-name { display: flex; align-items: flex-start; flex: 1; gap: 6px; min-width: 0; }
 .library-name strong { min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; font-size: 13px; font-weight: 600; }

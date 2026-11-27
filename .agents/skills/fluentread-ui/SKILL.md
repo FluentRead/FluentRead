@@ -26,9 +26,9 @@ description: FluentRead 官方 UI/UX 设计体系与工程实践技能。编写�
 
 ## 提交前自查清单（Pre-Ship Gate）
 
-- [ ] **无硬编码漂移**：全部文字、表面、边框、圆角、间距、动效均使用 `--fr-*` 或共享语义别名（`--ink` / `--muted` / `--line` / `--surface` / `--surface-soft` / `--brand` / `--brand-strong` / `--brand-soft`）。
-- [ ] **无装饰性噪音**：无主画布渐变、无 Logo 彩色光晕、无状态点发光阴影、无按钮 hover 上浮发光、无全局 `* { transition }`。
-- [ ] **可读性与对比度**：无 `<11px` 文本；常规正文/说明 ≥12px；文字对比度在 `--surface` 与 `--surface-soft` 上均 ≥4.5:1。
+- [ ] **无硬编码漂移**：全部文字、表面、边框、圆角、间距、动效与微渐变均使用 `--fr-*` 或共享语义别名（`--ink` / `--muted` / `--line` / `--surface` / `--surface-soft` / `--brand` / `--brand-strong` / `--brand-soft` / `--fr-success-indicator`）。
+- [ ] **无背景与动效噪音**：无主画布径向光斑、无 Logo 彩色光晕、无按钮 hover 上浮跳动、无全局 `* { transition }`；默认皮肤主按钮与状态灯统一消费 Token 化的轻盈微渐变与柔光圈，传统色皮肤继续纯色平涂。
+- [ ] **分层可读性与对比度**：无 `<11px` 文本；常规正文/说明 ≥12px；文字对比度在 `--surface` 与 `--surface-soft` 上均 ≥4.5:1，图形图标（`--brand`）≥3.0:1，主按钮白字 ≥3.5:1。
 - [ ] **双主题 + 全皮肤 + 多语言**：在浅色、深色、代表性皮肤（`default` / `minimal` / `contrast` / `xuanqing`）及 `en-US` 长文案下无横向溢出、无裁切。
 - [ ] **键盘与无障碍**：所有可见交互控件有可访问名称、可见 `:focus-visible` 轮廓、正确 `aria-pressed` / `aria-expanded` / `role="switch"`，且响应 `prefers-reduced-motion: reduce`。
 - [ ] **验证通过**：运行相关 Vitest（含 `tests/designSystemTokens.test.ts`、`tests/interfaceSkinReadability.test.ts`、`tests/settingsUiArchitecture.test.ts`）、`pnpm storybook:typecheck` 及隔离浏览器截图验收。

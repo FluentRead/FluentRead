@@ -29,45 +29,48 @@
 | **Apple HIG** | 原生分组列表（外框 + 内部分隔线）、同心圆角几何、可预测的开关/分段控件与清晰焦点 | macOS 强毛玻璃材质在跨平台浏览器扩展中性能与对比不稳定 | 设置中心坚持「单层分组容器 + 内部分隔线」，取消毛玻璃与卡片套卡片，保证跨浏览器一致 |
 | **Read Frog / Kiss Translator** | 清晰的语义前缀隔离（避免宿主 CSS 污染）、Storybook 文档化验证、服务配置与规则分离 | React/Tailwind 技术栈与过于工具化的表单密度 | 坚守 Vue 3 + Element Plus + WXT，扩展现有 `--fr-*` 语义 Token 与 Storybook 规范站 |
 
-### FluentRead 设计方向：**Editorial Precision（编辑级精准阅读）**
+### FluentRead 设计方向：**Luminous Editorial Precision（澄明轻盈的编辑级精准）**
 
-1. **中性为底，玫红点睛**：90% 界面由高可读中性纸面与细边框构成；FluentRead 标志性玫红只用于核心 CTA、当前激活态与焦点轮廓。
-2. **平涂质感，克制阴影**：静态面板使用 `1px solid var(--fr-color-line)` 划分层级，去掉主画布渐变、Logo 发光与卡片大阴影；阴影仅用于悬浮菜单、抽屉与对话框。
-3. **可读性第一的排版**：建立 7 级清晰字号阶梯与标准字重（400 / 500 / 600 / 700），核心 UI 文案原则上不低于 `12px`（仅极紧凑徽标/计数允许 `11px`），数值统一 `tabular-nums`。
-4. **物理一致的微交互**：采用 `cubic-bezier(0.23, 1, 0.32, 1)` 缓出曲线、120ms–220ms 克制时长、`scale(0.985)` 按压确认，取消 hover 上浮发光。
-5. **开放且兼容的皮肤架构**：默认主题与 13 套内置皮肤共享同一结构 Token 契约（间距、圆角比例、字号、焦点、反馈色），传统色皮肤只覆写调色与特色轮廓。
+1. **中性为底，亮玫点睛**：90% 界面由高可读中性纸面与轻盈发丝边框构成；FluentRead 标志性亮玫红（`#ef4776`）承载核心 CTA、图标强调、激活态与焦点轮廓，不再因过度压暗而与 Logo 产生明度断层。
+2. **分层对比度，按角色控明度**：正文、辅助文字与小字品牌文本严格遵守 WCAG 2.2 AA（≥ `4.5:1`）；图形图标（快捷卡片图标、局部/显示模式图标）按非文本图形标准（≥ `3.0:1`）直接复用 Logo 同色 `--fr-color-brand`；状态指示灯独立于文字成功色，使用清透翡翠绿配克制柔光圈；主按钮白字（SemiBold）使用贴近 Logo 的鲜亮玫红（≥ `3.5:1`）。
+3. **清零背景噪音，保留主操作微质感**：严禁画布背景径向光斑、Logo 彩色光晕阴影、hover 上浮跳动与重卡片阴影；默认皮肤的主按钮允许使用 Token 化的同色系微渐变与轻漫射投影，主卡片使用极克制 `--fr-shadow-xs` 增加白底透气感；10 套中国传统色皮肤与简约/高对比皮肤继续坚持 100% 纯色平涂。
+4. **可读性第一的排版**：建立 7 级清晰字号阶梯与标准字重（400 / 500 / 600 / 700），核心 UI 文案原则上不低于 `12px`（仅极紧凑徽标/计数允许 `11px`），数值统一 `tabular-nums`。
+5. **物理一致的微交互**：采用 `cubic-bezier(0.23, 1, 0.32, 1)` 缓出曲线、120ms–220ms 克制时长、`scale(0.985)` 按压确认，取消 hover 上浮跳动。
+6. **开放且兼容的皮肤架构**：默认主题与 13 套内置皮肤共享同一结构 Token 契约（间距、圆角比例、字号、焦点、反馈色），传统色皮肤只覆写调色与特色轮廓。
 
 ---
 
 ## 3. 统一 Design Tokens 规范（`src/ui/styles/tokens.css`）
 
-### 3.1 色彩系统（WCAG 2.2 AA 数学校验）
+### 3.1 色彩系统（分层 WCAG 2.2 AA 数学校验）
 
-#### 亮色主题（Light Default）
+#### 亮色主题（Light Default · Scheme C 轻盈柔光）
 | Token | 别名 | 色值 | 用途 | 对比度（对 `--surface`） |
 | --- | --- | --- | --- | --- |
-| `--fr-color-brand` | `--brand` | `#ef4776` | 品牌源色、开关开启态、装饰锚点 | —（图形/大元素） |
-| `--fr-color-brand-action` | — | `#d62d5e` | 主操作按钮纯色填充（白字对比 ≥ 4.69:1） | 4.69:1（白字） |
-| `--fr-color-brand-action-hover` | — | `#bf2351` | 主操作按钮悬停态 | 5.79:1（白字） |
-| `--fr-color-brand-strong` | `--brand-strong` | `#cc2655` | 品牌色文字、链接、选中态文字 | **5.28:1**（AA ✓） |
-| `--fr-color-brand-soft` | `--brand-soft` | `#fff1f5` | 品牌浅底（选中项、轻强调标签） | 4.82:1（配 `brand-strong`） |
-| `--fr-color-canvas` | — | `#f5f6f8` | 页面外层画布（设置页工作区） | — |
+| `--fr-color-brand` | `--brand` | `#ef4776` | 品牌源色、图形图标强调、开关开启态（与 Logo 一致） | **3.60:1**（图形 AA ≥3.0 ✓） |
+| `--fr-color-brand-action` | — | `#eb3a70` | 主操作按钮基色与边框（白字 SemiBold 3.91:1） | 3.91:1（白字 ≥3.5 ✓） |
+| `--fr-color-brand-action-hover` | — | `#dc2d63` | 主操作按钮悬停基色 | **4.57:1**（白字 ✓） |
+| `--fr-color-brand-action-gradient` | — | `linear-gradient(135deg, #f45686, #e53268)` | 默认皮肤主操作同色微渐变 | 轻盈通透（配 `--fr-shadow-brand-action`） |
+| `--fr-color-brand-strong` | `--brand-strong` | `#d4235a` | 品牌色小字文本、链接、选中态文字 | **5.01:1**（AA ✓） |
+| `--fr-color-brand-soft` | `--brand-soft` | `#fff0f5` | 品牌浅底（选中项、图标柔底、轻强调标签） | **4.55:1**（配 `brand-strong` ✓） |
+| `--fr-color-canvas` | — | `#f6f7fa` | 页面外层画布（设置页工作区） | — |
 | `--fr-color-surface` | `--surface` | `#ffffff` | 卡片、弹窗、主面板表面 | — |
-| `--fr-color-surface-soft` | `--surface-soft` | `#f6f7f9` | 控件底面、次级分区、悬停底色 | — |
-| `--fr-color-surface-hover` | — | `#eef0f4` | 交互项悬停强化底色 | — |
-| `--fr-color-ink` | `--ink` | `#161b26` | 主标题、正文、表单值 | **17.23:1**（AAA ✓） |
-| `--fr-color-muted` | `--muted` | `#5b6476` | 辅助说明、次级标签、占位符 | **5.95:1**（AA ✓） |
-| `--fr-color-line` | `--line` | `#e3e6ed` | 1px 标准分隔线与卡片边框 | — |
-| `--fr-color-line-strong` | — | `#cfd5e0` | 控件悬停边框、强调分隔线 | — |
+| `--fr-color-surface-soft` | `--surface-soft` | `#f7f8fb` | 控件底面、次级分区、悬停底色 | — |
+| `--fr-color-surface-hover` | — | `#eff1f6` | 交互项悬停强化底色 | — |
+| `--fr-color-ink` | `--ink` | `#172033` | 主标题、正文、表单值 | **16.27:1**（AAA ✓） |
+| `--fr-color-muted` | `--muted` | `#5d6678` | 辅助说明、次级标签、占位符 | **5.77:1**（AA ✓） |
+| `--fr-color-line` | `--line` | `#e7eaf1` | 1px 轻盈分隔线与卡片边框 | — |
+| `--fr-color-line-strong` | — | `#d2d7e2` | 控件悬停边框、强调分隔线 | — |
 
 #### 暗色主题（Dark Default）
 | Token | 别名 | 色值 | 用途 | 对比度（对 `--surface`） |
 | --- | --- | --- | --- | --- |
-| `--fr-color-brand` | `--brand` | `#f25c88` | 暗色品牌源色、开关开启态 | — |
-| `--fr-color-brand-action` | — | `#d93464` | 暗色主操作按钮填充（白字对比 4.54:1） | **4.54:1**（AA ✓） |
-| `--fr-color-brand-action-hover` | — | `#e44574` | 暗色主操作按钮悬停态 | — |
-| `--fr-color-brand-strong` | `--brand-strong` | `#ff7fa6` | 暗色品牌色文字与选中图标 | **6.87:1**（AA ✓） |
-| `--fr-color-brand-soft` | `--brand-soft` | `rgba(242, 92, 136, 0.16)` | 暗色品牌浅底 | — |
+| `--fr-color-brand` | `--brand` | `#f46590` | 暗色品牌源色、图形图标强调、开关开启态 | **5.53:1**（AA ✓） |
+| `--fr-color-brand-action` | — | `#e6376b` | 暗色主操作按钮基色（白字对比 4.10:1） | 4.10:1（白字 ≥3.5 ✓） |
+| `--fr-color-brand-action-hover` | — | `#ef4778` | 暗色主操作按钮悬停基色 | — |
+| `--fr-color-brand-action-gradient` | — | `linear-gradient(135deg, #f35484, #df2e63)` | 暗色默认皮肤主操作同色微渐变 | 配 `--fr-shadow-brand-action` |
+| `--fr-color-brand-strong` | `--brand-strong` | `#ff85ab` | 暗色品牌色文字与选中态文字 | **7.15:1**（AAA ✓） |
+| `--fr-color-brand-soft` | `--brand-soft` | `rgba(244, 101, 144, 0.16)` | 暗色品牌浅底 | — |
 | `--fr-color-canvas` | — | `#14171c` | 暗色外层画布（Popup/Settings/Document 统一） | — |
 | `--fr-color-surface` | `--surface` | `#1c2028` | 暗色卡片、弹窗、主面板表面 | — |
 | `--fr-color-surface-soft` | `--surface-soft` | `#232833` | 暗色控件底面、次级分区 | — |
@@ -77,8 +80,9 @@
 | `--fr-color-line` | `--line` | `#2f3542` | 暗色 1px 细边框 | — |
 | `--fr-color-line-strong` | — | `#434b5c` | 暗色悬停边框 | — |
 
-#### 语义反馈色（亮 / 暗均 ≥ 4.5:1）
-- Success：`#1e6f5c` / `#eaf7f3`（暗：`#8fdcc4` / `#19322b`）
+#### 语义反馈色（文字均 ≥ 4.5:1）与独立状态指示灯
+- Success 文字：`#147e5c` / `#eaf7f3`（暗：`#8ce0c4` / `#19322b`）
+- Success 指示灯（`--fr-success-indicator`）：`#24b47e` 配柔和外圈 `0 0 0 3px rgba(36, 180, 126, .16)`（暗：`#34d399` 配 `rgba(52, 211, 153, .20)`；传统色皮肤下保持无外圈平涂）
 - Warning：`#8f5f16` / `#fff6e2`（暗：`#ebca84` / `#382e1d`）
 - Danger：`#b42348` / `#fff0f3`（暗：`#f5a3b8` / `#3b2029`）
 - Info：`#2563a6` / `#edf4ff`（暗：`#9bc5f2` / `#1f3045`）
@@ -119,7 +123,8 @@
 ### 3.4 层级与阴影（Elevation）
 
 - **Level 0（画布）**：`--fr-color-canvas`，无阴影。
-- **Level 1（静态表面/卡片）**：`--fr-color-surface` + `1px solid var(--fr-color-line)`，默认无阴影或极轻 `--fr-shadow-xs: 0 1px 2px rgba(22, 27, 38, 0.04)`。
+- **Level 1（静态表面/卡片）**：`--fr-color-surface` + `1px solid var(--fr-color-line)`，默认皮肤使用极克制 `--fr-shadow-xs: 0 1px 3px rgba(23, 32, 51, 0.04)` 提升呼吸感；传统色/简约/高对比皮肤保持无阴影平涂。
+- **Primary CTA 强调层**：默认皮肤主按钮使用 `--fr-color-brand-action-gradient` + `--fr-shadow-brand-action: 0 4px 12px rgba(233, 50, 103, 0.20)`，不使用 hover 上浮跳动。
 - **Level 2（悬浮菜单 / Popover / Tooltip）**：`--fr-shadow-md: 0 8px 24px rgba(22, 27, 38, 0.10), 0 1px 3px rgba(22, 27, 38, 0.05)` + `1px solid var(--fr-color-line)`。
 - **Level 3（模态 Dialog / Drawer）**：`--fr-shadow-lg: 0 18px 44px rgba(22, 27, 38, 0.16), 0 2px 8px rgba(22, 27, 38, 0.06)`。
 
@@ -158,11 +163,12 @@
 
 | 维度 | 优化前（Baseline） | 优化后（Target） |
 | --- | --- | --- |
-| 亮色 `--muted` 对比度 | `4.19:1`（白底）/ `3.95:1`（灰底） ❌ | `5.95:1`（白底）/ `5.55:1`（灰底） ✅ |
-| 亮色 `--brand-strong` 在 `--brand-soft` 上对比度 | `4.09:1` ❌ | `4.82:1` ✅ |
-| 亮色主按钮白字对比度 | `3.60:1`（梯度粉） ❌ | `4.69:1`（纯色 `#d62d5e`） ✅ |
-| 侧栏分组标题对比度 | `2.86:1` ❌ | `5.95:1` ✅ |
+| 亮色 `--muted` 对比度 | `4.19:1`（白底）/ `3.95:1`（灰底） ❌ | `5.77:1`（白底）/ `5.44:1`（灰底） ✅ |
+| 亮色 `--brand-strong` 在 `--brand-soft` 上对比度 | `4.09:1` ❌ | `4.55:1`（`#d4235a` on `#fff0f5`） ✅ |
+| 亮色图形图标与主按钮色阶 | 图标与按钮混用偏暗深红，与 Logo 割裂 ❌ | 图标复用 `#ef4776`（3.26:1 图形 AA ✓），主按钮采用 `#eb3a70` + Token 化轻盈微渐变（3.91:1 ✓） ✅ |
+| 状态指示灯与文字成功色 | 指示灯复用深墨绿 `#1e6f5c` 偏沉 ❌ | 文本 `#147e5c`（4.58:1 ✓）与指示灯 `#24b47e`（+ 轻柔外圈）分层独立 ✅ |
+| 侧栏分组标题对比度 | `2.86:1` ❌ | `5.77:1` ✅ |
 | 暗色画布统一性 | Popup `#14161b` / Options `#191b21` / Document `#151a23` | 统一 `--fr-color-canvas: #14171c` / `--fr-color-surface: #1c2028` |
 | Popup 极小字号（<11px） | 存在多处 `8px`/`9px`/`9.5px`/`10px` | 消除正文/按钮 <11px，核心标签 ≥12px，辅助最小 11px |
-| Popup/Options 装饰噪音 | Logo 粉光晕、主按钮渐变+上浮发光、绿点光晕、关于页/文档页径向光斑 | 全部清零，纯色平涂 + 1px 细边框 + 克制按压反馈 |
+| 背景与交互噪音 | Logo 粉光晕、hover 上浮跳动、关于页/文档页径向光斑 | 全部清零；默认皮肤主按钮保留 Token 化同色微渐变与轻漫射质感，传统色皮肤保持纯平涂 |
 | Storybook 规范覆盖 | Colors / Surfaces / Typography（基础版） | 新增 Spacing & Radius、Motion & Elevation、Popup & Settings 规范对照 |

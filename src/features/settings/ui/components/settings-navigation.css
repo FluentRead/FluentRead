@@ -34,6 +34,6 @@
   transition: color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease);
 }
 .settings-subnavigation > button:hover { color: var(--ink, #161b26); background: var(--surface-soft, #f6f7f9); }
-.settings-subnavigation > button[aria-current] { color: var(--brand-strong, #cc2655); background: var(--brand-soft, #fff1f5); font-weight: 600; }
+.settings-subnavigation > button[aria-current] { color: var(--brand-strong, #d4235a); background: var(--brand-soft, #fff0f5); font-weight: 600; }
 .settings-subnavigation > button:focus-visible { outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand-strong)); outline-offset: -2px; border-radius: var(--fr-radius-xs, 6px); box-shadow: none; }
 .settings-subnavigation > button:disabled { cursor: default; opacity: .6; }

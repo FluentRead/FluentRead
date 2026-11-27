@@ -52,12 +52,13 @@ const pressedCount = ref(0)
 .fr-motion-lab { display: grid; gap: 14px; }
 .fr-motion-primary {
   min-height: 38px; padding: 0 16px; border: 0; border-radius: var(--fr-control-radius, 8px);
-  color: #fff; background: var(--fr-color-brand-action, var(--brand-strong));
+  color: #fff; background: var(--fr-color-brand-action-gradient, var(--fr-color-brand-action, var(--brand-strong)));
+  box-shadow: var(--fr-shadow-brand-action, none);
   font: inherit; font-size: var(--fr-text-base, 13px); font-weight: 600; cursor: pointer;
   font-variant-numeric: tabular-nums;
-  transition: background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), transform var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease);
+  transition: background var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), box-shadow var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), transform var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease);
 }
-.fr-motion-primary:hover { background: var(--fr-color-brand-action-hover, var(--brand-strong)); }
+.fr-motion-primary:hover { background: var(--fr-color-brand-action-gradient-hover, var(--fr-color-brand-action-hover, var(--brand-strong))); box-shadow: var(--fr-shadow-brand-action-hover, var(--fr-shadow-brand-action, none)); }
 .fr-motion-primary:active { transform: scale(.985); }
 .fr-motion-secondary {
   min-height: 38px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--fr-control-radius, 8px);

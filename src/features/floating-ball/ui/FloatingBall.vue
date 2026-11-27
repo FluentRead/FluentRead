@@ -779,10 +779,10 @@ watch(() => presentation.value.toolsDisplay, () => {
 <style scoped>
 .fr-floating-ball {
   --fr-surface: #ffffff;
-  --fr-border: rgba(22, 27, 38, 0.14);
-  --fr-ink: #161b26;
-  --fr-accent: #cc2655;
-  --fr-active: #fff1f5;
+  --fr-border: rgba(23, 32, 51, 0.14);
+  --fr-ink: #172033;
+  --fr-accent: #d4235a;
+  --fr-active: #fff0f5;
   --fr-shadow: 0 2px 8px rgba(17, 24, 39, 0.1);
   --fr-face-inset: 0px;
   color: var(--fr-ink);

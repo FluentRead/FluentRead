@@ -290,13 +290,13 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
 .preview-action-row { display: flex; align-items: stretch; gap: 7px; }
 .preview-action {
   display: flex; min-width: 0; min-height: 40px; flex: 1 1 auto; align-items: center; justify-content: center; gap: 6px; padding: 8px;
-  border-radius: 14px; color: #fff; background: linear-gradient(135deg, #f35482, #e93267);
-  box-shadow: 0 6px 16px rgba(233, 50, 103, .16);
+  border-radius: 14px; color: #fff; background: var(--fr-color-brand-action-gradient, linear-gradient(135deg, #f45686, #e53268));
+  box-shadow: var(--fr-shadow-brand-action, 0 4px 12px rgba(233, 50, 103, .20));
 }
 .preview-popup .preview-action > strong { min-width: 0; font-size: 12px; font-weight: 750; text-align: center; overflow-wrap: anywhere; }
 .preview-section-action {
   display: inline-flex; min-width: 50px; flex: none; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px 8px;
-  border: 1px solid var(--line); border-radius: 14px; color: var(--brand-strong); background: var(--surface-soft);
+  border: 1px solid var(--line); border-radius: 14px; color: var(--brand); background: var(--surface-soft);
   font-size: 10px; font-weight: 750; line-height: 1.1; white-space: nowrap;
 }
 .preview-section-action svg { width: 16px; height: 16px; }
@@ -321,7 +321,7 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
 .preview-feature-icon { display: grid; width: 26px; height: 28px; place-items: center; border-radius: 9px; }
 .preview-feature-icon svg { width: 19px; height: 19px; }
 /* 未被皮肤统一着色时，五个入口沿用菜单栏各自的图标色调。 */
-.preview-feature-icon.rose { color: #e73a6c; background: #fff0f4; }
+.preview-feature-icon.rose { color: var(--brand, #ef4776); background: var(--brand-soft, #fff0f5); }
 .preview-feature-icon.violet { color: #6f55d9; background: #f1edff; }
 .preview-feature-icon.blue { color: #2678c9; background: #eaf4ff; }
 .preview-feature-icon.amber { color: #a75f16; background: #fff4df; }
@@ -336,7 +336,7 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
 .preview-popup .preview-feature-copy small { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .preview-feature > b { justify-self: center; color: var(--muted); font-size: 12px; font-weight: 400; }
 .preview-feature-status { width: 5px; height: 5px; justify-self: center; border-radius: 50%; background: #b8bec9; }
-.preview-feature-status.active { background: #24b47e; box-shadow: 0 0 0 4px rgba(36, 180, 126, .12); }
+.preview-feature-status.active { background: var(--fr-success-indicator, #24b47e); box-shadow: var(--fr-success-indicator-ring, 0 0 0 3px rgba(36, 180, 126, .16)); }
 
 .preview-footer {
   display: grid; min-height: 30px; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px;

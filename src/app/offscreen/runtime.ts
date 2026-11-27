@@ -11,6 +11,7 @@ import {
     downloadImageOcrLanguages,
     removeImageOcrLanguages,
     disposeImageOcrWorker,
+    configureImageOffscreenBackgroundRuntime,
     fetchImageInOffscreen,
     translateAreaInOffscreen,
     cropAreaInOffscreen,
@@ -62,6 +63,8 @@ export function startOffscreenApp(): void {
     const runtime = browserCapabilities.browser === 'safari'
         ? createExtensionPageRuntime(() => chrome.runtime, () => window.parent === window ? undefined : window.parent as unknown as ExtensionPageMessageTarget, () => window.location.href)
         : chrome.runtime;
+    // 图片文字翻译、取消与进度也必须经同一通道；Safari 原生 runtime 不把子 iframe 消息交给后台页。
+    configureImageOffscreenBackgroundRuntime(runtime);
     const readingAnnotation = createReadingAnnotationRuntime({createWorker: () => new Worker(chrome.runtime.getURL('readingAnnotationWorker.js'), {type: 'module'})});
     const downloadNotifications = createCoalescedDownloadNotifier((snapshot) => new Promise<void>((resolve) => {
         try {

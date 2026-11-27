@@ -31,6 +31,7 @@ vi.mock('@/src/features/image-translation/services/rendering', async importOrigi
 }));
 
 import {
+    configureImageOffscreenBackgroundRuntime,
     cropAreaInOffscreen,
     translateAreaInOffscreen,
     translateImageInOffscreen,
@@ -923,6 +924,40 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(canvases).toHaveLength(2);expect(canvases.every(canvas => canvas.width === 0 && canvas.height === 0)).toBe(true);
         expect(images[0].src).toBe('');expect(mocks.encode).not.toHaveBeenCalled();
     });
+    it('注入的后台通道承载文字翻译、取消与进度，不再调用原生 runtime（Safari 子 iframe）', async () => {
+        let lastError: {message: string} | undefined;
+        const injected = {
+            get lastError() { return lastError; },
+            sendMessage: vi.fn((message: {type: string}, callback: (response: unknown) => void) => {
+                if (message.type === 'fluentReadImageTranslateTexts') callback({success: true, translations: ['你好']});
+                else callback(undefined);
+            }),
+        };
+        configureImageOffscreenBackgroundRuntime(injected);
+        try {
+            await expect(translateImageTextsInExtension(['Hello'], 'Page', 'safari-text')).resolves.toEqual({translations: ['你好']});
+            expect(injected.sendMessage).toHaveBeenCalledWith(expect.objectContaining({type: 'fluentReadImageTranslateTexts', requestId: 'safari-text'}), expect.any(Function));
+            injected.sendMessage.mockImplementationOnce((_message, callback) => {
+                lastError = {message: 'Could not establish connection. Receiving end does not exist.'};
+                callback(undefined);
+                lastError = undefined;
+            });
+            await expect(translateImageTextsInExtension(['Hello'], 'Page', 'safari-missing')).rejects.toThrow('Receiving end does not exist');
+            const controller = new AbortController();
+            injected.sendMessage.mockImplementationOnce(() => undefined);
+            const pending = translateImageTextsInExtension(['Hello'], 'Page', 'safari-cancel', controller.signal);
+            controller.abort();
+            await expect(pending).rejects.toMatchObject({name: 'AbortError'});
+            expect(injected.sendMessage).toHaveBeenCalledWith({type: 'fluentReadImageCancel', requestId: 'safari-cancel'}, expect.any(Function));
+            mocks.recognize.mockResolvedValueOnce([]);
+            await translateImageInOffscreen('image', 'en', '', undefined, 'safari-progress').catch(() => undefined);
+            expect(injected.sendMessage).toHaveBeenCalledWith(expect.objectContaining({type: 'fluentReadImageProgress', requestId: 'safari-progress'}), expect.any(Function));
+            expect(sendMessage).not.toHaveBeenCalled();
+        } finally {
+            configureImageOffscreenBackgroundRuntime(undefined);
+        }
+    });
+
     it('文字翻译失败原因穿过 Offscreen 文本客户端', async () => {
         sendMessage.mockImplementation((_message,callback)=>callback({success:false,error:'model not ready',errorCode:'notDownloaded'}));
         await expect(translateImageTextsInExtension(['Hello'],'Page','model-error')).rejects.toMatchObject({errorCode:'notDownloaded'});

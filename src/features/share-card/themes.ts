@@ -1,95 +1,232 @@
 /**
  * @file src/features/share-card/themes.ts
- * 文件职责：定义分享卡片的八套视觉语言，并绘制不承载用户内容的背景材质。
- * 主要内容：珊瑚、晴空、流光、月白及抹茶、书页、落日、蓝图；组合上下分区、居中与双栏排版，保留文字对比度，装饰随内容高度适配。
+ * 文件职责：定义分享卡片的八套单层现代编排视觉语言，并绘制克制、无套娃边框的背景材质。
+ * 主要内容：珊瑚、晴空、流光、月白（双栏）、抹茶、书页、落日、蓝图（双栏）；单一纯净画布承载双语正文，避免多层套框。
  * 模块边界：只在已确定尺寸的 Canvas 上绘图，不测量或裁切正文，不访问配置存储、网络及宿主页面，也不加载外部设计素材。
  */
 import type {ShareCardTheme} from '@/src/core/config/shareCard';
 
 const SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
 const SERIF = 'Georgia, "Songti SC", "Noto Serif CJK SC", "SimSun", serif';
+
 export const CARD_THEMES = {
-    coral: {background: '#eb4635', ink: '#fff8ea', secondary: '#573a30', accent: '#c53325', muted: '#8b6854', font: `500 {size}px ${SERIF}`, inset: 48},
-    sky: {background: '#eaf5ff', ink: '#153d65', secondary: '#315e80', accent: '#306fa3', muted: '#47728f', font: `600 {size}px ${SANS}`, inset: 48},
-    prism: {background: '#12131a', ink: '#b6b7ff', secondary: '#e1e2e9', accent: '#bcb4e7', muted: '#a8aabf', font: `600 {size}px ${SANS}`, inset: 48},
-    pearl: {background: '#eaeaf0', ink: '#292b34', secondary: '#5e6270', accent: '#777d96', muted: '#7b7e8c', font: `600 {size}px ${SANS}`, inset: 48},
-    moss: {background: '#edf3e6', ink: '#2d4935', secondary: '#4b6351', accent: '#54734a', muted: '#62735d', font: `500 {size}px ${SERIF}`, inset: 56},
-    linen: {background: '#faf4e8', ink: '#493b30', secondary: '#6b5948', accent: '#9a6740', muted: '#857361', font: `500 {size}px ${SERIF}`, inset: 56},
-    sunset: {background: '#ffe5d6', ink: '#63372e', secondary: '#774e43', accent: '#a35242', muted: '#8d6254', font: `600 {size}px ${SANS}`, inset: 48},
-    blueprint: {background: '#15324d', ink: '#eef7ff', secondary: '#c7dceb', accent: '#b5d9ed', muted: '#a5c1d4', font: `500 {size}px ${SANS}`, inset: 48},
+    coral: {
+        background: '#fff7f9',
+        ink: '#172033',
+        secondary: '#4d576b',
+        accent: '#ef4776',
+        muted: '#7d8699',
+        divider: 'rgba(239, 71, 118, 0.30)',
+        footerLine: 'rgba(23, 32, 51, 0.08)',
+        font: `600 {size}px ${SERIF}`,
+        inset: 48,
+    },
+    sky: {
+        background: '#eaf3ff',
+        ink: '#142d4c',
+        secondary: '#3d5c7e',
+        accent: '#3b82c4',
+        muted: '#617f9e',
+        divider: 'rgba(59, 130, 196, 0.34)',
+        footerLine: 'rgba(20, 45, 76, 0.09)',
+        font: `600 {size}px ${SANS}`,
+        inset: 48,
+    },
+    prism: {
+        background: '#111520',
+        ink: '#f3f5fa',
+        secondary: '#b6c1d6',
+        accent: '#f46590',
+        muted: '#8692a8',
+        divider: 'rgba(244, 101, 144, 0.55)',
+        footerLine: 'rgba(255, 255, 255, 0.10)',
+        font: `600 {size}px ${SANS}`,
+        inset: 48,
+    },
+    pearl: {
+        background: '#ffffff',
+        ink: '#172033',
+        secondary: '#525c70',
+        accent: '#78849e',
+        muted: '#7e889b',
+        divider: '#e2e6ef',
+        footerLine: 'rgba(23, 32, 51, 0.08)',
+        font: `600 {size}px ${SANS}`,
+        inset: 48,
+    },
+    moss: {
+        background: '#eff4ea',
+        ink: '#1f3528',
+        secondary: '#4c6254',
+        accent: '#567a58',
+        muted: '#718677',
+        divider: 'rgba(86, 122, 88, 0.34)',
+        footerLine: 'rgba(31, 53, 40, 0.09)',
+        font: `500 {size}px ${SERIF}`,
+        inset: 54,
+    },
+    linen: {
+        background: '#f8f3e8',
+        ink: '#2d241c',
+        secondary: '#655647',
+        accent: '#a67247',
+        muted: '#8a7a69',
+        divider: 'rgba(166, 114, 71, 0.36)',
+        footerLine: 'rgba(45, 36, 28, 0.09)',
+        font: `500 {size}px ${SERIF}`,
+        inset: 50,
+    },
+    sunset: {
+        background: '#fdf0e6',
+        ink: '#3d2222',
+        secondary: '#6e4945',
+        accent: '#d46a59',
+        muted: '#8f6862',
+        divider: 'rgba(212, 106, 89, 0.36)',
+        footerLine: 'rgba(61, 34, 34, 0.09)',
+        font: `600 {size}px ${SANS}`,
+        inset: 48,
+    },
+    blueprint: {
+        background: '#112338',
+        ink: '#eff7ff',
+        secondary: '#b8d3e8',
+        accent: '#6db5e3',
+        muted: '#89aec9',
+        divider: 'rgba(148, 198, 232, 0.28)',
+        footerLine: 'rgba(148, 198, 232, 0.16)',
+        font: `500 {size}px ${SANS}`,
+        inset: 48,
+    },
 } as const satisfies Record<ShareCardTheme, unknown>;
+
 export const CARD_SECONDARY_FONT = SANS;
+
+function drawRoundedRect(context: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radius: number): void {
+    context.beginPath();
+    if (typeof context.roundRect === 'function') context.roundRect(x, y, w, h, radius);
+    else context.rect(x, y, w, h);
+}
 
 function glow(context: CanvasRenderingContext2D, x: number, y: number, radius: number, color: string, width: number, height: number): void {
     const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
-    gradient.addColorStop(0, color); gradient.addColorStop(1, `${color.slice(0, 7)}00`);
-    context.fillStyle = gradient; context.fillRect(0, 0, width, height);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(1, `${color.slice(0, 7)}00`);
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, width, height);
 }
-export function paintCardBackground(context: CanvasRenderingContext2D, theme: ShareCardTheme, width: number, height: number, split: number): void {
+
+export function paintCardBackground(context: CanvasRenderingContext2D, theme: ShareCardTheme, width: number, height: number, _split: number): void {
     context.fillStyle = CARD_THEMES[theme].background;
     context.fillRect(0, 0, width, height);
     context.save();
+
     if (theme === 'coral') {
-        // 已选定的默认版式保持红白比例、字体和细节不变。
-        context.fillStyle = '#fff3dd'; context.fillRect(0, split, width, height - split);
-        context.strokeStyle = '#fff8ea38'; context.lineWidth = 1;
-        for (const radius of [27, 35, 43]) {context.beginPath(); context.arc(width - 21, 10, radius, 0, Math.PI * 2); context.stroke();}
-        context.fillStyle = '#f4ce94'; context.fillRect(48, 22, 22, 3);
-        context.fillStyle = '#c53325'; context.fillRect(width - 33, height - 45, 7, 7);
+        const bg = context.createLinearGradient(0, 0, width, height);
+        bg.addColorStop(0, '#fffbfc');
+        bg.addColorStop(1, '#fff0f4');
+        context.fillStyle = bg;
+        context.fillRect(0, 0, width, height);
+
+        const bar = context.createLinearGradient(48, 30, 80, 30);
+        bar.addColorStop(0, '#f45686');
+        bar.addColorStop(1, '#e53268');
+        context.fillStyle = bar;
+        drawRoundedRect(context, 48, 30, 28, 3, 2);
+        context.fill();
     } else if (theme === 'sky') {
-        const gradient = context.createLinearGradient(0, 0, width * .25, height);
-        gradient.addColorStop(0, '#f5faff'); gradient.addColorStop(.6, '#d8edff'); gradient.addColorStop(1, '#9bcbf2');
-        context.fillStyle = gradient; context.fillRect(0, 0, width, height);
-        glow(context, width * .65, -10, 330, '#ffffff', width, height);
-        // 光线只落在下沿，避免在正文背后堆叠图形。
-        context.beginPath(); context.moveTo(0, height - 57);
-        context.bezierCurveTo(width * .38, height - 115, width * .7, height + 30, width, height - 70);
-        context.lineTo(width, height); context.lineTo(0, height); context.closePath();
-        context.fillStyle = '#ffffff52'; context.fill();
-        context.strokeStyle = '#ffffff80'; context.lineWidth = 1; context.stroke();
+        const gradient = context.createLinearGradient(0, 0, width * 0.4, height);
+        gradient.addColorStop(0, '#f4f9ff');
+        gradient.addColorStop(0.55, '#e5f1ff');
+        gradient.addColorStop(1, '#d3e7fd');
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, width, height);
+        glow(context, width * 0.82, 20, 260, '#ffffffb0', width, height);
     } else if (theme === 'prism') {
-        glow(context, 90, height + 140, 290, '#3759c945', width, height);
-        glow(context, width - 30, height + 140, 290, '#c1478c38', width, height);
+        const bg = context.createLinearGradient(0, 0, width, height);
+        bg.addColorStop(0, '#10141e');
+        bg.addColorStop(1, '#161b29');
+        context.fillStyle = bg;
+        context.fillRect(0, 0, width, height);
+        glow(context, 90, 28, 250, '#4f6cf032', width, height);
+        glow(context, width - 64, height - 20, 260, '#e84d852c', width, height);
+
+        const prismBar = context.createLinearGradient(48, 30, 92, 30);
+        prismBar.addColorStop(0, '#77b7ff');
+        prismBar.addColorStop(0.5, '#b09cff');
+        prismBar.addColorStop(1, '#f46590');
+        context.fillStyle = prismBar;
+        drawRoundedRect(context, 48, 30, 40, 3, 2);
+        context.fill();
     } else if (theme === 'pearl') {
-        const gradient = context.createLinearGradient(0, 0, width, height);
-        gradient.addColorStop(0, '#e6effc'); gradient.addColorStop(.45, '#f4eaf1'); gradient.addColorStop(1, '#dcebed');
-        context.fillStyle = gradient; context.fillRect(0, 0, width, height);
-        context.shadowColor = '#47436e1a'; context.shadowBlur = 16; context.shadowOffsetY = 5;
-        context.fillStyle = '#ffffffed'; context.strokeStyle = '#ffffff'; context.lineWidth = 1;
-        context.beginPath();
-        // 老浏览器缺少 roundRect 时使用直角面板，装饰不会阻断导出。
-        if (typeof context.roundRect === 'function') context.roundRect(12, 12, width - 24, height - 24, 18);
-        else context.rect(12, 12, width - 24, height - 24);
-        context.fill(); context.shadowColor = 'transparent'; context.stroke();
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, width, height);
+        context.strokeStyle = '#e5e8f0';
+        context.lineWidth = 1;
+        drawRoundedRect(context, 0.5, 0.5, width - 1, height - 1, 2);
+        context.stroke();
     } else if (theme === 'moss') {
-        context.fillStyle = '#dce8cd'; context.fillRect(0, 0, 18, height);
-        context.fillStyle = '#739063'; context.fillRect(32, 46, 3, height - 100);
-        context.strokeStyle = '#9aaf833d'; context.lineWidth = 1;
-        for (const radius of [24, 38, 52]) { context.beginPath(); context.arc(width - 12, height + 12, radius, 0, Math.PI * 2); context.stroke(); }
+        const bg = context.createLinearGradient(0, 0, 0, height);
+        bg.addColorStop(0, '#f4f7f0');
+        bg.addColorStop(1, '#e9f0e2');
+        context.fillStyle = bg;
+        context.fillRect(0, 0, width, height);
+
+        context.fillStyle = '#6b8f6d';
+        drawRoundedRect(context, 30, 44, 2.5, Math.max(40, height - 88), 2);
+        context.fill();
     } else if (theme === 'linen') {
-        context.strokeStyle = '#c9b89b'; context.lineWidth = 1;
-        context.strokeRect(20, 20, width - 40, height - 40);
-        context.fillStyle = '#9a6740'; context.fillRect(56, 30, 28, 3);
-        // 装饰仅位于边缘，不在正文背后制造纹理噪声。
-        context.fillStyle = '#c9b89b'; context.fillRect(width - 76, height - 26, 20, 1);
+        const bg = context.createLinearGradient(0, 0, 0, height);
+        bg.addColorStop(0, '#fbf8f1');
+        bg.addColorStop(1, '#f4ecdc');
+        context.fillStyle = bg;
+        context.fillRect(0, 0, width, height);
+
+        context.fillStyle = '#a67247';
+        drawRoundedRect(context, 50, 30, 24, 2.5, 2);
+        context.fill();
     } else if (theme === 'sunset') {
-        const gradient = context.createLinearGradient(0, 0, 0, height);
-        gradient.addColorStop(0, '#fff1df'); gradient.addColorStop(.55, '#ffe2cf'); gradient.addColorStop(1, '#efb5ad');
-        context.fillStyle = gradient; context.fillRect(0, 0, width, height);
-        glow(context, width / 2, -100, 240, '#ffffff', width, height);
-        context.fillStyle = '#ffffff26'; context.beginPath(); context.arc(width + 12, height + 100, 170, 0, Math.PI * 2); context.fill();
+        const gradient = context.createLinearGradient(0, 0, width * 0.3, height);
+        gradient.addColorStop(0, '#fff8f1');
+        gradient.addColorStop(0.55, '#fce7db');
+        gradient.addColorStop(1, '#f6d2c7');
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, width, height);
+        glow(context, width * 0.5, 10, 260, '#ffffffa8', width, height);
     } else {
-        // CARD_THEMES 的穷尽类型已在入口取色；剩余主题必为 blueprint。
-        context.strokeStyle = '#aacde012'; context.lineWidth = .5;
-        for (let x = 16; x < width; x += 32) { context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke(); }
-        for (let y = 16; y < height; y += 32) { context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke(); }
-        context.strokeStyle = '#90bcd177'; context.strokeRect(20, 20, width - 40, height - 40);
+        // blueprint：建筑深靛微网格 + 四角极细校准十字（无套娃内框）
+        const bg = context.createLinearGradient(0, 0, width, height);
+        bg.addColorStop(0, '#102136');
+        bg.addColorStop(1, '#152c47');
+        context.fillStyle = bg;
+        context.fillRect(0, 0, width, height);
+
+        context.strokeStyle = 'rgba(165, 208, 238, 0.055)';
+        context.lineWidth = 0.5;
+        for (let x = 20; x < width; x += 28) {
+            context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke();
+        }
+        for (let y = 20; y < height; y += 28) {
+            context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke();
+        }
+
+        context.strokeStyle = 'rgba(148, 198, 232, 0.45)';
+        context.lineWidth = 1;
+        for (const [cx, cy] of [[18, 18], [width - 18, 18], [18, height - 18], [width - 18, height - 18]] as const) {
+            context.beginPath();
+            context.moveTo(cx - 4, cy); context.lineTo(cx + 4, cy);
+            context.moveTo(cx, cy - 4); context.lineTo(cx, cy + 4);
+            context.stroke();
+        }
     }
+
     context.restore();
 }
+
 export function cardPrismInk(context: CanvasRenderingContext2D, width: number, top: number): CanvasGradient {
-    const gradient = context.createLinearGradient(48, top, width - 48, top + 80);
-    gradient.addColorStop(0, '#77b7ff'); gradient.addColorStop(.36, '#b09cff');
-    gradient.addColorStop(.7, '#ef9dcd'); gradient.addColorStop(1, '#ffc3a3');
+    const gradient = context.createLinearGradient(48, top, width - 48, top + 64);
+    gradient.addColorStop(0, '#f5f8ff');
+    gradient.addColorStop(0.55, '#eef2ff');
+    gradient.addColorStop(1, '#ffeef5');
     return gradient;
 }

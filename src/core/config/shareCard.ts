@@ -24,6 +24,6 @@ export function normalizeShareCardPreferences(value?: unknown): ShareCardPrefere
         fontSize: source.fontSize === 'small' || source.fontSize === 'large' ? source.fontSize : 'medium',
         translationFirst: source.translationFirst === true,
         showSource: source.showSource !== false,
-        showBrand: source.showBrand !== false,
+        showBrand: false,
     };
 }

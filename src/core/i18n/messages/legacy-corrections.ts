@@ -448,7 +448,6 @@ export const correctionRows: readonly LegacyCorrectionRow[] = [
     ['译文', 'Translation', '訳文', '번역문', 'Traduction', 'Перевод', 'Traducción'],
     ['进行中', 'In progress', '進行中', '진행 중', 'En cours', 'Выполняется', 'En curso'],
     ['松开鼠标翻译', 'Release to translate', 'マウスを離して翻訳', '마우스를 놓으면 번역', 'Relâchez pour traduire', 'Отпустите, чтобы перевести', 'Suelta para traducir'],
-    ['正在识别并翻译…', 'Recognizing and translating…', '認識して翻訳しています…', '인식하고 번역하는 중…', 'Reconnaissance et traduction…', 'Распознавание и перевод…', 'Reconociendo y traduciendo…'],
     ['圈选翻译结果', 'Area translation result', '範囲翻訳の結果', '영역 번역 결과', 'Résultat de la traduction de zone', 'Результат перевода области', 'Resultado de la traducción de área'],
     ['圈选翻译失败', 'Area translation failed', '範囲翻訳に失敗しました', '영역 번역에 실패했습니다', 'Échec de la traduction de zone', 'Не удалось перевести область', 'No se pudo traducir el área'],
     ['重试', 'Retry', '再試行', '다시 시도', 'Réessayer', 'Повторить', 'Reintentar'],
@@ -790,6 +789,10 @@ export const correctionRows: readonly LegacyCorrectionRow[] = [
     ['AI 上下文增强', 'AI context enhancement', 'AI による文脈補正', 'AI 문맥 보정', 'Amélioration contextuelle par IA', 'Контекстная обработка ИИ', 'Mejora contextual con IA'],
     ['跟随当前服务', 'Follow the current translation service', '現在の翻訳サービスを使用', '현재 번역 서비스 사용', 'Utiliser le service de traduction actuel', 'Использовать текущий сервис перевода', 'Usar el servicio de traducción actual'],
     ['不翻译的标签', 'Tags to skip', '翻訳しないタグ', '번역하지 않을 태그', 'Balises à ne pas traduire', 'Теги без перевода', 'Etiquetas que no se traducen'],
+    ['翻译中…', 'Translating…', '翻訳中…', '번역 중…', 'Traduction…', 'Перевод…', 'Traduciendo…'],
+    ['首次准备中…', 'Setting up…', '初回準備中…', '초기 준비 중…', 'Préparation initiale…', 'Первичная настройка…', 'Preparación inicial…'],
+    ['排队中…', 'Queued…', '待機中…', '대기 중…', 'En file d’attente…', 'В очереди…', 'En cola…'],
+    ['识别内容仅供参考，请核对数字与专名', 'Recognized text is for reference. Check numbers and names.', '認識結果は参考用です。数字や固有名詞をご確認ください。', '인식 결과는 참고용입니다. 숫자와 고유명사를 확인해 주세요.', 'Le texte reconnu est fourni à titre indicatif. Vérifiez les nombres et les noms.', 'Распознанный текст приведён для справки. Проверьте числа и имена.', 'El texto reconocido es orientativo. Comprueba números y nombres.'],
 ];
 
 const LANGUAGE_COLUMNS: Readonly<Record<RegisteredUiLanguage, 1 | 2 | 3 | 4 | 5 | 6>> = {

@@ -334,7 +334,7 @@ describe('界面 i18n 契约', () => {
   });
 
   it.each(['en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES'] as const)('图片翻译的准备与各阶段说明在 %s 中完整本地化', language => {
-    for (const source of ["首次使用需准备识别语言包，下载后自动继续", "正在准备识别语言包…", "正在读取图片…", "正在识别图片文字…", "正在翻译文字…", "正在生成译图…", "已翻译 · 点击恢复原图", "查看译图", "翻译设置已更改，请重试", "译图加载超时", "图片读取超时", "图片加载超时"]) {
+    for (const source of ["首次使用需准备识别语言包，下载后自动继续", "翻译中…", "首次准备中…", "排队中…", "识别内容仅供参考，请核对数字与专名", "正在准备识别语言包…", "正在读取图片…", "正在识别图片文字…", "正在翻译文字…", "正在生成译图…", "已翻译 · 点击恢复原图", "查看译图", "翻译设置已更改，请重试", "译图加载超时", "图片读取超时", "图片加载超时"]) {
       const translated = translateLegacyText(source, language);
       expect(translated).not.toBe(source);
       if (language !== 'ja-JP') expect(translated).not.toMatch(/[\u3400-\u9fff]/u);

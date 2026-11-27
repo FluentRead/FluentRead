@@ -69,6 +69,15 @@ import {DEFAULT_SECTION_TRANSLATION_HOTKEY} from '../sectionTranslation';
 import type {SectionTranslationRule} from '../sectionTranslationRules';
 import type {WordDictionarySourceSetting} from '../selectionDictionary';
 import {
+    DEFAULT_SELECTION_TTS_ONLINE_SOURCES,
+    DEFAULT_SELECTION_TTS_OPENAI_MODEL,
+    DEFAULT_SELECTION_TTS_OPENAI_VOICE,
+    DEFAULT_SELECTION_TTS_RATE,
+    type SelectionTtsOnlineSourceId,
+    type SelectionTtsOpenAiModel,
+    type SelectionTtsOpenAiVoice,
+} from '../selectionTts';
+import {
     DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE,
     DEFAULT_SENTENCE_HIGHLIGHT_STYLE,
     type SentenceHighlightAppearance,
@@ -339,6 +348,10 @@ export class Config {
     selectionTtsVoices: string[]; // 划词朗读的 Edge TTS 音色回退顺序
     selectionTtsMode: LocalTtsMode; // 朗读在线/本地合成策略
     selectionTtsLocalVoice: LocalTtsVoiceId; // 本地 Kokoro 音色，auto 表示按语言选择
+    selectionTtsRate: number; // 朗读默认语速（0.5-2.0 倍速）
+    selectionTtsOnlineSources: SelectionTtsOnlineSourceId[]; // 在线朗读多源尝试与回退顺序
+    selectionTtsOpenAiModel: SelectionTtsOpenAiModel; // OpenAI / 兼容 TTS 模型名
+    selectionTtsOpenAiVoice: SelectionTtsOpenAiVoice; // OpenAI / 兼容 TTS 音色
     vocabularyBookEnabled: boolean; // 是否启用本地单词本 Beta
     vocabularyReencounterEnabled: boolean; // 阅读时轻量标记已收藏表达，独立于收藏入口
     declare personalCorrectionsEnabled: boolean; // 扩展个人校订须主动开启；userscript 不创建此不可用字段
@@ -577,6 +590,10 @@ export class Config {
         this.selectionTtsVoices = []; // 默认按当前语言使用内置音色回退顺序
         this.selectionTtsMode = DEFAULT_LOCAL_TTS_MODE;
         this.selectionTtsLocalVoice = DEFAULT_LOCAL_TTS_VOICE;
+        this.selectionTtsRate = DEFAULT_SELECTION_TTS_RATE;
+        this.selectionTtsOnlineSources = [...DEFAULT_SELECTION_TTS_ONLINE_SOURCES];
+        this.selectionTtsOpenAiModel = DEFAULT_SELECTION_TTS_OPENAI_MODEL;
+        this.selectionTtsOpenAiVoice = DEFAULT_SELECTION_TTS_OPENAI_VOICE;
         this.vocabularyBookEnabled = false; // Beta 默认关闭，由用户在单词本页面主动开启
         this.vocabularyReencounterEnabled = false; // 主动开启后才在网页中匹配收藏
         if (import.meta.env?.BROWSER !== 'userscript') this.personalCorrectionsEnabled = false;

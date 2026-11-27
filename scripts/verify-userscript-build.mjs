@@ -148,7 +148,9 @@ const artifactBytes = Buffer.byteLength(source);
 // 利用原余量后按既有 1 KB 步长最小增加 2 KB，余 930 字节；全部协议、资源及 VM 断言保留。
 // 构建对照与散列见 docs/reports/reading-consistency-20261023/userscript-size.json。
 // 发布审计整合已进一步缩小产物，继续使用审计开始时的原上限，不沿用上游增加的 2 KB 余量。
-const MAX_USERSCRIPT_BYTES = 2_125_100;
+// 多源 TTS 退避熔断、47 音色配置、语速控制、七语本地化与播控 UI 优化（基于 9f1da7d98，实测产物 2,149,387 字节，
+// 超原预算 24,287 字节；后台合成与本地 Kokoro 均隔离在扩展端，不进入油猴产物）。按既有 1 KB 步长最小增加 25 KB，余量 713 字节。
+const MAX_USERSCRIPT_BYTES = 2_150_100;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

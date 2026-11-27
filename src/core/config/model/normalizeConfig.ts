@@ -90,7 +90,13 @@ import {
 } from '../sectionTranslation';
 import {normalizeSectionTranslationRules} from '../sectionTranslationRules';
 import {normalizeWordDictionarySource} from '../selectionDictionary';
-import {normalizeSelectionTtsVoiceOrder} from '../selectionTts';
+import {
+    normalizeSelectionTtsOnlineSources,
+    normalizeSelectionTtsOpenAiModel,
+    normalizeSelectionTtsOpenAiVoice,
+    normalizeSelectionTtsRate,
+    normalizeSelectionTtsVoiceOrder,
+} from '../selectionTts';
 import {isSensitiveConfigKey} from '../sensitiveKeys';
 import {
     normalizeSentenceHighlightAppearance,
@@ -611,6 +617,10 @@ export function normalizeConfig(value: unknown): Config {
     normalized.selectionTtsVoices = normalizeSelectionTtsVoiceOrder(normalized.selectionTtsVoices);
     normalized.selectionTtsMode = normalizeLocalTtsMode(source.selectionTtsMode);
     normalized.selectionTtsLocalVoice = normalizeLocalTtsVoice(source.selectionTtsLocalVoice);
+    normalized.selectionTtsRate = normalizeSelectionTtsRate(source.selectionTtsRate);
+    normalized.selectionTtsOnlineSources = normalizeSelectionTtsOnlineSources(source.selectionTtsOnlineSources);
+    normalized.selectionTtsOpenAiModel = normalizeSelectionTtsOpenAiModel(source.selectionTtsOpenAiModel);
+    normalized.selectionTtsOpenAiVoice = normalizeSelectionTtsOpenAiVoice(source.selectionTtsOpenAiVoice);
     normalized.disableSelectionTranslator = normalized.selectionTranslatorMode === 'disabled';
     normalized.selectionTranslatorModeBeforeDisable = normalized.selectionTranslatorMode === 'translation-only'
         || (normalized.selectionTranslatorMode === 'disabled' && source.selectionTranslatorModeBeforeDisable === 'translation-only')

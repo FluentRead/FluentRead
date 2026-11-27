@@ -34,7 +34,7 @@ export interface OffscreenRequestMap {
     LOCAL_TRANSLATION_PAUSE: {model: LocalTranslationModelId};
     LOCAL_TRANSLATION_REMOVE_MODEL: {model: LocalTranslationModelId};
     CANCEL_LOCAL_TRANSLATION_OFFSCREEN: {requestId: string};
-    LOCAL_TTS_SYNTHESIZE: {requestId: string; text: string; language: string; voice: string};
+    LOCAL_TTS_SYNTHESIZE: {requestId: string; text: string; language: string; voice: string; speed?: number};
     LOCAL_TTS_PREPARE: {keepWarm?: boolean};
     LOCAL_TTS_STATUS: object;
     LOCAL_TTS_REMOVE_MODEL: object;
@@ -102,7 +102,7 @@ const requests: {[K in OffscreenRequestType]: Validator<OffscreenRequestMap[K]>}
     LOCAL_TRANSLATION_PREPARE: shape<OffscreenRequestMap['LOCAL_TRANSLATION_PREPARE']>({model: isLocalTranslationModel, keepWarm: optional(isBoolean)}),
     LOCAL_TRANSLATION_STATUS: noFields, LOCAL_TRANSLATION_PAUSE: shape<OffscreenRequestMap['LOCAL_TRANSLATION_PAUSE']>({model: isLocalTranslationModel}), LOCAL_TRANSLATION_REMOVE_MODEL: shape<OffscreenRequestMap['LOCAL_TRANSLATION_REMOVE_MODEL']>({model: isLocalTranslationModel}),
     CANCEL_LOCAL_TRANSLATION_OFFSCREEN: shape<OffscreenRequestMap['CANCEL_LOCAL_TRANSLATION_OFFSCREEN']>({requestId}),
-    LOCAL_TTS_SYNTHESIZE: shape<OffscreenRequestMap['LOCAL_TTS_SYNTHESIZE']>({requestId, text: isNonEmptyString, language: isNonEmptyString, voice: isNonEmptyString}),
+    LOCAL_TTS_SYNTHESIZE: shape<OffscreenRequestMap['LOCAL_TTS_SYNTHESIZE']>({requestId, text: isNonEmptyString, language: isNonEmptyString, voice: isNonEmptyString, speed: optional(isFiniteNumber)}),
     LOCAL_TTS_PREPARE: shape<OffscreenRequestMap['LOCAL_TTS_PREPARE']>({keepWarm: optional(isBoolean)}), LOCAL_TTS_STATUS: noFields, LOCAL_TTS_REMOVE_MODEL: noFields,
     CANCEL_LOCAL_TTS_OFFSCREEN: shape<OffscreenRequestMap['CANCEL_LOCAL_TTS_OFFSCREEN']>({requestId}),
 };

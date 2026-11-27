@@ -1482,7 +1482,7 @@ describe('selection translator text and speech language normalization', () => {
             await expect(request).rejects.toMatchObject({name: 'AbortError'});
             const synthesisCalls = fetchMock.mock.calls.filter(([input]) => String(input).includes('.tts.speech.microsoft.com'));
             expect(synthesisCalls).toHaveLength(1);
-            expect(synthesisCalls[0]?.[1]?.signal).toBe(controller.signal);
+            expect(synthesisCalls[0]?.[1]?.signal?.aborted).toBe(true);
         } finally {
             vi.stubGlobal('fetch', originalFetch);
         }

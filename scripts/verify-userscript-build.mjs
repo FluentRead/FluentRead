@@ -148,9 +148,12 @@ const artifactBytes = Buffer.byteLength(source);
 // 利用原余量后按既有 1 KB 步长最小增加 2 KB，余 930 字节；全部协议、资源及 VM 断言保留。
 // 构建对照与散列见 docs/reports/reading-consistency-20261023/userscript-size.json。
 // 发布审计整合已进一步缩小产物，继续使用审计开始时的原上限，不沿用上游增加的 2 KB 余量。
-// 多源 TTS 退避熔断、47 音色配置、语速控制、七语本地化与播控 UI 优化（基于 9f1da7d98，实测产物 2,149,387 字节，
-// 超原预算 24,287 字节；后台合成与本地 Kokoro 均隔离在扩展端，不进入油猴产物）。按既有 1 KB 步长最小增加 25 KB，余量 713 字节。
-const MAX_USERSCRIPT_BYTES = 2_150_100;
+// 合入最新 main 9f1da7d98（#1445/#1447/#1448/#1449）与设置中心 4 组 17 分区重构、视频字幕改版及 7 语种 i18n 文案差分
+// （不含新依赖或扩展专属组件）后精简脚本实测 2,162,283 字节，超出 main 上限 2,125,100 字节 37,183 字节；
+// 按既有 1 KB 步长最小增加 38 KB 至 2,163,100，余 817 字节；保留全部协议、资源、排除项和 VM 断言。
+// 在 db6d05720（#1446）基础上合入多源 TTS 退避熔断、47 音色配置、语速控制、七语本地化与播控 UI 优化（后台与本地 Kokoro 不进入油猴产物），
+// 按既有 1 KB 步长最小增加 25 KB 至 2,188,100；保留全部协议、资源、排除项和 VM 断言。
+const MAX_USERSCRIPT_BYTES = 2_188_100;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

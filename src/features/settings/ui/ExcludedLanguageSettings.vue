@@ -20,7 +20,6 @@
         <button type="button" :aria-expanded="expanded" @click="expanded = !expanded">{{ t(expanded ? 'settings.excludedLanguages.less' : 'settings.excludedLanguages.more') }}</button>
         <button v-if="modelValue.length" type="button" @click="emit('update:modelValue', [])">{{ t('settings.excludedLanguages.clear') }}</button>
       </div>
-      <p class="excluded-language-hint">{{ t('settings.excludedLanguages.hint') }}</p>
     </div>
   </SettingsGroup>
 </template>

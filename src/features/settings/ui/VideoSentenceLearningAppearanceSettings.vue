@@ -5,7 +5,10 @@
  * 模块边界：只编辑父级传入的 Config 草稿，保存和重开持久化沿用设置中心既有配置管线；预览不播放视频、不发送翻译请求，不保存拖动位置。
  -->
 <template>
-  <SettingsGroup class="video-learning-appearance-group" id="video-sentence-learning-appearance" :title="t('video.learningAppearance.title')" :description="t('video.learningAppearance.description')" data-settings-anchor="video-sentence-learning-appearance" :data-settings-anchor-label="t('video.learningAppearance.title')" data-video-sentence-learning-appearance>
+  <SettingsGroup class="video-learning-appearance-group" id="video-sentence-learning-appearance" :title="t('video.learningAppearance.title')" :description="t('video.learningAppearance.description')" data-settings-anchor="video-learning" :data-settings-anchor-label="t('video.learningAppearance.title')" data-video-sentence-learning-appearance>
+    <template #heading-extra>
+      <button type="button" class="learning-appearance-reset" data-video-learning-reset @click="resetAppearance">{{ t('video.learningAppearance.reset') }}</button>
+    </template>
     <SettingsPreviewLayout :label="t('video.learningAppearance.preview')" sticky-preview>
       <template #preview>
         <div class="learning-preview-scene" :data-position="appearance.position" :data-layout="appearance.layout" data-video-learning-preview-scene>
@@ -24,10 +27,9 @@
             <footer aria-hidden="true"><span>{{ t('video.learning.explain') }}</span><strong>{{ t('video.learning.save') }}</strong></footer>
           </div>
         </div>
-        <p class="learning-appearance-hint">{{ t('video.learningAppearance.previewHint') }}</p>
       </template>
       <div class="learning-appearance-controls">
-        <SettingsItem stacked :label="t('video.learningAppearance.layout')" :description="t('video.learningAppearance.layoutHint')">
+        <SettingsItem stacked :label="t('video.learningAppearance.layout')">
           <SegmentedControl v-model="appearance.layout" :options="layoutOptions" :label="t('video.learningAppearance.layout')" data-video-learning-layout />
         </SettingsItem>
         <label class="learning-appearance-range"><span>{{ t('video.learningAppearance.opacity') }}<b>{{ appearance.backgroundOpacity }}%</b></span><input v-model.number="appearance.backgroundOpacity" type="range" :min="ranges.backgroundOpacity.min" :max="ranges.backgroundOpacity.max" step="1" :aria-label="t('video.learningAppearance.opacity')" data-video-learning-opacity /></label>
@@ -40,7 +42,6 @@
           </div>
           <p class="learning-appearance-hint">{{ t('video.learningAppearance.dragHint') }}</p>
         </div>
-        <button type="button" class="learning-appearance-reset" data-video-learning-reset @click="resetAppearance">{{ t('video.learningAppearance.reset') }}</button>
       </div>
     </SettingsPreviewLayout>
   </SettingsGroup>
@@ -110,5 +111,6 @@ function resetAppearance(): void {Object.assign(appearance.value, DEFAULT_VIDEO_
 .learning-position-grid button { padding:8px; border:1px solid var(--line); border-radius:8px; color:var(--ink); background:var(--surface-soft); cursor:pointer; font-size:12px; }
 .learning-position-grid button.selected { border-color:var(--brand); color:var(--brand-strong); background:color-mix(in srgb,var(--brand) 10%,var(--surface)); }
 .learning-position-grid button:focus-visible,.learning-appearance-reset:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
-.learning-appearance-reset { justify-self:start; padding:0; border:0; color:var(--brand-strong); background:transparent; cursor:pointer; font-size:12px; }
+.learning-appearance-reset { margin-left:auto; padding:5px 10px; border:1px solid var(--line); border-radius:8px; color:var(--brand-strong); background:var(--surface); cursor:pointer; font:inherit; font-size:12px; font-weight:600; }
+.learning-appearance-reset:hover { border-color:var(--brand); background:var(--brand-soft); }
 </style>

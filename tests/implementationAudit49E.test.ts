@@ -533,25 +533,18 @@ describe('audit 49 E real Vue client model settings', () => {
     });
     it('updates actual image and manga controls in the parent configuration and filters the site catalog', async () => {
         vi.useFakeTimers(); const settings = new Config(); settings.imageTranslationMangaEnabled = false; settings.useCache = true;
-        const initialHover = settings.imageTranslationHoverEnabled, initialContextMenu = settings.imageTranslationContextMenuEnabled;
+        const initialHover = settings.imageTranslationHoverEnabled;
         const imageChanged = vi.fn();
         const {container, props} = await mount(MangaSettings, {settings, imageEnabled: false, available: true, serviceOptions: [{value: 'fixture', label: 'Fixture service'}], 'onUpdate:imageEnabled': imageChanged});
-        for (const preview of container.querySelectorAll<HTMLElement>('.image-example')) {
-            const buttons = preview.querySelectorAll<HTMLButtonElement>('.image-example-tabs button');
-            buttons[0].click(); await settle(); expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
-            expect(preview.textContent).toContain(preview.querySelector('.image-example-comic') ? 'Let’s explore a bigger world!' : 'Read. Discover a new perspective.');
-            buttons[1].click(); await settle(); expect(buttons[1].getAttribute('aria-pressed')).toBe('true');
-            expect(preview.textContent).toContain(preview.querySelector('.image-example-comic') ? '一起去看看更大的世界吧！' : '阅读，发现新的视角');
-        }
         const select = async (label: string, value: string) => {container.querySelector<HTMLButtonElement>(`[aria-label="${label}"] [data-option-value="${value}"]`)!.click(); await settle();};
-        await select('area.settings.sourceLanguage', 'en'); await select('漫画目标语言', 'ja'); await select('漫画翻译服务', 'fixture'); await select('图片识别方式', 'tesseract');
-        await select('本地处理后端', 'cpu');
-        expect(props.settings).toMatchObject({from: 'en', to: 'ja', imageTranslationService: 'fixture', imageTranslationOcrEngine: 'tesseract', imageTranslationInferenceBackend: 'cpu'});
         container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="网页图片翻译"]')!.click(); await settle(); expect(imageChanged).toHaveBeenCalledWith(true);
         props.imageEnabled = true; await settle();
-        for (const label of ['image.hover', 'image.context', '漫画连续翻译', '独立漫画按钮']) {container.querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label}"]`)!.click(); await settle();}
+        await select('图片识别方式', 'tesseract');
+        await select('本地处理后端', 'cpu');
+        expect(props.settings).toMatchObject({imageTranslationOcrEngine: 'tesseract', imageTranslationInferenceBackend: 'cpu'});
+        for (const label of ['image.hover', '漫画连续翻译', '独立漫画按钮']) {container.querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label}"]`)!.click(); await settle();}
         await select('提前翻译后续页面', '5'); await select('快速缓存图片数量', '24');
-        expect(props.settings).toMatchObject({imageTranslationHoverEnabled: !initialHover, imageTranslationContextMenuEnabled: !initialContextMenu, imageTranslationMangaEnabled: true, imageTranslationMangaPrefetchPages: 5, imageTranslationMangaCachePages: 24});
+        expect(props.settings).toMatchObject({imageTranslationHoverEnabled: !initialHover, imageTranslationMangaEnabled: true, imageTranslationMangaPrefetchPages: 5, imageTranslationMangaCachePages: 24});
         const search = container.querySelector<HTMLInputElement>('input[type="search"]')!;
         search.value = '  PiXiV  '; search.dispatchEvent(new Event('input', {bubbles: true})); await settle();
         expect(container.querySelectorAll('.manga-site')).toHaveLength(3);

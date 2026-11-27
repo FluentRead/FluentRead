@@ -52,9 +52,9 @@ const { t } = useUiI18n()
 .library-item:is(:hover, :focus-within) .library-remove:not(:disabled) { opacity: 1; }
 .library-remove:hover:not(:disabled) { color: var(--brand-strong, #d4235a); background: var(--brand-soft); }
 .library-remove:disabled { opacity: .25; cursor: default; }
-.library-name { display: flex; align-items: flex-start; flex: 1; gap: 6px; min-width: 0; }
-.library-name strong { min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; font-size: 13px; font-weight: 600; }
-.library-metadata { display: flex; align-items: center; flex: none; flex-wrap: nowrap; gap: 4px; min-width: 0; max-width: calc(100% - 64px); }
+.library-name { display: flex; align-items: center; flex-wrap: wrap; flex: 1; gap: 3px 6px; min-width: 0; }
+.library-name strong { min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; font-size: 13px; font-weight: 600; }
+.library-metadata { display: flex; align-items: center; flex: 0 1 auto; flex-wrap: wrap; gap: 4px; min-width: 0; max-width: 100%; }
 .library-metadata:empty { display: none; }
 .library-item :deep(.service-brand-icon) { width: 28px; height: 28px; border-radius: 8px; }
 button:focus-visible { outline: 2px solid var(--brand-strong, #bd2853); outline-offset: 2px; }

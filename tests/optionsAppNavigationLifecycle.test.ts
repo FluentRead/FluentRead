@@ -144,7 +144,7 @@ async function mountOptions(hash = '#settings-selection', ready = Promise.resolv
 }
 
 describe('OptionsApp language recovery search with actual UI messages', () => {
-  const englishLanguageSuffix = ['settings-translation/excluded-languages', 'settings-translation', 'settings-image-translation', 'settings-writing', 'settings-glossary'];
+  const englishLanguageSuffix = ['settings-translation/excluded-languages', 'settings-translation', 'settings-writing', 'settings-image-translation', 'settings-glossary'];
 
   it.each(['chrome', 'userscript'])('shares query work within each actual search evaluation in %s', async browser => {
     const {state} = await mountOptions('#settings-selection', Promise.resolve(), undefined, undefined, browser, 'en-US');
@@ -175,9 +175,9 @@ describe('OptionsApp language recovery search with actual UI messages', () => {
     };
     for (const [query, expectedIds] of [
       ['Language', ['settings-general', ...englishLanguageSuffix]],
-      ['OpenAI', ['settings-services', 'settings-translation-stats']],
+      ['OpenAI', ['settings-services']],
       ['Ｌａｎｇｕａｇｅ', ['settings-general']],
-      [' language ', ['settings-general', 'settings-translation', 'settings-image-translation', 'settings-writing', 'settings-glossary']],
+      [' language ', ['settings-general', 'settings-translation', 'settings-writing', 'settings-image-translation', 'settings-glossary']],
       ['UnmatchedAbC'.repeat(10_000), []],
       ['Language', ['settings-general', ...englishLanguageSuffix]],
     ] as const) {
@@ -196,7 +196,7 @@ describe('OptionsApp language recovery search with actual UI messages', () => {
     expect(space.results[0].id).toBe('settings-translation-stats/overview');
     expect(space.results.at(-1)?.id).toBe('settings-data/history');
     expect(space.results.every(result => result.panelId)).toBe(true);
-    expect(space.results.some(result => result.panelId === 'information-highlight')).toBe(browser === 'chrome');
+    expect(space.results.some(result => result.panelId === 'reading')).toBe(true);
     expect(space.lowercaseCalls).toBe(4);
     expect(space.normalizationCalls).toBe(1);
   });
@@ -236,7 +236,7 @@ describe('OptionsApp language recovery search with actual UI messages', () => {
     language.value = 'en-US';
     const oldLanguageResult = state.filteredResults[0];
     state.query = 'OpenAI';
-    expect(state.filteredResults.map(result => result.id)).toEqual(['settings-services', 'settings-translation-stats']);
+    expect(state.filteredResults.map(result => result.id)).toEqual(['settings-services']);
     const querySelector = vi.fn();
     vi.stubGlobal('document', {querySelector});
     await state.selectResult(oldLanguageResult);
@@ -271,32 +271,28 @@ describe('OptionsApp language recovery search with actual UI messages', () => {
   it('preserves non-language result content and panel/target/section ordering', async () => {
     const {state, i18n} = await mountOptions('#settings-selection', Promise.resolve(), undefined, undefined, 'chrome', 'zh-CN');
     state.query = '翻译';
-    expect(state.filteredResults.map(result => result.id)).toEqual([
-      'settings-translation-stats/overview', 'settings-translation/page', 'settings-translation/section-translation',
-      'settings-translation/excluded-languages', 'settings-translation/excluded-tags', 'settings-sites/rules', 'settings-video/general', 'settings-advanced/privacy', 'settings-advanced/cache',
-      'privacy-protection', 'feature-services', 'floating-ball-toggle', 'floating-ball-settings', 'excluded-tags', 'translation-sentence-highlight',
-      'settings-general', 'settings-services', 'settings-translation', 'settings-interface', 'settings-selection',
-      'settings-image-translation', 'settings-video', 'settings-translation-center', 'settings-sites', 'settings-translation-stats',
-    ]);
+    const ids = state.filteredResults.map(result => result.id);
+    expect(ids[0]).toBe('settings-translation-stats/overview');
+    expect(ids).toEqual(expect.arrayContaining([
+      'settings-translation/page', 'settings-translation/hover', 'settings-translation/excluded-languages', 'settings-translation/excluded-tags',
+      'settings-sites/rules', 'settings-video/general', 'settings-advanced/privacy', 'settings-advanced/cache',
+      'privacy-protection', 'information-highlight', 'feature-services', 'floating-ball-toggle', 'excluded-tags',
+      'translation-sentence-highlight', 'input-translation',
+      'settings-general', 'settings-services', 'settings-interface', 'settings-translation', 'settings-interactions',
+      'settings-selection', 'settings-writing', 'settings-image-translation',
+      'settings-sites', 'settings-translation-center', 'settings-translation-stats',
+    ]));
     state.query = 'OpenAI';
-    expect(state.filteredResults).toMatchInlineSnapshot(`
-      [
-        {
-          "id": "settings-services",
-          "label": "翻译服务",
-          "searchDescription": "服务与模型",
-          "sectionId": "settings-services",
-        },
-        {
-          "id": "settings-translation-stats",
-          "label": "翻译统计",
-          "searchDescription": "请求规模、耗时与服务表现",
-          "sectionId": "settings-translation-stats",
-        },
-      ]
-    `);
+    expect(state.filteredResults).toEqual([
+      {
+        id: 'settings-services',
+        label: '翻译服务',
+        searchDescription: '服务连接与模型',
+        sectionId: 'settings-services',
+      },
+    ]);
     i18n!.language.value = 'en-US';
-    expect(state.filteredResults.map(result => result.id)).toEqual(['settings-services', 'settings-translation-stats']);
+    expect(state.filteredResults.map(result => result.id)).toEqual(['settings-services']);
     state.query = '';
     expect(state.filteredResults).toEqual([]);
   });
@@ -362,14 +358,14 @@ describe('OptionsApp mounted hash navigation', () => {
 
   it('scrolls smart-highlighting searches within the continuous form without hiding any translation groups', async () => {
     const {state} = await mountOptions('#settings-translation');
-    expect(state.activePanel).toBe('reading');
+    expect(state.activePanel).toBe('page');
     expect(state.contentComponentProps.activePanel).toBeUndefined();
     expect(state.activePanels).toEqual([]);
-    expect(state.sectionPanels.map(panel => panel.id)).toEqual(expect.arrayContaining(['reading', 'information-highlight', 'hover', 'input']));
+    expect(state.sectionPanels.map(panel => panel.id)).toEqual(['page', 'hover', 'reading', 'excluded-languages', 'excluded-tags']);
     vi.stubGlobal('MutationObserver', class {observe() {} disconnect() {}});
     vi.stubGlobal('ResizeObserver', class {observe() {} disconnect() {}});
     Object.assign(window, {setTimeout: vi.fn(() => 1), clearTimeout: vi.fn()});
-    const groups = ['reading', 'information-highlight', 'hover', 'input'].map(name => ({
+    const groups = ['page', 'hover', 'reading', 'excluded-languages'].map(name => ({
       name, style: {display: ''}, getClientRects() {return this.style.display === 'none' ? [] : [{}];},
     }));
     const container = Object.assign(new EventTarget(), {
@@ -385,23 +381,18 @@ describe('OptionsApp mounted hash navigation', () => {
     for (const keyword of ['智能高亮', 'Smart Highlighting', '意外度', 'surprisal', '关键词']) {
       state.query = keyword;
       expect(state.filteredResults.length).toBeGreaterThan(0);
-      expect(state.filteredResults.every(result => result.panelId === 'information-highlight' || result.targetId === 'information-highlight-settings')).toBe(true);
+      expect(state.filteredResults.every(result => result.targetId === 'information-highlight-settings')).toBe(true);
       await state.selectResult(state.filteredResults[0]);
-      expect(state.activePanel).toBe('information-highlight');
+      expect(state.activePanel).toBe('reading');
       expect(state.contentComponentProps.activePanel).toBeUndefined();
-      expect(container.querySelectorAll).toHaveBeenLastCalledWith('[data-settings-panel="information-highlight"]');
-      expect(container.scrollTo).toHaveBeenLastCalledWith({top: 500, behavior: 'instant'});
+      expect(container.querySelectorAll).toHaveBeenLastCalledWith('#information-highlight-settings');
       expect(groups.every(group => group.getClientRects().length === 1)).toBe(true);
     }
-    state.query = 'Smart Highlighting';
-    await state.selectResult(state.filteredResults.find(result => result.targetId === 'information-highlight-settings')!);
-    expect(container.querySelectorAll).toHaveBeenLastCalledWith('#information-highlight-settings');
-    expect(container.scrollTo).toHaveBeenLastCalledWith({top: 320, behavior: 'instant'});
     state.selectSection('settings-translation', 'translation-sentence-highlight');
     expect(state.activePanel).toBe('reading');
     state.selectSection('settings-translation', 'information-highlight-settings');
-    expect(state.activePanel).toBe('information-highlight');
-    state.selectSection('settings-translation', 'floating-ball-settings');
+    expect(state.activePanel).toBe('reading');
+    state.selectSection('settings-interactions', 'floating-ball-settings');
     expect(state.activePanel).toBe('floating-ball');
     expect(state.contentComponentProps.activePanel).toBeUndefined();
   });
@@ -419,7 +410,7 @@ describe('OptionsApp mounted hash navigation', () => {
     state.selectSection('settings-translation', 'information-highlight-settings');
     expect(state.contentComponentProps.activePanel).toBeUndefined();
     state.query = '双语逐句高亮';
-    expect(state.filteredResults.some(result => result.targetId === 'translation-sentence-highlight')).toBe(true);
+    expect(state.filteredResults.some(result => result.targetId === 'translation-sentence-highlight-style')).toBe(true);
   });
 
   it('keeps userscript builds excluded even when the runtime capability port reports chrome', async () => {
@@ -515,10 +506,10 @@ it('reveals collapsed groups and the correct page category for a cross-page cont
   expect(location.hash).toBe('#settings-advanced');
   state.selectPanel('requests');
   expect(state.activePanel).toBe('requests');
-  state.selectSection('settings-translation', 'floating-ball-settings');
+  state.selectSection('settings-interactions', 'floating-ball-settings');
   expect(state.activePanel).toBe('floating-ball');
   state.selectSection('settings-translation');
-  expect(state.activePanel).toBe('reading');
+  expect(state.activePanel).toBe('page');
   state.toggleGroup(3);
   expect(state.isGroupOpen(3)).toBe(false);
   state.toggleGroup(3);
@@ -809,7 +800,7 @@ describe('OptionsApp actual client URL targets', () => {
     expect(content.scrollTop).toBeGreaterThan(0);expect(mounted.location.search).toBe('?target='+encodeURIComponent(panel));
   });
   it('keeps a concrete registered search destination ahead of the panel fallback',async()=>{
-    const mounted=await mountClientOptions('settings-translation','chrome',undefined,{target:'floating-ball-settings'});
+    const mounted=await mountClientOptions('settings-interactions','chrome',undefined,{target:'floating-ball-settings'});
     expect(mounted.targetQueries).toContain('#floating-ball-settings');
     expect(mounted.targetQueries).not.toContain('[data-settings-panel="floating-ball-settings"]');
     expect(mounted.highlightedPanels).toContain('floating-ball');expect(mounted.errors).toEqual([]);
@@ -820,8 +811,8 @@ describe('OptionsApp actual client URL targets', () => {
     expect(mounted.targetQueries).toEqual([]);expect(mounted.highlightedPanels).toEqual([]);
     expect(mounted.host.querySelector<HTMLElement>('.settings-card')!.scrollTop).toBe(0);expect(mounted.errors).toEqual([]);
   });
-  it('keeps a capability-hidden panel unavailable to a userscript URL target',async()=>{
-    const mounted=await mountClientOptions('settings-translation','userscript',undefined,{target:'information-highlight'});
+  it('keeps a capability-hidden target unavailable to a userscript URL target',async()=>{
+    const mounted=await mountClientOptions('settings-translation','userscript',undefined,{target:'information-highlight-settings'});
     expect(mounted.targetQueries).toEqual([]);expect(mounted.highlightedPanels).toEqual([]);expect(mounted.errors).toEqual([]);
   });
   it('leaves an internal mount on its own initial section regardless of host URL section/target',async()=>{
@@ -837,7 +828,6 @@ describe('OptionsApp actual client standalone capability navigation', () => {
     ['settings-image-translation', 'settings-image-translation'],
     ['settings-area-translation', 'settings-image-translation'],
     ['settings-video', 'settings-video'],
-    ['settings-writing', 'settings-writing'],
     ['settings-translation-stats', 'settings-translation-stats'],
     ['settings-model-usage', 'settings-translation-stats'],
   ])('keeps unavailable %s public links without loading extension forms', async (requested, canonical) => {

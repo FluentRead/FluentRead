@@ -8,7 +8,6 @@
 <template>
   <SettingsPanel name="translation" :active="props.activePanel">
 <TranslationStyleSettings :config="props.config" />
-<SentenceHighlightStyleSettings :config="props.config" />
 </SettingsPanel>
 
   <SettingsPanel name="skin" :active="props.activePanel">
@@ -198,10 +197,6 @@
   />
 </SettingsPanel>
 
-  <SettingsPanel name="video-learning" :active="props.activePanel">
-    <VideoSentenceLearningAppearanceSettings :config="props.config" data-settings-anchor="video-learning" />
-  </SettingsPanel>
-
   <SettingsPanel name="font" :active="props.activePanel">
 <SettingsGroup
     class="interface-font-group"
@@ -288,7 +283,6 @@
 <script lang="ts" setup>
 import './interface-font-previews.css'
 import SettingsPanel from './components/SettingsPanel.vue'
-import VideoSentenceLearningAppearanceSettings from './VideoSentenceLearningAppearanceSettings.vue'
 import {computed, defineAsyncComponent, onActivated, onBeforeUnmount, onDeactivated, ref, watch} from 'vue'
 import {ElMessage} from 'element-plus'
 import type {Config} from '@/src/core/config/model'
@@ -318,7 +312,6 @@ import PopupLayoutPreview from './components/PopupLayoutPreview.vue'
 import PopupLayoutEditor from './PopupLayoutEditor.vue'
 import TranslationLoadingStyleSettings from './TranslationLoadingStyleSettings.vue'
 import TranslationStyleSettings from './TranslationStyleSettings.vue'
-import SentenceHighlightStyleSettings from './SentenceHighlightStyleSettings.vue'
 import SettingsGroup from './components/SettingsGroup.vue'
 import SettingsItem from './components/SettingsItem.vue'
 const SidepanelScopeSetting = import.meta.env.BROWSER === 'userscript'

@@ -26,6 +26,7 @@ type Listener = (event: any) => unknown;
 
 class FakeDocument {
     activeElement: Element | null = null;
+    documentElement = {lang: ''};
     listeners = new Map<string, Listener[]>();
 
     addEventListener(type: string, listener: Listener, options?: AddEventListenerOptions): void {
@@ -174,6 +175,24 @@ afterEach(() => {
 });
 
 describe('input translation content feature', () => {
+    it.each([
+        ['auto', 'fr-CA', 'fr'],
+        ['auto', 'zh-HK', 'zh-Hant'],
+        ['auto', 'und', 'en'],
+        ['auto', '', 'en'],
+        ['ja', 'fr', 'ja'],
+    ])('requests %s on a %s page with concrete target %s', async (setting, pageLanguage, expected) => {
+        const h = mountHarness({config: {inputBoxTranslationTarget: setting}});
+        const input = fakeElement('textarea');
+        input.value = 'A reply to translate';
+        h.fakeDocument.activeElement = input;
+        h.fakeDocument.documentElement.lang = pageLanguage;
+        await h.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        expect(h.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'inputBoxTranslation', text: 'A reply to translate', targetLang: expected,
+        }));
+        h.controller.abort();
+    });
     it.each(['restore','triple-cleanup'])('a late %s write cannot release the newer editor write lease',async phase=>{
         const h=mountHarness({config:{inputBoxTranslationTrigger:phase==='restore'?'ctrl_enter':'triple_equal'}}),rich=fakeElement('div',{contenteditable:'true'});rich.innerText=rich.value='Hello';h.fakeDocument.activeElement=rich;
         if(phase==='restore')await h.fakeDocument.emit('keydown',trustedKey({key:'Enter',ctrlKey:true}));

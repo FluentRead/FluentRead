@@ -708,7 +708,7 @@ export const options = {
         {value: "dark", label: "暗色主题"},
     ],
     // 输入框翻译目标语言选项
-    inputBoxTranslationTarget: translationLanguageOptions,
+    inputBoxTranslationTarget: [{value: "auto", label: "自动检测"}, ...translationLanguageOptions],
     // 输入框翻译触发方式选项
     inputBoxTranslationTrigger: [
         {value: "disabled", label: "已关闭"},

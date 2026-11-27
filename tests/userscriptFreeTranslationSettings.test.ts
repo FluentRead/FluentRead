@@ -15,7 +15,7 @@ vi.mock('@/src/services/config/store', () => ({
     requestConfigPatch: (...args: unknown[]) => (globalThis as any).__frUserscriptTimeoutSettings.saved(...args),
     subscribeConfig: (...args: unknown[]) => (globalThis as any).__frUserscriptTimeoutSettings.subscribe(...args),
 }));
-vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({t: (key: string) => key})}));
+vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({t: (key: string) => key, translateLegacy: (value: string) => value})}));
 vi.mock('webextension-polyfill', () => ({default: {tabs: {sendMessage: (...args: unknown[]) => (globalThis as any).__frUserscriptTimeoutSettings.sent(...args)}}}));
 vi.mock('element-plus', () => ({ElOption: {props: ['value','label'], setup: (props: any) => () => vueRuntime.h('option', {value: props.value}, props.label)}}));
 vi.mock('@/src/ui/components/TranslationLoadingPreview.vue', () => ({default: {render: () => null}}));
@@ -498,8 +498,9 @@ describe('compact userscript real settings controls', () => {
         await pressSetting('保存设置');
         expect(h.saved.mock.calls[0][0]).toMatchObject({service:'microsoft',inputBoxTranslationTrigger:'triple_equal',inputBoxTranslationInterval:350,inputBoxTranslationTarget:'ja',inputBoxTranslationService:'deepseek',inputBoxTranslationModel:'deepseek-chat',inputBoxTranslationSystemPrompt:'Input system',inputBoxTranslationPrompt:'Translate {{origin}} to {{to}}'});
         await pressSetting('恢复默认间隔');await pressSetting('恢复默认系统提示词');await pressSetting('恢复默认翻译提示词');
+        await h.change('输入框目标语言','auto');
         await h.change('输入框翻译服务','microsoft');expect(h.state.draft.inputBoxTranslationModel).toBe('');
-        await pressSetting('保存设置');expect(h.saved.mock.calls[1][0]).toMatchObject({inputBoxTranslationInterval:1000,inputBoxTranslationSystemPrompt:'',inputBoxTranslationPrompt:'',inputBoxTranslationService:'microsoft',inputBoxTranslationModel:''});
+        await pressSetting('保存设置');expect(h.saved.mock.calls[1][0]).toMatchObject({inputBoxTranslationInterval:1000,inputBoxTranslationSystemPrompt:'',inputBoxTranslationPrompt:'',inputBoxTranslationService:'microsoft',inputBoxTranslationModel:'',inputBoxTranslationTarget:'auto'});
     });
 
     it.each([

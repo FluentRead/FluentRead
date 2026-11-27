@@ -129,7 +129,7 @@
               <p class="hint">相邻两次按键最多等待此时长；默认 1000 毫秒。</p>
               <button type="button" @click="draft.inputBoxTranslationInterval = 1000">恢复默认间隔</button>
             </template>
-            <label><span>目标语言</span><UiSelect v-model="draft.inputBoxTranslationTarget" :append-to="menuContainer" filterable aria-label="输入框目标语言"><ElOption v-for="item in options.inputBoxTranslationTarget" :key="item.value" :value="item.value" :label="item.label" /></UiSelect></label>
+            <label><span>目标语言</span><UiSelect v-model="draft.inputBoxTranslationTarget" :append-to="menuContainer" filterable aria-label="输入框目标语言"><ElOption v-for="item in options.inputBoxTranslationTarget" :key="item.value" :value="item.value" :label="item.value === 'auto' ? translateLegacy(item.label) : item.label" /></UiSelect></label>
             <label><span>输入框翻译服务</span><UiSelect v-model="draft.inputBoxTranslationService" :append-to="menuContainer" filterable aria-label="输入框翻译服务" @change="draft.inputBoxTranslationModel = ''"><ElOption v-for="item in serviceOptions" :key="item.value" :value="item.value" :label="item.label" /></UiSelect></label>
             <p class="hint">使用该服务已保存的连接设置。</p>
             <label v-if="servicesType.isUseModel(draft.inputBoxTranslationService)"><span>输入框翻译模型</span><input v-model="draft.inputBoxTranslationModel" :list="inputModelListId" placeholder="留空使用该服务的默认模型" /></label>
@@ -221,7 +221,7 @@ const versionLabel = `流畅阅读 V${process.env.VUE_APP_VERSION} · Userscript
 const iconUrl = globalThis.__FLUENTREAD_ICON_DATA__ || '';
 const menuContainer = ref<HTMLElement>();
 const draft = ref(new Config());
-const {t} = useUiI18n();
+const {t, translateLegacy} = useUiI18n();
 const hydrated = ref(false);
 const aiRequestTimeoutSecondsDraft = ref<number | string>(draft.value.aiRequestTimeoutMs / 1000);
 watch(() => [draft.value, draft.value.aiRequestTimeoutMs] as const, ([, value]) => {

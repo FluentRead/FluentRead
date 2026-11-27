@@ -52,7 +52,7 @@
 
       <SettingsItem :label="t('inputTranslation.target')">
         <el-select :model-value="targetLanguage" :onUpdate:modelValue="actions.target" data-testid="input-translation-target" :aria-label="t('inputTranslation.target')">
-          <el-option v-for="item in targetOptions" :key="item.value" class="select-left" data-i18n-ignore :label="getMultilingualTargetLanguageLabel(item.value, item.label, language)" :value="item.value" />
+          <el-option v-for="item in targetOptions" :key="item.value" class="select-left" data-i18n-ignore :label="getMultilingualTargetLanguageLabel(item.value, translateLegacy(item.label), language)" :value="item.value" />
         </el-select>
       </SettingsItem>
 
@@ -466,6 +466,7 @@ const workflowDescription = computed(() => {
   try {
     target = new Intl.DisplayNames([language.value], {type: 'language'}).of(targetLanguage.value) || target
   } catch { /* 无法识别的语言标识继续显示目录名称。 */ }
+  if (targetLanguage.value === 'auto') target = translateLegacy('自动检测')
   const workflowKey = outputMode.value === 'replace' ? 'inputTranslation.workflowEnabled'
     : outputMode.value === 'prepend' ? 'inputTranslation.workflowPrepend' : 'inputTranslation.workflowAppend'
   return t(workflowKey, {trigger, language: target})

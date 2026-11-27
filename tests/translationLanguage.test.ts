@@ -77,7 +77,8 @@ describe('扩展翻译语言目录', () => {
         expect(targets).toHaveLength(52);
         expect(new Set(targets).size).toBe(targets.length);
         expect(options.from.map(item => item.value)).toEqual(['auto', ...targets]);
-        expect(options.inputBoxTranslationTarget.map(item => item.value)).toEqual(targets);
+        expect(options.inputBoxTranslationTarget.map(item => item.value)).toEqual(['auto', ...targets]);
+        expect(normalizeConfig({inputBoxTranslationTarget: 'auto'}).inputBoxTranslationTarget).toBe('auto');
         expect(WRITING_LANGUAGES.map(item => item.value)).toEqual(['target', ...targets]);
         expect(targets).toEqual(expect.arrayContaining(['ar', 'hi', 'vi', 'th', 'de', 'pt', 'it', 'uk', 'sw', 'fil']));
     });

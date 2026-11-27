@@ -110,6 +110,15 @@ import {
     normalizeSectionTranslationHotkey,
     resolveSectionTranslationHotkey,
 } from '@/src/core/config/sectionTranslation';
+import {
+    DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY,
+    DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY_ACTION,
+    normalizeCustomVideoSubtitleModeHotkey,
+    normalizeVideoSubtitleModeHotkey,
+    normalizeVideoSubtitleModeHotkeyAction,
+    resolveVideoSubtitleModeHotkey,
+    type VideoSubtitleModeHotkeyAction,
+} from '@/src/core/config/videoSubtitleShortcut';
 import {normalizeSectionTranslationRules, type SectionTranslationRule} from './sectionTranslationRules';
 import { normalizeSelectionTtsVoiceOrder } from "./selectionTts";
 import {
@@ -439,6 +448,10 @@ export class Config {
     videoServiceDefaultMigrated: boolean; // 是否已迁移视频字幕默认服务
     videoSubtitleVisible: boolean; // 是否显示 FluentRead 视频字幕
     videoSubtitleDisplayMode: VideoSubtitleDisplayMode; // 视频字幕显示模式
+    videoSubtitleModeHotkeyEnabled: boolean; // 是否启用快捷键切换视频字幕显示模式
+    videoSubtitleModeHotkey: string; // 视频字幕模式切换快捷键；'custom' 表示使用自定义组合键
+    customVideoSubtitleModeHotkey: string; // 自定义视频字幕模式切换快捷键
+    videoSubtitleModeHotkeyAction: VideoSubtitleModeHotkeyAction; // 快捷键切换方式：双语↔原文或循环切换
     videoSubtitleFontSize: number; // 视频字幕字号百分比
     videoSubtitleOffsetMs: number; // 字幕时间偏移，正数延后、负数提前
     videoSubtitleAppearance: VideoSubtitleAppearance; // 视频字幕皮肤与布局参数
@@ -669,6 +682,10 @@ export class Config {
         this.videoServiceDefaultMigrated = true;
         this.videoSubtitleVisible = true; // 默认显示视频译文
         this.videoSubtitleDisplayMode = 'bilingual'; // 默认双语显示
+        this.videoSubtitleModeHotkeyEnabled = false; // 默认关闭，避免未主动选择时接管播放器页面的组合键
+        this.videoSubtitleModeHotkey = DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY; // 默认 Alt+M，开启后才监听
+        this.customVideoSubtitleModeHotkey = '';
+        this.videoSubtitleModeHotkeyAction = DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY_ACTION; // 默认在双语和仅原文之间往返
         this.videoSubtitleFontSize = DEFAULT_VIDEO_SUBTITLE_FONT_SIZE; // 默认字幕字号
         this.videoSubtitleOffsetMs = 0;
         this.videoSubtitleAppearance = normalizeVideoSubtitleAppearance(DEFAULT_VIDEO_SUBTITLE_APPEARANCE);
@@ -1502,6 +1519,16 @@ export function normalizeConfig(value: unknown): Config {
     if (!['bilingual', 'translation-only', 'original-only'].includes(normalized.videoSubtitleDisplayMode)) {
         normalized.videoSubtitleDisplayMode = 'bilingual';
     }
+    if (typeof normalized.videoSubtitleModeHotkeyEnabled !== 'boolean') {
+        normalized.videoSubtitleModeHotkeyEnabled = false;
+    }
+    normalized.customVideoSubtitleModeHotkey = normalizeCustomVideoSubtitleModeHotkey(source.customVideoSubtitleModeHotkey);
+    normalized.videoSubtitleModeHotkey = normalizeVideoSubtitleModeHotkey(source.videoSubtitleModeHotkey);
+    // 选择自定义却没有可用组合键时回到预设默认值，避免开启状态没有可用快捷键。
+    if (normalized.videoSubtitleModeHotkey === 'custom' && !normalized.customVideoSubtitleModeHotkey) {
+        normalized.videoSubtitleModeHotkey = DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY;
+    }
+    normalized.videoSubtitleModeHotkeyAction = normalizeVideoSubtitleModeHotkeyAction(source.videoSubtitleModeHotkeyAction);
     normalized.videoSubtitleFontSize = normalizeVideoSubtitleFontSize(normalized.videoSubtitleFontSize);
     normalized.videoSubtitleOffsetMs = normalizeVideoSubtitleOffsetMs(normalized.videoSubtitleOffsetMs);
     const hasVideoSubtitleAppearance = hasOwn(source as object, 'videoSubtitleAppearance');
@@ -1765,6 +1792,9 @@ export function normalizeConfig(value: unknown): Config {
                     : []),
                 ...(normalized.sectionTranslationHotkeyEnabled
                     ? [resolveSectionTranslationHotkey(normalized.sectionTranslationHotkey, normalized.customSectionTranslationHotkey)]
+                    : []),
+                ...(normalized.videoSubtitleModeHotkeyEnabled
+                    ? [resolveVideoSubtitleModeHotkey(normalized.videoSubtitleModeHotkey, normalized.customVideoSubtitleModeHotkey)]
                     : []),
                 inputBoxTranslationTriggerHotkey(
                     normalized.inputBoxTranslationTrigger,

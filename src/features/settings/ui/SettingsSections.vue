@@ -276,6 +276,11 @@
           </GlossaryLibrarySelect>
         </SettingsItem>
       </SettingsGroup>
+      <VideoSubtitleShortcutSettings
+        v-if="VideoSubtitleShortcutSettings"
+        :config="config"
+        :active="viewActive && props.activeSection === 'settings-video' && (!props.activePanel || props.activePanel === 'general')"
+      />
       </SettingsPanel>
       <SettingsPanel name="appearance" :active="props.activePanel">
 <VideoSubtitleAppearanceSettings :config="config" />
@@ -711,6 +716,7 @@ import {
 const ImageOcrSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/image-translation/ui/public').then(module => module.ImageOcrSettings));
 const MangaSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/image-translation/ui/public').then(module => module.MangaSettings));
 const VideoLocalModelSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoLocalModelSettings.vue'));
+const VideoSubtitleShortcutSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSubtitleShortcutSettings.vue'));
 const LocalTtsSettings = defineAsyncComponent(() => import('./LocalTtsSettings.vue'));
 const VideoSubtitleAppearanceSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSubtitleAppearanceSettings.vue'));
 const ModelUsageDashboard = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/model-usage/public').then(module => module.ModelUsageDashboard));

@@ -301,7 +301,7 @@ export const settingsPagePanels: Readonly<Record<string, readonly SettingsPagePa
     {id: 'preview', labelKey: 'options.panel.sitePreview', searchTerms: '生效预览 网址匹配 检查规则 优先级', targetIds: []},
   ],
   'settings-video': [
-    {"id": "general", "labelKey": "options.panel.video", "searchTerms": "字幕 开关 翻译服务 术语库", "targetIds": []},
+    {"id": "general", "labelKey": "options.panel.video", "searchTerms": "字幕 开关 翻译服务 术语库 快捷键 显示模式 双语 原文 shortcut hotkey", "targetIds": []},
     {"id": "appearance", "labelKey": "options.panel.appearance", "searchTerms": "字幕外观 显示模式 颜色 字号 双语顺序 双语上下顺序 原文在上 译文在上 读音标注 拉丁字母辅助读音 拼音 罗马音", "targetIds": []},
     {"id": "local", "labelKey": "options.panel.local", "searchTerms": "X 本地 AI Whisper 语音 识别", "targetIds": []},
   ],

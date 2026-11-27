@@ -11,7 +11,8 @@ type HotkeyFields =
     | {mode: 'inputBoxTranslationTrigger'; custom: 'customInputBoxTranslationHotkey'}
     | {mode: 'paragraphCopyHotkey'; custom: 'customParagraphCopyHotkey'}
     | {mode: 'sectionTranslationHotkey'; custom: 'customSectionTranslationHotkey'}
-    | {mode: 'selectionAreaHotkey'; custom: 'customSelectionAreaHotkey'};
+    | {mode: 'selectionAreaHotkey'; custom: 'customSelectionAreaHotkey'}
+    | {mode: 'videoSubtitleModeHotkey'; custom: 'customVideoSubtitleModeHotkey'};
 
 export function useHotkeyDraft(getConfig: () => Config, fields: HotkeyFields, getAvailable: () => boolean, getContext?: () => boolean) {
     const showCustomHotkeyDialog = ref(false);

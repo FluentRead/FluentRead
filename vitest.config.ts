@@ -54,6 +54,7 @@ export default defineConfig({
         resolve(__dirname, 'src/features/settings/ui/AreaTranslationSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/ParagraphCopySettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/SectionTranslationSettings.vue'),
+        resolve(__dirname, 'src/features/settings/ui/VideoSubtitleShortcutSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/InterfaceSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/components/ToolbarClickSetting.vue'),
         resolve(__dirname, 'src/features/settings/ui/TranslationStyleSettings.vue'),

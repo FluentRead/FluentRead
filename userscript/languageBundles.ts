@@ -23,6 +23,7 @@ export function userscriptMessages<T extends Record<string, string>>(messages: T
         && !key.startsWith('contextMenu.notice.') && !key.startsWith('video.learning.') && !key.startsWith('video.learningAppearance.')
         && !key.startsWith('video.readingAnnotation.')
         && !key.startsWith('video.appearance.') && !key.startsWith('video.export') && !key.startsWith('video.ai') && !key.startsWith('video.model')
+        && (!key.startsWith('video.modeShortcut.') || key === 'video.modeShortcut.title')
         && key !== 'video.nativeFullscreenHint'
         && !key.startsWith('diagnostics.')
         && !['waitingTranslation', 'crossPageContext', 'fullPassage', 'closePassage'].some(name => key === `document.pdfReading.${name}`)

@@ -10,7 +10,9 @@ Read original captions and translations in YouTube, X, Bilibili, Udemy, edX, Dis
 2. In YouTube or X, click the FluentRead icon near the fullscreen button.
 3. Choose **Bilingual / Translated / Original**. Other supported platforms provide display controls near their captions.
 
-The service follows webpage translation by default; choose a separate one in **Video translation settings**. Selecting **Off** in the player disables video translation and removes its button. Re-enable it from the extension menu or settings.
+The service follows webpage translation by default; choose a separate one in **Video translation settings**. Selecting **Off** in the player hides FluentRead subtitles while keeping its icon so you can re-enable them later.
+
+To switch subtitle modes from the keyboard without clicking the player icon, enable **Subtitle mode shortcut** under **Video translation settings → General** (default `Alt+M` / `Option+M`, with presets and custom shortcut recording) and choose **Bilingual ↔ Original**, **Cycle (Bilingual → Translated → Original)**, or **Cycle all (including Off)**. The shortcut automatically yields while typing in input fields.
 
 Translation depends on the selected service's response. Opening a video or seeking to an untranslated section can cause a delay. Retry a failed translation without repeating transcription: recognized source captions and their timeline remain available.
 

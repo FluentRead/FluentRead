@@ -12,7 +12,7 @@
  * 字号尺度与原色：普通图先通过透明准入，再在原图中观察背景、字色及逐行墨迹，优先用原文字与实测字形核对字号，同次核对通过的位置用于原绘字框内的译文对齐；只有新增范围全部是已证不透明底色且避开其他文字时，才为完整单行少量增高绘字框，清字始终沿原掩码。可确认的渐变字色不借此扩框。漫画修补前也用原文字保存源色和可信字号，不把译文长度当作原字体比例，不从修补结果反推样式；原OCR字号、物理框和白底旁置规则保持独立。
  * 空识别：普通图片仅在 OCR 真正返回空数组时使用轻量原图保留协议，不分配译图画布；非空结果经保护或置信过滤后不可读仍报错，漫画维持既有空页协议。
  * 气泡补绘：漫画发生原文碰撞时保持全部原文保护；仅同源局部气泡提示有效、原闭合组件内有足够纯白空处且完整译文字号不低于源字号时另放译文，不清除原文、不新增 OCR、翻译或修补模型；分段显示窗口同时限制原段归属和完整补绘位置，非法范围仅撤回补绘，不改变正常清字；已使用补绘范围参与后续避让，阅读定位仍保留原坐标，无安全位置时继续标记未绘制。
- * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
+ * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；回传后台的 callback runtime 由组合根注入（Safari 为同源页面通道），未注入时使用 chrome.runtime；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
  * 倾斜排版：在原像素上独立观察方向，再用原文字核对尺度；普通图与漫画只向对应绘制传递同源样式，不扩大擦字范围，也不绕过透明预检或完整译文要求。
  * 译文字形：背景返回本次翻译选用的目标语言。原文字体尺度度量完成后，为译文排版画布指定该语言，预检和实际绘制使用相同的字形回退。
  */
@@ -126,10 +126,30 @@ async function checkImageCancellation(signal?: AbortSignal): Promise<void> {
     throwIfImageOperationAborted(signal);
 }
 
+/** 发往后台的 callback runtime；Safari 后台 iframe 由组合根注入同源页面通道，其余容器使用 chrome.runtime。 */
+export interface ImageOffscreenBackgroundRuntime {
+    readonly lastError?: {readonly message?: string};
+    sendMessage(message: unknown, callback: (response: unknown) => void): void;
+}
+
+let backgroundRuntime: ImageOffscreenBackgroundRuntime | undefined;
+
+/** 由 app/offscreen 组合根在启动时注入，使文字翻译、取消与进度与其他离屏回传走同一通道。 */
+export function configureImageOffscreenBackgroundRuntime(runtime: ImageOffscreenBackgroundRuntime | undefined): void {
+    backgroundRuntime = runtime;
+}
+
+function getBackgroundRuntime(): ImageOffscreenBackgroundRuntime {
+    return backgroundRuntime ?? chrome.runtime as unknown as ImageOffscreenBackgroundRuntime;
+}
+
 function reportProgress(requestId: string | undefined, stage: ImageTranslationStage, progress?: number): void {
     if (!requestId) return;
     // 进度是旁路；页面已关闭时不得影响取消与 OCR 主链。
-    try { chrome.runtime.sendMessage({type: IMAGE_PROGRESS_MESSAGE_TYPE, requestId, stage, progress}, () => void chrome.runtime.lastError); } catch { /* 扩展上下文可能已销毁。 */ }
+    try {
+        const runtime = getBackgroundRuntime();
+        runtime.sendMessage({type: IMAGE_PROGRESS_MESSAGE_TYPE, requestId, stage, progress}, () => void runtime.lastError);
+    } catch { /* 扩展上下文可能已销毁。 */ }
 }
 
 export async function translateImageTextsInExtension(
@@ -140,6 +160,7 @@ export async function translateImageTextsInExtension(
     imageLabelSlots?: number[],
 ): Promise<{translations: string[]; targetLanguage?: string}> {
     const operationId = requestId || `legacy-image-text-${++legacyImageTextRequestSequence}`;
+    const runtime = getBackgroundRuntime();
     const response = await new Promise<any>((resolve, reject) => {
         let settled = false;
         let timeout: ReturnType<typeof setTimeout>;
@@ -152,10 +173,10 @@ export async function translateImageTextsInExtension(
         };
         const notifyCancellation = () => {
             try {
-                chrome.runtime.sendMessage({
+                runtime.sendMessage({
                     type: 'fluentReadImageCancel',
                     requestId: operationId,
-                }, () => void chrome.runtime.lastError);
+                }, () => void runtime.lastError);
             } catch {
                 // Offscreen 正在销毁时取消消息可能无法投递；本地等待仍必须立即结束。
             }
@@ -174,7 +195,7 @@ export async function translateImageTextsInExtension(
             reject(new Error('图片文字翻译超时，请重试'));
         }), IMAGE_TEXT_TRANSLATION_TIMEOUT_MS);
         try {
-            chrome.runtime.sendMessage({
+            runtime.sendMessage({
                 type: 'fluentReadImageTranslateTexts',
                 texts,
                 ...(imageLabelSlots?.length ? {imageLabelSlots} : {}),
@@ -182,7 +203,8 @@ export async function translateImageTextsInExtension(
                 requestId: operationId,
                 timeoutMs: IMAGE_TEXT_TRANSLATION_TIMEOUT_MS,
             }, result => finish(() => {
-                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                const lastError = runtime.lastError;
+                if (lastError) reject(new Error(lastError.message));
                 else resolve(result);
             }));
         } catch (error) {

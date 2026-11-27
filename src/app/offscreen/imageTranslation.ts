@@ -13,6 +13,7 @@ export {
     disposeImageOcrWorker,
 } from '@/src/features/image-translation/services/ocrRuntime';
 export {
+    configureImageOffscreenBackgroundRuntime,
     cropAreaInOffscreen,
     translateAreaInOffscreen,
     translateImageInOffscreen,

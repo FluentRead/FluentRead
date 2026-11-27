@@ -60,29 +60,41 @@ const AnswerInline = ({text}: {text: string}) => parseReadingEvidence(text, prop
 });
 </script>
 <style scoped>
-.fr-reading-markdown { --fr-answer-quote: var(--el-text-color-regular, inherit); --fr-answer-border: var(--el-border-color-lighter, #e9e9ef); --fr-answer-soft: var(--el-fill-color-lighter, #f8f8fa); --fr-answer-code: var(--el-fill-color-light, #f3f3f6); color: inherit; font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; }
+.fr-reading-markdown {
+  --fr-answer-quote: var(--el-text-color-regular, #475266);
+  --fr-answer-border: var(--el-border-color-lighter, #e7eaf1);
+  --fr-answer-soft: var(--el-fill-color-lighter, #f7f8fb);
+  --fr-answer-code: var(--el-fill-color-light, #eff1f6);
+  --fr-answer-accent: var(--el-color-primary, #ef4776);
+  color: inherit;
+  font-size: 14px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
 .fr-reading-markdown > :first-child { margin-top: 0; }
 .fr-reading-markdown > :last-child { margin-bottom: 0; }
-.fr-reading-structure { margin-bottom: 16px; }
+.fr-reading-structure { margin-bottom: 14px; }
 .fr-reading-markdown .fr-reading-structure > h3 { margin: 0 0 8px; padding: 0; border: 0; }
-.fr-reading-markdown h3, .fr-reading-markdown h4 { margin: 22px 0 8px; color: inherit; font-size: 14px; font-weight: 700; line-height: 1.45; }
-.fr-reading-markdown h3 { font-size: 15px; }
-.fr-reading-markdown h3:not(:first-child), .fr-reading-markdown h4:not(:first-child) { padding-top: 12px; border-top: 1px solid var(--fr-answer-border); }
-.fr-reading-markdown p { margin: 0 0 12px; white-space: pre-line; }
-.fr-reading-markdown ul, .fr-reading-markdown ol { margin: 6px 0 14px; padding-inline-start: 1.5em; }
-.fr-reading-markdown li { padding-inline-start: 2px; margin: 5px 0; white-space: pre-line; }
-.fr-reading-markdown li::marker { color: var(--el-color-primary, #ec4899); }
-.fr-reading-markdown blockquote { margin: 12px 0; padding: 7px 12px; border-inline-start: 3px solid var(--el-color-primary-light-5, #f6a5c4); color: var(--fr-answer-quote); background: var(--fr-answer-soft); border-radius: 0 5px 5px 0; white-space: pre-line; }
+.fr-reading-markdown h3, .fr-reading-markdown h4 { margin: 18px 0 7px; color: inherit; font-size: 13.5px; font-weight: 650; line-height: 1.45; }
+.fr-reading-markdown h3 { font-size: 14.5px; }
+.fr-reading-markdown h3:not(:first-child), .fr-reading-markdown h4:not(:first-child) { padding-top: 11px; border-top: 1px solid var(--fr-answer-border); }
+.fr-reading-markdown p { margin: 0 0 10px; white-space: pre-line; }
+.fr-reading-markdown ul, .fr-reading-markdown ol { margin: 5px 0 12px; padding-inline-start: 1.4em; }
+.fr-reading-markdown li { padding-inline-start: 2px; margin: 4px 0; white-space: pre-line; }
+.fr-reading-markdown li::marker { color: var(--fr-answer-accent); }
+.fr-reading-markdown blockquote { margin: 10px 0; padding: 8px 12px; border-inline-start: 2.5px solid color-mix(in srgb, var(--fr-answer-accent) 48%, transparent); color: var(--fr-answer-quote); background: var(--fr-answer-soft); border-radius: 0 7px 7px 0; white-space: pre-line; }
 .fr-reading-markdown :deep(strong) { color: inherit; font-weight: 650; }
-.fr-reading-markdown :deep(code) { padding: 2px 5px; border-radius: 4px; background: var(--fr-answer-code); color: inherit; font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; }
-.fr-reading-markdown pre { margin: 12px 0; padding: 12px; max-width: 100%; overflow: auto; border: 1px solid var(--fr-answer-border); border-radius: 7px; background: var(--fr-answer-soft); line-height: 1.65; }
+.fr-reading-markdown :deep(code) { padding: 1.5px 5px; border-radius: 5px; background: var(--fr-answer-code); color: inherit; font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; }
+.fr-reading-markdown pre { margin: 10px 0; padding: 10px 12px; max-width: 100%; overflow: auto; border: 1px solid var(--fr-answer-border); border-radius: 8px; background: var(--fr-answer-soft); line-height: 1.6; }
 .fr-reading-markdown pre code { display: block; padding: 0; background: transparent; white-space: pre; }
-.fr-reading-table { max-width: 100%; margin: 12px 0; overflow-x: auto; }
-.fr-reading-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.fr-reading-table th, .fr-reading-table td { padding: 7px 9px; border: 1px solid var(--fr-answer-border); text-align: start; vertical-align: top; }
-.fr-reading-table th { font-weight: 650; background: var(--fr-answer-soft); }
-.is-compact { font-size: 13px; line-height: 1.75; }
-.is-compact h3, .is-compact h4 { margin-top: 18px; font-size: 13px; }
-.is-compact p, .is-compact ul, .is-compact ol { margin-bottom: 10px; }
-.fr-dark-theme .fr-reading-markdown { --fr-answer-quote: #b6a9b5; --fr-answer-border: #514651; --fr-answer-soft: #352f38; --fr-answer-code: #413846; }
+.fr-reading-table { max-width: 100%; margin: 10px 0; overflow-x: auto; border: 1px solid var(--fr-answer-border); border-radius: 8px; }
+.fr-reading-table table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.fr-reading-table th, .fr-reading-table td { padding: 7px 10px; border-bottom: 1px solid var(--fr-answer-border); text-align: start; vertical-align: top; }
+.fr-reading-table th + th, .fr-reading-table td + td { border-inline-start: 1px solid var(--fr-answer-border); }
+.fr-reading-table tbody tr:last-child td { border-bottom: 0; }
+.fr-reading-table th { font-weight: 600; background: var(--fr-answer-soft); }
+.is-compact { font-size: 13px; line-height: 1.7; }
+.is-compact h3, .is-compact h4 { margin-top: 14px; font-size: 13px; }
+.is-compact p, .is-compact ul, .is-compact ol { margin-bottom: 9px; }
+.fr-dark-theme .fr-reading-markdown { --fr-answer-quote: #c6cedd; --fr-answer-border: #2f3542; --fr-answer-soft: #232833; --fr-answer-code: #2b313e; --fr-answer-accent: #f46590; }
 </style>

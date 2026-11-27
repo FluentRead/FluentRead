@@ -11,7 +11,7 @@ describe('双语分享卡片内容与外观', () => {
     it('旧配置得到珊瑚默认样式且只持久化白名单外观字段', () => {
         expect(new Config().shareCard).toEqual(normalizeShareCardPreferences());
         const result = normalizeConfig({shareCard: {theme: 'prism', format: 'square', showSource: false, original: 'private excerpt', source: 'secret URL'}});
-        expect(result.shareCard).toEqual({theme: 'prism', format: 'square', showSource: false, showBrand: true, translationFirst: false, fontSize: 'medium'});
+        expect(result.shareCard).toEqual({theme: 'prism', format: 'square', showSource: false, showBrand: false, translationFirst: false, fontSize: 'medium'});
         expect(JSON.stringify(result.shareCard)).not.toContain('private');
         expect(normalizeConfig(JSON.parse(JSON.stringify(result))).shareCard).toEqual(result.shareCard);
     });

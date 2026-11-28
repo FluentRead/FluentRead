@@ -286,7 +286,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         const observePrivacy = deps.recordPrivacyActivity && glossarySource?.privateContext !== true
             ? (event: Parameters<NonNullable<TranslationBrokerDependencies['recordPrivacyActivity']>>[0]) => {
                 try {
-                    deps.recordPrivacyActivity!(event, trace.privacyActivityGeneration ?? 0);
+                    deps.recordPrivacyActivity!(event, trace.privacyActivityGeneration);
                 } catch (error) {
                     warn('[FluentRead] privacy activity record failed:', error);
                 }

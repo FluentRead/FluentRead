@@ -150,7 +150,7 @@ export function createBrokerProviderTransport(options: BrokerProviderTransportOp
                         throwIfRequestAborted(execution.abortSignal);
                         const observePrivacy = deps.recordPrivacyActivity && execution.privateContext !== true
                             ? (event: Parameters<NonNullable<TranslationBrokerDependencies['recordPrivacyActivity']>>[0]) => {
-                                deps.recordPrivacyActivity!(event, execution.trace.privacyActivityGeneration ?? 0);
+                                deps.recordPrivacyActivity!(event, execution.trace.privacyActivityGeneration);
                             }
                             : undefined;
                         const privacy = preparePrivacyRequest(providerMessage, execution.config, observePrivacy);

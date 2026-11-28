@@ -41,7 +41,7 @@ export interface TranslationRequestTrace {
     upstreamCalls: number;
     upstreamMs: number;
     routeAttempts: TranslationRouteAttempt[];
-    privacyActivityGeneration?: number;
+    privacyActivityGeneration: number;
 }
 
 export interface TranslationRequestExecution extends TranslationRequestIdentityContext {

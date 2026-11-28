@@ -155,9 +155,7 @@
   --fr-info: #2563a6;
   --fr-info-soft: #edf4ff;
 }
-:root.dark,
-:root[data-interface-skin="xuanqing"],
-:root[data-interface-skin="wujin"] {
+:root.dark {
   --fr-menu-shadow: 0 10px 30px rgba(0, 0, 0, .34), 0 2px 6px rgba(0, 0, 0, .18);
   --fr-card-shadow: none;
   --fr-success: #8ce0c4;

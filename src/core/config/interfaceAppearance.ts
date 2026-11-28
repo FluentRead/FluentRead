@@ -1,170 +1,687 @@
 /**
  * @file src/core/config/interfaceAppearance.ts
- * 文件职责：定义 FluentRead 扩展的可插拔皮肤、字体、Popup 模块布局与栏目可见性配置契约，作为 Options、Popup 和配置持久化共同依赖的单一来源。
- * 主要内容：维护界面皮肤的分组、缩略图的配色与造型（画布、卡片描边与圆角、主按钮）以及尺寸策略，并把已下线的风格 ID 换成接替它的现有风格，提供本地字体栈预设，以及 Popup 区域和快捷功能卡片的两级注册表、默认顺序、可见性和安全归一化函数；旧圈选入口迁入图片，视频与信息高亮入口移出 Popup，但保留功能配置。
- * 模块边界：本文件只描述纯配置规则和用户可见元数据，不读取浏览器存储、不操作 DOM，也不决定具体页面布局；DOM 皮肤应用由 src/ui/interfaceAppearance.ts 负责。
+ * 文件职责：集中定义 FluentRead 扩展 Popup 专属的 12 套风格化皮肤（3 大材质/美学系列 × 4 款）与界面字体元数据、分组顺序、旧皮肤统一回退默认逻辑及微缩预览色板。
+ * 主要内容：提供 interfaceSkinGroups、interfaceSkinOptions、interfaceFontOptions 等只读注册表，纯 JSON 字面量以兼容油猴 AST 压缩插件；所有已退役或未知皮肤 ID 统一兜底回退到 'default'。
+ * 模块边界：不操作 DOM、不读取浏览器存储或拉取外部字体；DOM 属性挂载与预览隔离由 src/ui/interfaceAppearance.ts 负责，皮肤仅作用于 Popup 与设置页局部预览容器。
  */
 
 export const interfaceSkinGroups = [
   {
-    value: 'utility',
-    label: '效率与可读性',
-    description: '从熟悉、简洁、紧凑到高对比，按使用场景选择。',
+    value: 'atmosphere',
+    label: '光影与材质',
+    description: '液态玻璃、极光渐变与立体拟物键帽的现代质感表达。',
   },
   {
-    value: 'palette',
-    label: '传统色风格',
-    description: '配色取自中国传统色，每套一种造型；全部平涂，不用渐变与光效。',
+    value: 'expressive',
+    label: '潮流与个性',
+    description: '新粗野波普、赛博霓虹、经典复古桌面与极客终端的鲜明视觉世界。',
+  },
+  {
+    value: 'editorial',
+    label: '东方与人文',
+    description: '典藏画报、樱雾物语、宇治手账与黑金典藏的独具韵味调性。',
   },
 ] as const
+
+export type InterfaceSkinGroup = (typeof interfaceSkinGroups)[number]['value']
+export type InterfaceSkinGroupId = InterfaceSkinGroup
+
+export type InterfaceSkinToneMode = 'adaptive' | 'dark'
+
+export type InterfaceSkinKind = 'default' | 'craft'
+
+export type InterfaceSkinIconShape = 'rounded' | 'circle' | 'square'
+
+export type InterfaceSkinCardStyle =
+  | 'default'
+  | 'liquid-glass'
+  | 'aurora'
+  | 'tactile'
+  | 'brutalist'
+  | 'cyber'
+  | 'retro-os'
+  | 'terminal'
+  | 'editorial'
+  | 'sakura'
+  | 'matcha'
+  | 'midnight-gold'
+
+export interface InterfaceSkinPreviewPalette {
+  readonly mat: string
+  readonly canvas: string
+  readonly surface: string
+  readonly surfaceSoft: string
+  readonly border: string
+  readonly ink: string
+  readonly muted: string
+  readonly accent: string
+  readonly actionBg: string
+  readonly actionInk: string
+  readonly iconBg: string
+  readonly iconFg: string
+  readonly swatches: readonly [string, string, string]
+}
+
+export interface InterfaceSkinPreviewSpec {
+  readonly cardStyle: InterfaceSkinCardStyle
+  readonly panelRadius: number
+  readonly controlRadius: number
+  readonly borderWidth: number
+  readonly iconShape: InterfaceSkinIconShape
+  readonly framelessHero: boolean
+  readonly dense: boolean
+  readonly light: InterfaceSkinPreviewPalette
+  readonly dark: InterfaceSkinPreviewPalette
+}
 
 export const interfaceSkinOptions = [
+  // === 系列一：光影与材质 ===
   {
     value: 'default',
-    label: '默认风格',
-    description: '保留当前 FluentRead 的界面布局与视觉效果。',
-    group: 'utility',
+    label: '默认经典',
+    badge: '默认',
+    description: '澄明留白与标志性玫红主操作，保留原生 FluentRead 的清晰与平衡。',
+    group: 'atmosphere',
     kind: 'default',
-    popupHeight: 'content',
+    toneMode: 'adaptive',
     popupWidth: 320,
-    preview: {canvas: '#ffffff', backdrop: '#ffffff', surface: '#ffffff', border: '#e7eaf1', radius: 5, ink: '#172033', title: '#172033', accent: '#ef4776', action: 'linear-gradient(135deg, #f45686, #e53268)'},
+    popupHeight: 'content',
+    preview: {
+      cardStyle: 'default',
+      panelRadius: 6,
+      controlRadius: 4,
+      borderWidth: 1,
+      iconShape: 'rounded',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#eef1f6',
+        canvas: '#ffffff',
+        surface: '#ffffff',
+        surfaceSoft: '#f5f6f9',
+        border: '#e5e8f0',
+        ink: '#172033',
+        muted: '#667085',
+        accent: '#ef4776',
+        actionBg: 'linear-gradient(135deg, #f05a84 0%, #ea3c6f 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#fef0f4',
+        iconFg: '#d63362',
+        swatches: ['#ffffff', '#f5f6f9', '#ef4776'],
+      },
+      dark: {
+        mat: '#0d1016',
+        canvas: '#14171c',
+        surface: '#1b1f26',
+        surfaceSoft: '#222731',
+        border: '#2d3340',
+        ink: '#eef1f6',
+        muted: '#9ba4b5',
+        accent: '#f36a8d',
+        actionBg: 'linear-gradient(135deg, #f36a8d 0%, #e04674 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#321c26',
+        iconFg: '#f788a5',
+        swatches: ['#14171c', '#222731', '#f36a8d'],
+      },
+    },
   },
   {
-    value: 'minimal',
-    label: '简约风格',
-    description: '平面留白与轻边界，让主要操作更突出。',
-    group: 'utility',
-    kind: 'minimal',
+    value: 'liquid-glass',
+    label: '液态玻璃',
+    badge: '玻璃',
+    description: '冷感冰蓝弥散光斑、半透明磨砂玻璃卡面与顶部镜面折射高光。',
+    group: 'atmosphere',
+    kind: 'craft',
+    toneMode: 'adaptive',
+    popupWidth: 324,
     popupHeight: 'content',
-    popupWidth: 310,
-    preview: {canvas: '#ffffff', backdrop: '#ffffff', surface: '#f7f8fb', border: '#f7f8fb', radius: 5, ink: '#313743', title: '#313743', accent: '#ef4776', action: '#e3e7ee'},
+    preview: {
+      cardStyle: 'liquid-glass',
+      panelRadius: 11,
+      controlRadius: 6,
+      borderWidth: 1,
+      iconShape: 'circle',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#dbeafe',
+        canvas: '#e8f1fb',
+        surface: '#f5faff',
+        surfaceSoft: '#eaf3fd',
+        border: '#ffffff',
+        ink: '#0b192c',
+        muted: '#3b506b',
+        accent: '#1466e6',
+        actionBg: 'linear-gradient(180deg, #1466e6 0%, #0b4cc2 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#eff6ff',
+        iconFg: '#0e4fb8',
+        swatches: ['#bae6fd', '#ddd6fe', '#1466e6'],
+      },
+      dark: {
+        mat: '#0b1120',
+        canvas: '#09111f',
+        surface: '#142036',
+        surfaceSoft: '#1e2e4a',
+        border: '#324a70',
+        ink: '#f0f7ff',
+        muted: '#9ec0e0',
+        accent: '#60b8ff',
+        actionBg: 'linear-gradient(180deg, #1b6ce8 0%, #0f52c4 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#162d4d',
+        iconFg: '#85ccff',
+        swatches: ['#09111f', '#38bdf8', '#1b6ce8'],
+      },
+    },
   },
   {
-    value: 'compact',
-    label: '紧凑风格',
-    description: '压缩间距与控件高度，适合高频快速操作。',
-    group: 'utility',
-    kind: 'compact',
+    value: 'aurora',
+    label: '极光幻彩',
+    badge: '极光',
+    description: '全画布晨霞与北极光渐变氛围、悬浮珠光卡片与三段虹彩发光按钮。',
+    group: 'atmosphere',
+    kind: 'craft',
+    toneMode: 'adaptive',
+    popupWidth: 322,
     popupHeight: 'content',
-    popupWidth: 300,
-    preview: {canvas: '#f6f7fa', backdrop: '#f6f7fa', surface: '#ffffff', border: '#e7eaf1', radius: 4, ink: '#283042', title: '#283042', accent: '#ef4776', action: 'linear-gradient(135deg, #f45686, #e53268)'},
+    preview: {
+      cardStyle: 'aurora',
+      panelRadius: 9,
+      controlRadius: 5,
+      borderWidth: 1,
+      iconShape: 'rounded',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#f3e8ff',
+        canvas: '#f8eefc',
+        surface: '#fdfaff',
+        surfaceSoft: '#f5ebfc',
+        border: '#e5d4fa',
+        ink: '#1e1330',
+        muted: '#54446b',
+        accent: '#7c3aed',
+        actionBg: 'linear-gradient(120deg, #b8209a 0%, #7328d4 52%, #2554d4 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#f3e8ff',
+        iconFg: '#6b21a8',
+        swatches: ['#fecdd3', '#c7d2fe', '#7328d4'],
+      },
+      dark: {
+        mat: '#120f29',
+        canvas: '#0b0e1e',
+        surface: '#13172c',
+        surfaceSoft: '#1e2442',
+        border: '#3b2e66',
+        ink: '#f4f3ff',
+        muted: '#a7b0d6',
+        accent: '#c084fc',
+        actionBg: 'linear-gradient(120deg, #b8209a 0%, #6d28d9 52%, #0e7490 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#2c1d4a',
+        iconFg: '#d8b4fe',
+        swatches: ['#14b8a6', '#d946ef', '#6d28d9'],
+      },
+    },
   },
   {
-    value: 'contrast',
-    label: '高对比 ⚡',
-    description: '强化文字、边框与焦点状态，提升辨识度。',
-    group: 'utility',
-    kind: 'contrast',
+    value: 'tactile',
+    label: '拟物硬件',
+    badge: '立体',
+    description: '哑光石瓷机身、物理立体凹凸键帽、内凹控件槽与发光 LED 指示灯。',
+    group: 'atmosphere',
+    kind: 'craft',
+    toneMode: 'adaptive',
+    popupWidth: 324,
     popupHeight: 'content',
+    preview: {
+      cardStyle: 'tactile',
+      panelRadius: 7,
+      controlRadius: 4,
+      borderWidth: 1,
+      iconShape: 'rounded',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#dcd7ce',
+        canvas: '#e4e0d8',
+        surface: '#f1eee8',
+        surfaceSoft: '#ddd8ce',
+        border: '#c7c2b7',
+        ink: '#1a1917',
+        muted: '#524f49',
+        accent: '#cc3f10',
+        actionBg: 'linear-gradient(180deg, #cc3f10 0%, #b03209 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#e7e2d9',
+        iconFg: '#a8320a',
+        swatches: ['#e4e0d8', '#f1eee8', '#cc3f10'],
+      },
+      dark: {
+        mat: '#141518',
+        canvas: '#18191c',
+        surface: '#23252a',
+        surfaceSoft: '#141518',
+        border: '#353840',
+        ink: '#f2f0eb',
+        muted: '#a6a49d',
+        accent: '#f26d3d',
+        actionBg: 'linear-gradient(180deg, #cc3f10 0%, #ab3008 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#2d3036',
+        iconFg: '#ff946b',
+        swatches: ['#18191c', '#23252a', '#cc3f10'],
+      },
+    },
+  },
+
+  // === 系列二：潮流与个性 ===
+  {
+    value: 'brutalist',
+    label: '新粗野波普',
+    badge: '波普',
+    description: '奶油黄波点底纸、2px 纯黑粗框、硬偏移阴影与四色撞色功能磁贴。',
+    group: 'expressive',
+    kind: 'craft',
+    toneMode: 'adaptive',
+    popupWidth: 324,
+    popupHeight: 'content',
+    preview: {
+      cardStyle: 'brutalist',
+      panelRadius: 2,
+      controlRadius: 2,
+      borderWidth: 2,
+      iconShape: 'square',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#ffef9a',
+        canvas: '#fff5cc',
+        surface: '#ffffff',
+        surfaceSoft: '#fff9e0',
+        border: '#111111',
+        ink: '#111111',
+        muted: '#3f3c32',
+        accent: '#d91b60',
+        actionBg: '#ffde38',
+        actionInk: '#111111',
+        iconBg: '#ffe4ef',
+        iconFg: '#111111',
+        swatches: ['#fff5cc', '#ffde38', '#111111'],
+      },
+      dark: {
+        mat: '#1f1d14',
+        canvas: '#17161a',
+        surface: '#222028',
+        surfaceSoft: '#2d2a36',
+        border: '#f5f2e6',
+        ink: '#ffffff',
+        muted: '#d6d2c4',
+        accent: '#ffde38',
+        actionBg: '#ffde38',
+        actionInk: '#111111',
+        iconBg: '#3b3314',
+        iconFg: '#ffeb7a',
+        swatches: ['#17161a', '#ffde38', '#f5f2e6'],
+      },
+    },
+  },
+  {
+    value: 'cyber',
+    label: '赛博霓虹',
+    badge: '赛博',
+    description: '常暗赛博正交网格、电光青与洋红双色霓虹光晕与高能等离子主按钮。',
+    group: 'expressive',
+    kind: 'craft',
+    toneMode: 'dark',
+    popupWidth: 324,
+    popupHeight: 'content',
+    preview: {
+      cardStyle: 'cyber',
+      panelRadius: 3,
+      controlRadius: 2,
+      borderWidth: 1,
+      iconShape: 'square',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#070812',
+        canvas: '#080616',
+        surface: '#0f0d24',
+        surfaceSoft: '#171433',
+        border: '#00e5ff',
+        ink: '#eef8ff',
+        muted: '#93b4cc',
+        accent: '#00e5ff',
+        actionBg: 'linear-gradient(135deg, #c9146c 0%, #7c1fd9 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#0c2c3d',
+        iconFg: '#7af2ff',
+        swatches: ['#080616', '#00e5ff', '#c9146c'],
+      },
+      dark: {
+        mat: '#070812',
+        canvas: '#080616',
+        surface: '#0f0d24',
+        surfaceSoft: '#171433',
+        border: '#00e5ff',
+        ink: '#eef8ff',
+        muted: '#93b4cc',
+        accent: '#00e5ff',
+        actionBg: 'linear-gradient(135deg, #c9146c 0%, #7c1fd9 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#0c2c3d',
+        iconFg: '#7af2ff',
+        swatches: ['#080616', '#00e5ff', '#c9146c'],
+      },
+    },
+  },
+  {
+    value: 'retro-os',
+    label: '经典复古桌面',
+    badge: '复古',
+    description: '致敬 90 年代经典系统：0px 像素锐角、3D 凿刻凸凹窗框、条纹顶栏与钴蓝按钮。',
+    group: 'expressive',
+    kind: 'craft',
+    toneMode: 'adaptive',
     popupWidth: 320,
-    preview: {canvas: '#ffffff', backdrop: '#ffffff', surface: '#fff9c4', border: '#000000', radius: 2, ink: '#000000', title: '#000000', accent: '#111111', action: '#000000'},
+    popupHeight: 'content',
+    preview: {
+      cardStyle: 'retro-os',
+      panelRadius: 0,
+      controlRadius: 0,
+      borderWidth: 1,
+      iconShape: 'square',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#008080',
+        canvas: '#d4d2c8',
+        surface: '#dfded6',
+        surfaceSoft: '#ffffff',
+        border: '#8c8b83',
+        ink: '#111111',
+        muted: '#42423d',
+        accent: '#0b3d91',
+        actionBg: '#0b3d91',
+        actionInk: '#ffffff',
+        iconBg: '#ffffff',
+        iconFg: '#0a3580',
+        swatches: ['#008080', '#dfded6', '#0b3d91'],
+      },
+      dark: {
+        mat: '#143638',
+        canvas: '#23252c',
+        surface: '#2e313a',
+        surfaceSoft: '#17191f',
+        border: '#555a69',
+        ink: '#f0f0eb',
+        muted: '#b5b7bf',
+        accent: '#68a0ff',
+        actionBg: '#1f56b8',
+        actionInk: '#ffffff',
+        iconBg: '#1c2d4a',
+        iconFg: '#8cb8ff',
+        swatches: ['#143638', '#2e313a', '#1f56b8'],
+      },
+    },
   },
   {
-    value: 'qinghua',
-    label: '青花',
-    description: '白瓷底配琉璃蓝：主卡片一粗一细两道蓝线，图标是蓝色圆片。',
-    group: 'palette',
-    kind: 'palette',
-    popupHeight: 'content',
+    value: 'terminal',
+    label: '极客终端',
+    badge: 'CRT',
+    description: '常暗 CRT 水平扫描线、全局等宽代码字体、荧光绿虚线框与磷光绿命令按钮。',
+    group: 'expressive',
+    kind: 'craft',
+    toneMode: 'dark',
     popupWidth: 320,
-    preview: {canvas: '#ffffff', backdrop: '#ffffff', surface: '#ffffff', border: '#183a65', radius: 6, ink: '#161823', title: '#161823', accent: '#183a65', action: '#183a65'},
+    popupHeight: 'content',
+    preview: {
+      cardStyle: 'terminal',
+      panelRadius: 0,
+      controlRadius: 0,
+      borderWidth: 1,
+      iconShape: 'square',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#040a06',
+        canvas: '#060b08',
+        surface: '#0a140e',
+        surfaceSoft: '#0f1f16',
+        border: '#22c55e',
+        ink: '#d9ffe6',
+        muted: '#6ecb8f',
+        accent: '#4ade80',
+        actionBg: '#34d36e',
+        actionInk: '#04140a',
+        iconBg: '#10301d',
+        iconFg: '#86efac',
+        swatches: ['#060b08', '#1c472d', '#34d36e'],
+      },
+      dark: {
+        mat: '#040a06',
+        canvas: '#060b08',
+        surface: '#0a140e',
+        surfaceSoft: '#0f1f16',
+        border: '#22c55e',
+        ink: '#d9ffe6',
+        muted: '#6ecb8f',
+        accent: '#4ade80',
+        actionBg: '#34d36e',
+        actionInk: '#04140a',
+        iconBg: '#10301d',
+        iconFg: '#86efac',
+        swatches: ['#060b08', '#1c472d', '#34d36e'],
+      },
+    },
+  },
+
+  // === 系列三：东方与人文 ===
+  {
+    value: 'editorial',
+    label: '典藏画报',
+    badge: '画报',
+    description: '暖米报刊纸底、典雅衬线标题、无盒化双细线排版与深酒红印章按钮。',
+    group: 'editorial',
+    kind: 'craft',
+    toneMode: 'adaptive',
+    popupWidth: 324,
+    popupHeight: 'content',
+    preview: {
+      cardStyle: 'editorial',
+      panelRadius: 0,
+      controlRadius: 0,
+      borderWidth: 1,
+      iconShape: 'square',
+      framelessHero: true,
+      dense: false,
+      light: {
+        mat: '#e7e0d2',
+        canvas: '#f5efe4',
+        surface: '#faf6ee',
+        surfaceSoft: '#efe8da',
+        border: '#1c1917',
+        ink: '#1c1917',
+        muted: '#5c544b',
+        accent: '#881c28',
+        actionBg: '#7f1d28',
+        actionInk: '#faf6ee',
+        iconBg: '#f5efe4',
+        iconFg: '#1c1917',
+        swatches: ['#f5efe4', '#1c1917', '#7f1d28'],
+      },
+      dark: {
+        mat: '#1b1814',
+        canvas: '#151311',
+        surface: '#1e1b18',
+        surfaceSoft: '#28241f',
+        border: '#c4b8a6',
+        ink: '#f2ece1',
+        muted: '#b0a697',
+        accent: '#e07884',
+        actionBg: '#9e2433',
+        actionInk: '#faf6ee',
+        iconBg: '#28241f',
+        iconFg: '#f2ece1',
+        swatches: ['#151311', '#c4b8a6', '#9e2433'],
+      },
+    },
   },
   {
-    value: 'zhusha',
-    label: '朱砂',
-    description: '方正的朱红印面配白字，主卡片顶上一道朱红、一线库金。',
-    group: 'palette',
-    kind: 'palette',
+    value: 'sakura',
+    label: '樱雾物语',
+    badge: '樱雾',
+    description: '柔粉霞光渐层画布、棉花糖大圆角乳白卡面、莓果光泽胶囊钮与马卡龙四色图标。',
+    group: 'editorial',
+    kind: 'craft',
+    toneMode: 'adaptive',
+    popupWidth: 322,
     popupHeight: 'content',
-    popupWidth: 320,
-    preview: {canvas: '#ffffff', backdrop: '#ffffff', surface: '#ffffff', border: '#e6ddd0', radius: 2, ink: '#312520', title: '#312520', accent: '#c3272b', action: '#c3272b'},
+    preview: {
+      cardStyle: 'sakura',
+      panelRadius: 12,
+      controlRadius: 6,
+      borderWidth: 1,
+      iconShape: 'circle',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#ffe1ec',
+        canvas: '#fff0f6',
+        surface: '#ffffff',
+        surfaceSoft: '#fff2f7',
+        border: '#f2c6d8',
+        ink: '#331826',
+        muted: '#754d60',
+        accent: '#d4356f',
+        actionBg: 'linear-gradient(135deg, #cf2e6a 0%, #ad1d55 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#ffe0ec',
+        iconFg: '#a81d52',
+        swatches: ['#ffd4e5', '#e8dcff', '#cf2e6a'],
+      },
+      dark: {
+        mat: '#2a1522',
+        canvas: '#181016',
+        surface: '#231720',
+        surfaceSoft: '#2e1f2a',
+        border: '#452e3e',
+        ink: '#fcf0f5',
+        muted: '#c9a3b6',
+        accent: '#f472b6',
+        actionBg: 'linear-gradient(135deg, #cf2e6a 0%, #ad1d55 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#401c2d',
+        iconFg: '#ffa3c7',
+        swatches: ['#181016', '#452e3e', '#f472b6'],
+      },
+    },
   },
   {
-    value: 'shuimo',
-    label: '水墨',
-    description: '只用墨的浓淡，主按钮上留一点朱红的印。',
-    group: 'palette',
-    kind: 'palette',
+    value: 'matcha',
+    label: '宇治手账',
+    badge: '抹茶',
+    description: '青岚抹茶色底画布衬托暖白宣纸圆角卡片、深茶绿主操作与温润茶金点缀。',
+    group: 'editorial',
+    kind: 'craft',
+    toneMode: 'adaptive',
+    popupWidth: 322,
     popupHeight: 'content',
-    popupWidth: 320,
-    preview: {canvas: '#f0f0f4', backdrop: '#f0f0f4', surface: '#ffffff', border: '#ffffff', radius: 7, ink: '#161823', title: '#161823', accent: '#3d3b4f', action: '#161823'},
+    preview: {
+      cardStyle: 'matcha',
+      panelRadius: 9,
+      controlRadius: 5,
+      borderWidth: 1,
+      iconShape: 'rounded',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#c8dcc4',
+        canvas: '#d7e7d6',
+        surface: '#fbf8f0',
+        surfaceSoft: '#f0ece0',
+        border: '#cad9c7',
+        ink: '#1c2b21',
+        muted: '#4c6152',
+        accent: '#2b6946',
+        actionBg: 'linear-gradient(180deg, #2b6b47 0%, #1e5235 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#f5eed6',
+        iconFg: '#7c520d',
+        swatches: ['#d7e7d6', '#fbf8f0', '#2b6b47'],
+      },
+      dark: {
+        mat: '#101b14',
+        canvas: '#101913',
+        surface: '#18241c',
+        surfaceSoft: '#213026',
+        border: '#2c4032',
+        ink: '#edf5ed',
+        muted: '#9bb5a2',
+        accent: '#57c98a',
+        actionBg: 'linear-gradient(180deg, #276944 0%, #1c5234 100%)',
+        actionInk: '#ffffff',
+        iconBg: '#332b18',
+        iconFg: '#ebd08a',
+        swatches: ['#101913', '#276944', '#ebd08a'],
+      },
+    },
   },
   {
-    value: 'zhuqing',
-    label: '竹青',
-    description: '荼白底配松花绿，快捷入口像一片片竹简。',
-    group: 'palette',
-    kind: 'palette',
+    value: 'midnight-gold',
+    label: '黑金典藏',
+    badge: '黑金',
+    description: '常暗丝绒墨黑、顶部香槟金聚光晕、金属拉丝渐变金按钮与细金描边。',
+    group: 'editorial',
+    kind: 'craft',
+    toneMode: 'dark',
+    popupWidth: 324,
     popupHeight: 'content',
-    popupWidth: 320,
-    preview: {canvas: '#f3f9f1', backdrop: '#f3f9f1', surface: '#ffffff', border: '#d3e2d5', radius: 4, ink: '#1f2a24', title: '#1f2a24', accent: '#057748', action: '#057748'},
-  },
-  {
-    value: 'ouhe',
-    label: '藕荷',
-    description: '淡藕色的底，圆润的胶囊控件与黛紫主按钮。',
-    group: 'palette',
-    kind: 'palette',
-    popupHeight: 'content',
-    popupWidth: 320,
-    preview: {canvas: '#f6ecf1', backdrop: '#f6ecf1', surface: '#ffffff', border: '#ffffff', radius: 10, ink: '#2a2230', title: '#2a2230', accent: '#574266', action: '#574266'},
-  },
-  {
-    value: 'xiangse',
-    label: '缃色',
-    description: '象牙白的卡片配缃色主按钮与煤黑的字。',
-    group: 'palette',
-    kind: 'palette',
-    popupHeight: 'content',
-    popupWidth: 320,
-    preview: {canvas: '#ffffff', backdrop: '#ffffff', surface: '#fffbf0', border: '#eadfbe', radius: 5, ink: '#312520', title: '#312520', accent: '#8a6200', action: '#f0c239'},
-  },
-  {
-    value: 'qinglv',
-    label: '青绿',
-    description: '青绿山水的三种矿物色：沙青、铜绿与赭。',
-    group: 'palette',
-    kind: 'palette',
-    popupHeight: 'content',
-    popupWidth: 320,
-    preview: {canvas: '#f1f6f6', backdrop: '#f1f6f6', surface: '#ffffff', border: '#d5e0e7', radius: 6, ink: '#172530', title: '#172530', accent: '#205580', action: '#205580'},
-  },
-  {
-    value: 'yuebai',
-    label: '月白',
-    description: '整块月白的版面，白卡片与花青主按钮。',
-    group: 'palette',
-    kind: 'palette',
-    popupHeight: 'content',
-    popupWidth: 320,
-    preview: {canvas: '#d6ecf0', backdrop: '#d6ecf0', surface: '#ffffff', border: '#ffffff', radius: 9, ink: '#1c2733', title: '#1c2733', accent: '#576d93', action: '#576d93'},
-  },
-  {
-    value: 'xuanqing',
-    label: '玄青',
-    description: '漆黑的夜色配月白主按钮；始终为深色。',
-    group: 'palette',
-    kind: 'palette',
-    popupHeight: 'content',
-    popupWidth: 320,
-    preview: {canvas: '#161823', backdrop: '#161823', surface: '#1e2030', border: '#33364a', radius: 8, ink: '#e6eef2', title: '#e6eef2', accent: '#8db4dc', action: '#d6ecf0'},
-  },
-  {
-    value: 'wujin',
-    label: '乌金',
-    description: '黑底、乌金细线与赤金主按钮；始终为深色。',
-    group: 'palette',
-    kind: 'palette',
-    popupHeight: 'content',
-    popupWidth: 320,
-    preview: {canvas: '#131210', backdrop: '#131210', surface: '#1b1a16', border: '#a78e44', radius: 1, ink: '#f2ecdd', title: '#f2be45', accent: '#f2be45', action: '#f2be45'},
+    preview: {
+      cardStyle: 'midnight-gold',
+      panelRadius: 4,
+      controlRadius: 3,
+      borderWidth: 1,
+      iconShape: 'square',
+      framelessHero: false,
+      dense: false,
+      light: {
+        mat: '#0a0908',
+        canvas: '#0a090d',
+        surface: '#131218',
+        surfaceSoft: '#1c1a22',
+        border: '#c7a455',
+        ink: '#f7f1e3',
+        muted: '#b8ae99',
+        accent: '#dfc076',
+        actionBg: 'linear-gradient(135deg, #f0d797 0%, #d6b15c 52%, #bd9038 100%)',
+        actionInk: '#140f05',
+        iconBg: '#1c1914',
+        iconFg: '#f0d99e',
+        swatches: ['#0a090d', '#1c1a22', '#dfc076'],
+      },
+      dark: {
+        mat: '#0a0908',
+        canvas: '#0a090d',
+        surface: '#131218',
+        surfaceSoft: '#1c1a22',
+        border: '#c7a455',
+        ink: '#f7f1e3',
+        muted: '#b8ae99',
+        accent: '#dfc076',
+        actionBg: 'linear-gradient(135deg, #f0d797 0%, #d6b15c 52%, #bd9038 100%)',
+        actionInk: '#140f05',
+        iconBg: '#1c1914',
+        iconFg: '#f0d99e',
+        swatches: ['#0a090d', '#1c1a22', '#dfc076'],
+      },
+    },
   },
 ] as const
 
-/**
- * 扩展自身页面的字体方案。默认系统字体不下载；其他方案首次使用时下载并缓存。
- * 未覆盖的字符交给系统字体。字体文件只由 Popup / Options 按需加载。
- */
 export const interfaceFontOptions = [
   {
     value: 'system',
@@ -244,23 +761,6 @@ const interfaceSkinByValue = new Map<string, InterfaceSkinOption>(
   interfaceSkinOptions.map((item) => [item.value, item]),
 )
 
-/**
- * 已下线的风格与接替它的现有风格。旧配置里保存的是这些 ID，升级后换成气质最接近的一套，
- * 让原本选了配色风格的用户仍停留在一套配色风格里，而不是意外退回默认界面。
- */
-const retiredInterfaceSkinSuccessors = new Map<string, InterfaceSkin>([
-  ['cheese', 'xiangse'],
-  ['ocean', 'yuebai'],
-  ['matcha', 'zhuqing'],
-  ['sakura', 'ouhe'],
-  ['emoji', 'ouhe'],
-  ['midnight', 'xuanqing'],
-  ['paper', 'shuimo'],
-  ['aurora', 'xuanqing'],
-  ['arcade', 'qinglv'],
-  ['sunset', 'zhusha'],
-])
-
 export const POPUP_MODULE_IDS = [
   'translation',
   'siteRule',
@@ -308,7 +808,6 @@ export interface PopupQuickFeatureOption {
   descriptionKey: string
 }
 
-/** Popup 的用户可编排模块注册表；顶部品牌和设置入口固定保留，避免失去返回设置页的路径。 */
 export const popupModuleOptions: readonly PopupModuleOption[] = [
   {
     id: 'translation',
@@ -403,7 +902,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-/** 只接受注册表中的皮肤：已下线的风格换成接替者，其余未知值稳定回到当前默认界面。 */
+/** 规范化界面皮肤值；所有旧版已退役皮肤与未知值统一安全兜底回退到默认皮肤 `'default'`。 */
 export function normalizeInterfaceSkin(value: unknown): InterfaceSkin {
   return getInterfaceSkinOption(value).value
 }
@@ -420,10 +919,10 @@ export function getInterfaceFontOption(value: unknown): InterfaceFontOption {
     : interfaceFontByValue.get(DEFAULT_INTERFACE_FONT)!
 }
 
-/** 返回完整皮肤元数据，让应用层无需识别任何具体皮肤 ID；已下线的风格先换成接替它的现有风格。 */
+/** 返回完整皮肤元数据，所有已退役或未知皮肤 ID 稳定兜底回退到默认皮肤 `'default'`。 */
 export function getInterfaceSkinOption(value: unknown): InterfaceSkinOption {
   if (typeof value !== 'string') return interfaceSkinOptions[0]
-  return interfaceSkinByValue.get(retiredInterfaceSkinSuccessors.get(value) ?? value) ?? interfaceSkinOptions[0]
+  return interfaceSkinByValue.get(value) ?? interfaceSkinOptions[0]
 }
 
 /** Popup 根据注册元数据决定是否使用内容高度，新增皮肤不需要修改 Popup 组件。 */

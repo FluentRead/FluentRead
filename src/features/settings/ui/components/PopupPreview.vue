@@ -1,8 +1,8 @@
 <!--
 @file src/features/settings/ui/components/PopupPreview.vue
-文件职责：用真实 DOM 按菜单栏的实际结构、尺寸和皮肤变量还原一份 Popup，供风格预览和菜单栏布局预览共用，保证两处看到的是同一个界面。
-主要内容：优先复用脚本构建注入的品牌图标并保留扩展资源回退，依次绘制品牌与版本、赞赏图标、受支持时的侧边栏图标和设置、语言与服务、网页及局部翻译、站点开关、快捷入口卡片和底部信息栏；按构建与实际平台能力过滤专属入口，区域与快捷入口按传入顺序渲染，传入编辑层级和排序控制器时叠加拖动手柄与插入提示。
-模块边界：只负责展示与把排序手势交给外部控制器，不读取用户配置、不连接浏览器状态，也不执行菜单栏业务；范例里的服务、快捷键和开关状态是固定示意，不代表用户当前设置。
+文件职责：用真实 DOM 按菜单栏的实际结构、尺寸和皮肤变量还原一份 Popup，供 Popup Skin Studio 实时预览和菜单栏布局预览共用，保证两处看到的是同一个界面。
+主要内容：优先复用脚本构建注入的品牌图标并保留扩展资源回退，依次绘制品牌与版本、赞赏图标、受支持时的侧边栏图标和设置、语言与服务、网页及局部翻译、站点开关、右侧译文字体与双语模式工具、快捷入口卡片和底部信息栏；按构建与实际平台能力过滤专属入口，区域与快捷入口按传入顺序渲染，传入编辑层级和排序控制器时叠加拖动手柄与插入提示。
+模块边界：只负责展示与把排序手势交给外部控制器，不读取用户配置、不连接浏览器状态，也不执行菜单栏业务；范例里的服务、快捷键和开关状态是固定示意，不代表用户当前设置；皮肤配色与造型统一由外部 `.popup-skin-scope` 与 `popup-skins-base.css` 注入。
 -->
 <template>
   <div
@@ -14,7 +14,7 @@
   >
     <header class="preview-header" aria-hidden="true">
       <span class="preview-brand">
-        <img class="preview-logo" :src="iconUrl" alt="" width="32" height="32" />
+        <PopupBrandIcon :skin="skin.value" :src="iconUrl" img-class="preview-logo" />
         <span><strong>{{ t('common.brand') }}</strong><small>v{{ version }}</small></span>
       </span>
       <span class="preview-header-actions">
@@ -63,7 +63,7 @@
             </span>
           </div>
 
-          <div v-if="(siteModuleNestedInTranslation && siteModule) || skin.kind === 'default'" class="preview-meta">
+          <div class="preview-meta">
             <PopupLayoutPreviewItem
               v-if="siteModuleNestedInTranslation && siteModule"
               :item="siteModule"
@@ -75,7 +75,7 @@
               <span class="preview-site-rule-button" aria-hidden="true"><span>{{ translateLegacy('始终翻译此网站') }}</span><i /></span>
               <span class="preview-site-rule-button preview-site-disable" aria-hidden="true"><span>{{ translateLegacy('在此网站禁用扩展') }}</span><i /></span>
             </PopupLayoutPreviewItem>
-            <span v-if="skin.kind === 'default'" class="preview-tools" aria-hidden="true">
+            <span class="preview-tools" aria-hidden="true">
               <span>Aa</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path :d="featurePath('appearance')" /></svg>
             </span>
@@ -154,6 +154,7 @@ import {computed} from 'vue'
 import {Coffee, Setting} from '@element-plus/icons-vue'
 import {version} from '@/package.json'
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue'
+import PopupBrandIcon from '@/src/ui/components/PopupBrandIcon.vue'
 import {canOpenTranslationSidepanel} from '@/src/platform/browser/translationSidepanel'
 import {
   POPUP_QUICK_FEATURE_IDS,
@@ -222,133 +223,139 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
 </script>
 
 <style scoped>
-/* 尺寸、间距与字号取自 src/app/popup/popup.css 的实际菜单栏；颜色与造型读取当前皮肤变量，四类皮肤各有一段与真实样式对应的规则。 */
+/* 尺寸、间距与字号取自 src/app/popup/popup.css 的实际菜单栏；craft 皮肤配色与造型统一由 .popup-skin-scope + popup-skins-base.css 注入。 */
 .preview-popup {
   --layout-preview-accent: var(--brand);
   --layout-preview-surface: var(--surface);
   position: relative;
   width: 100%;
-  padding: 10px 16px 4px;
+  padding: 10px 12px 6px;
   overflow: hidden;
-  /* 外框用不占位的描边，内部可用宽度与真实菜单栏完全一致，文字换行位置才不会走样。 */
-  border-radius: 14px;
+  border-radius: 12px;
   color: var(--ink);
-  background: var(--surface);
+  background: var(--preview-canvas-bg, var(--surface));
   box-shadow: 0 0 0 1px var(--line);
   font-size: 11px;
   line-height: 1.4;
   text-align: left;
+  transition: background-color 150ms var(--fr-ease-out, ease), border-color 150ms var(--fr-ease-out, ease), color 150ms var(--fr-ease-out, ease);
 }
 .preview-popup *, .preview-popup *::before, .preview-popup *::after { box-sizing: border-box; }
-.preview-popup strong { color: inherit; font-size: inherit; font-weight: 650; line-height: 1.35; }
-.preview-popup small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.preview-popup strong { color: inherit; font-size: inherit; font-weight: 600; line-height: 1.35; }
+.preview-popup small { color: var(--muted); font-size: 10.5px; line-height: 1.4; }
 
 .preview-header, .preview-brand, .preview-header-actions, .preview-header-actions > span { display: flex; align-items: center; }
-.preview-header { flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-bottom: 10px; }
-.preview-brand { min-width: 0; gap: 9px; }
+.preview-header { flex-wrap: nowrap; gap: 8px; justify-content: space-between; margin-bottom: 10px; }
+.preview-brand { min-width: 0; gap: 8px; }
 .preview-logo { width: 32px; height: 32px; flex: none; }
 .preview-brand > span { display: flex; min-width: 0; flex-direction: column; }
-.preview-popup .preview-brand strong { font-size: 14px; font-weight: 760; line-height: 1.25; white-space: nowrap; }
-.preview-popup .preview-brand small { margin-top: 2px; }
-.preview-header-actions { flex: none; gap: 7px; margin-left: auto; }
+.preview-popup .preview-brand strong { font-size: 14px; font-weight: 650; line-height: 1.25; white-space: nowrap; }
+.preview-popup .preview-brand small { margin-top: 1px; font-variant-numeric: tabular-nums; }
+.preview-header-actions { flex: none; gap: 6px; margin-left: auto; }
 .preview-header-actions > span {
-  justify-content: center; gap: 5px; height: 34px; padding: 0 8px; border: 1px solid var(--line);
-  border-radius: 11px; color: var(--ink); background: var(--surface); font-size: 11px; font-weight: 700;
+  justify-content: center; gap: 5px; height: 32px; padding: 0 8px; border: 1px solid var(--line);
+  border-radius: 8px; color: var(--ink); background: var(--surface); font-size: 11px; font-weight: 550;
 }
 .preview-header-actions > span:first-child { color: var(--muted); }
-.preview-header-actions > .preview-header-icon { width: 34px; padding: 0; }
+.preview-header-actions > .preview-header-icon { width: 32px; padding: 0; }
 .preview-header-actions svg { width: 16px; height: 16px; flex: none; }
 
 .preview-flow { display: flex; flex-direction: column; gap: 10px; }
 .preview-hero {
   display: grid; min-width: 0; gap: 8px; padding: 10px 12px; border: 1px solid var(--line);
-  border-radius: 14px; background: var(--surface);
+  border-radius: 12px; background: var(--surface); box-shadow: var(--fr-shadow-xs, 0 1px 3px rgba(23, 32, 51, .04));
 }
 .preview-language-pair { display: grid; grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr); align-items: end; gap: 6px; }
-.preview-language { display: grid; min-width: 0; gap: 5px; }
-.preview-popup .preview-language > small { padding-left: 3px; font-weight: 650; }
+.preview-language { display: grid; min-width: 0; gap: 4px; }
+.preview-popup .preview-language > small { padding-left: 2px; font-weight: 550; }
 .preview-language-select {
-  display: flex; min-height: 35px; align-items: center; justify-content: space-between; gap: 6px; padding: 0 9px;
-  border: 1px solid var(--line); border-radius: 11px; background: var(--surface-soft);
+  display: flex; min-height: 34px; align-items: center; justify-content: space-between; gap: 6px; padding: 0 9px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft);
 }
-.preview-popup .preview-language-select strong { min-width: 0; overflow-wrap: anywhere; }
-.preview-language-select i { width: 7px; height: 7px; margin-top: -3px; flex: none; border-right: 1px solid var(--muted); border-bottom: 1px solid var(--muted); transform: rotate(45deg); }
-.preview-language-pair > b { display: grid; height: 35px; place-items: center; color: var(--muted); font-weight: 400; }
+.preview-popup .preview-language-select strong { min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.preview-language-select i { width: 6px; height: 6px; margin-top: -3px; flex: none; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg); }
+.preview-language-pair > b { display: grid; height: 34px; place-items: center; color: var(--muted); font-weight: 400; }
 .preview-service {
-  display: flex; min-width: 0; min-height: 40px; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 9px;
-  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft);
+  display: flex; min-width: 0; min-height: 42px; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 9px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft);
 }
-.preview-service-copy { display: flex; min-width: 0; flex: 1; align-items: baseline; gap: 5px; }
+.preview-service-copy { display: flex; min-width: 0; flex: 1; align-items: baseline; gap: 6px; }
 .preview-popup .preview-service-copy strong { font-size: 12px; font-weight: 600; }
 .preview-provider-icons { display: flex; flex: none; align-items: center; padding-left: 6px; }
 .preview-provider-avatar {
-  display: grid; width: 29px; height: 29px; margin-left: -6px; place-items: center;
+  display: grid; width: 28px; height: 28px; margin-left: -6px; place-items: center;
   border: 2px solid var(--surface); border-radius: 50%; background: var(--surface-soft);
 }
-.preview-provider-avatar :deep(.service-icon) { width: 23px; height: 23px; border-radius: 50%; }
-.preview-provider-icons > b { margin-left: 7px; color: var(--muted); font-size: 19px; font-weight: 400; line-height: 1; }
-.preview-action-row { display: flex; align-items: stretch; gap: 7px; }
+.preview-provider-avatar :deep(.service-icon) { width: 22px; height: 22px; border-radius: 50%; }
+.preview-provider-icons > b { margin-left: 6px; color: var(--muted); font-size: 18px; font-weight: 400; line-height: 1; }
+.preview-action-row { display: flex; align-items: stretch; gap: 6px; }
 .preview-action {
-  display: flex; min-width: 0; min-height: 40px; flex: 1 1 auto; align-items: center; justify-content: center; gap: 6px; padding: 8px;
-  border-radius: 14px; color: #fff; background: var(--fr-color-brand-action-gradient, linear-gradient(135deg, #f45686, #e53268));
+  display: flex; min-width: 0; min-height: 42px; flex: 1 1 auto; align-items: center; justify-content: center; gap: 6px; padding: 6px 10px;
+  border-radius: 8px; color: #fff; background: var(--fr-color-brand-action-gradient, linear-gradient(135deg, #f45686, #e53268));
   box-shadow: var(--fr-shadow-brand-action, 0 4px 12px rgba(233, 50, 103, .20));
 }
-.preview-popup .preview-action > strong { min-width: 0; font-size: 12px; font-weight: 750; text-align: center; overflow-wrap: anywhere; }
+.preview-popup .preview-action > strong { min-width: 0; font-size: 12.5px; font-weight: 650; text-align: center; overflow-wrap: anywhere; }
 .preview-section-action {
-  display: inline-flex; min-width: 50px; flex: none; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px 8px;
-  border: 1px solid var(--line); border-radius: 14px; color: var(--brand); background: var(--surface-soft);
-  font-size: 10px; font-weight: 750; line-height: 1.1; white-space: nowrap;
+  display: inline-flex; width: 46px; min-width: 46px; flex: none; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 5px;
+  border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface-soft);
+  font-size: 10px; font-weight: 600; line-height: 1.1; white-space: nowrap;
 }
-.preview-section-action svg { width: 16px; height: 16px; }
+.preview-section-action svg { width: 15px; height: 15px; color: var(--brand); }
+
+.preview-meta { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .preview-site-rules {
-  display: flex; min-height: 34px; flex-wrap: wrap; align-items: center; gap: 5px; padding: 6px 8px;
-  border: 1px solid var(--line); border-radius: 11px; background: var(--surface-soft);
+  display: grid; grid-template-columns: minmax(0, 10fr) minmax(0, 11fr); align-items: center; gap: 4px;
+  min-height: 24px; padding: 0; border: 0; background: transparent;
 }
+.preview-site-rules.nested { flex: 1; min-width: 0; }
 .preview-site-rule-button {
-  display: inline-flex; min-width: 0; min-height: 24px; align-items: center; gap: 6px; padding: 0 8px;
-  border: 1px solid color-mix(in srgb, var(--brand) 26%, var(--line)); border-radius: 8px; color: var(--brand-strong);
-  background: var(--surface); font-size: 9px; font-weight: 750;
+  display: inline-flex; min-width: 0; min-height: 24px; align-items: center; justify-content: space-between; gap: 5px; padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--brand) 26%, var(--line)); border-radius: 6px; color: var(--brand-strong);
+  background: var(--surface); font-size: 9.5px; font-weight: 600;
 }
 .preview-site-rule-button.preview-site-disable { border-color: var(--line); color: var(--muted); }
-.preview-site-rule-button > i { width: 6px; height: 6px; flex: none; border-radius: 50%; background: color-mix(in srgb, var(--muted) 55%, transparent); }
+.preview-site-rule-button > i { width: 5.5px; height: 5.5px; flex: none; border-radius: 50%; background: color-mix(in srgb, var(--muted) 55%, transparent); }
+
+.preview-tools { display: flex; flex: none; gap: 4px; margin-inline-start: auto; color: var(--brand-strong); }
+.preview-tools > * { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 6px; background: var(--surface-soft); }
+.preview-tools > span { font: 600 13px Georgia, serif; }
+.preview-tools > svg { padding: 3px; }
 
 .preview-quick-features { display: grid; gap: 6px; }
 .preview-features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .preview-feature {
-  display: grid; grid-template-columns: 26px minmax(0, 1fr) 6px; min-width: 0; min-height: 50px; align-items: center; gap: 8px; padding: 7px 8px;
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) 6px; min-width: 0; min-height: 48px; align-items: center; gap: 8px; padding: 7px 9px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
 }
-.preview-feature-icon { display: grid; width: 26px; height: 28px; place-items: center; border-radius: 9px; }
-.preview-feature-icon svg { width: 19px; height: 19px; }
-/* 未被皮肤统一着色时，五个入口沿用菜单栏各自的图标色调。 */
+.preview-feature-icon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 6px; }
+.preview-feature-icon svg { width: 17px; height: 17px; }
+/* 默认皮肤快捷卡图标沿用品牌色；深色由 .popup-skin-scope[data-popup-theme="dark"] 控制，不读取 Options 的 :root.dark。 */
 .preview-feature-icon.rose { color: var(--brand, #ef4776); background: var(--brand-soft, #fff0f5); }
 .preview-feature-icon.violet { color: #6f55d9; background: #f1edff; }
-.preview-feature-icon.blue { color: #2678c9; background: #eaf4ff; }
-.preview-feature-icon.amber { color: #a75f16; background: #fff4df; }
-.preview-feature-icon.teal { color: #087f82; background: #e4f8f6; }
-:root.dark .preview-feature-icon.rose { background: rgba(231, 58, 108, .14); }
-:root.dark .preview-feature-icon.violet { background: rgba(111, 85, 217, .17); }
-:root.dark .preview-feature-icon.blue { background: rgba(38, 120, 201, .17); }
-:root.dark .preview-feature-icon.amber { background: rgba(177, 104, 29, .17); }
-:root.dark .preview-feature-icon.teal { background: rgba(8, 127, 130, .18); }
+.preview-feature-icon.blue { color: var(--fr-info, #2563a6); background: var(--fr-info-soft, #edf4ff); }
+.preview-feature-icon.amber { color: var(--fr-warning, #8f5f16); background: var(--fr-warning-soft, #fff6e2); }
+.preview-feature-icon.teal { color: var(--fr-success, #147e5c); background: var(--fr-success-soft, #eaf7f3); }
+.preview-popup[data-preview-kind="default"] .preview-feature-icon { color: var(--brand); background: var(--brand-soft); }
+
 .preview-feature-copy { display: flex; min-width: 0; flex-direction: column; overflow-wrap: anywhere; }
-.preview-popup .preview-feature-copy strong { font-size: 11.5px; font-weight: 600; line-height: 1.4; }
-.preview-popup .preview-feature-copy small { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-popup .preview-feature-copy strong { font-size: 11.5px; font-weight: 600; line-height: 1.35; }
+.preview-popup .preview-feature-copy small { margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .preview-feature > b { justify-self: center; color: var(--muted); font-size: 12px; font-weight: 400; }
-.preview-feature-status { width: 5px; height: 5px; justify-self: center; border-radius: 50%; background: #b8bec9; }
+.preview-feature-status { width: 6px; height: 6px; justify-self: center; border-radius: 50%; background: var(--fr-color-line-strong, #cfd5e0); }
 .preview-feature-status.active { background: var(--fr-success-indicator, #24b47e); box-shadow: var(--fr-success-indicator-ring, 0 0 0 3px rgba(36, 180, 126, .16)); }
 
 .preview-footer {
-  display: grid; min-height: 30px; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px;
-  padding: 6px 3px 1px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9.5px;
+  display: grid; min-height: 30px; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; gap: 6px;
+  padding: 7px 2px 2px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums;
 }
-.preview-footer.framed { padding: 6px 8px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-soft); }
+.preview-footer.framed { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); }
 .preview-open-source {
-  display: inline-flex; min-height: 22px; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid transparent;
-  border-radius: 999px; background: var(--surface-soft); font-weight: 650; white-space: nowrap;
+  display: inline-flex; min-width: 0; min-height: 24px; align-items: center; justify-content: center; gap: 4px; padding: 2px 6px; border: 1px solid transparent;
+  border-radius: 999px; background: var(--surface-soft); font-weight: 550; white-space: nowrap;
 }
 .preview-open-source svg { width: 12px; height: 12px; flex: none; }
-.preview-clear-cache { justify-self: end; font-size: 10px; font-weight: 500; }
+.preview-clear-cache { justify-self: end; font-size: 10.5px; font-weight: 500; }
+.preview-external-mark { flex: none; }
 
 /* 布局编辑：在真实界面上叠加排序手柄与入口切换，不改变各区域自身的样子。 */
 .preview-section-heading { display: flex; align-items: center; padding-left: 8px; }
@@ -356,142 +363,14 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
 .preview-section-heading button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .preview-footer.editable > span:first-of-type { padding-left: 10px; }
 
-/* 默认预览与实际菜单共用固定槽位与站点状态圆点。 */
-[data-preview-kind="default"] .preview-header { flex-wrap: nowrap; }
-[data-preview-kind="default"] .preview-settings { width: 68px; padding-inline: 5px; }
-[data-preview-kind="default"] .preview-service { height: 43px; }
-[data-preview-kind="default"] .preview-service-copy { display: grid; grid-template-columns: min(52px, 42%) minmax(0, 1fr); }
-.preview-popup[data-preview-kind="default"] .preview-service-copy > small { font-size: 11px; }
-[data-preview-kind="default"] .preview-action-row { gap: 6px; }
-[data-preview-kind="default"] :is(.preview-action, .preview-section-action) { min-height: 42px; border-radius: 10px; }
-[data-preview-kind="default"] .preview-section-action { width: 46px; min-width: 46px; padding-inline: 5px; }
-[data-preview-kind="default"] .preview-meta { display: flex; gap: 6px; }
-[data-preview-kind="default"] .preview-site-rules {
-  display: grid; grid-template-columns: minmax(0, 10fr) minmax(0, 11fr); min-height: 24px; padding: 0; border: 0; background: transparent;
-}
-[data-preview-kind="default"] .preview-site-rules.nested { flex: 1; min-width: 0; }
-[data-preview-kind="default"] .preview-site-rule-button { justify-content: space-between; }
-.preview-tools { display: flex; flex: none; gap: 6px; margin-inline-start: auto; color: var(--brand-strong); }
-.preview-tools > * { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 6px; background: var(--surface-soft); }
-.preview-tools > span { font: 600 14px Georgia, serif; }
-.preview-tools > svg { padding: 3px; }
-[data-preview-kind="default"] .preview-footer { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-[data-preview-kind="default"] .preview-open-source { min-width: 0; justify-content: center; padding-inline: 3px; }
-.preview-external-mark { flex: none; }
-[data-preview-kind="default"] :is(
+/* 单行溢出省略，保持预览排版规整。 */
+.preview-popup :is(
   .preview-brand strong, .preview-settings > span, .preview-language-select strong, .preview-language > small, .preview-service-copy > *,
   .preview-action > strong, .preview-section-action > span, .preview-site-rule-button > span,
   .preview-feature-copy > *, .preview-footer > span:not(.preview-open-source), .preview-open-source > span:not(.preview-external-mark)
 ) { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
 
-/* 默认快捷卡沿用品牌色。 */
-.preview-popup[data-preview-kind="default"] .preview-feature-icon { color: var(--brand-strong); background: var(--brand-soft); }
-
-/* 简约：对应 minimal.css——没有卡片外框，控件是中性浅灰，入口只留标题。 */
-.preview-popup[data-preview-kind="minimal"] { padding: 12px 12px 10px; }
-.preview-popup[data-preview-kind="minimal"] .preview-header { min-height: 42px; margin-bottom: 12px; }
-.preview-popup[data-preview-kind="minimal"] .preview-brand { gap: 8px; }
-.preview-popup[data-preview-kind="minimal"] .preview-logo { width: 38px; height: 38px; }
-.preview-popup[data-preview-kind="minimal"] .preview-brand small { font-size: 9px; }
-.preview-popup[data-preview-kind="minimal"] .preview-header-actions { gap: 5px; }
-.preview-popup[data-preview-kind="minimal"] .preview-header-actions > span { color: var(--muted); background: transparent; font-size: 9px; }
-.preview-popup[data-preview-kind="minimal"] .preview-flow { gap: 11px; }
-.preview-popup[data-preview-kind="minimal"] .preview-hero { gap: 10px; padding: 0; border: 0; border-radius: 0; background: transparent; }
-.preview-popup[data-preview-kind="minimal"] .preview-language-select { border-color: transparent; }
-.preview-popup[data-preview-kind="minimal"] .preview-action {
-  min-height: 46px; padding: 10px 12px; border: 1px solid transparent; color: var(--ink); background: var(--surface-soft); box-shadow: none;
+@media (prefers-reduced-motion: reduce) {
+  .preview-popup { transition: none; }
 }
-.preview-popup[data-preview-kind="minimal"] .preview-site-rules { border: 0; border-radius: 13px; }
-.preview-popup[data-preview-kind="minimal"] .preview-site-rule-button { min-height: 22px; padding: 3px 6px; border-radius: 6px; }
-.preview-popup[data-preview-kind="minimal"] .preview-features { gap: 5px; }
-.preview-popup[data-preview-kind="minimal"] .preview-feature { grid-template-columns: 30px minmax(0, 1fr) 6px; min-height: 48px; padding: 7px 9px; border-radius: 14px; }
-.preview-popup[data-preview-kind="minimal"] .preview-feature-icon { width: 30px; height: 30px; color: var(--muted); background: var(--surface-soft); }
-.preview-popup[data-preview-kind="minimal"] .preview-feature-copy strong { font-size: 11px; line-height: 1.3; }
-.preview-popup[data-preview-kind="minimal"] .preview-feature-copy small { display: none; }
-.preview-popup[data-preview-kind="minimal"] .preview-feature > b { font-size: 15px; }
-.preview-popup[data-preview-kind="minimal"] .preview-footer { min-height: 32px; padding: 7px 14px; border: 0; background: var(--surface-soft); font-size: 10px; }
-.preview-popup[data-preview-kind="minimal"] .preview-footer:not(.framed) { margin: 0 -12px -10px; }
-.preview-popup[data-preview-kind="minimal"] .preview-open-source { min-height: 20px; padding: 1px 4px; border-radius: 6px; }
-
-/* 紧凑：对应 compact.css——压缩间距与控件高度，文字不缩到难以辨认。 */
-.preview-popup[data-preview-kind="compact"] {
-  padding: 8px 12px 4px;
-  background: var(--surface);
-}
-.preview-popup[data-preview-kind="compact"] .preview-header { margin-bottom: 5px; }
-.preview-popup[data-preview-kind="compact"] .preview-brand { gap: 7px; }
-.preview-popup[data-preview-kind="compact"] .preview-brand strong { font-size: 13px; }
-.preview-popup[data-preview-kind="compact"] .preview-brand small { font-size: 9.5px; }
-.preview-popup[data-preview-kind="compact"] .preview-header-actions > span { height: 29px; padding: 0 7px; border-radius: 8px; font-size: 9.5px; }
-.preview-popup[data-preview-kind="compact"] .preview-flow { gap: 6px; }
-.preview-popup[data-preview-kind="compact"] .preview-hero { gap: 6px; padding: 9px; border-radius: 15px; box-shadow: 0 6px 15px rgba(27, 36, 57, .06); }
-.preview-popup[data-preview-kind="compact"] .preview-language-pair { grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr); gap: 5px; margin-top: 8px; }
-.preview-popup[data-preview-kind="compact"] .preview-action-row { margin-top: 1px; }
-.preview-popup[data-preview-kind="compact"] .preview-language { gap: 3px; }
-.preview-popup[data-preview-kind="compact"] .preview-language > small { font-size: 9.5px; }
-.preview-popup[data-preview-kind="compact"] .preview-language-select { min-height: 32px; border-radius: 8px; }
-.preview-popup[data-preview-kind="compact"] .preview-language-pair > b { height: 32px; }
-.preview-popup[data-preview-kind="compact"] .preview-service { min-height: 34px; padding: 3px 8px; border-radius: 9px; }
-.preview-popup[data-preview-kind="compact"] .preview-provider-avatar { width: 26px; height: 26px; }
-.preview-popup[data-preview-kind="compact"] .preview-provider-avatar :deep(.service-icon) { width: 20px; height: 20px; }
-.preview-popup[data-preview-kind="compact"] .preview-action { min-height: 36px; border-radius: 9px; box-shadow: none; }
-.preview-popup[data-preview-kind="compact"] .preview-action > strong { font-size: 10.5px; }
-.preview-popup[data-preview-kind="compact"] .preview-section-action { border-radius: 9px; }
-.preview-popup[data-preview-kind="compact"] .preview-site-rules { min-height: 28px; padding: 3px 5px 3px 7px; border-radius: 8px; }
-.preview-popup[data-preview-kind="compact"] .preview-site-rule-button { min-height: 22px; padding: 0 7px; }
-.preview-popup[data-preview-kind="compact"] .preview-features { gap: 4px; }
-.preview-popup[data-preview-kind="compact"] .preview-feature { grid-template-columns: 24px minmax(0, 1fr) 6px; gap: 5px; min-height: 42px; padding: 4px 6px; border-radius: 9px; }
-.preview-popup[data-preview-kind="compact"] .preview-feature-icon { width: 24px; height: 24px; border-radius: 7px; }
-.preview-popup[data-preview-kind="compact"] .preview-feature-copy strong { font-size: 10.5px; line-height: 1.25; }
-.preview-popup[data-preview-kind="compact"] .preview-feature-copy small { margin-top: 1px; font-size: 9px; }
-.preview-popup[data-preview-kind="compact"] .preview-footer { min-height: 26px; padding-top: 4px; font-size: 9px; }
-
-/* 高对比：对应 contrast.css——粗描边、方角、浅黄控件与实色主按钮。 */
-.preview-popup[data-preview-kind="contrast"] { padding-bottom: 8px; border-radius: 7px; box-shadow: 0 0 0 2px var(--line); }
-.preview-popup[data-preview-kind="contrast"] :is(.preview-hero, .preview-header-actions > span, .preview-language-select, .preview-service, .preview-site-rules, .preview-feature, .preview-section-action) {
-  border: 2px solid var(--line); border-radius: 7px;
-}
-.preview-popup[data-preview-kind="contrast"] .preview-header-actions > span { color: var(--ink); }
-.preview-popup[data-preview-kind="contrast"] .preview-action { border: 2px solid var(--line); border-radius: 7px; color: var(--surface); background: var(--brand); box-shadow: none; }
-.preview-popup[data-preview-kind="contrast"] .preview-feature-icon { border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--brand-soft); }
-
-/* 传统色风格：逐项读取 palette.css 的造型契约，与真实菜单栏使用同一组变量；各风格文件里的专属规则同时匹配这里的类名。 */
-.preview-popup[data-preview-kind="palette"] {
-  border-radius: min(var(--skin-panel-radius, 14px), 18px);
-  background: var(--skin-page, var(--surface));
-}
-.preview-popup[data-preview-kind="palette"] .preview-header-actions > span {
-  border: var(--skin-chip-border, 1px solid var(--line)); border-radius: var(--skin-chip-radius, var(--skin-control-radius, 10px));
-  color: var(--skin-chip-color, var(--ink)); background: var(--skin-chip-background, var(--surface));
-  box-shadow: var(--skin-chip-shadow, none);
-}
-.preview-popup[data-preview-kind="palette"] .preview-header-actions > span:first-child { color: var(--skin-chip-color, var(--muted)); }
-.preview-popup[data-preview-kind="palette"] .preview-hero {
-  border: var(--skin-panel-border, 1px solid var(--line)); border-radius: var(--skin-panel-radius, 14px);
-  background: var(--skin-panel-background, var(--surface)); box-shadow: var(--skin-panel-shadow, none);
-}
-.preview-popup[data-preview-kind="palette"] .preview-language > small { color: var(--skin-label-color, var(--muted)); }
-.preview-popup[data-preview-kind="palette"] :is(.preview-language-select, .preview-service, .preview-section-action, .preview-site-rules) {
-  border: var(--skin-control-border, 1px solid var(--line)); border-radius: var(--skin-control-radius, 10px);
-  background: var(--skin-control-background, var(--surface-soft)); box-shadow: var(--skin-control-shadow, none);
-}
-.preview-popup[data-preview-kind="palette"] .preview-section-action { color: var(--skin-section-color, var(--brand-strong)); }
-.preview-popup[data-preview-kind="palette"] .preview-provider-avatar { border-color: var(--skin-avatar-ring, var(--surface)); background: var(--skin-avatar-background, var(--surface-soft)); }
-.preview-popup[data-preview-kind="palette"] .preview-site-rule-button {
-  border-radius: var(--skin-tag-radius, min(8px, var(--skin-control-radius, 8px))); background: var(--skin-tag-background, var(--surface));
-}
-.preview-popup[data-preview-kind="palette"] .preview-action {
-  border: var(--skin-action-border, 0); border-radius: var(--skin-action-radius, var(--skin-control-radius, 10px)); color: var(--skin-action-text, #fff);
-  background: var(--skin-action-background, var(--brand)); box-shadow: var(--skin-action-shadow, none);
-}
-.preview-popup[data-preview-kind="palette"] .preview-feature {
-  border: var(--skin-feature-border, 1px solid var(--line)); border-radius: var(--skin-feature-radius, 10px);
-  background: var(--skin-feature-background, var(--surface)); box-shadow: var(--skin-feature-shadow, none);
-}
-.preview-popup[data-preview-kind="palette"] .preview-feature-icon {
-  border: var(--skin-icon-border, 0); border-radius: var(--skin-icon-radius, 8px);
-  color: var(--skin-icon-color, var(--brand-strong)); background: var(--skin-icon-background, var(--brand-soft)); box-shadow: var(--skin-icon-shadow, none);
-}
-.preview-popup[data-preview-kind="palette"] .preview-footer { border-color: var(--skin-footer-line, var(--line)); color: var(--muted); }
-.preview-popup[data-preview-kind="palette"] .preview-open-source { background: var(--skin-chip-background, var(--surface-soft)); }
 </style>

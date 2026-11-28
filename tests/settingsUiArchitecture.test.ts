@@ -351,7 +351,7 @@ describe('options UI composition architecture', () => {
     expect(skinStyles).toContain('min-height: 0')
     expect(skinStyles).toContain('./interface-skins/popup-skins-base.css')
     expect(skinStyles).toContain('./interface-skins/popup-skins-themes.css')
-    const craftSkins = ['liquid-glass', 'aurora', 'tactile', 'brutalist', 'cyber', 'retro-os', 'terminal', 'editorial', 'sakura', 'matcha', 'midnight-gold']
+    const craftSkins = ['liquid-glass', 'aurora', 'tactile', 'brutalist', 'cyber', 'retro-os', 'terminal', 'editorial', 'sakura', 'matcha', 'midnight-gold', 'swiss-minimal', 'golden-hour', 'blueprint', 'starlight']
     for (const skin of craftSkins) {
       expect(themeSkinStyles).toContain(`data-interface-skin="${skin}"`)
     }

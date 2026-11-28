@@ -66,7 +66,7 @@ function skinModes(skin: typeof craftSkins[number]): Record<string, Tokens> {
 }
 
 describe('Popup 专属皮肤可读性与隔离契约', () => {
-  it('全部 11 套 craft 皮肤在亮/暗态下满足 WCAG 2.2 AA 可读性对比度', () => {
+  it('全部 15 套 craft 皮肤在亮/暗态下满足 WCAG 2.2 AA 可读性对比度', () => {
     for (const skin of craftSkins) {
       const textMin = 4.5
       const inkMin = 10.0
@@ -132,7 +132,7 @@ describe('Popup 专属皮肤可读性与隔离契约', () => {
     }
   })
 
-  it('11 套 craft 皮肤造型、圆角与色板互不重复，且保持品牌 Logo 原样与精简 CSS 体积', () => {
+  it('15 套 craft 皮肤造型、圆角与色板互不重复，且保持品牌 Logo 原样与精简 CSS 体积', () => {
     const signatures = craftSkins.map((skin) => {
       const firstMode = Object.values(skinModes(skin))[0]
       return [
@@ -144,8 +144,8 @@ describe('Popup 专属皮肤可读性与隔离契约', () => {
         firstMode['--skin-icon-radius'] ?? '7px',
       ].join(' | ')
     })
-    expect(craftSkins).toHaveLength(11)
-    expect(new Set(signatures).size).toBe(11)
+    expect(craftSkins).toHaveLength(15)
+    expect(new Set(signatures).size).toBe(15)
 
     // 品牌 Logo 在所有皮肤下不被滤镜或改色，且不挂载角落插画
     expect(existsSync(resolve(root, 'src/ui/components/InterfaceBackdrop.vue'))).toBe(false)
@@ -155,8 +155,8 @@ describe('Popup 专属皮肤可读性与隔离契约', () => {
       expect(source(path)).not.toContain('InterfaceBackdrop')
     }
 
-    // 源码体积守卫：Popup 专属多材质视觉架构较旧版 224KB 缩减超过 70%
+    // 源码体积守卫：Popup 专属多材质视觉架构较旧版 224KB 缩减超过 60%
     const totalBytes = Buffer.byteLength(baseCss(), 'utf8') + Buffer.byteLength(themesCss(), 'utf8')
-    expect(totalBytes).toBeLessThan(70_000)
+    expect(totalBytes).toBeLessThan(90_000)
   })
 })

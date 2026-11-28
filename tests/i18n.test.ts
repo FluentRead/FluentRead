@@ -1016,6 +1016,7 @@ describe('界面 i18n 契约', () => {
       '光影与材质',
       '潮流与个性',
       '东方与人文',
+      '极简与视界',
       '弹窗风格',
       '快捷功能栏',
       '显示悬停、划词、图片、视频和文档等快捷入口。',
@@ -1032,6 +1033,8 @@ describe('界面 i18n 契约', () => {
     expect(translateLegacyText('界面与弹窗', 'en-US')).toBe('Interface and popup');
     expect(translateLegacyText('默认经典', 'en-US')).toBe('FluentRead Default');
     expect(translateLegacyText('液态玻璃', 'en-US')).toBe('Liquid Glass');
+    expect(translateLegacyText('素净极简', 'en-US')).toBe('Swiss Minimal');
+    expect(translateLegacyText('建筑蓝图', 'en-US')).toBe('Blueprint Grid');
     expect(translateLegacyText('宇治手账', 'ja-JP')).toBe('宇治抹茶手帳');
     expect(translateLegacyText('潮流与个性', 'fr-FR')).toBe('Audacieux et pop');
   });

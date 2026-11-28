@@ -266,8 +266,8 @@ describe('漫画局部气泡识别边界',()=>{
         expect(assigned).toEqual([{bbox:box(67,124,217,163),members:[1]}]);
         expect(Object.keys(assigned[0].bbox)).toEqual(['x0','y0','x1','y1']);
         const result=collectMangaRegions({results:items,layoutBubbles:assigned},'ja',width,height);
-        expect(result.map(region=>region.text)).toEqual(['本文の列','外の注釈']);
-        expect(result.flatMap(region=>region.sourceBoxes)).toEqual([box(130,150,20,80),box(199,170,20,60)]);
+        expect(result.map(region=>region.text)).toEqual(['外の注釈','本文の列']);
+        expect(result.flatMap(region=>region.sourceBoxes)).toEqual([box(199,170,20,60),box(130,150,20,80)]);
         expect(items).toEqual(originalItems);expect(p.every((value,index)=>value===originalPixels[index])).toBe(true);
     });
     it('封闭浅色面板中的独立白色岛被记录为原图排除区域',()=>{
@@ -475,8 +475,8 @@ describe('漫画局部气泡识别边界',()=>{
             {bbox:box(260,60,150,100),results:[neighbor]},
         ]};
         const result=collectMangaRegions(page,'en',500,400);
-        expect(result.map(line=>line.text)).toEqual(['Another speaker','First complete line Last recovered line']);
-        expect(result[1].sourceBoxes).toEqual([{x0:70,y0:80,x1:220,y1:92},{x0:70,y0:97,x1:220,y1:109}]);
+        expect(result.map(line=>line.text)).toEqual(['First complete line Last recovered line','Another speaker']);
+        expect(result[0].sourceBoxes).toEqual([{x0:70,y0:80,x1:220,y1:92},{x0:70,y0:97,x1:220,y1:109}]);
         expect(collectMangaRegions(page,'en',500,400,'image').map(line=>line.text)).toEqual(['First complete line','Another speaker','Last recovered line']);
     });
     it('独立气泡中略宽行距的英文保持整句，原始修补框不扩张，整页仍不跨框合并',()=>{
@@ -497,7 +497,7 @@ describe('漫画局部气泡识别边界',()=>{
         const page={results:[text('Noise',150,200),text('short',150,240),text('row',150,254),text('Reliable caption',200,290),text('second line',200,306),text('Below',25,90),text('Left',0,30),text('Right',90,30)],
             bubbles:[{bbox:box(10,10),results:[text('Hello',20,20)]},{bbox:box(200,10),results:[text('Again',210,20)]},{bbox:box(10,110),results:[]}]};
         const regions=collectMangaRegions(page,'en',400,400);
-        expect(regions.map(r=>r.text)).toEqual(['Again','Hello Left','Right','Below','Noise','short row','Reliable caption second line']);
+        expect(regions.map(r=>r.text)).toEqual(['Hello Left','Again','Right','Below','Noise','short row','Reliable caption second line']);
         expect(collectMangaRegions({results:[],bubbles:[{bbox:box(10,10),results:[]}]},'en',400,400)).toEqual([]);
     });
     it('局部 OCR 为空或低置信度时保留全页原文，局部漏行与可靠局部行合成同一句', () => {

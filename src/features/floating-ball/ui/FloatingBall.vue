@@ -1,7 +1,7 @@
 <!--
  * @file src/features/floating-ball/ui/FloatingBall.vue
- * 文件职责：呈现可拖动的网页悬浮球，协调翻译状态、漫画入口、快捷面板与隐藏选项的交互。
- * 主要内容：以品牌按钮为固定停靠锚点，辅助工具沿其纵向中线展开并避让视口上下边缘；同一按钮支持原生点击、焦点和指针拖动，拖动预览按帧更新变换。
+ * 文件职责：呈现可拖动的网页悬浮球，协调翻译状态、漫画入口与实时进度遥测、快捷面板与隐藏选项的交互。
+ * 主要内容：以品牌按钮为固定停靠锚点，辅助工具沿其纵向中线展开并避让视口上下边缘；同一按钮支持原生点击、焦点和指针拖动，拖动预览按帧更新变换；漫画阅读页按钮展示实时页数/错误计数微徽标（如 3/12、!2）与包含已翻译、已预译和错误数的本地化悬浮提示及无障碍标签。
  * 模块边界：组件只拥有局部布局和交互；content/runtime 负责执行动作、订阅翻译状态与持久化位置，core/config 负责外观配置归一化。
  -->
 <template>
@@ -51,7 +51,7 @@
       class="floating-ball-manga"
       :class="{'manga-active': manga.active}"
       type="button"
-      :aria-label="t(manga.areaFallback ? '圈选漫画翻译' : manga.active ? '暂停并显示原图' : '漫画翻译')"
+      :aria-label="mangaActionLabel"
       :aria-pressed="manga.active"
       :aria-busy="manga.pending"
       :title="mangaTitle"
@@ -61,7 +61,13 @@
         <path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1m0-14c3-2 6-2 9-1v14c-3-1-6-1-9 1V6Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M5.5 8.5h4v4h-2l-1.5 1v-1h-.5v-4Zm9.5.5h3m-3 3h3m-3 3h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
-      <span v-if="manga.active && !manga.pending && (manga.errors > 0 || (manga.completed ?? 0) > 0)" class="translation-indicator" :data-status="manga.errors ? 'error' : 'translated'" aria-hidden="true">{{ manga.errors ? '!' : '✓' }}</span>
+      <span
+        v-if="mangaIndicatorStatus"
+        class="translation-indicator"
+        :class="{'is-counter': mangaIndicatorText.length > 1}"
+        :data-status="mangaIndicatorStatus"
+        aria-hidden="true"
+      >{{ mangaIndicatorText }}</span>
       <span v-if="manga.pending" class="manga-progress" aria-hidden="true" />
     </button>
 
@@ -255,12 +261,53 @@ const translationActionLabel = computed(() => {
   }[displayTranslationStatus.value];
   return key ? `${action} · ${translateMessage(key)}` : action;
 });
+const mangaCompleted = computed(() => props.manga?.completed ?? 0);
+const mangaPageCount = computed(() => props.manga?.pageCount ?? 0);
+const mangaAhead = computed(() => props.manga?.ahead ?? 0);
+const mangaIndicatorStatus = computed<'error' | 'translated' | 'translating' | ''>(() => {
+  const manga = props.manga;
+  if (!manga?.active || manga.areaFallback) return '';
+  if (manga.errors > 0) return 'error';
+  if (manga.pending) return mangaPageCount.value > 0 ? 'translating' : '';
+  if (mangaCompleted.value > 0) return 'translated';
+  return '';
+});
+const mangaIndicatorText = computed(() => {
+  const manga = props.manga;
+  if (!mangaIndicatorStatus.value || !manga) return '';
+  if (manga.errors > 0) return manga.errors > 1 ? `!${manga.errors}` : '!';
+  if (mangaPageCount.value > 0) return `${mangaCompleted.value}/${mangaPageCount.value}`;
+  return '✓';
+});
+const mangaProgressSummary = computed(() => {
+  const manga = props.manga;
+  if (!manga?.active || manga.areaFallback) return '';
+  const parts: string[] = [];
+  if (mangaPageCount.value > 0) {
+    parts.push(!manga.pending && !manga.errors && mangaCompleted.value >= mangaPageCount.value
+      ? `${t('翻译完成')} (${mangaCompleted.value}/${mangaPageCount.value})`
+      : `${t('已翻译')} ${mangaCompleted.value}/${mangaPageCount.value} ${t('页')}`);
+  }
+  if (mangaAhead.value > 0) parts.push(`${t('已预译')} ${mangaAhead.value} ${t('页')}`);
+  return parts.join(' · ');
+});
+const mangaActionLabel = computed(() => {
+  const manga = props.manga;
+  if (manga?.areaFallback) return t('圈选漫画翻译');
+  if (!manga?.active) return t('漫画翻译');
+  const errorPart = manga.errors > 0 ? `${t('部分页面未完成')} (${manga.errors})` : '';
+  return [t('暂停并显示原图'), mangaProgressSummary.value, errorPart].filter(Boolean).join(' · ');
+});
 const mangaTitle = computed(() => {
   const manga = props.manga;
   if (manga?.areaFallback) return t('画布或分片漫画 · 拖选可见区域翻译');
   if (!manga?.active) return t('漫画翻译 · 自动翻译新页面');
-  const message = manga.pending ? manga.message || '正在处理当前漫画页' : manga.errors ? '部分页面未完成' : '连续翻译已开启';
-  return `${t(message)} · ${t('暂停并显示原图')}`;
+  const message = manga.pending ? t(manga.message || '正在处理当前漫画页')
+    : manga.errors ? `${t('部分页面未完成')} (${manga.errors})` : t('连续翻译已开启');
+  const pct = manga.pending && typeof manga.progress === 'number' && Number.isFinite(manga.progress)
+    ? `${Math.max(0, Math.min(100, Math.round(manga.progress)))}%` : '';
+  const pendingErrors = manga.pending && manga.errors > 0 ? `${t('部分页面未完成')} (${manga.errors})` : '';
+  return [message, pct, mangaProgressSummary.value, pendingErrors, t('暂停并显示原图')].filter(Boolean).join(' · ');
 });
 const mangaReadingLabel = computed(() => t(isMangaReadingOpen.value ? '关闭漫画文字' : '查看漫画文字'));
 const settingsActionLabel = computed(() => translateMessage(isUserscript
@@ -996,6 +1043,15 @@ watch(() => presentation.value.toolsDisplay, () => {
 
 .translation-indicator[data-status="error"] { background: #b45309; }
 .translation-indicator[data-status="translating"] { background: var(--fr-accent); color: var(--fr-surface); }
+.floating-ball-manga .translation-indicator.is-counter {
+  width: auto;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 .manga-progress {
   position: absolute;

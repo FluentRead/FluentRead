@@ -247,7 +247,7 @@ export function createMangaOcrRuntime(create: (signal?: AbortSignal, progress?: 
     };
 }
 
-export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Progress): Promise<MangaOcrPort> {
+export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Progress, onBroken?: () => void): Promise<MangaOcrPort> {
     assertOnnxWasmRuntimeSupported();
     const model = await loadMangaOcrAssets(signal, percent => progress?.('preparing', percent));
     assertMangaOcrActive(signal); progress?.('initializing');
@@ -466,7 +466,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                 return [await recognize(1),await recognize(-1)];
             },checkActive);
         }
-        beginMangaPage(): void {this.remainingRetries=4;this.remainingRubyRescues=2;this.remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;this.originalSource=undefined;colorAdapter.beginPage(activeSignal);whitespace.beginPage(activeSignal);if(this.detector instanceof MangaDetection)this.detector.detectionCore.beginPage(activeSignal);}
+        beginMangaPage(): void {this.inferenceFailure=undefined;for(const check of this.checks){try{check();}catch{/* 新页开始前清除上页残留的会话失败锁存。 */}}this.remainingRetries=4;this.remainingRubyRescues=2;this.remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;this.originalSource=undefined;colorAdapter.beginPage(activeSignal);whitespace.beginPage(activeSignal);if(this.detector instanceof MangaDetection)this.detector.detectionCore.beginPage(activeSignal);}
         tryReserveMangaRubyRescue(sourcePixels:number):boolean {
             if(this.remainingRubyRescues<=0||!Number.isSafeInteger(sourcePixels)||sourcePixels<=0||sourcePixels>this.remainingPreprocessingPixels)return false;
             this.remainingRubyRescues--;this.remainingPreprocessingPixels-=sourcePixels;return true;
@@ -685,7 +685,8 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                         if(candidate&&candidate.box.x===0&&candidate.box.y===0&&candidate.box.width===trim.width&&candidate.box.height===trim.height)
                             preserve({...candidate,box:item.box});
                         if(candidate&&candidate.box.x===0&&candidate.box.y===0&&candidate.box.width===trim.width&&candidate.box.height===trim.height
-                            &&candidate.confidence>=.99&&candidate.confidence>=item.confidence+.01){
+                            &&((candidate.confidence>=.99&&candidate.confidence>=item.confidence+.01)
+                                ||(candidate.confidence>=.94&&candidate.confidence>=item.confidence+.05))){
                             replacements.set(item,{...candidate,box:item.box});
                         }
                     }finally{ownedCrop.width=0;ownedCrop.height=0;rotated.width=0;rotated.height=0;trimmed.width=0;trimmed.height=0;}
@@ -711,7 +712,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                     try {assertMangaOcrActive(activeSignal);}catch(error){await Promise.resolve().then(()=>cpu.release()).catch(()=>undefined);throw error;}
                     cpuFallbackActive=true;
                     return cpu;
-                },()=>activeSignal));
+                },()=>activeSignal,onBroken));
                 if(session){
                     const run=session.run.bind(session),invoke=run as (...args:Parameters<typeof run>)=>ReturnType<typeof run>;
                     session.run=(async(...args:Parameters<typeof run>)=>{

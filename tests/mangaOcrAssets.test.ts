@@ -161,9 +161,21 @@ describe('漫画模型固定版本和完整性',()=>{
         expect(fetch).toHaveBeenCalledTimes(3);expect(cache.put).toHaveBeenCalledTimes(3);expect(progress.mock.calls.map(c=>c[0])).toEqual([31,99,100]);
         for(const [url,options] of vi.mocked(fetch).mock.calls) {expect(url).toContain('/resolve/bf1d5edb0335d3262be7caf13f766ba274b4cadd/');expect(options).toEqual({signal:expect.any(AbortSignal),credentials:'omit',referrerPolicy:'no-referrer'});}
     });
-    it('完整缓存不请求网络，取消后的任务不继续读取后续文件',async()=>{
+    it('完整缓存不请求网络，并发读取并校验三份模型，取消后的任务不继续执行',async()=>{
+        const gates = MANGA_OCR_ASSETS.map(() => deferred<Response>());
+        cache.match.mockImplementation((url:string)=>{
+            const index = MANGA_OCR_ASSETS.findIndex(a=>url.endsWith(a.path));
+            return gates[index].promise;
+        });
+        const loading = loadMangaOcrAssets();
+        await Promise.resolve();
+        await Promise.resolve();
+        // 三个缓存 match 均已并发发起，不等待前一个完成。
+        expect(cache.match).toHaveBeenCalledTimes(3);
+        MANGA_OCR_ASSETS.forEach((asset, index) => gates[index].resolve(response(asset.bytes)));
+        await loading;
+        expect(fetch).not.toHaveBeenCalled();expect(cache.put).not.toHaveBeenCalled();
         cache.match.mockImplementation(async(url:string)=>response(MANGA_OCR_ASSETS.find(a=>url.endsWith(a.path))!.bytes));
-        await loadMangaOcrAssets();expect(fetch).not.toHaveBeenCalled();expect(cache.put).not.toHaveBeenCalled();
         const abort=new AbortController();await expect(loadMangaOcrAssets(abort.signal,()=>abort.abort())).rejects.toMatchObject({name:'AbortError'});
     });
     it('损坏缓存被删除并重新下载，不保留坏模型',async()=>{
@@ -210,6 +222,33 @@ describe('漫画模型固定版本和完整性',()=>{
         await expect(loadMangaInpaintAsset(abort.signal)).rejects.toMatchObject({name:'AbortError'});expect(cache.put).not.toHaveBeenCalled();
         const cacheAbort=new AbortController();const cached=response(MANGA_INPAINT_ASSET.bytes);vi.mocked(cached.arrayBuffer).mockImplementationOnce(async()=>{cacheAbort.abort();return buffer(MANGA_INPAINT_ASSET.bytes)});cache.match.mockResolvedValueOnce(cached);
         await expect(loadMangaInpaintAsset(cacheAbort.signal)).rejects.toMatchObject({name:'AbortError'});expect(cache.delete).not.toHaveBeenCalled();
+    });
+    it('较旧下载与清除操作不会覆盖新下载的状态快照',async()=>{
+        const firstGate=deferred<Response>(),secondGate=deferred<Response>(),deleteGate=deferred<boolean>();
+        vi.mocked(fetch).mockImplementationOnce(()=>firstGate.promise).mockImplementationOnce(()=>secondGate.promise);
+        const oldDownload=loadMangaInpaintAsset();
+        await Promise.resolve();await Promise.resolve();
+        // 删除启动并挂起期间开始新下载，旧删除完成后不得清空新下载状态。
+        vi.mocked(caches.delete).mockImplementationOnce(()=>deleteGate.promise);
+        const removing=removeMangaOcrAssets();
+        const newerDownload=loadMangaInpaintAsset();
+        await Promise.resolve();await Promise.resolve();
+        deleteGate.resolve(true);await removing;
+        expect((await mangaOcrModelStatus()).download?.phase).toBe('downloading');
+        // 旧下载成功和失败均不覆盖新下载快照。
+        firstGate.resolve(response(MANGA_INPAINT_ASSET.bytes));await oldDownload;
+        expect((await mangaOcrModelStatus()).download?.phase).toBe('downloading');
+        const failGate=deferred<Response>(),liveGate=deferred<Response>();
+        vi.mocked(fetch).mockReset().mockImplementationOnce(()=>failGate.promise).mockImplementationOnce(()=>liveGate.promise).mockRejectedValue(new Error('old mirror fail'));
+        const oldFail=loadMangaInpaintAsset();
+        await Promise.resolve();await Promise.resolve();
+        const live=loadMangaInpaintAsset();
+        await Promise.resolve();await Promise.resolve();
+        failGate.reject(new Error('old official fail'));
+        await expect(oldFail).rejects.toThrow('未完成');
+        expect((await mangaOcrModelStatus()).download?.phase).toBe('downloading');
+        secondGate.resolve(response(MANGA_INPAINT_ASSET.bytes));liveGate.resolve(response(MANGA_INPAINT_ASSET.bytes));
+        await newerDownload;await live;
     });
 });
 

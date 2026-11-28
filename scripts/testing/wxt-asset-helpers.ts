@@ -122,6 +122,7 @@ export function resolveExtensionBuildBudget(
         45_000, // settingsCenterRefactorAndI18nBudget
         155_000, // multiSourceTtsOptimizationBudget
         80_000, // documentTranslationOverhaulAndFormatsBudget
+        60_000, // mangaTranslationOptimizationBudget
     ];
 
     return featureAdjustments.reduce((total, delta) => total + delta, baseBudget);

@@ -1,10 +1,10 @@
 /**
  * @file src/features/image-translation/services/mangaTypography.ts
- * 文件职责：在漫画原有区域内排版完整译文，区分对白与大标题并保持东亚标点的阅读习惯。
- * 主要内容：保留词、字素与显式换行，扩展东亚文字与英文分词，必要时按字素边界合并词；纯同类标点直接绑定，避免拆开后又重新合并，闭标点跟随前字、开标点跟随后字；按真实 Canvas 字宽和可用字形上下界二分适配字号，单行不重复扣除行距，多行仍保留基线间距，缺少完整字形指标时沿用行框；合并字形有效性与最大行距遍历，基线数组就地归一化，减少临时数组而不改变浮点运算顺序；同一区域共享分词与长词字素，候选仅保留数字状态，最大字号预检后按二分上界跳过不可能胜出的搜索；普通单框与候选搜索共用同一词界和适配规则；逐项求最大宽高以兼容大量段落与行；末行过短时平衡行宽而不增加行数或越过字形预算，不截字、不横向压缩。
+ * 文件职责：在漫画原有区域内排版完整译文，区分对白与大标题并保持东亚与泰语的阅读习惯。
+ * 主要内容：保留词、字素与显式换行，扩展东亚文字、泰语与英文分词，按归一化目标语言缓存词分割器并在字素边界合并词；纯同类标点直接绑定，闭标点跟随前字、开标点跟随后字；按真实 Canvas 字宽和可用字形上下界二分适配字号，并将外描边余量从多行行距中解耦，避免厚描边挤占行间领先距同时保留顶部与底部的完整描边高度；同一区域共享分词与长词字素，候选仅保留数字状态，最大字号预检及候选精修后均严格复核胜出字号和平局剪枝契约；普通单框与候选搜索共用同一词界、逐段方差最小化行宽平衡和保持原行数的可选椭圆气泡塑形规则，不增减行数、不过度缩字、不截字、不横向压缩。
  * 模块边界：纯文字和度量算法，不读取页面、配置或字体资源，不识别、翻译或修补图片；普通图片继续使用独立的通用排版。
- * 完整词：短正文在已安全绑定的字素/标点token上合并浏览器词边界，避免字号恢复后把中文词从中间折行；整段最多1024个UTF16单元和256个原token，不拆开既有安全单元，不改显式换行。长文或缺分割器沿用原分词，真正超宽的词仍由既有完整字素回退适配。
- * 可选几何约束：同样行数可采用已观察源行距，每个字号及平衡候选须同时通过调用方的完整字形变换检查；缺省调用仍保持原算法与返回布局。
+ * 完整词：短正文在已安全绑定的字素/标点token上按目标语言词界合并或切分泰语词，避免把词从中间折行；整段最多1024个UTF16单元和256个原token，不拆开既有安全单元，不改显式换行。长文或缺分割器沿用原分词，真正超宽的词仍由既有完整字素回退适配。
+ * 可选几何约束：同样行数可采用已观察源行距，每个字号、平衡及椭圆塑形候选须同时通过调用方的完整字形变换检查；缺省调用仍保持原算法与返回布局。
  */
 import type {ImageTranslationTextLayout,ImageTextLayoutConstraints} from './textLayoutTypes';
 
@@ -20,11 +20,38 @@ const SIMPLE_TEXT = /^[\x20-\x7e\p{Script=Han}\p{Script=Hiragana}\p{Script=Katak
 const TEXT_EXTEND = /[\p{Mark}\p{Grapheme_Extend}]/u;
 const MangaSegmenter=Intl.Segmenter;
 const segmenter = typeof MangaSegmenter === 'function' ? new MangaSegmenter(undefined, {granularity:'grapheme'}) : undefined;
-let wordSegmenter:Intl.Segmenter|undefined;
-const WORD_SCRIPTS=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+const wordSegmenters = new Map<string, Intl.Segmenter>();
+const WORD_SCRIPTS=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/u;
+const THAI_SCRIPT=/\p{Script=Thai}/u;
 
-export interface MangaGlyphMetrics {ascent: number; descent: number}
+export interface MangaGlyphMetrics {ascent: number; descent: number; bleed?: number}
+export interface MangaTypographyOptions {language?: string; elliptical?: boolean}
 export interface MangaTextLayout extends ImageTranslationTextLayout {ink?: {height: number; baselines: number[]}}
+
+function normalizeSegmenterLocale(language?: string): string | undefined {
+    if (typeof language !== 'string') return undefined;
+    const normalized = language.trim().replace(/_/gu, '-');
+    if (!normalized || normalized.toLowerCase() === 'auto') return undefined;
+    return normalized;
+}
+
+function getWordSegmenter(language?: string): Intl.Segmenter {
+    const locale = normalizeSegmenterLocale(language);
+    const key = locale?.toLowerCase() ?? '';
+    const existing = wordSegmenters.get(key);
+    if (existing) return existing;
+    let created: Intl.Segmenter;
+    try {
+        created = new MangaSegmenter(locale, {granularity:'word'});
+    } catch {
+        const fallback = wordSegmenters.get('') ?? new MangaSegmenter(undefined, {granularity:'word'});
+        wordSegmenters.set('', fallback);
+        return fallback;
+    }
+    if (wordSegmenters.size >= 16) wordSegmenters.delete(wordSegmenters.keys().next().value!);
+    wordSegmenters.set(key, created);
+    return created;
+}
 
 /** 按实际字素边界合并相邻词，空白保留原有归一化规则；无分段器时沿用码点回退。 */
 function tokenizeMangaText(paragraph:string):string[] {
@@ -126,16 +153,28 @@ interface MangaTextSource {paragraphs:string[];tokens:string[][];splitTokens:Map
 /** 失败的最大字号布局不进入候选状态，避免同时保留多份整段行数组和闭包。 */
 export interface MangaTextSearchCandidate {readonly width:number;readonly height:number;readonly maximum?:MangaTextLayout}
 
-function parseMangaText(normalized:string):MangaTextSource {
+function parseMangaText(normalized:string,language?:string):MangaTextSource {
     const paragraphs = normalized.split('\n').map(paragraph => paragraph.trim());
     const tokens = paragraphs.map(paragraph => bindPunctuation(splitEdgePunctuation(tokenizeMangaText(paragraph))));
     if(segmenter&&normalized.length<=1024&&tokens.reduce((count,parts)=>count+parts.length,0)<=256){
         for(let row=0;row<tokens.length;row++){
             const parts=tokens[row],text=parts.join('');
-            if(parts.length<2||!WORD_SCRIPTS.test(text))continue;
-            wordSegmenter??=new MangaSegmenter(undefined,{granularity:'word'});
+            if(!WORD_SCRIPTS.test(text))continue;
+            if(THAI_SCRIPT.test(text)){
+                if(text.length<2)continue;
+                const seg=getWordSegmenter(language),expanded:string[]=[];
+                for(const part of parts){
+                    if(THAI_SCRIPT.test(part)){
+                        for(const item of seg.segment(part))expanded.push(item.segment);
+                    }else expanded.push(part);
+                }
+                tokens[row]=bindPunctuation(splitEdgePunctuation(expanded));
+                continue;
+            }
+            if(parts.length<2)continue;
+            const seg=getWordSegmenter(language);
             const boundaries=new Set<number>([text.length]);
-            for(const part of wordSegmenter.segment(text))boundaries.add(part.index+part.segment.length);
+            for(const part of seg.segment(text))boundaries.add(part.index+part.segment.length);
             const words:string[]=[];let pending='',offset=0;
             for(const part of parts){
                 pending+=part;offset+=part.length;
@@ -148,89 +187,162 @@ function parseMangaText(normalized:string):MangaTextSource {
 }
 
 function mangaLayoutFunctions(source:MangaTextSource,width:number,height:number,
-    measure:(text:string,size:number)=>number,measureInk?: (text:string,size:number)=>MangaGlyphMetrics|undefined,constraints?:ImageTextLayoutConstraints) {
+    measure:(text:string,size:number)=>number,measureInk?: (text:string,size:number)=>MangaGlyphMetrics|undefined,constraints?:ImageTextLayoutConstraints,options?:MangaTypographyOptions) {
     const {paragraphs,tokens,splitTokens} = source;
-    const wrap = (size: number, limit = width) => {
+    const wrapParagraph = (paragraph: string[], size: number, limitForLine: (lineIndex: number) => number): string[] => {
         const lines: string[] = [];
-        for (const paragraph of tokens) {
-            let current = '', space = '';
-            for (const token of paragraph) {
-                if (/^\s+$/u.test(token)) {space = ' '; continue;}
-                const candidate = current + space + token; space = '';
-                if (measure(candidate,size) <= limit) {current = candidate; continue;}
-                if (current) {lines.push(current); current = '';}
-                // 有完整字素/标点边界时，平衡不能拆开原区域内放得下的词；旧码点路径保持原规则。
-                if (measure(token,size) <= (segmenter?width:limit)) {current = token; continue;}
-                let parts = splitTokens.get(token);
-                if (!parts) {
-                    parts = bindPunctuation(segmenter ? Array.from(segmenter.segment(token), part => part.segment) : Array.from(token));
-                    splitTokens.set(token, parts);
-                }
-                for (const part of parts) {
-                    if (current && measure(current + part,size) > limit) {lines.push(current); current = '';}
-                    current += part;
-                }
+        let current = '', space = '';
+        for (const token of paragraph) {
+            if (/^\s+$/u.test(token)) {space = ' '; continue;}
+            const limit = limitForLine(lines.length);
+            const candidate = current + space + token; space = '';
+            if (measure(candidate,size) <= limit) {current = candidate; continue;}
+            if (current) {lines.push(current); current = '';}
+            const nextLimit = limitForLine(lines.length);
+            // 有完整字素/标点边界时，平衡不能拆开原区域内放得下的词；旧码点路径保持原规则。
+            if (measure(token,size) <= (segmenter?width:nextLimit)) {current = token; continue;}
+            let parts = splitTokens.get(token);
+            if (!parts) {
+                parts = bindPunctuation(segmenter ? Array.from(segmenter.segment(token), part => part.segment) : Array.from(token));
+                splitTokens.set(token, parts);
             }
-            lines.push(current);
+            for (const part of parts) {
+                if (current && measure(current + part,size) > limitForLine(lines.length)) {lines.push(current); current = '';}
+                current += part;
+            }
         }
+        lines.push(current);
+        return lines;
+    };
+    const finalizeLayout = (lines: string[], size: number): MangaTextLayout => {
         const layout: MangaTextLayout = {lines,fontSize:size,lineHeight:size * 1.2};
         if (!measureInk) return layout;
         // 空段仍占一个行距；任何非空行缺少完整指标时保守使用既有行框。
         const metrics = lines.map(line=>line ? measureInk(line,size) : {ascent:size*.6,descent:size*.6});
         let lineHeight = layout.lineHeight;
         for (const metric of metrics) {
-            if (!metric || !Number.isFinite(metric.ascent) || !Number.isFinite(metric.descent) || !Number.isFinite(metric.ascent+metric.descent) || metric.ascent+metric.descent<=0) return layout;
-            lineHeight = Math.max(lineHeight,metric.ascent+metric.descent);
+            const bleed = metric?.bleed ?? 0;
+            if (!metric || !Number.isFinite(metric.ascent) || !Number.isFinite(metric.descent)
+                || !Number.isFinite(metric.ascent+metric.descent) || metric.ascent+metric.descent<=0
+                || !Number.isFinite(bleed) || bleed < 0) return layout;
+            // 外描边余量仅计入顶底外包高度，不再翻倍挤占行间基线距离。
+            lineHeight = Math.max(lineHeight,metric.ascent+metric.descent,bleed>0?size*1.22:0);
         }
         layout.lineHeight = lineHeight;
         if(lines.length===constraints?.sourceLineCount&&Number.isFinite(constraints.sourceLinePitch))layout.lineHeight=Math.max(layout.lineHeight,constraints.sourceLinePitch!);
         let top = Infinity, bottom = -Infinity;
         const baselines = (metrics as MangaGlyphMetrics[]).map((metric,index)=>{
-            const baseline = index*layout.lineHeight;
-            top = Math.min(top,baseline-metric.ascent);bottom = Math.max(bottom,baseline+metric.descent);
+            const baseline = index*layout.lineHeight, bleed = metric.bleed ?? 0;
+            top = Math.min(top,baseline-(metric.ascent+bleed));bottom = Math.max(bottom,baseline+(metric.descent+bleed));
             return baseline;
         });
         for (let index=0;index<baselines.length;index++) baselines[index] -= top;
         layout.ink = {height:bottom-top,baselines};
         return layout;
     };
+    const wrap = (size: number, limit = width) => {
+        const lines: string[] = [];
+        for (const paragraph of tokens) {
+            for (const line of wrapParagraph(paragraph, size, () => limit)) lines.push(line);
+        }
+        return finalizeLayout(lines, size);
+    };
     const fits = (layout: MangaTextLayout) => (layout.ink?.height ?? layout.lines.length * layout.lineHeight) <= height
         && layout.lines.every(line => measure(line,layout.fontSize) <= width)&&(!constraints?.accept||constraints.accept(layout));
-    // 保留字号与行数，仅在末行明显过短时收拢行宽，避免气泡中留下单独的「了。」。
-    const balance = (layout: MangaTextLayout) => {
-        if (paragraphs.length !== 1 || layout.lines.length < 2) return layout;
-        const lengths = layout.lines.map(line => measure(line,layout.fontSize));
-        if (lengths[lengths.length-1] >= lengths.reduce((largest, length) => Math.max(largest, length), -Infinity) * .55) return layout;
-        let low = 0, high = width, best = layout;
+    const lineStats = (widths: number[]) => {
+        let min = Infinity, max = -Infinity;
+        for (const value of widths) { if (value < min) min = value; if (value > max) max = value; }
+        const spread = max - min, last = widths[widths.length - 1];
+        const widowPenalty = last < max * .45 ? (max * .45 - last) * .5 : 0;
+        return {max, spread, score: spread + widowPenalty};
+    };
+    // 保留字号与行数，逐段在行宽差异明显时仅采纳真正降低极差与孤字惩罚的平衡候选。
+    const balance = (layout: MangaTextLayout): MangaTextLayout => {
+        if (paragraphs.length > 4) return layout;
+        const size = layout.fontSize;
+        const paragraphLines = paragraphs.length === 1
+            ? [layout.lines]
+            : tokens.map(paragraph => wrapParagraph(paragraph, size, () => width));
+        let bestLayout = layout;
+        for (let row = 0; row < paragraphLines.length; row++) {
+            const currentLines = paragraphLines[row];
+            if (currentLines.length < 2) continue;
+            const currentWidths = currentLines.map(line => measure(line, size));
+            if (currentLines.length > 6) continue;
+            const base = lineStats(currentWidths);
+            const trigger = segmenter ? base.spread > base.max * .25 : currentWidths[currentWidths.length - 1] < base.max * .55;
+            if (!(base.max > 0) || !trigger) continue;
+            let low = 0, high = width, bestSpread = base.spread, bestScore = base.score;
+            for (let iteration = 0; iteration < 5; iteration++) {
+                const limit = (low + high) / 2;
+                const candLines = wrapParagraph(tokens[row], size, () => limit);
+                if (candLines.length !== currentLines.length) { low = limit; continue; }
+                const candWidths = candLines.map(line => measure(line, size));
+                if (!candWidths.every(value => value <= limit)) { low = limit; continue; }
+                const merged = paragraphLines.length === 1
+                    ? candLines
+                    : paragraphLines.flatMap((group, index) => index === row ? candLines : group);
+                const candidate = finalizeLayout(merged, size);
+                if (!fits(candidate)) { low = limit; continue; }
+                high = limit;
+                const next = lineStats(candWidths);
+                if (next.spread < bestSpread && next.score < bestScore) {
+                    paragraphLines[row] = candLines;
+                    bestLayout = candidate;
+                    bestSpread = next.spread;
+                    bestScore = next.score;
+                }
+            }
+        }
+        return bestLayout;
+    };
+    // 居中均匀气泡的 3 行以上单段译文收窄首尾行宽贴合椭圆轮廓，超出 8% 缩字或增行则回退矩形。
+    const shapeElliptical = (layout: MangaTextLayout): MangaTextLayout => {
+        if (!options?.elliptical || paragraphs.length !== 1 || layout.lines.length < 3) return layout;
+        const target = layout.lines.length, edgeLimit = width * .86;
+        if (measure(layout.lines[0], layout.fontSize) <= edgeLimit
+            && measure(layout.lines[target - 1], layout.fontSize) <= edgeLimit) return layout;
+        const tryElliptical = (size: number): MangaTextLayout | undefined => {
+            const candLines = wrapParagraph(tokens[0], size, line => line === 0 || line >= target - 1 ? edgeLimit : width);
+            if (candLines.length !== target) return undefined;
+            if (!candLines.every((line, index) => measure(line, size) <= (index === 0 || index === target - 1 ? edgeLimit : width))) return undefined;
+            const candidate = finalizeLayout(candLines, size);
+            return fits(candidate) ? candidate : undefined;
+        };
+        const sameSize = tryElliptical(layout.fontSize);
+        if (sameSize) return sameSize;
+        let low = layout.fontSize * .92, high = layout.fontSize;
+        let best = tryElliptical(low);
+        if (!best) return layout;
         for (let iteration = 0; iteration < 5; iteration++) {
-            const limit = (low + high) / 2, candidate = wrap(layout.fontSize,limit);
-            if (candidate.lines.length === layout.lines.length && candidate.lines.every(line=>measure(line,layout.fontSize)<=limit) && fits(candidate)) {high = limit; best = candidate;}
-            else low = limit;
+            const mid = (low + high) / 2, candidate = tryElliptical(mid);
+            if (candidate) { best = candidate; low = mid; } else high = mid;
         }
         return best;
     };
-    return {wrap,fits,balance};
+    const refine = (layout: MangaTextLayout) => shapeElliptical(balance(layout));
+    return {wrap,fits,refine};
 }
 
 /** 准确测量候选整行；普通单框先校验、再分词，与候选搜索共用相同词界及适配算法。 */
 export function layoutMangaTranslationText(text: string, width: number, height: number,
     measure: (text: string, size: number) => number, maxSize: number,
-    measureInk?: (text: string, size: number) => MangaGlyphMetrics | undefined,constraints?:ImageTextLayoutConstraints): MangaTextLayout {
+    measureInk?: (text: string, size: number) => MangaGlyphMetrics | undefined,constraints?:ImageTextLayoutConstraints,options?:MangaTypographyOptions): MangaTextLayout {
     const normalized = text.replace(/\r\n?/gu, '\n').trim();
     if (!normalized || ![width,height,maxSize].every(value => Number.isFinite(value) && value > 0)) return {lines:[],fontSize:0,lineHeight:0};
-    const source=parseMangaText(normalized);
-    const {wrap,fits,balance}=mangaLayoutFunctions(source,width,height,measure,measureInk,constraints);
+    const source=parseMangaText(normalized,options?.language);
+    const {wrap,fits,refine}=mangaLayoutFunctions(source,width,height,measure,measureInk,constraints,options);
     const {paragraphs}=source;
     let high = measureInk ? maxSize : Math.min(maxSize,height / 1.2);
     const largest = wrap(high);
-    if (fits(largest)) return balance(largest);
+    if (fits(largest)) return refine(largest);
     let low = Math.min(1,width / paragraphs.reduce((largest, paragraph) => Math.max(largest, measure(paragraph,1)), 1),height / (paragraphs.length * 1.2)) * .99;
     let best = wrap(low);
     for (let iteration = 0; iteration < 12; iteration++) {
         const candidate = wrap((low + high) / 2);
         if (fits(candidate)) {best = candidate; low = candidate.fontSize;} else high = candidate.fontSize;
     }
-    return balance(best);
+    return refine(best);
 }
 
 /**
@@ -239,24 +351,25 @@ export function layoutMangaTranslationText(text: string, width: number, height: 
  * 所有候选共享不可变分词及按原词缓存的字素；没有额外全文或度量缓存，原生异常不捕获、不转换。
  */
 export function createMangaTranslationSearch(text:string,measure:(text:string,size:number)=>number,maxSize:number,
-    measureInk?:(text:string,size:number)=>MangaGlyphMetrics|undefined) {
+    measureInk?:(text:string,size:number)=>MangaGlyphMetrics|undefined,options?:MangaTypographyOptions) {
     const normalized=text.replace(/\r\n?/gu,'\n').trim();
-    const source=normalized&&Number.isFinite(maxSize)&&maxSize>0?parseMangaText(normalized):undefined;
+    const source=normalized&&Number.isFinite(maxSize)&&maxSize>0?parseMangaText(normalized,options?.language):undefined;
     const empty=():MangaTextLayout=>({lines:[],fontSize:0,lineHeight:0});
     const valid=(candidate:MangaTextSearchCandidate)=>!!source&&[candidate.width,candidate.height].every(value=>Number.isFinite(value)&&value>0);
     return {
         prepare(width:number,height:number):MangaTextSearchCandidate {
             const candidate={width,height};
             if(!valid(candidate))return {...candidate,maximum:empty()};
-            const {wrap,fits,balance}=mangaLayoutFunctions(source!,width,height,measure,measureInk);
+            const {wrap,fits,refine}=mangaLayoutFunctions(source!,width,height,measure,measureInk,undefined,options);
             const largest=wrap(measureInk?maxSize:Math.min(maxSize,height/1.2));
-            return fits(largest)?{...candidate,maximum:balance(largest)}:candidate;
+            return fits(largest)?{...candidate,maximum:refine(largest)}:candidate;
         },
         finish(candidate:MangaTextSearchCandidate,winningSize=-Infinity,allowEqual=true):MangaTextLayout|undefined {
-            if(candidate.maximum)return candidate.maximum;
+            const rejected=(layout:MangaTextLayout)=>layout.fontSize<winningSize||(!allowEqual&&layout.fontSize===winningSize);
+            if(candidate.maximum)return rejected(candidate.maximum)?undefined:candidate.maximum;
             if(!valid(candidate))return empty();
             const {width,height}=candidate,{paragraphs}=source!;
-            const {wrap,fits,balance}=mangaLayoutFunctions(source!,width,height,measure,measureInk);
+            const {wrap,fits,refine}=mangaLayoutFunctions(source!,width,height,measure,measureInk,undefined,options);
             let high=measureInk?maxSize:Math.min(maxSize,height/1.2);
             let low=Math.min(1,width/paragraphs.reduce((largest,paragraph)=>Math.max(largest,measure(paragraph,1)),1),height/(paragraphs.length*1.2))*.99;
             // 只有 high 是后续采样与 best 的上界时才能剪枝；极小字号仍完整沿用旧搜索。
@@ -269,8 +382,9 @@ export function createMangaTranslationSearch(text:string,measure:(text:string,si
                 const next=wrap((low+high)/2);
                 if(fits(next)){best=next;low=next.fontSize;}else high=next.fontSize;
             }
-            if(best.fontSize<winningSize||(!allowEqual&&best.fontSize===winningSize))return undefined;
-            return balance(best);
+            if(rejected(best))return undefined;
+            const refined=refine(best);
+            return rejected(refined)?undefined:refined;
         },
     };
 }

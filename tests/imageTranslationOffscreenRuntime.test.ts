@@ -691,9 +691,14 @@ describe('Offscreen 图片完整操作生命周期', () => {
             if(reuse)return pixels;const result=new Uint8ClampedArray(pixels);result[0]=173;return result;
         });
         await translateImageInOffscreen('manga','en','',undefined,'owned-pixels',true);
+        expect(canvases[0].getContext).toHaveBeenCalledWith('2d',{willReadFrequently:true});
         expect(set).toHaveBeenCalledTimes(reuse?0:1);expect(input[0]).toBe(reuse?91:173);
         expect(mocks.mangaDraw.mock.calls[0][1]).toBe(input);
-        expect(canvases[0].context.putImageData).toHaveBeenCalledOnce();expect(canvases[0].context.putImageData).toHaveBeenCalledWith({data:input},0,0);
+        if(reuse) expect(canvases[0].context.putImageData).not.toHaveBeenCalled();
+        else {
+            expect(canvases[0].context.putImageData).toHaveBeenCalledOnce();
+            expect(canvases[0].context.putImageData).toHaveBeenCalledWith({data:input},0,0,1,1,30,14);
+        }
         expect(mocks.encode).toHaveBeenCalledOnce();expect(images[0].src).toBe('');expect(canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
     });
     it.each([false, true])('漫画进度按请求所有权投递，解码宽高可安全回退，带信号=%s', async withSignal => {
@@ -2179,10 +2184,15 @@ describe('漫画原文冲突后的纯白空处补绘',()=>{
     it.each([
         {x:21,y:0,width:100,height:160},{x:0,y:71,width:400,height:89},
         {x:0,y:0,width:79,height:160},{x:0,y:0,width:400,height:99},
-        {x:0,y:110,width:400,height:50},
-    ])('源段跨边界或只在padding时不能把全文搬进邻段核心 %j',async viewport=>{
+    ])('源段跨边界时不能把全文搬进邻段核心 %j',async viewport=>{
         const f=fixture(`blank-outside-core-${viewport.x}-${viewport.y}-${viewport.width}-${viewport.height}`),result=await f.run(undefined,viewport);
         expect(result.lines[0]).toMatchObject({text:'译文完整',renderSkipped:true});expect(result.mangaPatches?.patches).toEqual([]);
+        expect(canvases).toHaveLength(0);expect(mocks.mangaDraw).not.toHaveBeenCalled();expect(mocks.repair).not.toHaveBeenCalled();
+    });
+    it('源段完全位于padding外时跳过翻译、补绘、修补与图块编码',async()=>{
+        const f=fixture('blank-strictly-outside-core'),result=await f.run(undefined,{x:0,y:110,width:400,height:50});
+        expect(result.lines).toEqual([]);expect(result.mangaPatches?.patches).toEqual([]);
+        expect(sendMessage.mock.calls.some(([message])=>message.type==='fluentReadImageTranslateTexts')).toBe(false);
         expect(canvases).toHaveLength(0);expect(mocks.mangaDraw).not.toHaveBeenCalled();expect(mocks.repair).not.toHaveBeenCalled();
     });
     it('段落bbox在核心内但其中物理源框越界时仍保留完整阅读译文',async()=>{
@@ -2253,5 +2263,179 @@ describe('普通图 guardOnly 非破坏性夹紧与多方向保护边界',()=>{
         sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['损坏']}:undefined));
         const rejected=await translateImageInOffscreen('guard-invalid-source','en','Page',undefined,'guard-invalid-source',false,'paddle');
         expect(rejected.lines[0]).toMatchObject({renderSkipped:true});
+    });
+});
+
+describe('Offscreen 性能与长图分段裁剪优化',()=>{
+    it('普通图主画布启用 willReadFrequently，避免 GPU 读回退化',async()=>{
+        await translateImageInOffscreen('read-frequent','en','Page');
+        expect(canvases[0].getContext).toHaveBeenCalledWith('2d',{willReadFrequently:true});
+    });
+
+    it('漫画原位简单修补跳过整页拷回，并只上传非均匀修补区域的脏矩形',async()=>{
+        imageOptions.push({width:400,height:240});
+        const regions:MangaRegion[]=[
+            {text:'UNIFORM',bbox:{x0:20,y0:20,x1:100,y1:40},fontSize:10,sourceBoxes:[{x0:20,y0:20,x1:100,y1:40}]},
+            {text:'SIMPLE1',bbox:{x0:20,y0:100,x1:100,y1:120},fontSize:10,sourceBoxes:[{x0:20,y0:100,x1:100,y1:120}]},
+            {text:'SIMPLE2',bbox:{x0:220,y0:160,x1:320,y1:180},fontSize:10,sourceBoxes:[{x0:220,y0:160,x1:320,y1:180}]},
+        ];
+        const input=new Uint8ClampedArray(400*240*4).fill(120),set=vi.spyOn(input,'set');
+        vi.stubGlobal('document',{createElement:vi.fn(()=>{
+            const canvas=makeCanvas();if(canvases.length===1)canvas.context.getImageData.mockReturnValue({data:input});return canvas;
+        })});
+        mocks.mangaRecognize.mockResolvedValueOnce(regions);
+        mocks.sampleManga.mockReturnValueOnce([
+            {color:'rgb(255,255,255)',uniform:true},
+            {color:'rgb(200,200,200)',uniform:false},
+            {color:'rgb(180,180,180)',uniform:false},
+        ]);
+        mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+            ?{success:true,translations:['均匀','修补一','修补二']}:undefined));
+        const result=await translateImageInOffscreen('dirty-rects','en','Page',undefined,'dirty-rects',true);
+        expect(set).not.toHaveBeenCalled();
+        expect(canvases[0].context.putImageData).toHaveBeenCalledTimes(2);
+        expect(canvases[0].context.putImageData).toHaveBeenNthCalledWith(1,{data:input},0,0,18,98,84,24);
+        expect(canvases[0].context.putImageData).toHaveBeenNthCalledWith(2,{data:input},0,0,218,158,104,24);
+        expect(result.mangaPatches?.patches).toHaveLength(3);
+    });
+
+    it('漫画多图块编码使用上限 4 的并发池复用临时画布并保持确定性顺序',async()=>{
+        imageOptions.push({width:600,height:400});
+        const regions:MangaRegion[]=Array.from({length:6},(_,index)=>{
+            const x0=20+(index%3)*180,y0=20+Math.floor(index/3)*180;
+            return {text:`LINE_${index}`,bbox:{x0,y0,x1:x0+80,y1:y0+20},fontSize:10,sourceBoxes:[{x0,y0,x1:x0+80,y1:y0+20}]};
+        });
+        mocks.mangaRecognize.mockResolvedValueOnce(regions);
+        mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+            ?{success:true,translations:regions.map((_,index)=>`译文${index}`)}:undefined));
+        let inFlight=0,peak=0,started=0;
+        const pending:Array<{index:number;resolve:(value:string)=>void}>=[];
+        mocks.encode.mockImplementation(()=>{
+            const index=started++;
+            inFlight++;peak=Math.max(peak,inFlight);
+            return new Promise<string>(resolve=>{pending.push({index,resolve});});
+        });
+        const operation=translateImageInOffscreen('parallel-patches','en','Page',undefined,'parallel-patches',true);
+        while(pending.length<4)await new Promise(resolve=>setTimeout(resolve,0));
+        expect(peak).toBe(4);
+        expect(canvases).toHaveLength(5);
+        // 故意乱序完成首批 4 个图块，再完成剩余 2 个图块，验证输出顺序与画布复用。
+        for(const order of [3,1,0,2]){
+            const item=pending.find(entry=>entry.index===order)!;
+            inFlight--;item.resolve(`data:image/png;base64,p${order}`);
+        }
+        while(pending.length<6)await new Promise(resolve=>setTimeout(resolve,0));
+        expect(canvases).toHaveLength(5);
+        for(const order of [5,4]){
+            const item=pending.find(entry=>entry.index===order)!;
+            inFlight--;item.resolve(`data:image/png;base64,p${order}`);
+        }
+        const result=await operation;
+        expect(peak).toBe(4);
+        expect(result.mangaPatches?.patches.map(patch=>patch.image)).toEqual([
+            'data:image/png;base64,p0','data:image/png;base64,p1','data:image/png;base64,p2',
+            'data:image/png;base64,p3','data:image/png;base64,p4','data:image/png;base64,p5',
+        ]);
+        expect(canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
+    });
+
+    it.each(['error','abort'] as const)('并发编码中发生 %s 时停止后续图块并释放所有临时画布',async mode=>{
+        imageOptions.push({width:600,height:400});
+        const regions:MangaRegion[]=Array.from({length:6},(_,index)=>{
+            const x0=20+(index%3)*180,y0=20+Math.floor(index/3)*180;
+            return {text:`LINE_${index}`,bbox:{x0,y0,x1:x0+80,y1:y0+20},fontSize:10,sourceBoxes:[{x0,y0,x1:x0+80,y1:y0+20}]};
+        });
+        mocks.mangaRecognize.mockResolvedValueOnce(regions);
+        mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+            ?{success:true,translations:regions.map((_,index)=>`译文${index}`)}:undefined));
+        const controller=new AbortController();
+        let calls=0;
+        mocks.encode.mockImplementation(async()=>{
+            const current=calls++;
+            await new Promise(resolve=>setTimeout(resolve,0));
+            if(current===0){
+                if(mode==='abort'){controller.abort();return 'late';}
+                throw new Error('patch encode failed');
+            }
+            return `data:image/png;base64,p${current}`;
+        });
+        const promise=translateImageInOffscreen('parallel-fail','en','Page',controller.signal,'parallel-fail',true);
+        if(mode==='abort') await expect(promise).rejects.toMatchObject({name:'AbortError'});
+        else await expect(promise).rejects.toThrow('patch encode failed');
+        expect(calls).toBeLessThan(6);
+        expect(canvases).toHaveLength(5);
+        expect(canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
+    });
+
+    it('长图分段跳过严格落在上下左右 padding 区的文本，保留 1px 跨界与源框跨界文本，且不让段外可译行误伤段内接缝行',async()=>{
+        imageOptions.push({width:400,height:600});
+        const viewport:ImageViewport={x:50,y:150,width:300,height:300};
+        const outTop:MangaRegion={text:'OUT_TOP',bbox:{x0:100,y0:130,x1:180,y1:150},fontSize:10,sourceBoxes:[{x0:100,y0:130,x1:180,y1:150}]};
+        const outBottom:MangaRegion={text:'OUT_BOTTOM',bbox:{x0:100,y0:450,x1:180,y1:480},fontSize:10};
+        const outLeft:MangaRegion={text:'OUT_LEFT',bbox:{x0:10,y0:200,x1:50,y1:220},fontSize:10};
+        const outRight:MangaRegion={text:'OUT_RIGHT',bbox:{x0:350,y0:200,x1:390,y1:220},fontSize:10};
+        const nearTop:MangaRegion={text:'NEAR_TOP',bbox:{x0:100,y0:151,x1:180,y1:170},fontSize:10,sourceBoxes:[{x0:100,y0:151,x1:180,y1:170}]};
+        const straddle1px:MangaRegion={text:'STRADDLE',bbox:{x0:220,y0:130,x1:300,y1:151},fontSize:10,sourceBoxes:[{x0:220,y0:130,x1:300,y1:151}]};
+        const sourceBoxStraddle:MangaRegion={text:'SOURCE_STRADDLE',bbox:{x0:60,y0:20,x1:120,y1:40},fontSize:10,sourceBoxes:[{x0:60,y0:20,x1:120,y1:40},{x0:220,y0:445,x1:300,y1:465}]};
+        const inside:MangaRegion={text:'INSIDE',bbox:{x0:120,y0:260,x1:220,y1:280},fontSize:10,sourceBoxes:[{x0:120,y0:260,x1:220,y1:280}]};
+        mocks.mangaRecognize.mockResolvedValueOnce([outTop,outBottom,outLeft,outRight,nearTop,straddle1px,sourceBoxStraddle,inside]);
+        mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+            ?{success:true,translations:['边界邻近','跨界一像素','源框跨界','段内正文']}:undefined));
+        const result=await translateImageInOffscreen('webtoon-strip','en','Page',undefined,'webtoon-strip',true,'paddle',viewport);
+        const sentTexts=sendMessage.mock.calls.find(([m])=>m.type==='fluentReadImageTranslateTexts')![0].texts;
+        expect(sentTexts).toEqual(['NEAR_TOP','STRADDLE','SOURCE_STRADDLE','INSIDE']);
+        expect(result.lines.map(line=>[line.sourceText,line.text,line.renderSkipped===true])).toEqual([
+            ['NEAR_TOP','边界邻近',false],
+            ['STRADDLE','跨界一像素',false],
+            ['SOURCE_STRADDLE','源框跨界',false],
+            ['INSIDE','段内正文',false],
+        ]);
+        expect(mocks.repair.mock.calls[0][3].map((region:MangaRegion)=>region.text)).toEqual(['边界邻近','跨界一像素','源框跨界','段内正文']);
+        expect(mocks.mangaDraw.mock.calls[0][4].map((region:MangaRegion)=>region.text)).toEqual(['边界邻近','跨界一像素','源框跨界','段内正文']);
+    });
+
+    it('长图分段 y=2048 接缝两侧 16px 内的两条正常可译行不会互相级联跳过，各自段内正常绘制',async()=>{
+        // 段 0: contextTop=0, contextHeight=2304, viewport={x:0,y:0,width:800,height:2048}
+        imageOptions.push({width:800,height:2304});
+        const seg0LineAbove:MangaRegion={text:'ABOVE_SEAM',bbox:{x0:100,y0:2024,x1:260,y1:2044},fontSize:14,sourceBoxes:[{x0:100,y0:2024,x1:260,y1:2044}]};
+        const seg0LineBelow:MangaRegion={text:'BELOW_SEAM',bbox:{x0:100,y0:2052,x1:260,y1:2072},fontSize:14,sourceBoxes:[{x0:100,y0:2052,x1:260,y1:2072}]};
+        mocks.mangaRecognize.mockResolvedValueOnce([seg0LineAbove,seg0LineBelow]);
+        mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+            ?{success:true,translations:['接缝上方译文']}:undefined));
+        const res0=await translateImageInOffscreen('webtoon-seam-0','en','Page',undefined,'webtoon-seam-0',true,'paddle',{x:0,y:0,width:800,height:2048});
+        expect(res0.lines).toHaveLength(1);
+        expect(res0.lines[0]).toMatchObject({sourceText:'ABOVE_SEAM',text:'接缝上方译文'});
+        expect(res0.lines[0].renderSkipped).toBeUndefined();
+        expect(mocks.mangaDraw.mock.calls[0][4].map((r:MangaRegion)=>r.text)).toEqual(['接缝上方译文']);
+        // 段 1: contextTop=1792, contextHeight=2560, viewport={x:0,y:256,width:800,height:2048}（y=2048 对应段内 y=256）
+        imageOptions.push({width:800,height:2560});
+        const seg1LineAbove:MangaRegion={text:'ABOVE_SEAM',bbox:{x0:100,y0:232,x1:260,y1:252},fontSize:14,sourceBoxes:[{x0:100,y0:232,x1:260,y1:252}]};
+        const seg1LineBelow:MangaRegion={text:'BELOW_SEAM',bbox:{x0:100,y0:260,x1:260,y1:280},fontSize:14,sourceBoxes:[{x0:100,y0:260,x1:260,y1:280}]};
+        mocks.mangaRecognize.mockResolvedValueOnce([seg1LineAbove,seg1LineBelow]);
+        mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+            ?{success:true,translations:['接缝下方译文']}:undefined));
+        const res1=await translateImageInOffscreen('webtoon-seam-1','en','Page',undefined,'webtoon-seam-1',true,'paddle',{x:0,y:256,width:800,height:2048});
+        expect(res1.lines).toHaveLength(1);
+        expect(res1.lines[0]).toMatchObject({sourceText:'BELOW_SEAM',text:'接缝下方译文'});
+        expect(res1.lines[0].renderSkipped).toBeUndefined();
+        expect(mocks.mangaDraw.mock.calls[1][4].map((r:MangaRegion)=>r.text)).toEqual(['接缝下方译文']);
+    });
+
+    it('带有效 viewport 时退化几何框不会静默跳过，仍交由保护逻辑保守跳过绘制',async()=>{
+        imageOptions.push({width:400,height:400});
+        const bad:MangaRegion={text:'BAD',bbox:{x0:NaN,y0:10,x1:50,y1:30},fontSize:10};
+        const kept:MangaRegion={text:'KEEP',bbox:{x0:100,y0:200,x1:160,y1:220},fontSize:10};
+        mocks.mangaRecognize.mockResolvedValueOnce([bad,kept]);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+            ?{success:true,translations:['译文','KEEP']}:undefined));
+        const result=await translateImageInOffscreen('viewport-bad-box','en','Page',undefined,'viewport-bad-box',true,'paddle',{x:0,y:100,width:400,height:200});
+        expect(result.lines[0]).toMatchObject({sourceText:'BAD',text:'译文',renderSkipped:true});
+        expect(mocks.repair).not.toHaveBeenCalled();
     });
 });

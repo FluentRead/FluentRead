@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaBackground.ts
- * 文件职责：读取已适配阅读器公开展示的同源背景图片，复用漫画画布的翻译、压缩缓存与隔离译图。
- * 主要内容：串行探测附近页的尺寸和可读性，探测后立即释放解码图片；按 contain 与背景位置计算真实绘制范围；完整译图只编码一次有界 PNG，在可见时借用 background-image 原绘制层，不盖住宿主底色、子内容及交互；来源与样式接管归还单属性租约，取消、撤层和卸载释放编码与对象地址。
+ * 文件职责：读取已适配阅读器公开展示的同源背景图片，复用漫画画布的翻译、压缩缓存、隔离译图与无损原图速览。
+ * 主要内容：串行探测附近页的尺寸和可读性，探测后立即释放解码图片；按 contain 与背景位置计算真实绘制范围；完整译图只编码一次有界 PNG，在可见时借用 background-image 原绘制层，不盖住宿主底色、子内容及交互；暴露 setPeekOriginal 无损临时归还原背景并在松手后直接复显，不取消任务也不驱逐缓存，清缓存保持当前对照态以便与运行时同步；来源与样式接管归还单属性租约，取消、撤层、清缓存释放编码与对象地址，卸载时一并复位对照态。
  * 模块边界：只支持单层、无重复、无边框内距的同源 blob 正文；不访问章节接口、不隐藏宿主、不读取额外全页像素、不扩大模型与会话预算；逻辑来源与自有译图地址分离，无法读取或呈现的页面保留原文。
  */
 import {createMangaCanvas} from './mangaCanvas';
@@ -231,6 +231,7 @@ export function createMangaBackground(ports: Parameters<typeof createMangaCanvas
     }});
     const clear = () => {if (probing) forget(probing);pages = new WeakMap();surface.resetCache();};
     return {...surface, bounds,
+        setPeekOriginal(peeking: boolean) {surface.setPeekOriginal(peeking);},
         pixels: (element: HTMLElement) => {const page = pages.get(element)!;return page.width * page.height;},
         prepare(elements: HTMLElement[]) {
             if (probing && !elements.includes(probing)) forget(probing);

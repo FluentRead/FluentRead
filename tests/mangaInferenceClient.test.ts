@@ -80,6 +80,10 @@ describe('图片 CPU/WASM 偏好和诊断', () => {
         h.workers[1].emit({success: true, result: outputText()}); await segment;
         await vi.advanceTimersByTimeAsync(180_000);
         expect(h.workers[1].latest.type).toBe('dispose-seg'); h.workers[1].emit(); await flush();
+        // recognize 成功已恢复 ocr 端口，分割空闲释放不会误杀活跃 OCR；释放 ocr 后才终止 Worker。
+        expect(h.workers[1].terminate).not.toHaveBeenCalled();
+        const releaseOcr = h.client.release('ocr'); await flush();
+        h.workers[1].emit(); await releaseOcr;
         expect(h.workers[1].terminate).toHaveBeenCalledOnce();
     });
     it('取消 CPU 准备立即发布取消状态，迟到初始化不恢复页面状态', async () => {
@@ -396,7 +400,7 @@ describe('漫画独立 Worker 客户端', () => {
         await expect(canceled).resolves.toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
         const next = client.request<Float32Array>({type: 'inpaint'});
         await vi.advanceTimersByTimeAsync(1_000);
-        expect(workers[0].postMessage).toHaveBeenCalledTimes(3);
+        expect(workers[0].postMessage.mock.calls.map(([message]) => message.type)).toEqual(['prepare-ocr', 'prepare-inpaint', 'recognize', 'cancel']);
         workers[0].emit({stage: 'recognizing', percent: 99});
         workers[0].emit({success: true, result: {results: []}});
         await flush();
@@ -512,7 +516,7 @@ describe('漫画独立 Worker 客户端', () => {
         workers[0].postMessage.mockImplementationOnce(() => {
             controller.abort(); workers[0].emit();
         });
-        const queued = client.request({type: 'recognize', image: 'next'});
+        const queued = client.request({type: 'dispose-inpaint'});
         workers[0].emit();
         await expect(canceled).resolves.toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
         await queued;
@@ -1011,4 +1015,139 @@ it.each(['pre-aborted','queued-cancel'] as const)('已有分割端口再次prepa
     h.workers[0].emit();await flush();expect(h.workers[0].terminate).not.toHaveBeenCalled();
     const next=h.client.request({type:'recognize',image:'next-ocr'});await flush();h.workers[0].emit({success:true,result:{results:[]}});await next;
     expect(h.createWorker).toHaveBeenCalledOnce();expect(h.workers[0].terminate).not.toHaveBeenCalled();
+});
+
+describe('漫画推理协作取消与端口清理', () => {
+    it('协作取消中止在途识别与修补时不终止温热 Worker，下个请求立即复用', async () => {
+        const {client, workers, createWorker} = harness();
+        const ocr = client.prepare('ocr');
+        await flush(); workers[0].emit(); await ocr;
+        const abort = new AbortController();
+        const canceled = observe(client.request({type: 'recognize', image: 'page-1'}, abort.signal));
+        await flush();
+        const canceledId = workers[0].latest.requestId;
+        abort.abort();
+        await expect(canceled).resolves.toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
+        expect(workers[0].latest).toEqual({type: 'cancel', requestId: canceledId, cpu: false});
+        const next = client.request({type: 'recognize', image: 'page-2'});
+        workers[0].emit({requestId: canceledId, success: false, aborted: true, error: '漫画处理已取消'});
+        await flush();
+        expect(workers[0].terminate).not.toHaveBeenCalled();
+        expect(workers[0].latest).toMatchObject({type: 'recognize', image: 'page-2'});
+        workers[0].emit({success: true, result: {results: []}});
+        await expect(next).resolves.toEqual({results: []});
+        expect(createWorker).toHaveBeenCalledOnce();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('取消通知发送失败或 Worker 无响应时仍按 1.5 秒收尾回退硬终止，并清空全部残留端口', async () => {
+        const {client, workers} = harness();
+        for (const kind of ['ocr', 'inpaint'] as const) {
+            const p = client.prepare(kind);
+            await flush(); workers[0].emit(); await p;
+        }
+        const abort = new AbortController();
+        const canceled = observe(client.request({type: 'recognize', image: 'stuck'}, abort.signal));
+        await flush();
+        workers[0].postMessage.mockImplementationOnce(() => { throw new Error('postMessage failed'); });
+        abort.abort();
+        await expect(canceled).resolves.toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
+        await vi.advanceTimersByTimeAsync(1_500);
+        expect(workers[0].terminate).toHaveBeenCalledOnce();
+        // 旧 Worker 终止后端口已清空，新准备的单端口释放后应立即终止新 Worker，不再被残留端口锁住。
+        const nextPainter = client.prepare('inpaint');
+        await flush(); workers[1].emit(); await nextPainter;
+        const releasePainter = client.release('inpaint');
+        await flush(); workers[1].emit(); await releasePainter;
+        expect(workers[1].terminate).toHaveBeenCalledOnce();
+    });
+
+    it('真实 Worker 协作取消可立即中止识别与修补，不触发 1.5 秒超时硬终止', async () => {
+        const deferred = <T>() => {
+            let resolve!: (value: T) => void;
+            let reject!: (error: unknown) => void;
+            const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+            return {promise, resolve, reject};
+        };
+        const recognizePending = deferred<{results: []}>();
+        const inpaintPending = deferred<Float32Array>();
+        const recognize = vi.fn((_image: string, options: {signal?: AbortSignal}) => {
+            options.signal?.addEventListener('abort', () => recognizePending.reject(new DOMException('已取消', 'AbortError')), {once: true});
+            return recognizePending.promise;
+        });
+        const run = vi.fn((_patch: unknown, signal?: AbortSignal) => {
+            signal?.addEventListener('abort', () => inpaintPending.reject(new DOMException('已取消', 'AbortError')), {once: true});
+            return inpaintPending.promise;
+        });
+        const ort = {InferenceSession: {create: vi.fn()}};
+        vi.doMock('onnxruntime-web/webgpu', () => ort);
+        vi.doMock('@/src/features/image-translation/services/mangaOcr', () => ({
+            createBrowserMangaOcr: vi.fn(async () => ({recognize, destroy: async () => undefined})),
+        }));
+        vi.doMock('@/src/features/image-translation/services/mangaInpainting', () => ({
+            createBrowserMangaInpainter: vi.fn(async () => ({run, release: async () => undefined})),
+        }));
+        const {startMangaInferenceWorker} = await import('@/src/features/image-translation/services/mangaInference.worker');
+        const workers: ControlledWorker[] = [];
+        const client = module.createMangaInferenceClient(() => {
+            const worker = new ControlledWorker();
+            const scope = {
+                onmessage: undefined as ((event: MessageEvent<MangaInferenceMessage>) => void) | undefined,
+                postMessage: (response: MangaInferenceResponse) => worker.onmessage?.({data: response} as MessageEvent<MangaInferenceResponse>),
+            };
+            const previousScope = globalThis.self;
+            vi.stubGlobal('self', scope);
+            ort.InferenceSession.create = vi.fn();
+            startMangaInferenceWorker();
+            vi.stubGlobal('self', previousScope);
+            worker.postMessage.mockImplementation(message => scope.onmessage!({data: message} as MessageEvent<MangaInferenceMessage>));
+            workers.push(worker);
+            return worker as unknown as Worker;
+        });
+        clients.push(client);
+        const ocrPrepared = client.prepare('ocr'); await flush(); await ocrPrepared;
+        const inpaintPrepared = client.prepare('inpaint'); await flush(); await inpaintPrepared;
+        const abortOcr = new AbortController();
+        const canceledOcr = observe(client.request({type: 'recognize', image: 'page-1'}, abortOcr.signal));
+        await flush();
+        abortOcr.abort();
+        await expect(canceledOcr).resolves.toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
+        await flush();
+        expect(workers[0].terminate).not.toHaveBeenCalled();
+        const abortInpaint = new AbortController();
+        const canceledInpaint = observe(client.request({
+            type: 'inpaint', patch: {image: new Float32Array(3), mask: new Float32Array(1), width: 1, height: 1},
+        }, abortInpaint.signal));
+        await flush();
+        abortInpaint.abort();
+        await expect(canceledInpaint).resolves.toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
+        await flush();
+        expect(workers[0].terminate).not.toHaveBeenCalled();
+        expect(workers).toHaveLength(1);
+    });
+
+    it('CPU 回退重建保留其他逻辑端口，释放 ocr 不误杀活跃 inpaint 或重置 cpu 标记', async () => {
+        const {client, workers} = harness();
+        const ocr = client.prepare('ocr'); await flush(); workers[0].emit(); await ocr;
+        const painter = client.prepare('inpaint'); await flush(); workers[0].emit(); await painter;
+        const rec = client.request({type: 'recognize', image: 'page'}); await flush();
+        workers[0].emit({success: false, error: 'GPU device lost'}); await flush();
+        expect(workers[0].terminate).toHaveBeenCalledOnce();
+        expect(workers[1].latest).toMatchObject({type: 'recognize', cpu: true});
+        workers[1].emit({success: true, result: {results: []}}); await rec;
+        // 仅释放 ocr 后，inpaint 端口仍存活且保持 CPU 后端，不终止 Worker。
+        const relOcr = client.release('ocr'); await flush();
+        expect(workers[1].latest.type).toBe('dispose-ocr');
+        workers[1].emit(); await relOcr;
+        expect(workers[1].terminate).not.toHaveBeenCalled();
+        expect(client.getDiagnostics().cpuFallback).toBe(true);
+        const paint = client.request({type: 'inpaint'}); await flush();
+        expect(workers[1].latest).toMatchObject({type: 'inpaint', cpu: true});
+        workers[1].emit({success: true, result: new Float32Array([0.5])}); await paint;
+        expect(workers).toHaveLength(2);
+        const relPainter = client.release('inpaint'); await flush();
+        workers[1].emit(); await relPainter;
+        expect(workers[1].terminate).toHaveBeenCalledOnce();
+        expect(client.getDiagnostics().cpuFallback).toBe(false);
+    });
 });

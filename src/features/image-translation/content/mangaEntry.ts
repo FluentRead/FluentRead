@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaEntry.ts
- * 文件职责：将安静的独立漫画按钮和按需资源确认挂载到隔离 Shadow UI，并桥接真实会话、资源检查与持久偏好。
- * 主要内容：用地址识别阅读页，在已有 Shadow UI 中持有唯一按需文字面板；主入口和悬浮球共享打开状态与可信触发目标，不自动读取；注册实际宿主并按实例释放。订阅会话和配置，卸载即时退订，挂载所有权防止迟到实例影响新入口。
+ * 文件职责：将安静的独立漫画按钮、按住对照原图桥接和按需资源确认挂载到隔离 Shadow UI，并桥接真实会话、资源检查与持久偏好。
+ * 主要内容：用地址识别阅读页，在已有 Shadow UI 中持有唯一按需文字面板；主入口和悬浮球共享打开状态与可信触发目标，不自动读取；暴露可选 onPeekOriginal 端口并在暂停、禁用或卸载时安全复位对照态；注册实际宿主并按实例释放，订阅会话和配置，卸载即时退订，挂载所有权防止迟到实例影响新入口。
  * 模块边界：仅编排 feature 内部 UI 与公共配置、浏览器消息端口，不下载模型、不实现翻译，宿主脚本不能通过合成 DOM 事件发起动作。
  */
 import {reactive} from 'vue';
@@ -17,6 +17,11 @@ import MangaEntry from '../ui/MangaEntry.vue';
 import {subscribeMangaTranslation, toggleMangaTranslation, getMangaReadingCandidates, readMangaReadingCandidate, observeMangaReadingCandidate, registerMangaReadingOverlayHost, registerMangaReadingOpener} from './runtime';
 import type {MangaTranslationStatus} from './mangaSession';
 import {getMangaOcrEngine, getRequiredImageOcrLanguages, normalizeImageOcrLanguageCodes, type ImageOcrStatusResponse} from '../ocrLanguages';
+
+export interface MangaEntryPorts {
+    startAreaTranslation?: () => boolean | Promise<boolean>;
+    onPeekOriginal?: (peeking: boolean) => void;
+}
 
 let ui: ShadowRootContentScriptUi<VueShadowMount> | null = null;
 let pending: Promise<void> | null = null;
@@ -37,7 +42,7 @@ export function subscribeMangaReading(listener:(open:boolean)=>void):()=>void {
 export function isMangaReaderPage(href = typeof location === 'undefined' ? '' : location.href): boolean {return !!resolveMangaSite(href, config.imageTranslationMangaSites);}
 export function isImageTranslatorNeeded(): boolean {return config.on && (!config.disableImageTranslator || (config.imageTranslationMangaEnabled && isMangaReaderPage()));}
 
-export function mountMangaEntry(ctx: ContentScriptContext, ports: {startAreaTranslation?: () => boolean | Promise<boolean>} = {}): Promise<void> {
+export function mountMangaEntry(ctx: ContentScriptContext, ports: MangaEntryPorts = {}): Promise<void> {
     if (ui || pending) return pending ?? Promise.resolve();
     const request = ++owner;
     const status = reactive<MangaTranslationStatus>({available: false, active: false, pending: false, errors: 0});
@@ -47,15 +52,22 @@ export function mountMangaEntry(ctx: ContentScriptContext, ports: {startAreaTran
         copy:(text:string)=>navigator.clipboard.writeText(text),theme:theme()});
     const allowed = () => config.on && config.imageTranslationMangaEnabled && status.available && status.active && !status.areaFallback;
     canRead = allowed;
+    let peeking = false;
+    const setPeeking = (next: boolean) => {
+        if (peeking === next) return;
+        peeking = next;
+        ports.onPeekOriginal?.(next);
+    };
     const sourceLanguage = () => resolveMangaSourceLanguage(location.href, config.from, config.imageTranslationMangaSites);
     const settings = reactive({sourceLanguage: sourceLanguage(), promptEnabled: config.imageTranslationMangaPromptEnabled, floatingBallVisible: !config.disableFloatingBall && !isFloatingBallDisabledOnSite(location.href, config.floatingBallDisabledDomains), to: config.to,
         service: config.imageTranslationService, downloadConfirmed: config.imageTranslationMangaDownloadConfirmed, animations: config.animations, toolsDisplay: config.floatingBallToolsDisplay ?? 'always', prefetchPages: config.imageTranslationMangaPrefetchPages});
     const page = reactive({site: resolveMangaSite(location.href, config.imageTranslationMangaSites)?.name ?? '', route: location.href});
     const sync = () => {Object.assign(settings, {sourceLanguage: sourceLanguage(), promptEnabled: config.imageTranslationMangaPromptEnabled, floatingBallVisible: !config.disableFloatingBall && !isFloatingBallDisabledOnSite(location.href, config.floatingBallDisabledDomains), to: config.to,
         service: config.imageTranslationService, downloadConfirmed: config.imageTranslationMangaDownloadConfirmed, animations: config.animations, toolsDisplay: config.floatingBallToolsDisplay ?? 'always', prefetchPages: config.imageTranslationMangaPrefetchPages});
-        reading.theme = theme();Object.assign(page, {site: resolveMangaSite(location.href, config.imageTranslationMangaSites)?.name ?? '', route: location.href});};
+        reading.theme = theme();Object.assign(page, {site: resolveMangaSite(location.href, config.imageTranslationMangaSites)?.name ?? '', route: location.href});
+        if (!allowed()) setPeeking(false);};
     const stopOpener = registerMangaReadingOpener(event => openMangaReading(event, false));
-    const stopStatus = subscribeMangaTranslation(value => Object.assign(status, value));
+    const stopStatus = subscribeMangaTranslation(value => {Object.assign(status, value);if (!allowed()) setPeeking(false);});
     const stopConfig = subscribeConfig(sync);
     document.addEventListener('fluentread-route-change', sync);
     let removed = false;
@@ -63,12 +75,16 @@ export function mountMangaEntry(ctx: ContentScriptContext, ports: {startAreaTran
     const remove = () => {
         if (removed) return;
         removed = true;
+        setPeeking(false);
         stopOpener();stopStatus();stopConfig();releaseOverlay?.();releaseOverlay = undefined;document.removeEventListener('fluentread-route-change', sync);
         if (cleanup === remove) {cleanup = undefined;canRead=undefined;publishReading(false);}
     };
     cleanup = remove;
+    const onPeekOriginal = ports.onPeekOriginal
+        ? (next: boolean) => {if (request === owner && !removed && (!next || allowed())) setPeeking(next);}
+        : undefined;
     pending = createVueShadowUi(ctx, {name: 'fluent-read-manga-entry', hostId: 'fluent-read-manga-entry-container', component: MangaEntry, mode: 'closed', css:mangaEntryStyles,
-        props: {status, settings, page,reading,readingState,readManga:openMangaReading,
+        props: {status, settings, page,reading,readingState,readManga:openMangaReading,onPeekOriginal,
             readingChanged:(open:boolean)=>{if(request===owner && !removed){readingState.open=open;publishReading(open);}},
             startAreaTranslation: async () => config.on && config.imageTranslationMangaEnabled && status.available && status.areaFallback === true
                 && await (ports.startAreaTranslation?.() ?? false),

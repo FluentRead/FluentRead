@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {observeImageSourceInk} from '@/src/features/image-translation/services/sourceInk';
+import {matchesImageSourceInk,observeImageSourceInk} from '@/src/features/image-translation/services/sourceInk';
 import {observeImageSourceAppearances,expandImageTextBounds} from '@/src/features/image-translation/services/sourceAppearance';
 
 const box=(x0=20,y0=20,x1=120,y1=60)=>({x0,y0,x1,y1});
@@ -98,5 +98,63 @@ describe('源墨色的只读渐变与完整物理框观察',()=>{
         expect(observeImageSourceInk(new Uint8ClampedArray(2),W,H,box(),[box()])).toBeUndefined();
         for(const sources of [[],Array(129).fill(box()),[box(80,20,70,60)],[box(20,70,120,60)],[box(NaN,20,120,60)],[box(1,20,120,60)]])expect(observe(pixels,box(),sources)).toBeUndefined();
         expect(observeImageSourceInk(new Uint8ClampedArray(1000*1000*4),1000,1000,box(10,10,990,990),[box()])).toBeUndefined();
+    });
+    it('matchesImageSourceInk 逐通道共享覆盖率，紧凑控件夹紧覆盖四边边框与全部拒绝路径',()=>{
+        expect(matchesImageSourceInk([128,128,128],[0,0,0],[255,255,255])).toBe(true);
+        expect(matchesImageSourceInk([200,10,10],[0,0,0],[255,255,255])).toBe(false);
+
+        const makeButton=(ink:[number,number,number]=[255,255,255],bg:[number,number,number]=[0,174,66],padX=5,padY=4)=>{
+            const pixels=new Uint8ClampedArray(W*H*4);
+            for(let i=0;i<pixels.length;i+=4)pixels.set([255,255,255,255],i);
+            const src=box(60,40,90,56);
+            for(let y=src.y0-padY;y<src.y1+padY;y++)for(let x=src.x0-padX;x<src.x1+padX;x++)pixels.set([...bg,255],(y*W+x)*4);
+            for(let y=43;y<53;y++)for(let x=65;x<85;x++)pixels.set([...ink,255],(y*W+x)*4);
+            return {pixels,src,outer:box(58,34,92,62)};
+        };
+
+        // 四边均在 8px 内检测到锐利边框：白字绿底与低对比浅字均正确处理
+        const tight=makeButton();
+        expect(observeImageSourceInk(tight.pixels,W,H,tight.outer,[tight.src])).toEqual({
+            background:[0,174,66,255],foreground:'rgb(255,255,255)',inkBoxes:[box(65,43,85,53)],
+        });
+        const lowContrast=makeButton([20,190,80],[0,174,66]);
+        expect(observeImageSourceInk(lowContrast.pixels,W,H,lowContrast.outer,[lowContrast.src])).toEqual({
+            background:[0,174,66,255],inkBoxes:[box(65,43,85,53)],
+        });
+
+        // 左侧贴边无内边距（padLeft=0 -> roiLeft>=sx0，其余三边仍为绿底）拒绝
+        const zeroMargin=makeButton();
+        for(let y=36;y<60;y++)for(let x=55;x<60;x++)zeroMargin.pixels.set([255,255,255,255],(y*W+x)*4);
+        expect(observeImageSourceInk(zeroMargin.pixels,W,H,zeroMargin.outer,[zeroMargin.src])).toBeUndefined();
+
+        // 1px 外环含透明像素（左右环）拒绝
+        const ringAlpha=makeButton();
+        ringAlpha.pixels[(45*W+59)*4+3]=128;
+        expect(observeImageSourceInk(ringAlpha.pixels,W,H,ringAlpha.outer,[ringAlpha.src])).toBeUndefined();
+
+        // 夹紧 ROI 外周（上下边与左右边）存在杂色拒绝
+        const badTop=makeButton();badTop.pixels[(36*W+60)*4]=200;
+        expect(observeImageSourceInk(badTop.pixels,W,H,badTop.outer,[badTop.src])).toBeUndefined();
+        const badLeft=makeButton();badLeft.pixels[(45*W+55)*4]=200;
+        expect(observeImageSourceInk(badLeft.pixels,W,H,badLeft.outer,[badLeft.src])).toBeUndefined();
+
+        // 夹紧 ROI 内部透明、源外杂点、无足够墨迹、混色不共享覆盖率均拒绝
+        const innerAlpha=makeButton();innerAlpha.pixels[(48*W+70)*4+3]=200;
+        expect(observeImageSourceInk(innerAlpha.pixels,W,H,innerAlpha.outer,[innerAlpha.src])).toBeUndefined();
+        const outerSpeck=makeButton();outerSpeck.pixels[(37*W+57)*4]=200;
+        expect(observeImageSourceInk(outerSpeck.pixels,W,H,outerSpeck.outer,[outerSpeck.src])).toBeUndefined();
+        const emptyInk=makeButton([0,174,66],[0,174,66]);
+        expect(observeImageSourceInk(emptyInk.pixels,W,H,emptyInk.outer,[emptyInk.src])).toBeUndefined();
+        const mixedInk=makeButton();mixedInk.pixels.set([255,0,0,255],(48*W+70)*4);
+        expect(observeImageSourceInk(mixedInk.pixels,W,H,mixedInk.outer,[mixedInk.src])).toBeUndefined();
+
+        // 夹紧 ROI 内颜色超过 4096 上限拒绝
+        const wide=260,tall=100,many=new Uint8ClampedArray(wide*tall*4);
+        for(let i=0;i<many.length;i+=4)many.set([255,255,255,255],i);
+        const bigSrc=box(20,20,240,80);
+        for(let y=16;y<84;y++)for(let x=16;x<244;x++)many.set([0,174,66,255],(y*wide+x)*4);
+        let n=0;
+        for(let y=22;y<78;y++)for(let x=22;x<238;x++,n++)many.set([n&255,(n>>>8)&255,200,255],(y*wide+x)*4);
+        expect(observeImageSourceInk(many,wide,tall,box(14,14,246,86),[bigSrc])).toBeUndefined();
     });
 });

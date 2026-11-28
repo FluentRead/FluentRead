@@ -1,80 +1,77 @@
-# Shortcuts and triggers
+# Shortcuts & triggers
 
-Translate, restore the original or copy a paragraph with a shortcut. On Mac, Alt is usually labeled Option.
+Translate pages, individual paragraphs, or screen regions instantly from your keyboard. On macOS, `Alt` maps to `Option`.
+
+<DocDiagram kind="shortcuts-board" en />
 
 <GuideVisual kind="shortcuts" en />
 
-## Common actions
+## Where to customize shortcuts {#where-to-change-them}
 
-| Action | Default |
-| --- | --- |
-| Translate a paragraph | Point at it and press **Control** |
-| Translate page / restore original | **Alt+T** |
-| Capture an area | Press **Shift+Z** once, then drag |
-| Copy the paragraph under the pointer | Point at it and press **Alt+C** |
-| Translate part of a page | Click **Section** in the extension menu, or enable **Alt+R** |
-| Translate a selection | Enable selection translation, select text and click the nearby icon |
-| Select text by clicking its start and end | Enable **Two-point selection** in selection settings, then press **Alt+Shift+S** |
+- **Hover & selection triggers:** Open **Hover translation** or **Selection translation** from the popup or Settings.
+- **Area translation shortcut:** Edit under **Settings → Image & manga translation → Area translation**.
+- **Browser commands** (such as **Open translation window**): Assign in your browser’s extension shortcuts page.
 
-## Change a trigger
+When recording a shortcut, hold `Ctrl`, `Alt/Option`, or `Shift` plus a letter or function key, then confirm. Conflicting shortcuts with other enabled FluentRead features prompt you to choose another combination.
 
-Open **Hover translation** or **Selection translation** in the extension menu and enter its settings. Change the area shortcut under **Image translation → Area translation**.
+## Section translation & independent profiles {#section-translation-and-extra-profiles}
 
-To record a combination, hold Ctrl, Alt/Option or Shift and press a letter or function key, then confirm. A modifier alone does not finish recording. Canceling or leaving the settings section keeps the previous shortcut. Resolve any conflict with another enabled feature before saving.
+Enable the section-picker shortcut (`Alt+R` / `Option+R` by default) under **Settings → Translation → Section translation**:
 
-## Section shortcut profiles
+1. Press the shortcut, preview blocks with your cursor, and click or drag across paragraphs to lock.
+2. Fine-tune with `↑ / ↓`, confirm with `Enter` (confirming an already-translated section restores it), or exit with `Esc`.
 
-The section shortcut is off by default. Enable it under **Settings → Translation → Section translation**.
+### Up to 8 independent profiles
 
-1. Use the shortcut and move the pointer to preview a section. Click to lock it, or hold the left mouse button and drag across paragraphs, then release.
-2. Adjust the range with **↑/↓** or the toolbar. Press **Enter** or click **Translate selected section** to confirm.
-3. Select a translated section and confirm again to restore it. Press **Esc**, right-click or use the same shortcut to exit.
-
-Hover, page and section translation each support up to eight extra profiles with their own provider, model, language and display mode. Enabled extra profiles work when the primary shortcut is off. See [section translation](/en/guide/features#section-translation).
-
-## Two-point selection
-
-Enable **Two-point selection** under **Settings → Selection translation → Activation and display**. Press **Alt+Shift+S**, then click the start and end of the text to select across lines or backward without dragging. The second click leaves a native browser selection; translation follows your existing selection trigger.
-
-Press **Esc**, use the shortcut again or leave the page to cancel. Clicking a link, button or editor ends selection and keeps the normal page action. If you click blank space or the same point twice, follow the retry prompt; an established start point is kept. Choose another end point when prompted about protected content or the 4,096-character limit.
-
-If another feature takes the shortcut, the settings row shows the conflict. Click the key label to change it. Two-point selection does not start inside editable areas. Touch devices keep native long-press selection. Two-point, section and area selection use one selection mode at a time.
+Hover, page, and section translation each support up to **8 extra profiles** with independent shortcuts, providers, models, languages, and display modes. Enabled extra profiles continue working even if the primary shortcut is turned off. See [Section translation](/en/guide/features#section-translation).
 
 <details class="guide-details">
-<summary>Paragraph copying and selection entries</summary>
+<summary>Provider & model inheritance in extra profiles</summary>
 
-Choose copied content under **Settings → Translation → Paragraph copy**:
-
-| Content | Behavior |
-| --- | --- |
-| Match what is shown (default) | Follow bilingual or translation-only display; copy the original when untranslated |
-| Original text | Always copy the webpage text |
-| Translation | Copy the original with a notice if it is not translated yet |
-| Original and translation | Copy both, following the translated-text position setting |
-
-A notice shows the copied content and character count. The shortcut stays inactive in editable areas. **Ctrl+C** still copies selected text.
-
-Selection translation supports an icon, dot, direct popup, hover-over-icon, shortcut or **Context menu only**. Context-menu mode hides floating entries. Select text and choose **Translate selected text** in the context menu; keep the menu and selection entry enabled under **Settings → Context menu**.
+When a profile follows the default provider, selecting a specific model pins the current provider. Clearing the model restores that provider’s default; select **Follow default** to track the global webpage provider again.
 
 </details>
 
-<details class="guide-details">
-<summary>Providers and models in extra profiles</summary>
+## Two-point selection (hands-free multi-line highlight) {#two-point-selection}
 
-Choosing a model while following the default provider also pins the current provider. Clearing the model restores that provider's default model; select **Follow default** to follow the webpage provider again. Changing providers clears the old model.
+Enable **Two-point selection** under **Settings → Selection translation → Activation and display**:
+
+1. Press `Alt+Shift+S` (`Option+Shift+S` on Mac).
+2. Click the **start** and then the **end** of the passage—works across lines and in reverse without holding the mouse button.
+3. The second click creates a standard browser selection and opens your configured selection entry.
+
+- Press `Esc`, re-press the shortcut, or leave the page to cancel; clicking links, buttons, or inputs exits and preserves normal webpage interaction.
+- Up to **4,096 characters** per selection; only one picking mode (two-point, section, or area) can be active at a time.
+
+<details class="guide-details">
+<summary>Paragraph copy options & selection activation styles</summary>
+
+### Paragraph copy (`Alt+C` / `Option+C`)
+
+Configure under **Settings → Translation → Paragraph copy** (automatically yields inside inputs; `Ctrl+C` stays standard copy):
+
+| Copy mode | Behavior |
+| --- | --- |
+| **Follow page display (default)** | Copies bilingual or translation-only when translated, or original otherwise |
+| **Original** | Always copies the source paragraph |
+| **Translation** | Copies original with a notice if untranslated |
+| **Original and translation** | Copies both in your configured bilingual order |
+
+### Selection activation styles
+
+Choose **Show icon (default)**, **Dot**, **Direct popup**, **Hover icon**, **Shortcut**, or **Context menu only** (keep **Settings → Context menu** enabled when using Context menu only).
 
 </details>
 
-## A shortcut does nothing
+## Shortcut not responding or conflicting? {#not-working-or-conflicting}
 
-Check the feature through the extension menu first, then look for a conflict with the browser, input method or website. Some keys intentionally stay inactive in inputs. Browser internal pages and extension stores generally cannot be translated.
-
-Custom combinations match the character produced by the layout used during recording. When Option on Mac produces a special character, the physical key is matched. The browser's extension shortcut page controls only the commands it lists; configure other triggers inside FluentRead.
-
-If a page update removes an entry, select the text again. If it stays missing, report the URL, browser, extension version and trigger method.
+1. Verify the feature is enabled on a regular webpage (browser settings and store pages block extensions).
+2. Check whether focus is inside an input box or active IME composition—shortcuts intentionally yield while typing.
+3. Check for clashes with browser, OS, or website shortcuts (on macOS, `Option` combos match physical keys).
 
 ## Related guides
 
 - [Hover translation](/en/guide/hover-translation)
 - [Selection translation](/en/guide/deepseek-harness)
+- [Page & section translation](/en/guide/webpage-translation)
 - [Area translation](/en/guide/area-translation)

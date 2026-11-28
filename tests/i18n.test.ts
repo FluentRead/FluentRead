@@ -982,9 +982,10 @@ describe('界面 i18n 契约', () => {
 
     const interfaceAppearanceCopy = [
       '界面与弹窗',
-      '从效率布局到传统色配色，选择适合自己的界面；也可以只留下常用栏目。',
+      '光影与材质',
+      '潮流与个性',
+      '东方与人文',
       '弹窗风格',
-      '风格只改变扩展界面的呈现，不影响网页翻译效果。',
       '快捷功能栏',
       '显示悬停、划词、图片、视频和文档等快捷入口。',
       '当前网站栏目',
@@ -998,10 +999,10 @@ describe('界面 i18n 契约', () => {
       }
     }
     expect(translateLegacyText('界面与弹窗', 'en-US')).toBe('Interface and popup');
-    expect(translateLegacyText('默认风格', 'es-ES')).toBe('Estilo predeterminado');
-    expect(translateLegacyText('青花', 'en-US')).toBe('Blue and white (Qinghua)');
-    expect(translateLegacyText('水墨', 'ja-JP')).toBe('水墨（すいぼく）');
-    expect(translateLegacyText('传统色风格', 'fr-FR')).toBe('Couleurs traditionnelles chinoises');
+    expect(translateLegacyText('默认经典', 'en-US')).toBe('FluentRead Default');
+    expect(translateLegacyText('液态玻璃', 'en-US')).toBe('Liquid Glass');
+    expect(translateLegacyText('宇治手账', 'ja-JP')).toBe('宇治抹茶手帳');
+    expect(translateLegacyText('潮流与个性', 'fr-FR')).toBe('Audacieux et pop');
   });
 
   it('把界面语言作为普通可迁移配置保留，并不触碰凭据边界', () => {

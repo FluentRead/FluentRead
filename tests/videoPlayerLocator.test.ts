@@ -756,3 +756,106 @@ it('adopts a playing HTML audio element before the first scan', () => {
   media.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('play', {bubbles: true}));
   expect(locator.getTarget()!.video).toBe(media); locator.destroy();
 });
+
+it('discovers open Shadow DOM videos, honors webkit fullscreen, prefers playing media, and ignores non-media play events', () => {
+  const f = setup('<div id="host"></div><div class="plain"><video id="paused"></video></div><div class="plain"><video id="playing"></video></div>', 'https://example.test/');
+  const host = f.document.getElementById('host')!;
+  const shadow = host.attachShadow({mode: 'open'});
+  const shadowVideo = f.document.createElement('video') as unknown as HTMLVideoElement;
+  shadowVideo.id = 'shadow-video';
+  Object.defineProperty(shadowVideo, 'getBoundingClientRect', {configurable: true, value: () => ({width: 640, height: 360, top: 0, left: 0, right: 640, bottom: 360})});
+  shadow.appendChild(shadowVideo);
+  const paused = f.document.getElementById('paused') as unknown as HTMLVideoElement;
+  const playing = f.document.getElementById('playing') as unknown as HTMLVideoElement;
+  Object.defineProperty(paused, 'paused', {configurable: true, value: true});
+  Object.defineProperty(playing, 'paused', {configurable: true, value: false});
+  Object.defineProperty(playing, 'ended', {configurable: true, value: false});
+  Object.defineProperty(shadowVideo, 'paused', {configurable: true, value: true});
+
+  const locator = createVideoPlayerLocator({document: f.document, window: f.window, includeAudio: true});
+  expect(locator.sync()?.video).toBe(playing);
+
+  // 非媒体节点派发 play 不应切换选中项
+  f.document.body.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('play', {bubbles: true}));
+  expect(locator.getTarget()?.video).toBe(playing);
+
+  // webkitFullscreenElement 与 webkitfullscreenchange 切到全屏容器（直指 Shadow DOM video）
+  Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: shadowVideo});
+  f.document.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('webkitfullscreenchange'));
+  expect(locator.getTarget()?.video).toBe(shadowVideo);
+  expect(locator.getTarget()?.fullscreen).toBe(true);
+
+  // 容器级全屏包裹 Shadow DOM video：通过 containsDeep 与受限子树深查命中，且忽略不可见的额外全屏视频
+  const hiddenShadowVideo = f.document.createElement('video') as unknown as HTMLVideoElement;
+  Object.defineProperty(hiddenShadowVideo, 'getBoundingClientRect', {configurable: true, value: () => ({width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0})});
+  shadow.appendChild(hiddenShadowVideo);
+  Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: host});
+  f.document.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('webkitfullscreenchange'));
+  expect(locator.getTarget()?.video).toBe(shadowVideo);
+  expect(locator.getTarget()?.fullscreen).toBe(true);
+  hiddenShadowVideo.remove();
+  expect(locator.sync()?.player).toBe(host);
+  locator.destroy();
+
+  // 纯 Shadow DOM 页面（无轻 DOM video）回退全页深查命中
+  const shadowOnly = setup('<div id="only-host"></div>', 'https://example.test/');
+  const onlyHost = shadowOnly.document.getElementById('only-host')!;
+  const onlyShadow = onlyHost.attachShadow({mode: 'open'});
+  const onlyVideo = shadowOnly.document.createElement('video') as unknown as HTMLVideoElement;
+  Object.defineProperty(onlyVideo, 'getBoundingClientRect', {configurable: true, value: () => ({width: 640, height: 360, top: 0, left: 0, right: 640, bottom: 360})});
+  onlyShadow.appendChild(onlyVideo);
+  expect(selectVideoPlayerTarget(shadowOnly.document, {window: shadowOnly.window})?.video).toBe(onlyVideo);
+});
+
+it('skips ambient muted autoplay previews, tiny/transparent HTML videos, and ignores native player ticks under detached host', () => {
+  vi.useFakeTimers();
+  const f = setup(
+    '<section class="card"><video id="preview" muted autoplay></video><video id="tiny" controls></video><video id="offset-tiny" controls></video><video id="invisible" controls></video><div class="real-player"><video id="main" controls></video><span class="timer">00:01</span></div></section>',
+    'https://podcast.example/',
+  );
+  const preview = f.document.getElementById('preview') as HTMLVideoElement;
+  const tiny = f.document.getElementById('tiny') as HTMLVideoElement;
+  const offsetTiny = f.document.getElementById('offset-tiny') as HTMLVideoElement;
+  const invisible = f.document.getElementById('invisible') as HTMLVideoElement;
+  const main = f.document.getElementById('main') as HTMLVideoElement;
+  const timer = f.document.querySelector('.timer')!;
+  const realPlayer = f.document.querySelector('.real-player')!;
+  Object.defineProperty(tiny, 'getBoundingClientRect', {configurable: true, value: () => ({width: 80, height: 40, top: 0, left: 0, right: 80, bottom: 40})});
+  Object.defineProperty(tiny, 'offsetWidth', {configurable: true, value: 80});
+  Object.defineProperty(tiny, 'offsetHeight', {configurable: true, value: 40});
+  Object.defineProperty(offsetTiny, 'getBoundingClientRect', {configurable: true, value: () => ({width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0})});
+  Object.defineProperty(offsetTiny, 'offsetWidth', {configurable: true, value: 100});
+  Object.defineProperty(offsetTiny, 'offsetHeight', {configurable: true, value: 40});
+  invisible.style.opacity = '0';
+  const origComputed = f.window.getComputedStyle;
+  Object.defineProperty(f.window, 'getComputedStyle', {
+    configurable: true,
+    value: (el: Element) => ({...(origComputed?.(el) || {}), opacity: (el as HTMLElement).style?.opacity || '1'}),
+  });
+  let mutation!: (records: MutationRecord[]) => void;
+  let frameCount = 0;
+  Object.defineProperty(f.window, 'requestAnimationFrame', {configurable: true, value: (cb: () => void) => { frameCount += 1; cb(); return frameCount; }});
+  vi.stubGlobal('MutationObserver', class {
+    constructor(callback: (records: MutationRecord[]) => void) { mutation = callback; }
+    observe() {}
+    disconnect() {}
+  });
+  const host = f.document.createElement('div');
+  f.document.body.appendChild(host);
+  const locator = createVideoPlayerLocator({document: f.document, window: f.window, includeAudio: true, getPlayer: () => host});
+  expect(locator.sync()?.video).toBe(main);
+  preview.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('play', {bubbles: true}));
+  expect(locator.getTarget()?.video).toBe(main);
+
+  frameCount = 0;
+  mutation([{type: 'childList', target: timer, addedNodes: [f.document.createTextNode('00:02')], removedNodes: []} as unknown as MutationRecord]);
+  vi.advanceTimersByTime(300);
+  expect(frameCount).toBe(0);
+
+  realPlayer.className = 'real-player active';
+  mutation([{type: 'attributes', attributeName: 'class', oldValue: 'real-player', target: realPlayer, addedNodes: [], removedNodes: []} as unknown as MutationRecord]);
+  expect(frameCount).toBe(0);
+  vi.advanceTimersByTime(260);
+  expect(frameCount).toBe(1);
+  locator.destroy();
+});

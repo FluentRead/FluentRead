@@ -380,4 +380,211 @@ describe('standalone manga reading panel prototype',()=>{
     const filter=h.button(`${translateLegacyText('未绘制译文',language)} · 1`)!;expect(filter).toBeDefined();filter.props.onClick(trusted);await h.tick();
     expect(h.button(`${translateLegacyText('未绘制译文',language)} · 1`)!.props.title).toBe(translateLegacyText('查看全文',language));expect(h.button(translateLegacyText('复制全文',language))).toBeDefined();
   });
+
+  it('auto-selects a single candidate on open while allowing explicit return to list', async () => {
+    const h = await mount();
+    const only: MangaReadingCandidate = {kind: 'image', ordinal: 1, token: {}};
+    h.props.list.mockReturnValue({status: 'ready', items: [only]});
+    await h.instance.open(trusted); await h.tick();
+    expect(h.props.read).toHaveBeenCalledOnce();
+    expect(h.props.read.mock.calls[0][0]).toBe(only.token);
+    expect(h.get(n => n.tag === 'pre' && n.text === '译文')).toBeDefined();
+    expect(h.get(n => n.props.class === 'fr-manga-reading-count')?.text).toBe('1');
+    // Returning to list shows the single item without re-auto-selecting
+    h.button('选择其他页面')!.props.onClick(trusted); await h.tick();
+    expect(h.button('图片 1')).toBeDefined();
+    expect(h.props.read).toHaveBeenCalledOnce();
+  });
+
+  it('supports per-line copy with 2.5s auto-reset and footer copied feedback auto-reset', async () => {
+    vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    try {
+      const h = await mount();
+      h.props.read.mockResolvedValueOnce({status: 'ready', lines: [line('第一句', 'First'), line('第二句', 'Second')]});
+      await h.instance.open(trusted); h.button('图片 1')!.props.onClick(trusted); await h.tick();
+      const copyBtn = h.get(n => n.props.class === 'fr-manga-reading-item-copy')!;
+      copyBtn.props.onClick({isTrusted: false}); expect(h.props.copy).not.toHaveBeenCalled();
+      copyBtn.props.onClick(trusted); await h.tick();
+      expect(h.props.copy).toHaveBeenCalledWith('第一句');
+      expect(copyBtn.props['data-copied']).toBe('true');
+      vi.advanceTimersByTime(2500); await h.tick();
+      expect(copyBtn.props['data-copied']).toBeUndefined();
+
+      // Compare mode copies source + translation and footer copied auto-resets after 2.5s
+      h.button('原文对照')!.props.onClick(); await h.tick();
+      h.button('复制全部')!.props.onClick(trusted); await h.tick();
+      expect(h.panel.feedback).toBe('已复制');
+      expect(h.panel.feedbackState).toBe('copied');
+      vi.advanceTimersByTime(2500); await h.tick();
+      expect(h.panel.feedback).toBe('');
+      expect(h.panel.feedbackState).toBeUndefined();
+
+      // Per-line copy failure sets error feedback
+      h.props.copy.mockRejectedValueOnce(new Error('denied'));
+      copyBtn.props.onClick(trusted); await h.tick();
+      expect(h.panel.feedbackState).toBe('error');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('supports prev/next candidate navigation, ArrowLeft/ArrowRight keys, and preserves compare mode', async () => {
+    const h = await mount();
+    h.props.read
+      .mockResolvedValueOnce({status: 'ready', lines: [line('第一页译文', 'Page 1')]})
+      .mockResolvedValueOnce({status: 'ready', lines: [line('第二页译文', 'Page 2')]})
+      .mockResolvedValueOnce({status: 'ready', lines: [line('第一页译文', 'Page 1')]})
+      .mockResolvedValueOnce({status: 'ready', lines: [line('第二页译文', 'Page 2')]})
+      .mockResolvedValueOnce({status: 'ready', lines: [line('第一页译文', 'Page 1')]});
+    await h.instance.open(trusted); h.button('图片 1')!.props.onClick(trusted); await h.tick();
+    h.button('原文对照')!.props.onClick(); await h.tick();
+    expect(h.panel.compare).toBe(true);
+
+    const prevBtn = h.get(n => n.tag === 'button' && n.props['aria-label'] === '上一页')!;
+    const nextBtn = h.get(n => n.tag === 'button' && n.props['aria-label'] === '下一页')!;
+    expect(prevBtn.props.disabled).toBe(true);
+    expect(nextBtn.props.disabled).toBe(false);
+
+    // Click next candidate -> preserves compare mode
+    nextBtn.props.onClick(trusted); await h.tick();
+    expect(h.props.read).toHaveBeenCalledTimes(2);
+    expect(h.props.read.mock.calls[1][0]).toBe(targets[1].token);
+    expect(h.panel.compare).toBe(true);
+    expect(h.get(n => n.tag === 'pre' && n.text === 'Page 2')).toBeDefined();
+
+    // Click prev candidate button works too
+    prevBtn.props.onClick(trusted); await h.tick();
+    expect(h.props.read).toHaveBeenCalledTimes(3);
+    expect(h.props.read.mock.calls[2][0]).toBe(targets[0].token);
+
+    // ArrowRight outside input navigates to next candidate
+    const dialog = h.get(n => n.props.role === 'dialog')!;
+    const preventRight = vi.fn();
+    dialog.props.onKeydown({key: 'ArrowRight', isTrusted: true, target: {tagName: 'SECTION'}, stopPropagation: vi.fn(), preventDefault: preventRight});
+    await h.tick();
+    expect(preventRight).toHaveBeenCalledOnce();
+    expect(h.props.read).toHaveBeenCalledTimes(4);
+    expect(h.props.read.mock.calls[3][0]).toBe(targets[1].token);
+
+    // ArrowLeft inside input is ignored
+    const preventInput = vi.fn();
+    dialog.props.onKeydown({key: 'ArrowLeft', isTrusted: true, target: {tagName: 'INPUT'}, stopPropagation: vi.fn(), preventDefault: preventInput});
+    expect(preventInput).not.toHaveBeenCalled();
+    expect(h.props.read).toHaveBeenCalledTimes(4);
+
+    // ArrowLeft outside input navigates to previous candidate
+    const preventNav = vi.fn();
+    dialog.props.onKeydown({key: 'ArrowLeft', isTrusted: true, target: {tagName: 'SECTION'}, stopPropagation: vi.fn(), preventDefault: preventNav});
+    await h.tick();
+    expect(preventNav).toHaveBeenCalledOnce();
+    expect(h.props.read).toHaveBeenCalledTimes(5);
+    expect(h.props.read.mock.calls[4][0]).toBe(targets[0].token);
+    expect(h.panel.compare).toBe(true);
+
+    // Full close resets compare
+    h.instance.close(); await h.tick();
+    expect(h.panel.compare).toBe(false);
+  });
+
+  it('filters lines with in-panel search and allows inline refresh on pending/stale/error', async () => {
+    const h = await mount();
+    h.props.read
+      .mockResolvedValueOnce({status: 'pending'})
+      .mockResolvedValueOnce({status: 'ready', lines: [line('英雄登场', 'Hero arrives'), line('反派逃跑', 'Villain flees'), line('终章预告', 'Final preview')]});
+    await h.instance.open(trusted); h.button('图片 1')!.props.onClick(trusted); await h.tick();
+    expect(h.panel.status).toBe('pending');
+    const retryBtn = h.button('刷新结果')!;
+    expect(retryBtn).toBeDefined();
+    retryBtn.props.onClick({isTrusted: false}); expect(h.props.read).toHaveBeenCalledOnce();
+    retryBtn.props.onClick(trusted); await h.tick();
+    expect(h.props.read).toHaveBeenCalledTimes(2);
+    expect(h.panel.status).toBe('ready');
+    expect(h.get(n => n.props.class === 'fr-manga-reading-count')?.text).toBe('3');
+
+    // Search by English source text (case-insensitive) via actual input handler
+    const searchInput = h.get(n => n.tag === 'input' && n.props.class === 'fr-manga-reading-search-input')!;
+    searchInput.props.onInput({target: {value: 'HERO'}}); await h.tick();
+    expect(h.panel.visibleLines).toHaveLength(1);
+    expect(h.get(n => n.props.class === 'fr-manga-reading-count')?.text).toBe('1/3');
+    expect(h.get(n => n.props.class === 'fr-manga-reading-search-count')?.text).toBe('1 / 3');
+    expect(h.button('复制全文')).toBeDefined();
+    expect(h.button('复制全部')).toBeUndefined();
+
+    // IME composing Escape and Escape inside non-empty search input do not close panel
+    const dialog = h.get(n => n.props.role === 'dialog')!;
+    dialog.props.onKeydown({key: 'Escape', isTrusted: true, isComposing: true, target: {tagName: 'INPUT'}, stopPropagation: vi.fn(), preventDefault: vi.fn()});
+    expect(h.panel.searchQuery).toBe('HERO');
+    expect(h.get(n => n.props.role === 'dialog')).toBeDefined();
+    const preventEsc = vi.fn();
+    dialog.props.onKeydown({key: 'Escape', isTrusted: true, target: {tagName: 'INPUT'}, stopPropagation: vi.fn(), preventDefault: preventEsc});
+    await h.tick();
+    expect(preventEsc).toHaveBeenCalledOnce();
+    expect(h.panel.searchQuery).toBe('');
+    expect(h.get(n => n.props.role === 'dialog')).toBeDefined();
+    expect(h.button('复制全部')).toBeDefined();
+
+    // Search with no match shows empty message
+    h.panel.searchQuery = 'nonexistent'; await h.tick();
+    expect(h.get(n => n.text === '没有匹配的文字')).toBeDefined();
+
+    // Clear search button restores all lines and refocuses search input
+    h.get(n => n.props.class === 'fr-manga-reading-search-clear')!.props.onClick(); await h.tick();
+    expect(h.panel.searchQuery).toBe('');
+    expect(searchInput.focus).toHaveBeenCalledWith({preventScroll: true});
+    expect(h.get(n => n.props.class === 'fr-manga-reading-count')?.text).toBe('3');
+  });
+
+  it('retains step focus except at boundaries, ignores modified arrow keys, and prevents stale copy timer from clearing line copy error', async () => {
+    vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    try {
+      const h = await mount();
+      await h.instance.open(trusted); h.button('图片 1')!.props.onClick(trusted); await h.tick();
+      const prevBtn = h.get(n => n.tag === 'button' && n.props['aria-label'] === '上一页')!;
+      const nextBtn = h.get(n => n.tag === 'button' && n.props['aria-label'] === '下一页')!;
+      const dialog = h.get(n => n.props.role === 'dialog')!;
+
+      // Clicking next in middle keeps focus on nextBtn rather than stealing to backButton
+      active = nextBtn;
+      nextBtn.props.onClick({isTrusted: true, currentTarget: nextBtn}); await h.tick();
+      expect(active).toBe(nextBtn);
+
+      // Modified arrow keys are ignored
+      for (const mod of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey'] as const) {
+        const prevCount = h.props.read.mock.calls.length;
+        dialog.props.onKeydown({key: 'ArrowRight', isTrusted: true, [mod]: true, target: {tagName: 'SECTION'}, stopPropagation: vi.fn(), preventDefault: vi.fn()});
+        expect(h.props.read).toHaveBeenCalledTimes(prevCount);
+      }
+
+      // Keyboard ArrowRight does not steal focus
+      active = dialog;
+      dialog.props.onKeydown({key: 'ArrowRight', isTrusted: true, currentTarget: dialog, target: {tagName: 'SECTION'}, stopPropagation: vi.fn(), preventDefault: vi.fn()});
+      await h.tick();
+      expect(active).toBe(dialog);
+
+      // Reaching last candidate via nextBtn transfers focus to prevBtn
+      active = nextBtn;
+      nextBtn.props.onClick({isTrusted: true, currentTarget: nextBtn}); await h.tick();
+      expect(nextBtn.props.disabled).toBe(true);
+      expect(active).toBe(prevBtn);
+
+      // Stepping back to index 0 transfers focus to nextBtn at boundary
+      prevBtn.props.onClick({isTrusted: true, currentTarget: prevBtn}); await h.tick();
+      prevBtn.props.onClick({isTrusted: true, currentTarget: prevBtn}); await h.tick();
+      active = prevBtn;
+      prevBtn.props.onClick({isTrusted: true, currentTarget: prevBtn}); await h.tick();
+      expect(prevBtn.props.disabled).toBe(true);
+      expect(active).toBe(nextBtn);
+
+      // Stale footer copy timer does not wipe a subsequent per-line copy error
+      h.button('复制全部')!.props.onClick(trusted); await h.tick();
+      expect(h.panel.feedbackState).toBe('copied');
+      h.props.copy.mockRejectedValueOnce(new Error('denied'));
+      h.get(n => n.props.class === 'fr-manga-reading-item-copy')!.props.onClick(trusted); await h.tick();
+      expect(h.panel.feedbackState).toBe('error');
+      vi.advanceTimersByTime(3000); await h.tick();
+      expect(h.panel.feedbackState).toBe('error');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

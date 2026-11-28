@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/VideoSubtitleAppearanceSettings.vue
  * 文件职责：提供视频字幕外观的分层设置，左侧展示隔离的实时视频预览，右侧按“显示偏好 → 紧凑皮肤网格 → 默认折叠的微调面板”递进组织。
- * 主要内容：皮肤卡片在深色视频底板上呈现真实字幕质感（解决透明/毛玻璃皮肤在浅色背景下难以辨认的问题），微调区默认折叠并统一使用滑块+行内百分比框、开关与成组取色控件；完整保留整体与译文独立字号、双语上下顺序、逐字高亮、读音标注、轮廓样式/颜色/粗细、背景显隐与恢复默认。
+ * 主要内容：皮肤卡片在深色视频底板上呈现真实字幕质感（解决透明/毛玻璃皮肤在浅色背景下难以辨认的问题），微调区默认折叠并统一使用滑块+行内百分比框、开关与成组取色控件；尊重减少动态偏好，字号滑块与数值输入提供独立无障碍标签，顶部/底部位置自动切换对应偏移标签并在中部位置禁用偏移；完整保留整体与译文独立字号、双语上下顺序、逐字高亮、读音标注、轮廓样式/颜色/粗细、背景显隐与恢复默认。
  * 模块边界：只编辑传入 Config 草稿；保存由 SettingsSections 统一处理，播放器实际应用由 content 层负责。
  -->
 <template>
@@ -84,9 +84,9 @@
             <label class="subtitle-slider-field">
               <span class="subtitle-field-head"><span>字号</span></span>
               <span class="subtitle-slider-row">
-                <input v-model.number="config.videoSubtitleAppearance.fontScale" type="range" :min="VIDEO_SUBTITLE_FONT_SCALE_RANGE.min" :max="VIDEO_SUBTITLE_FONT_SCALE_RANGE.max" step="10" aria-label="字幕字号" />
+                <input v-model.number="config.videoSubtitleAppearance.fontScale" type="range" :min="VIDEO_SUBTITLE_FONT_SCALE_RANGE.min" :max="VIDEO_SUBTITLE_FONT_SCALE_RANGE.max" step="10" :aria-label="translateControlLabel('字幕字号')" />
                 <span class="subtitle-percent-pill">
-                  <input :value="config.videoSubtitleAppearance.fontScale" type="number" :min="VIDEO_SUBTITLE_FONT_SCALE_RANGE.min" :max="VIDEO_SUBTITLE_FONT_SCALE_RANGE.max" step="1" :aria-label="translateControlLabel('字幕字号')" @change="updateFontScale" />
+                  <input :value="config.videoSubtitleAppearance.fontScale" type="number" :min="VIDEO_SUBTITLE_FONT_SCALE_RANGE.min" :max="VIDEO_SUBTITLE_FONT_SCALE_RANGE.max" step="1" :aria-label="fontScaleNumberAriaLabel" @change="updateFontScale" />
                   <span aria-hidden="true">%</span>
                 </span>
               </span>
@@ -113,9 +113,9 @@
                 <ElOption value="top" :label="translateControlLabel('顶部')" />
               </UiSelect>
             </div>
-            <label class="subtitle-slider-field">
-              <span class="subtitle-field-head"><span>底部偏移</span><b>{{ config.videoSubtitleAppearance.position === 'bottom' && config.videoSubtitleAppearance.autoBottom ? translateControlLabel('自动') : `${config.videoSubtitleAppearance.bottomOffset}%` }}</b></span>
-              <input v-model.number="config.videoSubtitleAppearance.bottomOffset" type="range" min="0" max="25" step="1" aria-label="字幕底部偏移" @input="config.videoSubtitleAppearance.autoBottom = false" />
+            <label class="subtitle-slider-field" :class="{ disabled: config.videoSubtitleAppearance.position === 'center' }">
+              <span class="subtitle-field-head"><span>{{ offsetLabel }}</span><b>{{ config.videoSubtitleAppearance.position === 'bottom' && config.videoSubtitleAppearance.autoBottom ? translateControlLabel('自动') : `${config.videoSubtitleAppearance.bottomOffset}%` }}</b></span>
+              <input v-model.number="config.videoSubtitleAppearance.bottomOffset" type="range" min="0" max="25" step="1" :aria-label="offsetAriaLabel" :disabled="config.videoSubtitleAppearance.position === 'center'" @input="config.videoSubtitleAppearance.autoBottom = false" />
             </label>
             <label v-if="config.videoSubtitleAppearance.position === 'bottom'" class="subtitle-switch-row subtitle-auto-bottom-toggle">
               <span>{{ translateControlLabel('移动端 / X 自动贴底') }}</span>
@@ -174,7 +174,36 @@ import UiSelect from '@/src/ui/components/UiSelect.vue';
 import {ElOption, ElColorPicker} from 'element-plus';
 import 'element-plus/es/components/color-picker/style/css';
 import {useUiI18n as useControlI18n} from '@/src/ui/i18n';
-const {t, translateLegacy: translateControlLabel} = useControlI18n();
+import type {UiLanguage} from '@/src/core/i18n';
+const controlI18n = useControlI18n();
+const {t, translateLegacy: translateControlLabel} = controlI18n;
+const topOffsetLabels: Readonly<Record<UiLanguage, string>> = {
+  'zh-CN': '顶部偏移',
+  'en-US': 'Top offset',
+  'ja-JP': '上端オフセット',
+  'ko-KR': '상단 간격',
+  'fr-FR': 'Décalage supérieur',
+  'ru-RU': 'Отступ сверху',
+  'es-ES': 'Desplazamiento superior',
+};
+const topOffsetAriaLabels: Readonly<Record<UiLanguage, string>> = {
+  'zh-CN': '字幕顶部偏移',
+  'en-US': 'Subtitle top offset',
+  'ja-JP': '字幕の上端オフセット',
+  'ko-KR': '자막 상단 간격',
+  'fr-FR': 'Décalage supérieur des sous-titres',
+  'ru-RU': 'Отступ субтитров сверху',
+  'es-ES': 'Desplazamiento superior de subtítulos',
+};
+const fontScaleNumberAriaLabels: Readonly<Record<UiLanguage, string>> = {
+  'zh-CN': '字幕字号数值',
+  'en-US': 'Subtitle font size value',
+  'ja-JP': '字幕サイズ数値',
+  'ko-KR': '자막 크기 수치',
+  'fr-FR': 'Valeur de taille des sous-titres',
+  'ru-RU': 'Значение размера субтитров',
+  'es-ES': 'Valor del tamaño de subtítulos',
+};
 
 import {computed, nextTick} from 'vue';
 import type {CSSProperties} from 'vue';
@@ -195,6 +224,14 @@ import SettingsPreviewLayout from './components/SettingsPreviewLayout.vue';
 
 const props = defineProps<{config: Config}>();
 const config = computed(() => props.config);
+const currentLanguage = computed<UiLanguage>(() => controlI18n.language?.value ?? 'zh-CN');
+const fontScaleNumberAriaLabel = computed(() => fontScaleNumberAriaLabels[currentLanguage.value]);
+const offsetLabel = computed(() => config.value.videoSubtitleAppearance.position === 'top'
+  ? topOffsetLabels[currentLanguage.value]
+  : translateControlLabel('底部偏移'));
+const offsetAriaLabel = computed(() => config.value.videoSubtitleAppearance.position === 'top'
+  ? topOffsetAriaLabels[currentLanguage.value]
+  : translateControlLabel('字幕底部偏移'));
 const displayModeOptions = [{value: 'bilingual', label: '双语'}, {value: 'translation-only', label: '仅译文'}, {value: 'original-only', label: '仅原文'}];
 const bilingualOrderOptions = computed(() => [{value: 'original-first', label: t('video.originalFirst')}, {value: 'translation-first', label: t('video.translationFirst')}]);
 const customOutlineAvailable = computed(() => config.value.videoSubtitleAppearance.outlineStyle === 'stroke' || config.value.videoSubtitleAppearance.outlineStyle === 'shadow');
@@ -448,5 +485,8 @@ b.subtitle-preview-karaoke { --subtitle-preview-karaoke-color: var(--fluent-read
 @media (max-width: 560px) {
   .subtitle-skin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .subtitle-compact-pair, .subtitle-color-row, .subtitle-outline-row { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .subtitle-preview-karaoke::after { animation: none; clip-path: inset(-.3em 35% -.3em -.3em); }
 }
 </style>

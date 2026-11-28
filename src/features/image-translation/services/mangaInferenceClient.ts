@@ -1,20 +1,21 @@
 /**
  * @file src/features/image-translation/services/mangaInferenceClient.ts
  * 文件职责：在 Offscreen 外部看守独立漫画推理 Worker，隔离 GPU 初始化挂起与原生推理阻塞。
- * 主要内容：串行请求和真实阶段转发；取消立即结束调用方等待，已开始的模型准备继续暖机、推理仅允许短暂收尾；错误与超时仍硬终止并仅重建一次 CPU Worker，复用共享并行预算；可选缓存分割先准备再按次借读有界 RGBA，由消息克隆快照，缩放与张量构造归 Worker；CPU 重试重新核对原图归属，分割端口独立三分钟空闲释放，旧消息不能影响新请求。
+ * 主要内容：串行请求和真实阶段转发；取消立即结束调用方等待，已开始的模型准备继续暖机，推理发送协作取消消息并在及时中止时保留温热 Worker，仅在收尾超时时硬终止；错误、超时与硬终止清空全部端口，CPU 回退重建时保留逻辑端口并在推理成功时恢复对应端口，复用共享并行预算；可选缓存分割先准备再按次借读有界 RGBA，由消息克隆快照，缩放与张量构造归 Worker；CPU 重试重新核对原图归属，分割端口独立三分钟空闲释放，旧消息不能影响新请求。
  * 后端选择：CPU 偏好从首次消息采用单线程 WASM 与 CPU 超时预算；偏好变化在串行边界重建 Worker，保留逻辑端口；仅记录当前阶段和最近成功会话的执行提供程序，不记录图片或文字。
  * 模块边界：不处理图片像素、不下载模型、不操作宿主页；静态 Worker 只读取同源缓存和包内代码。
  */
 import {withLocalInferenceBudget} from '@/src/shared/onnx/resources';
+import {isOnnxJspiUnsupportedError} from '@/src/shared/onnx/wasmBinary';
 import {withMangaModelAdmission} from './mangaOcrAssets';
 import type {MangaOcrPage} from './mangaBubbles';
 import {isImageTextSegmentationSource,type ImageTextSegmentationSource} from './imageTextSegmentation';
 export interface MangaPatch {image: Float32Array; mask: Float32Array; width: number; height: number}
 
 export type MangaInferenceProgress = (stage: 'preparing' | 'initializing' | 'recognizing', percent?: number) => void;
-export type MangaInferenceRequest = {type: 'prepare-ocr' | 'recognize' | 'prepare-inpaint' | 'inpaint' | 'dispose-ocr' | 'dispose-inpaint' | 'prepare-seg' | 'segment' | 'dispose-seg'; image?: string; patch?: MangaPatch;imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true; source?:ImageTextSegmentationSource};
+export type MangaInferenceRequest = {type: 'prepare-ocr' | 'recognize' | 'prepare-inpaint' | 'inpaint' | 'dispose-ocr' | 'dispose-inpaint' | 'prepare-seg' | 'segment' | 'dispose-seg' | 'cancel'; image?: string; patch?: MangaPatch; profile?: 'manga' | 'image'; imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true; source?:ImageTextSegmentationSource};
 export type MangaInferenceMessage = MangaInferenceRequest & {requestId: number; cpu: boolean};
-export interface MangaInferenceResponse {requestId: number; stage?: Parameters<MangaInferenceProgress>[0]; percent?: number; executionProviders?: Array<'webgpu' | 'wasm'>; success?: boolean; result?: MangaOcrPage | Float32Array | Uint8Array | boolean; error?: string; errorKind?:'protocol'|'execution'}
+export interface MangaInferenceResponse {requestId: number; stage?: Parameters<MangaInferenceProgress>[0]; percent?: number; executionProviders?: Array<'webgpu' | 'wasm'>; success?: boolean; aborted?: boolean; result?: MangaOcrPage | Float32Array | Uint8Array | boolean; error?: string; errorKind?:'protocol'|'execution'}
 export interface MangaInferenceDiagnostics {
     preference: 'auto' | 'cpu';
     cpuFallback: boolean;
@@ -53,7 +54,7 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
             return operation();
         });
     }
-    function terminate() { clearWarmIdle();clearSegIdle();ports.delete('seg'); orphanWarm = false; const current = worker; worker = undefined; executionProviders = []; current?.terminate(); }
+    function terminate() { clearWarmIdle();clearSegIdle();ports.clear(); orphanWarm = false; const current = worker; worker = undefined; executionProviders = []; current?.terminate(); }
     function keepSegWarm(){
         clearSegIdle();const current=worker,epoch=segEpoch;
         if(!current||!ports.has('seg'))return;
@@ -100,6 +101,10 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
                 else {
                     // prepare 的成功回复与调用方拿到端口之间，也可能发生取消或销毁。
                     if (canceled || message.type.startsWith('prepare')) orphanWarm = true;
+                    if (!canceled) {
+                        if (message.type === 'recognize') ports.add('ocr');
+                        if (message.type === 'inpaint') ports.add('inpaint');
+                    }
                     if(message.type==='prepare-seg'&&result===true||message.type==='segment'){ports.add('seg');keepSegWarm();}
                     keepWarm(current);
                 }
@@ -111,8 +116,12 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
                 canceled = true;
                 stage = 'canceled';
                 // prepare 没有页面推理，可复用正在进行的下载和初始化；原有阶段看守仍生效。
-                // 原生推理无法中断，仅给已执行任务短暂收尾，不能一直阻挡新页面。
-                if (!message.type.startsWith('prepare')) drain = setTimeout(() => finish(undefined, true), CANCEL_DRAIN_MS);
+                // 推理优先通过协作取消提前结束，仅在单次原生内核无法及时响应时回退硬终止。
+                if (!message.type.startsWith('prepare')) {
+                    try { current.postMessage({type: 'cancel', requestId, cpu}); }
+                    catch { /* 取消通知发送失败时，仍由收尾看守在期限后硬终止。 */ }
+                    drain = setTimeout(() => finish(undefined, true), CANCEL_DRAIN_MS);
+                }
             };
             active = {reject: error => finish(error, true)};
             current.onmessage = (event: MessageEvent<MangaInferenceResponse>) => {
@@ -132,7 +141,8 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
                 if(response.success&&segmentation&&!(message.type==='prepare-seg'?typeof response.result==='boolean':response.result instanceof Uint8Array&&response.result.length===1024*1024&&response.result.byteOffset===0&&response.result.buffer instanceof ArrayBuffer&&response.result.byteLength===response.result.buffer.byteLength)){
                     finish(new MangaSegmentationProtocolError('图片分割返回值无效'),true);return;
                 }
-                finish(response.success ? undefined : response.errorKind==='protocol'?new MangaSegmentationProtocolError(response.error || '图片分割协议错误'):new Error(response.error || '漫画推理失败'), !response.success, response.result as T);
+                const aborted = canceled && response.aborted === true;
+                finish(response.success ? undefined : response.errorKind==='protocol'?new MangaSegmentationProtocolError(response.error || '图片分割协议错误'):new Error(response.error || '漫画推理失败'), !response.success && !aborted, response.result as T);
             };
             current.onerror = event => { if (worker === current) finish(new Error(event.message || '漫画推理 Worker 已停止'), true); };
             signal?.addEventListener('abort', abort, {once: true});
@@ -148,9 +158,9 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
             if(owner !== generation) throw new DOMException('漫画处理已取消','AbortError');
             if (workerPreference !== preference) {
                 // 只在上一请求结束后切换；已有代理端口由新 Worker 按需重建真实会话。
-                const segmented = ports.has('seg');
+                const preserved = Array.from(ports);
                 terminate();
-                if (segmented) ports.add('seg');
+                for (const kind of preserved) ports.add(kind);
                 cpu = preference === 'cpu'; workerPreference = preference;
             }
             // 工厂异常保持原对象，且不进入设备重试；排队取消/代次失效不读取原图。
@@ -162,11 +172,14 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
                 return {...message,source};
             };
             const initial=input();
+            const preserved = Array.from(ports);
             try { return await attempt<T>(initial, signal, progress); }
             catch (error) {
-                if (owner !== generation || cpu || signal?.aborted || message.type.startsWith('dispose')||error instanceof MangaSegmentationProtocolError) throw error;
+                if (owner !== generation || cpu || signal?.aborted || message.type.startsWith('dispose')||error instanceof MangaSegmentationProtocolError||isOnnxJspiUnsupportedError(error)) throw error;
                 cpu = true; progress?.('initializing');
-                return await attempt<T>(input(), signal, progress);
+                const next = input();
+                if (!signal?.aborted) for (const kind of preserved) ports.add(kind);
+                return await attempt<T>(next, signal, progress);
             }
         }, signal));
         tail = result.then(() => undefined, () => undefined);
@@ -206,7 +219,7 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
             finally{if(owner===generation)keepSegWarm();}
         },
         async release(kind: 'ocr' | 'inpaint'|'seg') { if(kind==='seg')clearSegIdle();ports.delete(kind); if (worker) await request({type: `dispose-${kind}`});if(kind==='seg')ports.delete(kind); if (!ports.size) { terminate(); cpu = false; } },
-        dispose() { generation++; active?.reject(new DOMException('漫画处理已取消', 'AbortError')); terminate(); ports.clear(); cpu = false; stage = 'idle'; },
+        dispose() { generation++; active?.reject(new DOMException('漫画处理已取消', 'AbortError')); terminate(); cpu = false; stage = 'idle'; },
     };
 }
 

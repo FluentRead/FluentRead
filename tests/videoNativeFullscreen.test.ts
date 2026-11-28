@@ -6,7 +6,7 @@
  */
 import {describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
-import {createNativeFullscreenSubtitles, supportsNativeVideoFullscreen, type NativeFullscreenSubtitleState} from '@/src/features/video-subtitle/content/nativeFullscreen';
+import {createNativeFullscreenSubtitles, supportsNativeVideoFullscreen, supportsSafariNativeVideoFullscreen, type NativeFullscreenSubtitleState} from '@/src/features/video-subtitle/content/nativeFullscreen';
 
 function setup() {
   const {document, window} = parseHTML('<html><body><video></video><video></video></body></html>');
@@ -23,7 +23,12 @@ function setup() {
       const stored: Cue[] = [];
       const track = {get mode() { return mode; }, set mode(value: TextTrackMode) { mode = value; },
         kind: 'subtitles', get cues() { return mode === 'disabled' ? null : stored; }, stored,
-        addCue(cue: Cue) { stored.push(cue); }, removeCue(cue: Cue) { stored.splice(stored.indexOf(cue), 1); }};
+        addCue(cue: Cue) {
+          const index = stored.findIndex(item => item.startTime > cue.startTime);
+          if (index === -1) stored.push(cue);
+          else stored.splice(index, 0, cue);
+        },
+        removeCue(cue: Cue) { stored.splice(stored.indexOf(cue), 1); }};
       tracks.push(track);
       Object.defineProperty(node, 'track', {value: track, configurable: true});
     }
@@ -122,7 +127,7 @@ describe('native fullscreen subtitles', () => {
   });
 
   it('accepts a platform cue already updated to the desired reading without writing it again', () => {
-    const f=setup();f.state.reading={enabled:true,source:'Original',text:''};f.bridge.sync();
+    const f=setup();f.state.revision=1;f.state.reading={enabled:true,source:'Original',text:''};f.bridge.sync();
     const track=f.tracks[0];f.select(track);
     const cue=track.cues![0];let text='Original\norijinaru\n译文';const assign=vi.fn((value:string)=>{text=value;});
     Object.defineProperty(cue,'text',{configurable:true,get:()=>text,set:assign});
@@ -413,4 +418,138 @@ it('does not reassign source ownership during internal cue work or queued cleanu
   expect(other.mode).toBe('disabled'); expect(f.original.mode).toBe('disabled');
   f.bridge.destroy(); f.change();
   expect(f.document.querySelector('track')).toBeNull();
+});
+
+describe('PiP、元素级全屏与增量脏 cue 同步', () => {
+  it('拒绝 <audio> 元素，精确区分 supportsSafariNativeVideoFullscreen 与通用支持能力', () => {
+    const f = setup();
+    const audio = f.document.createElement('audio') as unknown as HTMLVideoElement & {webkitEnterFullscreen?: () => void; requestFullscreen?: () => Promise<void>};
+    audio.webkitEnterFullscreen = () => undefined;
+    audio.requestFullscreen = async () => undefined;
+    expect(supportsNativeVideoFullscreen(audio)).toBe(false);
+    expect(supportsSafariNativeVideoFullscreen(audio)).toBe(false);
+    expect(supportsSafariNativeVideoFullscreen(null)).toBe(false);
+    expect(supportsSafariNativeVideoFullscreen(undefined)).toBe(false);
+    expect(supportsSafariNativeVideoFullscreen(f.videos[0])).toBe(true);
+
+    const nonSafari = f.videos[1] as unknown as HTMLVideoElement & {webkitEnterFullscreen?: () => void; requestPictureInPicture?: () => Promise<PictureInPictureWindow>};
+    delete nonSafari.webkitEnterFullscreen;
+    nonSafari.requestPictureInPicture = async () => ({} as PictureInPictureWindow);
+    expect(supportsSafariNativeVideoFullscreen(nonSafari)).toBe(false);
+    expect(supportsNativeVideoFullscreen(nonSafari)).toBe(true);
+    f.bridge.destroy();
+  });
+
+  it('非 Safari 正常内联播放不提前注入轨道，进入画中画/元素全屏才懒挂载并临时移除/恢复 native-cue-hidden', () => {
+    const f = setup();
+    const video = f.videos[0] as unknown as HTMLVideoElement & {webkitEnterFullscreen?: () => void; requestPictureInPicture?: () => Promise<PictureInPictureWindow>; requestFullscreen?: () => Promise<void>};
+    delete video.webkitEnterFullscreen;
+    video.requestPictureInPicture = async () => ({} as PictureInPictureWindow);
+    video.classList.add('fluent-read-video-native-cue-hidden');
+    expect(supportsNativeVideoFullscreen(video)).toBe(true);
+    expect(supportsSafariNativeVideoFullscreen(video)).toBe(false);
+
+    // 捕获 fullscreenchange 监听器，验证 destroy 后迟到回调不抛错
+    let capturedFsListener: (() => void) | undefined;
+    const origAdd = f.document.addEventListener.bind(f.document);
+    vi.spyOn(f.document, 'addEventListener').mockImplementation((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      if (type === 'fullscreenchange' && typeof listener === 'function') capturedFsListener = listener as () => void;
+      return origAdd(type, listener, options);
+    });
+
+    // 非 Safari 正常内联播放：不提前注入 <track>，保留 native-cue-hidden
+    f.bridge.sync();
+    expect(f.tracks).toHaveLength(0);
+    expect(f.document.querySelector('track')).toBeNull();
+    expect(video.classList.contains('fluent-read-video-native-cue-hidden')).toBe(true);
+    expect(f.original.mode).toBe('showing');
+
+    // 进入 Picture-in-Picture：懒创建轨道、自动切换 showing、关闭站点原轨并临时移除 native-cue-hidden
+    Object.defineProperty(f.document, 'pictureInPictureElement', {configurable: true, value: video});
+    video.dispatchEvent(new f.window.Event('enterpictureinpicture'));
+    expect(f.tracks).toHaveLength(1);
+    const track = f.tracks[0];
+    expect(track.mode).toBe('showing');
+    expect(f.original.mode).toBe('disabled');
+    expect(video.classList.contains('fluent-read-video-native-cue-hidden')).toBe(false);
+
+    // 同时进入元素级全屏后退出 PiP：仍处于元素全屏时不提前退出，且不重复恢复 native-cue-hidden
+    Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: video});
+    f.document.dispatchEvent(new f.window.Event('fullscreenchange'));
+    Object.defineProperty(f.document, 'pictureInPictureElement', {configurable: true, value: null});
+    video.dispatchEvent(new f.window.Event('leavepictureinpicture'));
+    expect(track.mode).toBe('showing');
+    expect(video.classList.contains('fluent-read-video-native-cue-hidden')).toBe(false);
+
+    // 容器级全屏（非 video 元素）退出元素全屏后恢复站点原轨并恢复 native-cue-hidden
+    const container = f.document.createElement('div');
+    f.document.body.appendChild(container);
+    Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: container});
+    f.document.dispatchEvent(new f.window.Event('fullscreenchange'));
+    expect(track.mode).toBe('hidden');
+    expect(f.original.mode).toBe('showing');
+    expect(video.classList.contains('fluent-read-video-native-cue-hidden')).toBe(true);
+
+    // 通过 requestFullscreen + webkitFullscreenElement 进入元素级全屏并容忍只读源轨
+    delete (video as {requestPictureInPicture?: unknown}).requestPictureInPicture;
+    video.requestFullscreen = async () => undefined;
+    expect(supportsNativeVideoFullscreen(video)).toBe(true);
+    const readonlySource = {kind: 'captions', get mode() { return 'showing' as TextTrackMode; }, set mode(_value: TextTrackMode) { throw new Error('readonly'); }};
+    f.sources.push(readonlySource as unknown as typeof f.original);
+    Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: null});
+    Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: video});
+    f.document.dispatchEvent(new f.window.Event('webkitfullscreenchange'));
+    expect(track.mode).toBe('showing');
+    expect(video.classList.contains('fluent-read-video-native-cue-hidden')).toBe(false);
+
+    // 移除只读模拟轨道后验证手动关闭自有轨道不强行重启，并恢复 native-cue-hidden
+    f.sources.pop();
+    f.select(null);
+    f.bridge.sync();
+    expect(track.mode).toBe('disabled');
+    expect(video.classList.contains('fluent-read-video-native-cue-hidden')).toBe(true);
+
+    Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: null});
+    f.document.dispatchEvent(new f.window.Event('webkitfullscreenchange'));
+    // 未处于原生展示态时容器级全屏变化保持静默
+    Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: container});
+    f.document.dispatchEvent(new f.window.Event('fullscreenchange'));
+    expect(track.mode).toBe('hidden');
+
+    // 原先没有 native-cue-hidden 类时，进入再退出 PiP 不会凭空添加该类
+    video.classList.remove('fluent-read-video-native-cue-hidden');
+    Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: null});
+    Object.defineProperty(f.document, 'pictureInPictureElement', {configurable: true, value: video});
+    video.dispatchEvent(new f.window.Event('enterpictureinpicture'));
+    expect(video.classList.contains('fluent-read-video-native-cue-hidden')).toBe(false);
+    Object.defineProperty(f.document, 'pictureInPictureElement', {configurable: true, value: null});
+    video.dispatchEvent(new f.window.Event('leavepictureinpicture'));
+    expect(video.classList.contains('fluent-read-video-native-cue-hidden')).toBe(false);
+
+    f.bridge.destroy();
+    // 销毁后即便迟到触发已捕获的 fullscreenchange 回调也安全短路
+    expect(() => capturedFsListener?.()).not.toThrow();
+  });
+
+  it('仅增删发生译文变化的脏 cue，避免长视频全量清空与重建', () => {
+    const f = setup();
+    const translations = new Map<string, string>();
+    f.state.cues = Array.from({length: 500}, (_, index) => ({startMs: index * 2000, durationMs: 1800, text: `Cue ${index}`}));
+    f.state.revision = 1;
+    f.state.translation = source => translations.get(source);
+    f.bridge.sync();
+    const track = f.tracks[0];
+    const add = vi.spyOn(track, 'addCue');
+    const remove = vi.spyOn(track, 'removeCue');
+
+    // 只更新 1 条译文
+    translations.set('Cue 42', '第 42 句译文');
+    f.state.revision = 2;
+    f.bridge.sync();
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(add).toHaveBeenCalledTimes(1);
+    expect(track.cues![42].text).toBe('Cue 42\n第 42 句译文');
+    expect(track.cues![41].text).toBe('Cue 41');
+    f.bridge.destroy();
+  });
 });

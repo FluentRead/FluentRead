@@ -312,6 +312,7 @@ describe('final boundary B independent local-download ownership', () => {
             match: async (key: string) => entries.get(key)?.clone(),
             put: async (key: string, value: Response) => {entries.set(key, value.clone());},
         })});
+        vi.stubGlobal('WebAssembly', {...WebAssembly, Suspending: function () {}, promising: function () {}});
         vi.stubGlobal('navigator', {storage: {estimate: async () => ({quota: 10_000_000_000, usage: 0})}});
         const {createLocalTranslationDownloadManager} = await import('@/src/features/local-translation/offscreen/downloads');
         let pausedCount = 0;

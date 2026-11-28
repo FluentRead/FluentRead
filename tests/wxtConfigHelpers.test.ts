@@ -39,6 +39,8 @@ describe('wxt.config extracted helpers', () => {
         expect(wxtConfig.extendRemoteConfigBuildConfig).toBe(viteHelpers.extendRemoteConfigBuildConfig);
         expect(wxtConfig.subframePageContextBuildPlugin).toBe(viteHelpers.subframePageContextBuildPlugin);
         expect(wxtConfig.extendSubframePageContextBuildConfig).toBe(viteHelpers.extendSubframePageContextBuildConfig);
+        expect(wxtConfig.subframeSiteCatalogBuildPlugin).toBe(viteHelpers.subframeSiteCatalogBuildPlugin);
+        expect(wxtConfig.extendSubframeSiteCatalogBuildConfig).toBe(viteHelpers.extendSubframeSiteCatalogBuildConfig);
         expect(wxtConfig.subframeSiteRulesBuildPlugin).toBe(viteHelpers.subframeSiteRulesBuildPlugin);
         expect(wxtConfig.extendSubframeSiteRulesBuildConfig).toBe(viteHelpers.extendSubframeSiteRulesBuildConfig);
         expect(wxtConfig.extendScopedChineseCatalogBuildConfig).toBe(viteHelpers.extendScopedChineseCatalogBuildConfig);
@@ -51,8 +53,15 @@ describe('wxt.config extracted helpers', () => {
 
     it('清单片段辅助函数按目标浏览器生成精确字段', () => {
         expect(manifestHelpers.resolveOnnxWasmVariant('chrome')).toBe('jspi');
-        expect(manifestHelpers.resolveOnnxWasmVariant('firefox')).toBe('jspi');
+        expect(manifestHelpers.resolveOnnxWasmVariant('edge')).toBe('jspi');
+        expect(manifestHelpers.resolveOnnxWasmVariant('firefox')).toBe('asyncify');
         expect(manifestHelpers.resolveOnnxWasmVariant('safari')).toBe('asyncify');
+        expect(manifestHelpers.resolveOnnxWasmVariant('thunderbird')).toBe('asyncify');
+
+        expect(manifestHelpers.createChromiumManifest({browser: 'chrome'})).toEqual({minimum_chrome_version: '137'});
+        expect(manifestHelpers.createChromiumManifest({browser: 'edge'})).toEqual({minimum_chrome_version: '137'});
+        expect(manifestHelpers.createChromiumManifest({browser: 'firefox'})).toEqual({});
+        expect(manifestHelpers.createChromiumManifest({browser: 'safari'})).toEqual({});
 
         expect(manifestHelpers.createSafariBackgroundPage({browser: 'chrome', manifestVersion: 3})).toEqual([]);
         const safariPages = manifestHelpers.createSafariBackgroundPage({browser: 'safari', manifestVersion: 2});
@@ -112,10 +121,10 @@ describe('wxt.config extracted helpers', () => {
     it('resolveExtensionBuildBudget 与拆分前生产/开发各平台字节上限严格一致', () => {
         expect(assetHelpers.resolveExtensionBuildBudget('chrome', true, false)).toBe(70_000_000);
         expect(assetHelpers.resolveExtensionBuildBudget('chrome', true, true)).toBe(170_000_000);
-        expect(assetHelpers.resolveExtensionBuildBudget('chrome', false)).toBe(52_809_250);
-        expect(assetHelpers.resolveExtensionBuildBudget('edge', false)).toBe(52_804_250);
-        expect(assetHelpers.resolveExtensionBuildBudget('firefox', false)).toBe(52_414_250);
-        expect(assetHelpers.resolveExtensionBuildBudget('safari', false)).toBe(61_420_250);
+        expect(assetHelpers.resolveExtensionBuildBudget('chrome', false)).toBe(52_949_250);
+        expect(assetHelpers.resolveExtensionBuildBudget('edge', false)).toBe(52_944_250);
+        expect(assetHelpers.resolveExtensionBuildBudget('firefox', false)).toBe(61_554_250);
+        expect(assetHelpers.resolveExtensionBuildBudget('safari', false)).toBe(61_560_250);
     });
 
     it('finalizeExtensionZip 验证 Chrome ZIP 固定身份并清理旧 store 包', async () => {

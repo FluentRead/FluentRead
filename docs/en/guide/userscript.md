@@ -1,66 +1,51 @@
-# Use a script manager
+# Userscript
 
-Use Tampermonkey, Violentmonkey, Via, or Safari Userscripts for FluentRead’s core webpage translation when an extension is unavailable. Support depends on your browser and manager.
+When browser extensions are unavailable, run FluentRead’s core webpage and selection translation via **Tampermonkey**, **Violentmonkey**, **Via**, or **Safari Userscripts**.
 
 <GuideVisual kind="userscript" en />
 
-## Install
+<DocDiagram kind="platform-matrix" en />
 
-1. Install and enable a script manager.
-2. Open the [FluentRead Greasy Fork page](https://greasyfork.org/en/scripts/482986) and follow its installation prompts.
-3. Confirm that the script is enabled. Reload a regular HTTP(S) page and use the floating button to translate or open settings.
+## Quick installation
 
-Keep only one FluentRead script enabled. Greasy Fork and source builds update separately; check the version actually installed in your manager when troubleshooting.
+1. Install and enable a compatible userscript manager.
+2. Open the [FluentRead Greasy Fork page](https://greasyfork.org/zh-CN/scripts/482986) and confirm installation.
+3. Keep only **one** FluentRead script enabled, refresh a regular HTTP(S) page, and use the floating ball to translate or open settings.
 
-Tampermonkey on Chromium browsers may also need permission to execute scripts. Follow its [official instructions](https://www.tampermonkey.net/faq.php?q=Q209), including the mobile steps for Edge Android.
+::: tip Chromium script execution permissions
+Tampermonkey on Chromium browsers (including Edge Android) may require enabling user-script execution permissions per [Tampermonkey FAQ Q209](https://www.tampermonkey.net/faq.php?q=Q209).
+:::
 
-### Build the standalone script from source
+## Build from source
 
-Install repository dependencies, run `pnpm test:userscript:standalone`, and import `.output/userscript-standalone/fluent-read.user.js` into your manager. **Use this standalone build for Via.**
+Install dependencies in the repository root and choose the build matching your manager:
 
-It includes runtime libraries, so installation needs no extra dependency downloads. Translation services and first use of some interface languages still need internet access. It uses the full settings center: supported desktop managers open a new tab, while Android and other managers show settings over the current page.
-
-Other builds are available for environments that need them:
-
-| Build command | File | Difference |
+| Command | Output file | Best for |
 | --- | --- | --- |
-| `pnpm test:userscript` | `.output/userscript/fluent-read.user.js` | Slim build; downloads dependencies at installation and uses compact settings |
-| `pnpm build:userscript:greasyfork` | `.output/userscript-greasyfork/fluent-read.user.js` | Source build prepared for Greasy Fork; downloads dependencies and uses compact settings |
+| `pnpm test:userscript:standalone` | `.output/userscript-standalone/fluent-read.user.js` | **Standalone (Required for Via):** bundles dependencies offline and includes the full Settings Center |
+| `pnpm test:userscript` | `.output/userscript/fluent-read.user.js` | Compact build loading dependencies from jsDelivr with compact settings |
+| `pnpm build:userscript:greasyfork` | `.output/userscript-greasyfork/fluent-read.user.js` | Greasy Fork distribution build loading external dependencies |
 
-A local build does not update the Greasy Fork listing. The standalone build is unsuitable for direct Greasy Fork submission; install its local file through a manager.
+## Via setup and troubleshooting {#via-setup-and-troubleshooting}
 
-## Via setup and troubleshooting
+1. Build the standalone script above.
+2. Open Via **Settings → Scripts → + → Import script**, pick `.user.js`, enable it, and disable other FluentRead copies.
+3. Open a regular webpage; if the floating ball is missing, verify the script toggle, URL scheme, and installed version.
 
-1. Build the standalone script above. Open **Settings → Scripts → + → Import script** and select its `.user.js` file.
-2. Enable it, disable other FluentRead copies, and reopen a regular webpage.
-3. If the floating button is missing, check the script switch, page address, and installed version.
+## Safari Userscripts setup and troubleshooting {#safari-userscripts-setup-and-troubleshooting}
 
-Existing Via checks used an Android emulator; physical devices and online services may behave differently. Include Via, Android, script versions, and the page URL when reporting a problem.
+1. Install **Userscripts** from the App Store and enable it in Safari extension settings with site permissions.
+2. Install from Greasy Fork, or place your local `.user.js` in the Userscripts directory and open the popup to refresh the file list.
+3. Confirm **Enable Injection** is on, refresh the page, and open FluentRead settings from the floating ball (Safari Userscripts has no script menu commands).
+4. Grant both page-access and translation-provider domain permissions when prompted. See [Userscripts docs](https://github.com/quoid/userscripts/tree/release/4.x.x).
 
-## Safari Userscripts setup and troubleshooting
+## Capabilities & privacy
 
-1. Install Userscripts from the App Store. Enable it in the system’s Safari extension settings and allow access to the current site.
-2. Open the Greasy Fork page in Safari and follow the Userscripts installation prompt. For a local build, put its `.user.js` file in the configured scripts directory, then open the Userscripts popup to refresh the file list.
-3. Check **Enable Injection**, confirm FluentRead matches and is enabled for this site, then reload the page.
-4. Open FluentRead settings from its page floating button. Safari Userscripts has no script menu commands.
-
-After replacing a file manually, open the Userscripts popup to refresh its file list. If the floating button is missing, check site permissions, URL matching, and dependency downloads. Page access and service-domain access follow separate manager rules; allow additional access when needed. Permission for a page does not grant access to every service.
-
-See the [official Userscripts documentation](https://github.com/quoid/userscripts/tree/release/4.x.x). Actual Safari Userscripts behavior still needs device verification.
-
-## What it can do
-
-Translate pages and restore originals, translate selections or hovered text, and use input translation, copying, and speech where the manager supports them. Choose free, cloud, AI, or custom services.
-
-Userscripts do not provide image OCR, area capture, Chrome’s built-in translator, video subtitles, writing assistance, translation statistics, or model usage. Extension context-menu and popup-layout settings also do not apply.
-
-## Data
-
-Configuration stays in the manager’s private storage. Translation text goes to your selected service. Slim builds download libraries from jsDelivr at installation; the standalone build includes them.
-
-Chinese and English interface text ships with the script. Japanese, Korean, French, Russian, and Spanish are downloaded from jsDelivr or GitHub on first use and cached. These requests contain no page text or keys. Before a language is cached, offline use temporarily falls back to Chinese.
+- **Included:** Bilingual webpage translation & restore, selection and hover translation, plus input translation, paragraph copy, and read-aloud where supported by the manager, with free, cloud, AI, or custom providers.
+- **Not included:** Image/manga OCR, area translation, built-in browser translation, video captions, writing assistant, translation statistics/AI usage, and extension context-menu/popup layout controls.
+- **Storage & locales:** Settings stay in manager private storage. Chinese and English UI ship inside the script; JA/KO/FR/RU/ES fetch once from jsDelivr/GitHub and cache locally (requests never include page text or keys).
 
 ## Related guides
 
-- [Mobile and Safari](/en/guide/mobile-safari)
-- [Data and privacy](/en/guide/privacy)
+- [Mobile & Safari](/en/guide/mobile-safari)
+- [Privacy policy](/en/guide/privacy)

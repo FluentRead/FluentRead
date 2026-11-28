@@ -56,7 +56,7 @@ vi.mock('vue', async importOriginal => {
 vi.mock('element-plus', () => ({ElMessageBox: {confirm: (...args: any[]) => ports.confirm(...args)}}));
 vi.mock('@element-plus/icons-vue', () => Object.fromEntries(['Check', 'Close', 'Cpu', 'Delete', 'Download', 'Promotion', 'Refresh', 'TopRight', 'VideoPause'].map(name => [name, {render: () => Vue.h('svg')}])));
 vi.mock('@/src/platform/browser/capabilities', () => ({browserCapabilities: {extensionDom: true}}));
-vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: () => true}));
+vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: () => true, supportsOpusTranslation: () => true}));
 vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({t: (key: string, values?: unknown) => values ? `${key}:${JSON.stringify(values)}` : key})}));
 vi.mock('@/src/features/settings/ui/components/FieldHelp.vue', () => ({default: {setup: (_: unknown, {slots}: any) => () => Vue.h('span', slots.default?.())}}));
 function task(phase: models.LocalTranslationDownloadPhase, downloadedBytes = 0, updatedAt = 1, model: models.LocalTranslationModelId = primary): models.LocalTranslationDownloadState {
@@ -291,5 +291,62 @@ describe('local translation actual mounted page ownership', () => {
     it('cancels trial and removes subscriptions on unmount', async () => {
         const h = await mount();await h.backend.ready();trialButton(h.host).click();await settle();const trial = [...h.backend.trials.values()][0];
         h.stop();await settle();expect(ports.listeners.size).toBe(0);expect(trial.signal.aborted).toBe(true);
+    });
+    it('shows Hy-MT3 and hides superseded Hy-MT2 by default, with bottom-start help placement', async () => {
+        const h = await mount();
+        const visibleIds = [...h.host.querySelectorAll<HTMLElement>('[data-model]')].map(node => node.getAttribute('data-model'));
+        expect(visibleIds).toEqual([
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusZhEn,
+            models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan3,
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusJaEn,
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusFrEn,
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusDeEn,
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusEsEn,
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusRuEn,
+        ]);
+        expect(h.host.querySelector(`[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan}"]`)).toBeNull();
+        const helpNodes = [...h.host.querySelectorAll<HTMLElement>('[data-model] [button-class="local-model-info"]')];
+        expect(helpNodes).toHaveLength(7);
+        expect(helpNodes.every(node => node.getAttribute('placement') === 'bottom-start')).toBe(true);
+    });
+    it('shows superseded Hy-MT2 with upgrade hint when selected, downloaded, or active at zero bytes', async () => {
+        const h = await mount();
+        h.state.config.model.localTranslation = models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan;
+        await settle();
+        const hyMt2Card = h.host.querySelector<HTMLElement>(`[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan}"]`);
+        expect(hyMt2Card).not.toBeNull();
+        expect(hyMt2Card?.textContent).toContain('settings.localTranslation.hunyuanUpgradeHint');
+        expect(hyMt2Card?.textContent).toContain('settings.localTranslation.legacyBadge');
+        expect(h.host.querySelector(`[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan3}"]`)).not.toBeNull();
+
+        h.state.config.model.localTranslation = primary;
+        await settle();
+        expect(h.host.querySelector(`[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan}"]`)).toBeNull();
+
+        await h.backend.emit([task('queued', 0, 5, models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan)]);
+        h.state.config.model.localTranslation = models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan3;
+        await settle();
+        const queuedHyMt2 = h.host.querySelector<HTMLElement>(`[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan}"]`);
+        expect(queuedHyMt2).not.toBeNull();
+        expect(queuedHyMt2?.getAttribute('data-phase')).toBe('queued');
+
+        await h.backend.emit([task('ready', 800_000, 10, models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan)]);
+        const downloadedHyMt2 = h.host.querySelector<HTMLElement>(`[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan}"]`);
+        expect(downloadedHyMt2).not.toBeNull();
+        expect(downloadedHyMt2?.textContent).toContain('settings.localTranslation.hunyuanUpgradeHint');
+    });
+    it('updates trial target language options when selecting a new OPUS pack', async () => {
+        const h = await mount();
+        const radio = h.host.querySelector<HTMLInputElement>(`input[value="${models.LOCAL_TRANSLATION_MODEL_IDS.opusFrEn}"]`)!;
+        expect(radio).not.toBeNull();
+        radio.dispatchEvent(new dom.window.Event('change', {bubbles: true}));
+        await settle();
+        expect(h.state.config.model[h.state.service]).toBe(models.LOCAL_TRANSLATION_MODEL_IDS.opusFrEn);
+        const segmented = renderedEvents.findLast(event => event.tag === 'SegmentedControl');
+        expect(segmented?.props.options).toEqual([
+            {value: 'fr', label: 'settings.localTranslation.langFrench'},
+            {value: 'en', label: 'area.settings.languageEnglish'},
+        ]);
+        expect(segmented?.props['model-value']).toBe('fr');
     });
 });

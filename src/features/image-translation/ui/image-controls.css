@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/ui/image-controls.css
- * 文件职责：定义图片翻译极简纯图标操作条、居中毛玻璃旋转加载球、首次准备进度胶囊、错误详情与漫画边缘进度的隔离样式。
- * 主要内容：沿用图片文字阅读器的基础变量，单图待翻译与已翻译态使用无文字纯图标轻玻璃微胶囊，单图常规加载在图片中央呈现极简毛玻璃旋转圆环（悬停平滑切换为取消图标），仅首次下载资源时展开简洁进度胶囊，漫画模式保持边缘极简圆环与低干扰提示，同时覆盖减少动态效果偏好。
+ * 文件职责：定义图片翻译极简纯图标操作条、居中毛玻璃旋转加载球、首次准备进度胶囊、错误详情、漫画边缘进度、单页悬停微胶囊与深浅色主题的隔离样式。
+ * 主要内容：沿用图片文字阅读器的基础变量，单图待翻译与已翻译态使用无文字纯图标轻玻璃微胶囊，单图常规加载在图片中央呈现极简毛玻璃旋转圆环（悬停平滑切换为取消图标），仅首次下载资源时展开简洁进度胶囊；漫画模式提供深色适配的错误卡片、与画布提示统一的磨砂未绘制药丸徽章以及悬停显现的单页原图/译图与重译微胶囊，同时覆盖减少动态效果偏好。
  * 模块边界：仅供所属 Shadow DOM 内联使用，不含业务逻辑或宿主网页样式。
  */
 .fr-image-controls,.fr-image-feedback {--fr-image-muted:#737c8f;}
@@ -76,22 +76,46 @@
 .fr-image-feedback[data-warning=true] {flex-direction:row;transform:none;min-width:0;max-height:24px;padding:0;border:0;font-size:11px;pointer-events:auto;}
 .fr-image-feedback[data-warning=true] .fr-image-warning-button {min-height:24px;padding:3px 6px;white-space:nowrap;}
 .fr-image-feedback[data-manga=false][data-warning=true] .fr-image-warning-button {min-width:24px;font-weight:700;}
+.fr-image-feedback[data-manga=true][data-warning=true] {background:transparent;box-shadow:none;backdrop-filter:none;border-radius:9999px;}
+.fr-image-feedback[data-manga=true][data-warning=true] .fr-image-warning-button {min-height:24px;padding:3px 10px;border:1px solid rgba(255,255,255,.18);border-radius:9999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px) saturate(135%);box-shadow:0 2px 10px rgba(15,23,42,.24);color:#f8fafc;font-size:11px;font-weight:500;line-height:1.35;transition:background-color 140ms cubic-bezier(.23,1,.32,1),border-color 140ms cubic-bezier(.23,1,.32,1),transform 120ms cubic-bezier(.23,1,.32,1);}
+.fr-image-feedback[data-manga=true][data-warning=true] .fr-image-warning-button:hover {background:rgba(15,23,42,.94);border-color:rgba(244,101,144,.48);color:#fff;}
+.fr-image-feedback[data-manga=true][data-warning=true] .fr-image-warning-button:active {transform:scale(.96);}
+.fr-image-feedback[data-manga=true][data-warning=true] .fr-image-status {padding:3px 9px;border:1px solid rgba(255,255,255,.16);border-radius:9999px;background:rgba(15,23,42,.8);backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(15,23,42,.22);color:#f8fafc;}
 .fr-image-feedback[data-manga=true][data-warning=true] .fr-image-status>span:last-child {white-space:normal;overflow-wrap:anywhere;}
 .fr-image-feedback[data-manga=true] .fr-image-status {gap:6px;min-width:0;}
 .fr-image-feedback[data-manga=true] .fr-image-status>span:last-child {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .fr-image-feedback[data-manga=true][data-phase=loading][data-queued=true] {pointer-events:auto;}
 .fr-image-feedback[data-manga=true][data-queued=true] .fr-image-actions {padding:0;gap:0;}
 .fr-image-feedback[data-manga=true][data-queued=true] .fluent-read-image-translation-button {min-height:20px;padding:1px 7px;background:rgba(15,23,42,.62);color:#fff;font-weight:500;}
-.fr-image-feedback[data-manga=true][data-phase=error] {width:280px;max-width:280px;transform:none;gap:5px;padding:8px 10px;border-color:#ffffff99;background:rgba(250,251,253,.94);box-shadow:0 2px 8px rgba(27,36,57,.08);font-size:11px;}
+.fr-image-feedback[data-manga=true][data-phase=error] {width:280px;max-width:280px;transform:none;gap:5px;padding:9px 11px;border-color:var(--fr-image-line);background:rgba(250,251,253,.94);backdrop-filter:blur(12px) saturate(140%);box-shadow:0 4px 16px rgba(27,36,57,.12);color:var(--fr-image-ink);font-size:11px;}
 .fr-image-feedback[data-manga=true][data-phase=error] .fr-image-status>span:last-child {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;min-width:0;flex:1;}
 .fr-image-feedback[data-manga=true][data-phase=error] .fr-image-actions {gap:4px;padding:0;}
 .fr-image-feedback[data-manga=true][data-phase=error] button {min-height:28px;padding:4px 7px;font-size:11px;}
+.fr-image-controls[data-manga-actions=true] .fr-image-actions {gap:2px;padding:2px 3px;border:1px solid rgba(255,255,255,.16);border-radius:9999px;background:rgba(15,23,42,.74);backdrop-filter:blur(10px) saturate(135%);box-shadow:0 3px 12px rgba(15,23,42,.24);color:#f8fafc;opacity:.82;}
+.fr-image-controls[data-manga-actions=true] .fr-image-actions:hover,.fr-image-controls[data-manga-actions=true]:focus-within .fr-image-actions {opacity:1;background:rgba(15,23,42,.9);border-color:rgba(255,255,255,.24);box-shadow:0 4px 14px rgba(15,23,42,.32);}
+.fr-image-controls[data-manga-actions=true] .fr-image-actions > button {width:auto;height:22px;min-height:22px;padding:0 8px;border-radius:9999px;font-size:11px;font-weight:500;line-height:1;color:#f1f5f9;}
+.fr-image-controls[data-manga-actions=true] .fr-image-actions > button:hover {background:rgba(255,255,255,.14);color:#fff;}
+.fr-image-controls[data-manga-actions=true] .fluent-read-image-translation-button::before {display:none;}
+.fr-image-controls[data-manga-actions=true] .fr-image-retranslate {position:relative;margin-left:3px;}
+.fr-image-controls[data-manga-actions=true] .fr-image-retranslate::before {content:"";position:absolute;left:-2px;top:5px;bottom:5px;width:1px;background:rgba(255,255,255,.2);pointer-events:none;}
+.fr-image-controls[data-theme=dark],.fr-image-feedback[data-theme=dark] {--fr-image-surface:rgba(28,32,40,.94);--fr-image-surface-soft:#232833;--fr-image-ink:#f1f3f7;--fr-image-muted:#a5aebf;--fr-image-line:rgba(255,255,255,.14);--fr-image-brand:#f46590;--fr-image-brand-strong:#ff85ab;--fr-image-brand-soft:rgba(244,101,144,.16);color-scheme:dark;}
+.fr-image-feedback[data-theme=dark][data-phase=error] .fr-image-status {color:#cbd5e1;}
+.fr-image-feedback[data-theme=dark][data-phase=error] .fr-image-actions > button {color:#171b24;}
+.fr-image-feedback[data-theme=dark][data-phase=error] .fr-image-actions > button:hover {background:#ff85ab;color:#171b24;}
+.fr-image-feedback[data-theme=dark][data-manga=true][data-phase=error] {border-color:rgba(255,255,255,.14);background:rgba(24,28,36,.92);box-shadow:0 6px 20px rgba(0,0,0,.38);color:#f1f3f7;}
+@media (prefers-color-scheme: dark) {
+  .fr-image-controls:not([data-theme=light]),.fr-image-feedback:not([data-theme=light]) {--fr-image-surface:rgba(28,32,40,.94);--fr-image-surface-soft:#232833;--fr-image-ink:#f1f3f7;--fr-image-muted:#a5aebf;--fr-image-line:rgba(255,255,255,.14);--fr-image-brand:#f46590;--fr-image-brand-strong:#ff85ab;--fr-image-brand-soft:rgba(244,101,144,.16);color-scheme:dark;}
+  .fr-image-feedback:not([data-theme=light])[data-phase=error] .fr-image-status {color:#cbd5e1;}
+  .fr-image-feedback:not([data-theme=light])[data-phase=error] .fr-image-actions > button {color:#171b24;}
+  .fr-image-feedback:not([data-theme=light])[data-phase=error] .fr-image-actions > button:hover {background:#ff85ab;color:#171b24;}
+  .fr-image-feedback:not([data-theme=light])[data-manga=true][data-phase=error] {border-color:rgba(255,255,255,.14);background:rgba(24,28,36,.92);box-shadow:0 6px 20px rgba(0,0,0,.38);color:#f1f3f7;}
+}
 .fr-image-progress {height:2px;width:64px;border-radius:9999px;background:rgba(15,23,42,.24);overflow:hidden;}
 .fr-image-progress>span {display:block;height:100%;background:linear-gradient(90deg,#ef4776,#f46590);border-radius:inherit;transition:width 240ms cubic-bezier(.23,1,.32,1);}
-.fr-image-feedback[data-animations=false],.fr-image-feedback[data-animations=false] .fr-image-progress>span,.fr-image-feedback[data-animations=false] .fr-image-actions>button,.fr-image-feedback[data-animations=false] .fr-image-spinner,.fr-image-feedback[data-animations=false] .fr-image-actions {animation:none;transition:none;}
+.fr-image-feedback[data-animations=false],.fr-image-feedback[data-animations=false] .fr-image-progress>span,.fr-image-feedback[data-animations=false] .fr-image-actions>button,.fr-image-feedback[data-animations=false] .fr-image-actions,.fr-image-feedback[data-animations=false] .fr-image-warning-button {animation:none;transition:none;}
 @keyframes fr-image-pop {from {opacity:0;transform:translate(-50%,-50%) scale(.92);} to {opacity:1;transform:translate(-50%,-50%) scale(1);}}
 @keyframes fr-manga-feedback {from {opacity:0;} to {opacity:1;}}
 @keyframes fr-image-spin {to {transform:rotate(360deg);}}
-@media (prefers-reduced-motion: reduce) {.fr-image-spinner,.fr-image-feedback[data-phase=loading] {animation:none;}.fr-image-controls .fr-image-actions,.fr-image-progress>span,.fr-image-feedback[data-phase=loading] .fr-image-actions>button,.fr-image-feedback[data-phase=loading] .fr-image-actions {transition:none;}}
+@media (prefers-reduced-motion: reduce) {.fr-image-spinner,.fr-image-feedback[data-phase=loading] {animation:none;}.fr-image-controls .fr-image-actions,.fr-image-progress>span,.fr-image-feedback[data-phase=loading] .fr-image-actions>button,.fr-image-feedback[data-phase=loading] .fr-image-actions,.fr-image-feedback[data-manga=true][data-warning=true] .fr-image-warning-button {transition:none;}}
 @media (prefers-reduced-motion: reduce) {.fr-image-feedback[data-manga=true][data-phase=loading] {animation-duration:0s;}}
 .fr-image-feedback[data-manga=true][data-phase=loading][data-animations=false] {animation-duration:0s;}

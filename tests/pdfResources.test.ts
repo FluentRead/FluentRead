@@ -9,9 +9,13 @@ describe('PDF static resource application boundary', () => {
         expect(getPdfResources().assetRoot).toBe('');
         expect(getPdfResources().workerUrl).toContain('pdf.worker.min.mjs');
     });
-    it('retains extension default resource addresses', () => {
+    it('retains extension default resource addresses and rejects opaque null origins', () => {
         vi.stubGlobal('window', {location: {origin: 'moz-extension://fixture'}});
         expect(getPdfResources().assetRoot).toBe('moz-extension://fixture/pdfjs');
+        vi.stubGlobal('window', {location: {origin: 'null'}});
+        expect(getPdfResources().assetRoot).toBe('');
+        vi.stubGlobal('window', {location: {}});
+        expect(getPdfResources().assetRoot).toBe('');
     });
     it('shares immutable explicit desktop resources and can reset the application port', () => {
         const source = {assetRoot: 'chrome://fluentread/content/pdfjs///', workerUrl: 'chrome://fluentread/content/pdfjs/worker.mjs'};

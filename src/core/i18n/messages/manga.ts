@@ -1,8 +1,8 @@
 /**
  * @file src/core/i18n/messages/manga.ts
- * 包含共享 CPU/WASM 后端设置及会话运行信息的七语界面文案。
- * 文件职责：提供漫画入口、首次资源说明和图片共享识别设置的产品文案，避免新增界面在非中文语言下显示中文。
- * 主要内容：英文完整回退目录与各语言核心操作文案，包含未绘制译文的快照筛选及全文复制；当前资源用途与准备状态优先展示，备用识别、可选文字分割的离线导入、语言包及下载管理采用简短入口。
+ * 包含共享 CPU/WASM 后端设置、漫画实时进度提示、按住对照原图、文字面板搜索/翻页/单条复制及二次确认清除资源的七语界面文案。
+ * 文件职责：提供漫画入口、首次资源说明、文字阅读面板和图片共享识别设置的产品文案，避免新增界面在非中文语言下显示中文。
+ * 主要内容：英文完整回退目录与各语言核心操作文案，包含未绘制译文的快照筛选、搜索、上下页切换、单条复制与全文复制，漫画实时进度与按住对照原图，示例对照与资源删除确认文案。
  * 模块边界：静态界面词典，不翻译漫画内容、不读取配置、不调用服务。
  */
 const locales = ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const;
@@ -70,6 +70,32 @@ const rows: Array<readonly [string, string, string, string, string, string, stri
   ['已复制','Copied','コピーしました','복사됨','Copié','Скопировано','Copiado'],
   ['复制失败，请选中文字后手动复制','Copy failed. Select the text to copy it manually.','コピーできませんでした。文字を選んで手動でコピーしてください','복사하지 못했습니다. 텍스트를 선택하여 수동으로 복사하세요','Échec de la copie. Sélectionnez le texte pour le copier manuellement.','Не удалось скопировать. Выделите текст и скопируйте вручную.','No se pudo copiar. Selecciona el texto para copiarlo manualmente.'],
   ['本地 OCR · 请核对名称和数字','Local OCR · Check names and numbers','ローカル OCR · 名前と数字を確認','로컬 OCR · 이름과 숫자를 확인하세요','OCR local · Vérifiez les noms et les nombres','Локальное OCR · Проверьте имена и числа','OCR local · Comprueba nombres y números'],
+  ['按住对照原图','Hold to view original','長押しで元画像を表示','길게 눌러 원본 보기','Maintenir pour voir l’original','Удерживайте для просмотра оригинала','Mantén pulsado para ver el original'],
+  ['已翻译','Translated','翻訳済み','번역됨','Traduit','Переведено','Traducido'],
+  ['已预译','Prefetched','先読み済み','미리 번역됨','Pré-traduit','Предпереведено','Pretraducido'],
+  ['翻译完成','Translation complete','翻訳完了','번역 완료','Traduction terminée','Перевод завершён','Traducción completada'],
+  ['页','pages','ページ','페이지','pages','стр.','págs.'],
+  ['复制本条','Copy line','この行をコピー','이 줄 복사','Copier cette ligne','Копировать строку','Copiar línea'],
+  ['上一页','Previous page','前のページ','이전 페이지','Page précédente','Предыдущая страница','Página anterior'],
+  ['下一页','Next page','次のページ','다음 페이지','Page suivante','Следующая страница','Página siguiente'],
+  ['搜索原文或译文','Search original or translation','原文または訳文を検索','원문 또는 번역문 검색','Rechercher dans l’original ou la traduction','Поиск по оригиналу или переводу','Buscar en el original o la traducción'],
+  ['清除搜索','Clear search','検索をクリア','검색 지우기','Effacer la recherche','Очистить поиск','Borrar búsqueda'],
+  ['没有匹配的文字','No matching text','一致する文字がありません','일치하는 텍스트가 없습니다','Aucun texte correspondant','Нет подходящего текста','No hay texto coincidente'],
+  ['刷新结果','Refresh result','結果を再読み込み','결과 새로고침','Actualiser le résultat','Обновить результат','Actualizar resultado'],
+  ['确认清除','Confirm removal','削除を確定','삭제 확인','Confirmer la suppression','Подтвердить удаление','Confirmar eliminación'],
+  ['取消','Cancel','キャンセル','취소','Annuler','Отмена','Cancelar'],
+  ['原图','Original','元画像','원본','Original','Оригинал','Original'],
+  ['译图','Translated','翻訳画像','번역본','Traduit','Перевод','Traducido'],
+  ['固定英中示例，仅说明原图与译图的对照方式','Fixed English–Chinese sample showing original vs. translated view','英語と中国語の固定サンプルで、元画像と翻訳画像の比較方法を示します','원본과 번역본의 비교 방식을 보여 주는 고정 영중 예시입니다','Exemple fixe anglais-chinois illustrant la comparaison entre l’original et la traduction','Фиксированный англо-китайский пример для показа сравнения оригинала и перевода','Ejemplo fijo inglés-chino que muestra la comparación entre el original y la traducción'],
+  ['常用选择器','Common selectors','よく使うセレクター','자주 쓰는 선택자','Sélecteurs courants','Частые селекторы','Selectores comunes'],
+  ['暂停并显示原图','Pause and show originals','一時停止して元画像を表示','일시 중지하고 원본 보기','Mettre en pause et afficher les originaux','Приостановить и показать оригиналы','Pausar y mostrar originales'],
+  ['部分页面未完成','Some pages are incomplete','一部のページが未完了です','일부 페이지가 완료되지 않았습니다','Certaines pages sont incomplètes','Некоторые страницы не завершены','Algunas páginas están incompletas'],
+  ['正在处理当前漫画页','Processing the current manga page','現在の漫画ページを処理中','현재 만화 페이지 처리 중','Traitement de la page de manga en cours','Обработка текущей страницы манги','Procesando la página actual del manga'],
+  ['连续翻译已开启','Continuous translation is on','連続翻訳がオンです','연속 번역이 켜져 있습니다','Traduction continue activée','Непрерывный перевод включён','Traducción continua activada'],
+  ['漫画翻译 · 自动翻译新页面','Manga translation · Translate new pages automatically','漫画翻訳 · 新しいページを自動翻訳','만화 번역 · 새 페이지 자동 번역','Traduction de mangas · Traduire automatiquement les nouvelles pages','Перевод манги · Автоперевод новых страниц','Traducción de manga · Traducir páginas nuevas automáticamente'],
+  ['正在检查阅读资源','Checking reading resources','読書用リソースを確認中','읽기 리소스 확인 중','Vérification des ressources de lecture','Проверка ресурсов для чтения','Comprobando recursos de lectura'],
+  ['圈选漫画翻译','Select manga area to translate','範囲を選択して漫画を翻訳','만화 영역 선택 번역','Sélectionner une zone du manga à traduire','Выделить область манги для перевода','Seleccionar área de manga para traducir'],
+  ['画布或分片漫画 · 拖选可见区域翻译','Canvas or tiled manga · Select a visible area to translate','キャンバス・分割形式の漫画 · 表示領域をドラッグして翻訳','캔버스 또는 분할 만화 · 보이는 영역을 드래그해 번역','Manga sur canevas ou en tuiles · Sélectionnez une zone visible à traduire','Манга на холсте или из фрагментов · Выделите видимую область для перевода','Manga en lienzo o mosaico · Selecciona un área visible para traducir'],
 ];
 export const mangaReadingLegacyMessages = Object.fromEntries(locales.map((locale, index) => [locale,
   Object.fromEntries(rows.map(row => [row[0], row[index + 1]]))])) as Record<(typeof locales)[number], Record<string,string>>;
@@ -90,8 +116,6 @@ const english = {
   "下载离线文件": "Download offline files",
   "最近页面直接显示。较早页面保留轻量缓存，返回时自动恢复；大图会按内存预算减少快速缓存数量。": "Recent pages display immediately. Earlier pages use a compact cache and are restored when you return. Large images reduce the number kept ready to fit the memory budget.",
   "默认悬停时展开，移开后收起；也可始终显示工具，或只保留品牌按钮": "Expand on hover and collapse when the pointer leaves by default; you can also keep tools visible or show only the brand button",
-  "圈选漫画翻译": "Select manga area to translate",
-  "画布或分片漫画 · 拖选可见区域翻译": "Canvas or tiled manga · Select a visible area to translate",
   "请在图片/漫画设置中启用圈选翻译，再拖选漫画区域。": "Enable area translation in Image/manga settings, then select a manga area.",
   "搜索网站名称或域名": "Search site name or domain",
   "已登记图片阅读器": "Registered image reader",
@@ -128,7 +152,6 @@ const english = {
   "后续已准备": "Upcoming pages ready",
   "优先翻译当前页，并在后台准备后续已加载的图片；增加预翻译页数会提高设备资源和翻译服务用量": "Current pages come first. Upcoming pages are prepared in the background using images already loaded by the site. More pages use more device resources and translation service requests.",
   "查看漫画翻译进度与选项": "View manga translation progress and options",
-  "漫画翻译 · 自动翻译新页面": "Manga translation · Translate new pages automatically",
   "漫画阅读资源与下载": "Manga reading resources and downloads",
   "普通图片识别资源": "Recognition resources for ordinary images",
   "约 30 MB": "About 30 MB",
@@ -138,8 +161,6 @@ const english = {
   "图片/漫画翻译": "Image/manga translation",
   "选择漫画连续阅读、单张图片或圈选翻译，分别调整入口与识别资源": "Choose manga reading, single images or selected areas, and adjust their controls and recognition resources.",
   "漫画翻译": "Manga translation",
-  "部分页面未完成": "Some pages are incomplete",
-  "连续翻译已开启": "Continuous translation is on",
   "收起漫画面板": "Collapse manga panel",
   "本次关闭漫画提示": "Dismiss manga prompt for this visit",
   "首次使用，先准备阅读资源": "Prepare reading resources for first use",
@@ -148,12 +169,9 @@ const english = {
   "准备资源并开始": "Prepare resources and start",
   "稍后": "Later",
   "开启后，滚动阅读时自动翻译新页面。随时切回原图。": "Translate new pages as you scroll. Switch back to the original whenever you want.",
-  "正在处理当前漫画页": "Processing the current manga page",
   "部分页面未完成，可在图片上重试": "Some pages are incomplete. Retry on the image.",
   "等待漫画图片加载": "Waiting for manga images",
   "当前页面已翻译，滚动后继续": "Current pages translated. Scroll to continue.",
-  "正在检查阅读资源": "Checking reading resources",
-  "暂停并显示原图": "Pause and show originals",
   "显示原图并暂停": "Show originals and pause",
   "开启连续翻译": "Start continuous translation",
   "翻译选项": "Translation options",

@@ -5,7 +5,7 @@
  * 模块边界：不扫描或改写网页、不读取词书数据库、不更新掌握度；读取交给内容挂载器，模型交给既有阅读助手，界面样式只作用于本组件。
  -->
 <template>
-  <div v-if="!state.paused" class="reencounter-ui" :class="{dark}" :style="{'--brand': accent}">
+  <div v-if="!state.paused" class="reencounter-ui" :class="{dark}">
     <button v-if="state.occurrences.length && !state.current" class="reencounter-entry" type="button" @click="open(state.occurrences[0])">
       <UiIcon name="book" :size="15" /><span>{{ t('reencounter.entry', {count: state.occurrences.length}) }}</span>
     </button>
@@ -33,7 +33,6 @@
 import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import browser from 'webextension-polyfill';
 import {config, subscribeConfig} from '@/src/services/config/store';
-import {getInterfaceSkinOption} from '@/src/core/config/interfaceAppearance';
 import {getHarnessRequestConfigKey} from '@/src/core/config/harness';
 import {useUiI18n} from '@/src/ui/i18n';
 import UiIcon from '@/src/ui/components/UiIcon.vue';
@@ -49,7 +48,6 @@ const prefs = ref({...config});
 const media = window.matchMedia('(prefers-color-scheme: dark)');
 const systemDark = ref(media.matches);
 const dark = computed(() => prefs.value.theme === 'dark' || (prefs.value.theme === 'auto' && systemDark.value));
-const accent = computed(() => getInterfaceSkinOption(prefs.value.interfaceSkin).preview.accent);
 const canExplain = computed(() => prefs.value.on && prefs.value.harness.enabled && prefs.value.harness.actions.includes('usage') && contextAllowed.value);
 const contextAllowed = computed(() => prefs.value.harness.contextMode === 'paragraph' && prefs.value.harness.maxContextChars > 0);
 const currentIndex = computed(() => Math.max(0, props.state.occurrences.findIndex(item => item.entry.id === props.state.current?.entry.id
@@ -122,7 +120,7 @@ onMounted(() => {
 onBeforeUnmount(() => { active = false; stop(); unsubscribe(); media.removeEventListener('change', mediaChanged); abort.abort(); });
 </script>
 <style scoped>
-.reencounter-ui{--ink:#283042;--muted:#657184;--surface:#fff;--soft:#f6f7fa;--line:#e5e8ee;color:var(--ink);font:14px/1.65 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+.reencounter-ui{--brand:#ef4776;--ink:#283042;--muted:#657184;--surface:#fff;--soft:#f6f7fa;--line:#e5e8ee;color:var(--ink);font:14px/1.65 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
 .reencounter-ui.dark{--ink:#edf0f6;--muted:#abb6c8;--surface:#202531;--soft:#2b3240;--line:#414a5c;}
 .reencounter-entry{position:fixed;right:18px;bottom:18px;display:flex;align-items:center;gap:7px;padding:7px 11px!important;box-shadow:0 3px 14px #00000014;font-size:12px!important;}
 .reencounter-ui button{color:var(--ink);font:inherit;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:6px 10px;cursor:pointer;}

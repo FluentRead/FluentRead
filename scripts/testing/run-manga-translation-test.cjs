@@ -1310,7 +1310,8 @@ async function verifyPipelinePerformance(extensionId) {
             const create=ort.InferenceSession.create.bind(ort.InferenceSession);
             if(${gpuDiagnosis} && file.includes('webgpu')) {
                 try {
-                    ort.env.wasm.numThreads=1;ort.env.wasm.proxy=false;ort.env.wasm.wasmPaths={mjs:chrome.runtime.getURL('/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'),wasm:chrome.runtime.getURL('/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm')};
+                    const wasmVariant = ${JSON.stringify(fs.existsSync(path.join(extensionDir, 'fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm')) ? 'jspi' : 'asyncify')};
+                    ort.env.wasm.numThreads=1;ort.env.wasm.proxy=false;ort.env.wasm.wasmPaths={mjs:chrome.runtime.getURL('/fluent-read-ai/ort-wasm-simd-threaded.'+wasmVariant+'.mjs'),wasm:chrome.runtime.getURL('/fluent-read-ai/ort-wasm-simd-threaded.'+wasmVariant+'.wasm')};
                     const cache=await caches.open('fluent-read-manga-ocr-v1'),keys=await cache.keys();
                     const key=keys.find(key=>key.url.includes('small_det'));
                     const model=await(await cache.match(key)).arrayBuffer();

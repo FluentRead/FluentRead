@@ -1,9 +1,12 @@
 /**
  * @file src/providers/translation/googleImageContext.ts
  * 文件职责：为同一图片的 Google HTML 批译提供有界邻文和可核对的位置协议。
- * 主要内容：最多四个相邻完整句子共享段落，标题和残句保持独立；原图确认同栏的短标签可借前后各一行，传输中临时补句号并在对应译文槽恢复原标点形式。保留大小写、编号和拒绝异常响应的契约。
+ * 主要内容：最多四个相邻完整句子共享段落，标题和残句保持独立；原图确认同栏的短标签可借前后各一行，连续相邻的界面短标签组共享同一段落（最多八项、总长不超过 1200 字符），传输中临时补句号并在对应译文槽恢复原标点形式。保留大小写、编号和拒绝异常响应的契约。
  * 模块边界：纯字符串协议，不发请求、不读取配置、不访问 DOM；取消、缓存与回退由 broker 和 Google adapter 管理，未知的返回形式回退到独立翻译。
  */
+
+const MAX_UI_LABEL_GROUP_SLOTS = 8;
+const PLAIN_LABEL_PATTERN = /^[\p{L} ]+$/u;
 
 function boundary(text: string): number {
     const end = text.trimEnd().replace(/["'”’»）)\]】」』]+$/u, '').match(/[.!?。！？؟۔…।॥,，、:：;；]+$/u)?.[0];
@@ -24,11 +27,39 @@ export function createGoogleImageContext(
         if (rows.length) documents.push(`<p>${rows.join(' ')}</p>`);
         rows = []; characters = 0;
     };
+    const isEligibleUiLabel = (slotIndex: number) =>
+        slotIndex < texts.length && allowed.has(slotIndex) && PLAIN_LABEL_PATTERN.test(texts[slotIndex]);
     for (let index = 0; index < texts.length; index++) {
         const text = texts[index];
+        if (isEligibleUiLabel(index)) {
+            const group: number[] = [index];
+            let groupChars = text.length + 1;
+            while (group.length < MAX_UI_LABEL_GROUP_SLOTS && isEligibleUiLabel(index + group.length)) {
+                const candidateIndex = index + group.length;
+                const candidateLength = texts[candidateIndex].length + 1;
+                if (groupChars + candidateLength > 1200) break;
+                group.push(candidateIndex);
+                groupChars += candidateLength;
+            }
+            // 满 8 项且后续恰好只余 1 个相邻短标签（如 9 或 17 项）时，拆为 7+2 避免尾项孤立退化为无语境 pre。
+            const tailIndex = index + group.length;
+            if (group.length === MAX_UI_LABEL_GROUP_SLOTS
+                && isEligibleUiLabel(tailIndex)
+                && !isEligibleUiLabel(tailIndex + 1)
+                && texts[group[group.length - 1]].length + texts[tailIndex].length + 2 <= 1200) {
+                group.pop();
+            }
+            if (group.length >= 2) {
+                flush();
+                documents.push(`<p>${group.map(slotIndex => render(slotIndex, texts[slotIndex] + '.')).join(' ')}</p>`);
+                for (const slotIndex of group) labelSlots.add(slotIndex);
+                index += group.length - 1;
+                continue;
+            }
+        }
         if (allowed.has(index + 1) && index + 2 < texts.length) {
             const label = texts[index + 1], after = texts[index + 2];
-            if (boundary(text) > 0 && /^[\p{L} ]+$/u.test(label) && boundary(after) > 0
+            if (boundary(text) > 0 && PLAIN_LABEL_PATTERN.test(label) && boundary(after) > 0
                 && text.length + label.length + after.length + 1 <= 1200 && !/[\r\n]/u.test(text + label + after)) {
                 flush();
                 const chosen = [render(index, text), render(index + 1, label + '.'), render(index + 2, after)];

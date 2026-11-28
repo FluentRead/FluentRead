@@ -209,4 +209,49 @@ describe('local document material references', () => {
         expect(resolveDocumentMaterialReference(reference, materialId, text(['Same', 'Same']))).toBeUndefined();
         expect(resolveDocumentMaterialReference({...reference, version: 2 as any}, materialId, text(['Same']))).toBeUndefined();
     });
+
+    it('caches documentSourceLocators per snapshot and invalidates on format, segment, or binary structure changes', () => {
+        const doc = pdf([['First', 1, 10], ['Second', 1, 40]]);
+        const first = documentSourceLocators(doc);
+        expect(Object.isFrozen(first)).toBe(true);
+        expect(documentSourceLocators(doc)).toBe(first);
+
+        // In-place push to binary.pages invalidates via binaryStructureLength.
+        if (doc.binary?.kind !== 'pdf') throw new Error('expected pdf');
+        doc.binary.pages.push({...doc.binary.pages[0], pageNumber: 3, blocks: []});
+        const afterPagePush = documentSourceLocators(doc);
+        expect(afterPagePush).not.toBe(first);
+        expect(documentSourceLocators(doc)).toBe(afterPagePush);
+
+        // Replacing pages reference invalidates PDF cache.
+        doc.binary.pages = [{...doc.binary.pages[0], pageNumber: 2}];
+        const afterPages = documentSourceLocators(doc);
+        expect(afterPages).not.toBe(afterPagePush);
+        expect(afterPages[0]?.scope).toBe('pdf:2');
+        expect(documentSourceLocators(doc)).toBe(afterPages);
+
+        // Pushing to segments invalidates via segmentCount.
+        (doc.segments as Array<{id: number; source: string}>).push({id: 2, source: 'Third'});
+        const afterPush = documentSourceLocators(doc);
+        expect(afterPush).not.toBe(afterPages);
+        expect(afterPush).toHaveLength(3);
+
+        // Replacing segments reference invalidates.
+        doc.segments = [{id: 0, source: 'Replaced'}];
+        const afterSegments = documentSourceLocators(doc);
+        expect(afterSegments).not.toBe(afterPush);
+        expect(afterSegments[0]?.source).toBe('Replaced');
+
+        // Replacing binary and format invalidates.
+        delete doc.binary;
+        doc.format = 'json';
+        doc.segments[0].pathLabel = '$.root';
+        const afterFormat = documentSourceLocators(doc);
+        expect(afterFormat).not.toBe(afterSegments);
+        expect(afterFormat[0]?.scope).toBe('path:$.root');
+        doc.format = 'txt';
+        const afterTxt = documentSourceLocators(doc);
+        expect(afterTxt).not.toBe(afterFormat);
+        expect(afterTxt[0]?.scope).toBeUndefined();
+    });
 });

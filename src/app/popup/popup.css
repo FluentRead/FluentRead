@@ -77,7 +77,7 @@ button:focus-visible, select:focus-visible { outline: var(--fr-focus-width, 2px)
 /* Logo 的圆角由图片透明轮廓提供；去除旧版粉色光晕投影，保持界面克制洁净。 */
 .brand img { display: block; width: 32px; height: 32px; border-radius: 0; box-shadow: none; }
 /* 只摇摆内部图像，点击区域和焦点框保持稳定；移开再进入可重播。 */
-.brand-icon-link[data-animated="true"]:is(:hover, :focus-visible) > img { animation: popup-brand-wiggle 1s ease-in-out; transform-origin: 50% 65%; }
+.brand-icon-link[data-animated="true"]:is(:hover, :focus-visible) > :is(img, svg, .popup-brand-wrap) { animation: popup-brand-wiggle 1s ease-in-out; transform-origin: 50% 65%; }
 .popup-brand-tooltip.el-popper { max-width: min(240px, calc(100vw - 24px)); padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--fr-radius-sm, 8px); color: var(--ink); background: var(--surface); box-shadow: var(--fr-shadow-md); font-size: var(--fr-text-xs, 11px); line-height: 1.5; overflow-wrap: anywhere; }
 .popup-brand-tooltip .brand-tooltip-copy { display: flex; flex-direction: column; gap: 2px; }
 .popup-brand-tooltip small { color: var(--muted); font-size: var(--fr-text-xs, 11px); }
@@ -90,7 +90,7 @@ button:focus-visible, select:focus-visible { outline: var(--fr-focus-width, 2px)
   86% { transform: rotate(-2deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .brand-icon-link[data-animated="true"]:is(:hover, :focus-visible) > img { animation: none; }
+  .brand-icon-link[data-animated="true"]:is(:hover, :focus-visible) > :is(img, svg, .popup-brand-wrap) { animation: none; }
 }
 .brand div { display: flex; flex-direction: column; }
 .brand strong { font-size: var(--fr-text-md, 14px); line-height: 1.25; font-weight: 600; }
@@ -103,8 +103,8 @@ button:focus-visible, select:focus-visible { outline: var(--fr-focus-width, 2px)
   background: var(--fr-success-indicator, var(--fr-success));
   box-shadow: var(--fr-success-indicator-ring, none);
 }
-:root[data-interface-skin-kind="palette"] .feature-card > i.active {
-  box-shadow: none;
+:root[data-popup-root][data-interface-skin-kind="craft"] .feature-card > i.active {
+  box-shadow: var(--skin-status-ring, none);
 }
 .settings-button {
   display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 66px; height: 32px; padding: 0 9px;
@@ -758,7 +758,7 @@ footer button { font-weight: 500; color: var(--muted); }
 :root:not(:lang(zh)) .popup-shell:not(.default-skin)[data-interface-skin] .translate-button .translate-label {
   overflow: visible; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; line-height: 1.4;
 }
-:root:not(:lang(zh)) .popup-shell[data-interface-skin] .translate-button { height: auto; min-height: 40px; padding-block: 7px; }
+:root:not(:lang(zh)) .popup-shell[data-interface-skin] .translate-button { height: auto; min-height: var(--skin-action-height, 40px); padding-block: 7px; }
 
 :root:not(:lang(zh)) .popup-shell .opensource-link { min-width: 0; white-space: normal; text-align: center; line-height: 1.4; }
 :root:not(:lang(zh)) .popup-shell .opensource-link > span:not(.external-mark) { min-width: 0; overflow-wrap: anywhere; }
@@ -821,20 +821,17 @@ footer button { font-weight: 500; color: var(--muted); }
 }
 
 /* 同排操作保持紧凑高度；短标题合并快捷键，完整用途和长组合由按钮提示呈现。 */
-:root .popup-shell[data-interface-skin] .translate-action { --diagnostic-space: 36px; --diagnostic-color: #fff; position: relative; display: flex; flex-wrap: nowrap; align-items: stretch; gap: 6px; margin-top: 8px; }
-:root[data-interface-skin="minimal"] .popup-shell[data-interface-skin] .translate-action { --diagnostic-color: var(--ink); }
-:root[data-interface-skin-kind="palette"] .popup-shell[data-interface-skin] .translate-action { --diagnostic-color: var(--skin-action-text, #fff); }
-:root[data-interface-skin-kind="palette"] .popup-shell[data-interface-skin] .translate-action.is-translated { --diagnostic-color: var(--brand-strong); }
-:root.dark[data-interface-skin="contrast"] .popup-shell[data-interface-skin] .translate-action { --diagnostic-color: #000; }
+:root .popup-shell[data-interface-skin] .translate-action { --diagnostic-space: 36px; --diagnostic-color: var(--skin-action-text, #fff); position: relative; display: flex; flex-wrap: nowrap; align-items: stretch; gap: 6px; margin-top: 8px; }
+:root[data-popup-root] .popup-shell[data-interface-skin] .translate-action.is-translated { --diagnostic-color: var(--skin-action-translated-text, var(--brand-strong)); }
 :root .popup-shell[data-interface-skin] .translate-action > .translate-button {
-  display: flex; flex: 1 1 0; flex-wrap: nowrap; align-items: center; min-width: 0; min-height: 42px; height: auto; padding: 6px var(--diagnostic-space); overflow: visible;
+  display: flex; flex: 1 1 0; flex-wrap: nowrap; align-items: center; min-width: 0; min-height: var(--skin-action-height, 42px); height: auto; padding: 6px var(--diagnostic-space); overflow: visible;
 }
 :root .popup-shell[data-interface-skin] .translate-action .translate-label {
   flex: 0 1 auto; min-width: 0; overflow: visible; text-overflow: clip; white-space: nowrap; line-height: 1.25;
 }
 :root .popup-shell[data-interface-skin] .translate-action .spinner { flex: none; }
 :root .popup-shell[data-interface-skin] .translate-action > .section-translate-button {
-  display: inline-flex; flex: 0 0 auto; flex-direction: column; justify-content: center; gap: 2px; width: var(--popup-secondary-action-width); min-width: var(--popup-secondary-action-width); height: auto; min-height: 42px; padding: 4px 5px;
+  display: inline-flex; flex: 0 0 auto; flex-direction: column; justify-content: center; gap: 2px; width: var(--popup-secondary-action-width); min-width: var(--popup-secondary-action-width); height: auto; min-height: var(--skin-action-height, 42px); padding: 4px 5px;
 }
 /* 入口叠在主按钮的预留区域，不参与网站规则或按钮的布局；详情沿整行右缘展开。 */
 :root .popup-shell[data-interface-skin] .translate-action > .fluentread-diagnostic {

@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/paragraphs.ts
  * 文件职责：将普通图片的 OCR 物理行恢复成可整段翻译与回填的文本区域。
- * 主要内容：按行距、字号、对齐和遮挡关系合并连续正文，续行与扫描早停共用完整源像素间距，避免缩放还原的亚像素差异拆开相邻行；竖排以从右到左的列序复用相同的邻接与遮挡约束，保留逐列擦除框；大输入首次尝试合段时建立有界深度的遮挡索引，暂时排除当前段成员并在结束后恢复，跳过无关区域及成员子树；保留标题、列表、栏位边界、原始擦除框与字号上限，并按完整 Unicode 码点衔接两侧 CJK 续行。
+ * 主要内容：按行距、字号、对齐和遮挡关系合并连续正文，续行与扫描早停共用完整源像素间距，避免缩放还原的亚像素差异拆开相邻行；紧凑表单与表格行在相邻对齐栏存在受保护独立项、三栏及以上非换行短单元格网格、或左栏短标签配右栏非连续正文时保守否决纵向合段，防止 UI 表单与数据表串行同时保留三栏换行卡片正文；竖排以从右到左的列序复用相同的邻接与遮挡约束，保留逐列擦除框；大输入首次尝试合段时建立有界深度的遮挡索引，暂时排除当前段成员并在结束后恢复，跳过无关区域及成员子树；保留标题、列表、栏位边界、原始擦除框与字号上限，并按完整 Unicode 码点衔接两侧 CJK 续行。
  * 可选续行：只为私有同帧布局证据指定的当前真实后继延长扫描和豁免大行距，完整段成员、数字与其他物理遮挡仍须通过；缺失、失效、已使用或被过滤的目标沿用旧早停，竖排投影不继承此能力。
  * 注音归属：明确附属的日文读音不重复进入正文，占用框参与相邻列的布局，正文与注音仍按原始物理框分别擦除并保留注音记录。
  * 模块边界：只处理原图坐标与识别文本，不运行 OCR、不调用翻译或 Canvas；漫画仍使用其气泡分组策略。
@@ -153,13 +153,112 @@ function createObstructionIndex(lines: ImageTextRegion[]) {
     return {setIncluded, intersects: (box: OcrLine['bbox']) => intersects(root, box)};
 }
 
+function alignedColumn(a: ImageTextRegion, b: ImageTextRegion): boolean {
+    const tol = Math.min(height(a), height(b)) * 0.8;
+    const leftDiff = Math.abs(a.bbox.x0 - b.bbox.x0);
+    const rightDiff = Math.abs(a.bbox.x1 - b.bbox.x1);
+    const centerDiff = Math.abs(a.bbox.x0 + a.bbox.x1 - b.bbox.x0 - b.bbox.x1) / 2;
+    const overlap = Math.min(a.bbox.x1, b.bbox.x1) - Math.max(a.bbox.x0, b.bbox.x0);
+    return Math.min(leftDiff, rightDiff, centerDiff) <= tol
+        || overlap >= Math.min(a.bbox.x1 - a.bbox.x0, b.bbox.x1 - b.bbox.x0) * 0.5;
+}
+
+function sameRowPeers(lines: ImageTextRegion[], targetIdx: number): {left: ImageTextRegion[]; right: ImageTextRegion[]} {
+    const target = lines[targetIdx], targetH = height(target), left: ImageTextRegion[] = [], right: ImageTextRegion[] = [];
+    const inspect = (other: ImageTextRegion) => {
+        if (other.vertical || other.guardOnly) return;
+        const otherH = height(other);
+        const vOverlap = Math.min(other.bbox.y1, target.bbox.y1) - Math.max(other.bbox.y0, target.bbox.y0);
+        if (vOverlap < Math.min(targetH, otherH) * 0.35) return;
+        if (other.bbox.x1 <= target.bbox.x0) left.push(other);
+        else if (other.bbox.x0 >= target.bbox.x1) right.push(other);
+    };
+    for (let k = targetIdx - 1; k >= 0 && target.bbox.y0 - lines[k].bbox.y0 <= targetH * 2; k--) inspect(lines[k]);
+    for (let k = targetIdx + 1; k < lines.length && lines[k].bbox.y0 < target.bbox.y1; k++) inspect(lines[k]);
+    left.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    right.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    return {left, right};
+}
+
+function hasAlignedGridColumns(rowA: ImageTextRegion[], rowB: ImageTextRegion[]): boolean {
+    if (rowA.length < 3 || rowB.length < 3) return false;
+    const matched = new Set<ImageTextRegion>();
+    let columns = 0;
+    for (const cellA of rowA) {
+        const match = rowB.find(cellB => cellB !== cellA && !matched.has(cellB) && alignedColumn(cellA, cellB));
+        if (match) {
+            matched.add(match);
+            if (++columns >= 3) return true;
+        }
+    }
+    return false;
+}
+
+function firstWordWidth(region: ImageTextRegion): number {
+    const trimmed = region.text.trim();
+    const width = region.bbox.x1 - region.bbox.x0;
+    const token = trimmed.split(/\s+/u)[0];
+    return startsEastAsianText(trimmed)
+        ? width / Array.from(trimmed).length
+        : width * (token.length / Math.max(1, trimmed.length));
+}
+
 /** 未合并区域保持原契约；合并区域只扩大排版范围，擦除仍使用逐行源框。 */
-function groupHorizontalParagraphs(input: ImageTextRegion[],physical:Set<ImageTextRegion>,continuations?:ImageParagraphContinuations): ImageTextRegion[] {
+function groupHorizontalParagraphs(input: ImageTextRegion[],physical:Set<ImageTextRegion>,continuations?:ImageParagraphContinuations,allowTabularVeto=true): ImageTextRegion[] {
     const lines = [...input].sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
     const lineSet=continuations?new Set(lines):undefined;
     const used = new Set<ImageTextRegion>();
     const result: ImageTextRegion[] = [];
     let obstructionIndex: ReturnType<typeof createObstructionIndex> | undefined;
+    const isTabularFormRow = (
+        previous: ImageTextRegion,
+        prevIdx: number,
+        next: ImageTextRegion,
+        nextIdx: number,
+        small: number,
+    ): boolean => {
+        const prevPeers = sameRowPeers(lines, prevIdx);
+        const nextPeers = sameRowPeers(lines, nextIdx);
+        const rightPrev = prevPeers.right[0], rightNext = nextPeers.right[0];
+        const leftPrev = prevPeers.left[prevPeers.left.length - 1], leftNext = nextPeers.left[nextPeers.left.length - 1];
+        const rightPair = rightPrev && rightNext && rightPrev !== rightNext && alignedColumn(rightPrev, rightNext)
+            ? [rightPrev, rightNext] as const : undefined;
+        const leftPair = leftPrev && leftNext && leftPrev !== leftNext && alignedColumn(leftPrev, leftNext)
+            ? [leftPrev, leftNext] as const : undefined;
+        if (!rightPair && !leftPair) return false;
+        const isolated = (region: ImageTextRegion) => Boolean(region.sourceBoxes && !physical.has(region));
+        for (const [peerPrev, peerNext] of [rightPair, leftPair].filter((pair): pair is readonly [ImageTextRegion, ImageTextRegion] => Boolean(pair))) {
+            if (isolated(peerPrev) || isolated(peerNext)) return true;
+        }
+        const rowPrev = [...prevPeers.left, previous, ...prevPeers.right];
+        const rowNext = [...nextPeers.left, next, ...nextPeers.right];
+        const colSpan = rightPair
+            ? rightPair[0].bbox.x0 - previous.bbox.x0
+            : previous.bbox.x0 - leftPair![0].bbox.x0;
+        const colLimitX = previous.bbox.x0 + colSpan;
+        const prevWidth = previous.bbox.x1 - previous.bbox.x0;
+        const wrapsColumn = prevWidth >= colSpan * 0.55
+            || previous.bbox.x1 + firstWordWidth(next) + small * 1.5 > colLimitX;
+        if (!wrapsColumn && hasAlignedGridColumns(rowPrev, rowNext)) return true;
+        if (!rightPair || wrapsColumn) return false;
+        const [peerPrev, peerNext] = rightPair;
+        const nextWidth = next.bbox.x1 - next.bbox.x0;
+        if (nextWidth >= colSpan * 0.55) return false;
+        // 右栏本身连续成段时保留双栏正文合并；仅当右栏不能成段时按表单行否决左栏合段。
+        if (!continues(peerPrev, metrics(peerPrev), peerNext, physical)) return true;
+        const peerBox = union(peerPrev.bbox, peerNext.bbox);
+        if (obstructionIndex) {
+            obstructionIndex.setIncluded(peerPrev, false);
+            obstructionIndex.setIncluded(peerNext, false);
+            const peerBlocked = obstructionIndex.intersects(peerBox);
+            obstructionIndex.setIncluded(peerPrev, true);
+            obstructionIndex.setIncluded(peerNext, true);
+            return peerBlocked;
+        }
+        return lines.some(other => other !== peerPrev && other !== peerNext
+            && other.bbox.x0 < peerBox.x1 && other.bbox.x1 > peerBox.x0
+            && other.bbox.y0 < peerBox.y1 && other.bbox.y1 > peerBox.y0);
+    };
     for (let index = 0; index < lines.length; index++) {
         const first = lines[index];
         if (used.has(first))
@@ -167,7 +266,7 @@ function groupHorizontalParagraphs(input: ImageTextRegion[],physical:Set<ImageTe
         used.add(first);
         const members = [first];
         const memberSet = lines.length < 64 ? new Set(members) : undefined;
-        let state = metrics(first), bbox = first.bbox;
+        let state = metrics(first), bbox = first.bbox, prevIdx = index;
         if (!first.vertical && (!first.sourceBoxes||physical.has(first))) {
             obstructionIndex?.setIncluded(first, false);
             for (let cursor = index + 1; cursor < lines.length; cursor++) {
@@ -200,12 +299,14 @@ function groupHorizontalParagraphs(input: ImageTextRegion[],physical:Set<ImageTe
                     : lines.some(other => other !== next && !memberSet!.has(other)
                     && other.bbox.x0 < mergedBox.x1 && other.bbox.x1 > mergedBox.x0
                     && other.bbox.y0 < mergedBox.y1 && other.bbox.y1 > mergedBox.y0);
-                if (obstructed) {
+                if (obstructed || (allowTabularVeto && !candidateBox
+                    && isTabularFormRow(previous, prevIdx, next, cursor, Math.min(state.minHeight, height(next))))) {
                     obstructionIndex?.setIncluded(next, true);
                     continue;
                 }
                 state = proposed;
                 bbox = mergedBox;
+                prevIdx = cursor;
                 used.add(next);
                 members.push(next);
                 memberSet?.add(next);
@@ -253,7 +354,7 @@ export function groupImageParagraphs(input: ImageTextRegion[],continuations?:Ima
         if(ruby.physical.has(line))projectedPhysical.add(candidate);
         return candidate;
     });
-    return groupHorizontalParagraphs(projected,projectedPhysical).map(line => originals.get(line) ?? {
+    return groupHorizontalParagraphs(projected,projectedPhysical,undefined,false).map(line => originals.get(line) ?? {
         ...line, bbox: restoreVerticalBox(line.bbox),
         sourceBoxes: line.sourceBoxes!.map(restoreVerticalBox), vertical: true as const, textAlign: 'center' as const,
     }).sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);

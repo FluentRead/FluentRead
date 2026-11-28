@@ -202,6 +202,10 @@ describe('video subtitle appearance contract', () => {
       '--fluent-read-video-subtitle-shadow': 'none',
       '--fluent-read-video-subtitle-backdrop-filter': 'none',
     });
+    expect(VIDEO_SUBTITLE_SKINS.find(item => item.id === 'minimal')?.shadow).toBe('none');
+    expect(getVideoSubtitleAppearanceCssVars({skin: 'minimal'})['--fluent-read-video-subtitle-shadow']).toBe('none');
+    expect(getVideoSubtitleAppearanceCssVars({skin: 'classic', backgroundOpacity: 0})['--fluent-read-video-subtitle-shadow']).toBe('none');
+    expect(getVideoSubtitleAppearanceCssVars({skin: 'classic', backgroundOpacity: 56})['--fluent-read-video-subtitle-shadow']).not.toBe('none');
     expect(normalizeVideoSubtitleAppearance({backgroundVisible: 'false'}).backgroundVisible).toBe(true);
     expect(normalizeVideoSubtitleAppearance({outlineStyle: 'invalid', outlineWidth: 99, outlineColor: 'url(javascript:alert(1))'}))
       .toMatchObject({outlineStyle: 'skin', outlineWidth: 4, outlineColor: '#000000'});
@@ -274,6 +278,33 @@ describe('video subtitle appearance contract', () => {
     expect(fitVideoSubtitleFontSize(32, 1, apply, () => applied * 3, 0)).toBe(8);
     expect(fitVideoSubtitleFontSize(13, 12.345, apply, () => applied, 12.345)).toBeGreaterThanOrEqual(12.345);
     expect(applied).toBeGreaterThanOrEqual(12.345);
+  });
+
+  it('字号适配在目标对象与几何签名一致时直接复用缓存，变化或测量失败时不误用旧值', () => {
+    const target = {};
+    let applied = 0;
+    const apply = vi.fn((size: number) => {applied = size;});
+    const measure = vi.fn(() => applied * 4 + 16);
+    const first = fitVideoSubtitleFontSize(100, 120, apply, measure, 8, {target, key: 'k1'});
+    expect(measure.mock.calls.length).toBeGreaterThan(1);
+    measure.mockClear(); apply.mockClear();
+    expect(fitVideoSubtitleFontSize(100, 120, apply, measure, 8, {target, key: 'k1'})).toBe(first);
+    expect(measure).not.toHaveBeenCalled();
+    expect(apply).toHaveBeenCalledExactlyOnceWith(first);
+    // 签名变化时重新测量；下界溢出与直接容纳分支均正确缓存。
+    expect(fitVideoSubtitleFontSize(100, 10, apply, measure, 12, {target, key: 'k2'})).toBe(12);
+    measure.mockClear();
+    expect(fitVideoSubtitleFontSize(100, 10, apply, measure, 12, {target, key: 'k2'})).toBe(12);
+    expect(measure).not.toHaveBeenCalled();
+    expect(fitVideoSubtitleFontSize(16, 500, apply, measure, 8, {target, key: 'k3'})).toBe(16);
+    measure.mockClear();
+    expect(fitVideoSubtitleFontSize(16, 500, apply, measure, 8, {target, key: 'k3'})).toBe(16);
+    expect(measure).not.toHaveBeenCalled();
+    // 测量返回 NaN 时不写入缓存，后续恢复有效测量可正常计算。
+    const flaky = vi.fn(() => Number.NaN);
+    expect(fitVideoSubtitleFontSize(100, 120, apply, flaky, 8, {target, key: 'k4'})).toBe(100);
+    expect(fitVideoSubtitleFontSize(100, 120, apply, measure, 8, {target, key: 'k4'})).toBe(first);
+    expect(measure).toHaveBeenCalled();
   });
 
 });

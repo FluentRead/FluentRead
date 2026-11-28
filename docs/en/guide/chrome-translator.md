@@ -1,21 +1,28 @@
 # Built-in browser translation
 
-FluentRead can translate on your device using the Translator API in desktop Chrome 138+ and Edge 148+. The first language pack download requires an internet connection. Once downloaded, the pack works offline. Availability depends on the browser version, device, language pair, and managed policies.
+FluentRead can use the native Translator API built into desktop **Chrome 138+** and **Edge 148+** to translate webpages directly on your device—no API key required, and offline after language packs download. Availability depends on browser version, device, language pair, and enterprise policies.
 
-Firefox provides on-device translation for pages and selected text through its browser menus. Its translation engine is currently unavailable to extensions. For offline translation in FluentRead on Firefox, choose “Local model translation”.
+<GuideVisual kind="chrome-local" en />
 
-## Prepare a language pack
+## Prepare & enable in 3 steps
 
-1. Open **Settings → Translation services → Built-in browser translation** to see the language pair and pack status.
-2. Click **Prepare language pack** to download the required models and verify the pair. If the pack is already downloaded, click **Check language pack**.
-3. When the status shows **Ready**, you can **Set as default** and return to the page to translate. When a new pair needs a language pack, follow the preparation prompt.
+1. Open **Settings → Translation providers → Built-in browser translation** to inspect the current language pair and pack status (older configs labeled “Chrome built-in AI translation” migrate automatically).
+2. Click **Prepare language pack** to download and verify the model for that language pair, or **Check language pack** if already installed.
+3. Once marked **Ready**, click **Set as default translation provider** and return to your webpage. Repeat when adding new language pairs.
 
-Existing “Chrome built-in AI translation” settings appear under “Built-in browser translation”.
+## Note for Firefox users
 
-## Check availability
+Firefox includes its own built-in on-device translation in the browser menu, but does not yet expose a translation API to extensions. To translate offline with FluentRead in Firefox, use [Built-in local models](/en/config/translation-engines#local-model-translation) or local Ollama.
 
-Settings indicates whether the browser exposes the API. If a pair is unavailable, check the browser’s language support, internet connection, and policies. You can also switch to another translation service.
+## Availability & browser diagnostics
 
-- [Chrome Translator API](https://developer.chrome.com/docs/ai/translator-api) · [Chrome model diagnostics](https://developer.chrome.com/docs/ai/debug-built-in-model)
+Settings immediately indicates whether your browser exposes the Translator API. If a language pair is unavailable, check browser version, initial download network, or managed policies—or switch to another provider anytime.
+
+- [Chrome Translator API](https://developer.chrome.com/docs/ai/translator-api) · [Debug Chrome built-in models](https://developer.chrome.com/docs/ai/debug-built-in-model)
 - [Microsoft Edge Translator API](https://learn.microsoft.com/microsoft-edge/web-platform/translator-api)
-- [Firefox on-device translation help](https://support.mozilla.org/kb/website-translation)
+- [Firefox local translation help](https://support.mozilla.org/kb/website-translation)
+
+## Related guides
+
+- [Translation providers & local models](/en/config/translation-engines)
+- [Privacy policy](/en/guide/privacy)

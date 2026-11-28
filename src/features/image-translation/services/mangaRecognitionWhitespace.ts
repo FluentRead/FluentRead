@@ -14,7 +14,7 @@
  * 浅中性底彩字：在其他投影未发现词界且外周仍有底色候选时，复用紧裁三层投影。主导浅底与高对比彩墨须解释全裁图颜色，完整空列仍须和原 CTC 对齐。单独计费，保持其他底色的观察额度。
  * 彩底重叠字形：其他颜色投影没有词界时，最多在65536像素的单个裁图核对三层二维字形。强颜色变化、公共完整空列与更高的原模型空格分数同时通过才恢复词界，整页另计扫描、组件和模型时间步。
  * 紧裁彩字的单层投影：墨迹触及上下边缘时，断掉的横笔可能留下假的空列。已有空格与独立空列吻合时，借同一行的模型帧距离排除偏短的新增候选。
- * 浅有色底紧裁衬线：仅当最大的原底色间隙明显比其他空隙宽，并被同帧相邻字符和强空格峰共同确认时恢复单个词间空格。
+ * 浅有色底紧裁衬线：仅当最大的原底色间隙明显比其他空隙宽，并被同帧相邻字符和强空格峰共同确认时恢复单个词间空格；四种紧裁配色路径共享单次 4096 色直方图预筛，CTC 扫描避免每步临时数组分配。
  * 模块边界：只给锁定的 per-box、原比例 SDK 路径提供可选文字后处理，不导入 SDK 私有解码器，不修改概率或原像素；
  * CTC 横坐标只是空间候选，不是字形或擦除边界，物理空隙仍不能证明作者的语义空格，真实异常由调用方保留首因。
  */
@@ -89,6 +89,44 @@ interface Scope {
     pending?:{input:object;indices:number[];widths:number[];width:number};
 }
 
+interface TightPaletteFlags {dark:boolean;lightColor:boolean;connectedColor:boolean;tintedGap:boolean}
+
+/** 单次构建最多 4096 色直方图，跨四种紧裁配色路径复用主导底色判断，避免重复扫图。 */
+function inspectTightPaletteFlags(data:Uint8ClampedArray,width:number):TightPaletteFlags|undefined {
+    const colors=new Map<number,number>();
+    for(let p=0;p<data.length;p+=4){
+        if(data[p+3]!==255)return;
+        const key=data[p]|data[p+1]<<8|data[p+2]<<16;
+        colors.set(key,(colors.get(key)??0)+1);
+        if(colors.size>4096)return;
+    }
+    const minCount=width*48*.2;
+    let darkCount=0,darkAmbiguous=false,lightCount=0,lightAmbiguous=false,overallKey=0,overallCount=0,overallAmbiguous=false;
+    for(const [key,count]of colors){
+        const r=key&255,g=key>>>8&255,b=key>>>16&255;
+        const maximum=Math.max(r,g,b),minimum=Math.min(r,g,b);
+        if(maximum<=64){
+            if(count>darkCount){darkCount=count;darkAmbiguous=false;}
+            else if(count===darkCount)darkAmbiguous=true;
+        }
+        if(isMangaRecognitionLightNeutral(maximum,minimum)){
+            if(count>lightCount){lightCount=count;lightAmbiguous=false;}
+            else if(count===lightCount)lightAmbiguous=true;
+        }
+        if(count>overallCount){overallKey=key;overallCount=count;overallAmbiguous=false;}
+        else if(count===overallCount)overallAmbiguous=true;
+    }
+    const hasOverall=!overallAmbiguous&&overallCount>=minCount;
+    const or=overallKey&255,og=overallKey>>>8&255,ob=overallKey>>>16&255;
+    const oMax=Math.max(or,og,ob),oMin=Math.min(or,og,ob);
+    return {
+        dark:!darkAmbiguous&&darkCount>=minCount,
+        lightColor:!lightAmbiguous&&lightCount>=minCount,
+        connectedColor:hasOverall&&isMangaRecognitionMidColor(oMax,oMin),
+        tintedGap:hasOverall&&isMangaRecognitionLightTint(oMax,oMin),
+    };
+}
+
 /** 同宽同内容也不能替代原索引；所有可选状态只属于当前串行 run。 */
 export function createMangaRecognitionWhitespace(){
     const limits=MANGA_RECOGNITION_WHITESPACE_LIMITS;
@@ -131,8 +169,15 @@ export function createMangaRecognitionWhitespace(){
         if(invalidBorder)return;
         const tightProjection=():Projection|undefined=>{
             if(flatBorder)return;
-            const cost=width*48*2;
-            if(darkPixels+cost<=limits.darkPixels){
+            const cost=width*48*2,area=width*48,connectedCost=area*5;
+            const canDark=darkPixels+cost<=limits.darkPixels;
+            const canLight=lightBorder>=6&&lightColorPixels+cost<=limits.lightColorPixels;
+            const canConnected=midColorBorder>=6&&area<=MAX_CONNECTED_RECOGNITION_PIXELS&&connectedColorPixels+connectedCost<=limits.connectedColorPixels;
+            const canTinted=tintedBorder>=6&&clippedTintedPixels+cost<=limits.clippedTintedPixels;
+            if(!canDark&&!canLight&&!canConnected&&!canTinted)return;
+            const palette=inspectTightPaletteFlags(data,width);
+            if(!palette)return;
+            if(canDark&&palette.dark){
                 darkPixels+=cost;
                 const budget={remaining:limits.darkRuns-darkRuns};
                 const projection=observeMangaRecognitionDarkProjection(data,width,budget);
@@ -140,7 +185,7 @@ export function createMangaRecognitionWhitespace(){
                 if(projection)return{width,...projection,dark:true};
             }
             // 三列完整浅底空隙至少需要在上下边缘各留下三点相同底色。
-            if(lightBorder>=6&&lightColorPixels+cost<=limits.lightColorPixels){
+            if(canLight&&palette.lightColor){
                 lightColorPixels+=cost;
                 const budget={remaining:limits.lightColorRuns-lightColorRuns};
                 const projection=observeMangaRecognitionLightColorProjection(data,width,budget);
@@ -148,15 +193,14 @@ export function createMangaRecognitionWhitespace(){
                 if(projection)return{width,...projection,lightColor:true};
             }
             // 两次颜色观察与三次连通遍历都预付，失败也不退回页预算。
-            const area=width*48,connectedCost=area*5;
-            if(midColorBorder>=6&&area<=MAX_CONNECTED_RECOGNITION_PIXELS&&connectedColorPixels+connectedCost<=limits.connectedColorPixels){
+            if(canConnected&&palette.connectedColor){
                 connectedColorPixels+=connectedCost;
                 const budget={remaining:limits.connectedColorRuns-connectedColorRuns};
                 const projection=observeMangaRecognitionConnectedColorProjection(data,width,budget);
                 connectedColorRuns=limits.connectedColorRuns-budget.remaining;
                 if(projection)return{width,...projection,connectedColor:true};
             }
-            if(tintedBorder<6||clippedTintedPixels+cost>limits.clippedTintedPixels)return;
+            if(!canTinted||!palette.tintedGap)return;
             clippedTintedPixels+=cost;
             const budget={remaining:limits.clippedTintedRuns-clippedTintedRuns};
             const gap=observeMangaRecognitionClippedTintedGap(data,width,budget);
@@ -234,8 +278,8 @@ export function createMangaRecognitionWhitespace(){
         const sdkValid=Math.max(1,Math.min(T,Math.ceil(T*(width/paddedWidth)))),scanLength=Math.max(valid,sdkValid);
         for(let t=0;t<scanLength;t++){
             const base=(row*T+t)*C,blank=data[base],space=data[base+C-1];let max=blank,index=0;
-            for(let c=1;c<C;c++)if(data[base+c]>max){max=data[base+c];index=c;}
-            if(![blank,space,max].every(Number.isFinite))return;
+            for(let c=1;c<C;c++){const value=data[base+c];if(value>max){max=value;index=c;}}
+            if(!Number.isFinite(blank)||!Number.isFinite(space)||!Number.isFinite(max))return;
             indices[t]=index;spaces[t]=space;
         }
         return{indices,spaces,paddedWidth,valid};

@@ -1,174 +1,145 @@
 # Document translation
 
-Import a file, read it alongside its translation, edit passages, and download the result.
+Import PDF, EPUB, Word, Markdown, spreadsheets, and subtitle files directly in your browser to read side-by-side translations, edit results, annotate PDFs, and export formatted bilingual or translated files.
 
 <GuideVisual kind="document" en />
 
-## Open your file
+<DocDiagram kind="document-workflow" en />
 
-Choose **Document translation** in the extension menu, then drop a file onto the page or use the file picker. Without a file, expand **No file yet? Try a sample**. Samples also wait for you to start translation.
+## Supported formats & importing
 
-For an online PDF, choose **Open PDF reader** from the extension menu or paste its direct link on the document start page. FluentRead opens the original in its own reader. If a link requires a login and cannot be opened, download the file first and import it.
+Open **Document translation** from the extension menu, then drop a file or pick one from disk. No file handy? Expand **No file? Try a sample** (samples still require clicking **Start translation**).
 
-Supported formats are PDF, ePub, Word DOCX, HTML, TXT, Markdown, JSON, CSV, TSV, and SRT, VTT, ASS, SSA, or LRC subtitles. The limit is **50 MB for a PDF** and **10 MB for other formats**. Convert older `.doc` files to `.docx` first.
+| Category | Formats | Limits & notes |
+| --- | --- | --- |
+| **PDF papers & books** | `.pdf` | Up to **50 MB**; open online PDFs via **Open PDF reader** in the menu or paste a public PDF URL (download login-walled PDFs first) |
+| **eBooks & Office** | `.epub`, `.docx` | Up to **10 MB**; save legacy `.doc` files as `.docx` first |
+| **Web & plain text** | `.html`, `.md`, `.txt` | Up to **10 MB**; supports UTF-8 and UTF-16 with BOM (exported as UTF-8) |
+| **Structured tables** | `.json`, `.csv`, `.tsv` | Up to **10 MB**; choose specific columns to translate in CSV/TSV |
+| **Subtitle files** | `.srt`, `.vtt`, `.ass`, `.ssa`, `.lrc` | Up to **10 MB**; preserves timestamps and styling tags |
 
-Text imports support UTF-8 and UTF-16 files with a byte order mark. Text exports use UTF-8. If you get an encoding error, save the source file as UTF-8 and import it again.
+You can also reopen **saved webpage articles** from Document History right where you left off, with existing translations and edits preserved; click **View original webpage** under the title to visit the source URL.
 
-## Read saved webpage articles
+## Translating, reading & session control
 
-Open a saved webpage article from document history to resume reading and see the saved translations and edits. **View original webpage** under the workbench title opens the source URL.
+1. Choose your **Translation provider** and **Target language** (plus model for AI providers) at the top; set **Source language & glossary** in the sidebar.
+2. Check the preview and click **Start translation**. Paragraphs near your current reading position translate first and appear progressively.
+3. Switch between **Original / Bilingual / Translation** anytime:
+   - Use **Files** to switch documents and **Outline** to jump chapters.
+   - Click **Focus reading** to hide surrounding chrome (`Esc` exits). Zoom previews via the toolbar, pinch, `Ctrl`+wheel, or `Ctrl/Cmd + / − / 0`.
+   - **CSV / TSV columns:** Pick which columns to translate under **Columns to translate** (numbers, formulas, and URLs stay untouched; bilingual exports separate original and translation with a newline inside each cell).
 
-## Translate and read
+### Pause, retry & switch providers
 
-1. Choose the **translation service**, **target language**, and a model for AI services in the toolbar. Set the source language and glossary in the sidebar; narrow windows use **Translation settings**.
-2. Check the file, then start translation.
-3. Switch between original, bilingual, and translated views. Translation starts near your current reading position and completed passages appear as they arrive.
+- **Pause & resume:** **Pause translation** keeps completed paragraphs and edits; **Resume** or **Retry** processes only remaining items.
+- **Rate limits & switching providers:** Rate-limited providers wait and retry automatically. Pause before switching providers or models so existing results stay intact while remaining paragraphs use the new provider.
+- **Changing language/glossary:** Prompts before **Translate again**, which replaces existing translations and edits—download first if you want to keep an earlier version.
 
-For CSV and TSV, use **Columns to translate** to choose which cells to translate, including the first row. Empty cells, numbers, formulas, and links retain their source values. Switching columns keeps existing translations. With the same language and glossary settings, retranslating replaces translations only in the selected columns. Downloads apply the current selection, and bilingual exports put the source and translation on separate lines inside the same cell.
+## PDF dual reading modes & annotations {#what-are-the-limits-for-pdfs}
 
-Use **Files** in the sidebar to switch documents and **Outline** to jump to chapters. Detected PDF bylines, affiliations, and contact details appear on the page itself. **Focus reading** hides surrounding controls; Esc exits. Zoom with the toolbar, a trackpad pinch, or Ctrl with the mouse wheel. After clicking the document, **Ctrl/Cmd +, −, and 0** also work. Zoom affects only the reading preview.
+### Original layout vs. Reflow reading
 
-### Pause, retry, or change services
+| Capability | Original layout (default) | Reflow reading |
+| --- | --- | --- |
+| **Layout** | Side-by-side mirror preserving page positions, formulas, figures, author blocks, and numeric cells | Single-column flowing paragraphs (works on untranslated originals too) |
+| **Best for** | Academic papers, figure-heavy pages, exact page-number alignment | Narrow windows, split screens, and long reading sessions |
+| **Long text & themes** | Hover or click the book icon for **Full paragraph**; supports Paper / Mint / Dark / Custom colors & **Smart invert** | Customize font size, family, line height, spacing, and color themes while keeping figures full-color |
+| **Search & selection** | Copy, search, and run selection translation directly on original pages | Full-text search and paragraph-level annotations |
 
-**Pause translation** preserves completed translations and edits. Continue, or choose **Retry** after a failure, to process unfinished passages.
-
-Temporary outages and rate limits show a reason and retry automatically; you can pause while waiting. To change a service or model, pause, make the change, and continue. Changing the active service or model from another page also pauses the old task. Existing results remain and the new service handles the remainder.
-
-Changing languages, glossary settings, or some connection parameters requires a fresh translation. Confirming **Retranslate** replaces existing translations and manual edits, so download the current version first if needed. Expand **Details** to inspect an error.
-
-## Edit and download
-
-1. Open proofreading, search for a sentence or filter untranslated passages, and edit the translation directly.
-2. Open **Download**, choose **Bilingual** or **Translation only**, then use the download button below. Your edits are included.
-
-The selected version is independent of the reading view. Partial downloads require confirmation. Passages without a translation, including cleared translations, retain their source text. Changing settings alone does not retranslate the file; downloads use the results currently kept.
-
-EPUB exports reuse translated chapter headings, including your edits, in the reader’s table of contents. **Bilingual** shows the heading translation after the original label. **Translation only** shows the heading translation by itself. An entry keeps its existing label if it points to an untranslated heading or cannot be matched to a heading.
-
-Word exports preserve hyperlinks and character formatting such as bold and italics in ordinary paragraphs. Keep formatting markers such as `<g1>…</g1>` when editing translations. Paragraphs containing fields, drawings, or incomplete formatting markers keep their original content and place the translation immediately after it.
-
-The panel opens beside the toolbar. PDF versions include a small layout illustration. Expand **PDF layout** to choose **Original** or **Reflow** without changing the reading view. If generation fails, your translation and edits are kept. Use **Retry download**, or expand **Technical details** to inspect the cause.
-
-**Download original** saves the opened source file without translating it first. You can cancel and retry ePub, DOCX, PDF, or batch ZIP generation without losing translations or edits.
-
-::: tip Continue after a refresh
-Documents, translations, and edits are stored in this browser. Continue after refreshing or restore an earlier file from **Recent translations**. Clearing browser data can remove them; download files you want to keep or share.
+::: info Browser built-in PDF viewer selection
+In your browser’s built-in PDF viewer, you can also select text and right-click **Translate selected text** (up to 4,096 characters in a standalone popup window) when selection translation and its context menu are enabled.
 :::
 
-## PDF limits
+### Local annotations & exporting annotated PDFs
 
-PDFs default to **Original layout**. Bilingual pages appear side by side, translated paragraphs follow the source positions, and formulas, figures, and numeric table cells keep their original appearance. Zoom scales the whole page, preserving line breaks and paragraph positions. Hover over a long passage or use the book button beside it to read the full paragraph. Choose **Reflowed text** for complete paragraphs in a reading layout. The toolbar offers search across both texts and translation styling.
+- Select text on a page (or paragraph in Reflow mode) to highlight, underline, or save a **Note** (up to **1,000 annotations** per document, stored with local history).
+- Open **Annotations** in the toolbar to browse, jump, edit, or delete entries.
+- Click **Export PDF** to save a copy with standard PDF annotations embedded (encrypted or damaged PDFs may not export).
 
-**Reflowed text** also works before translation. Bilingual reflow places each source paragraph and its translation in one responsive column. **Reading appearance** controls text size, font, line and paragraph spacing, sepia, mint, dark and custom text/background colors. Reflow preserves figure colors. Image-only pages keep their original image until text recognition is available. Original layout also supports sepia, mint, dark, custom colors and **Smart inversion** while preserving the colors of identified figures. Scanned page images and exceptionally dense vector graphics keep their original appearance. Appearance preferences stay on this device and do not change exported layouts.
+### Hypothesis collaborative annotations
 
-Open **Annotations** in the reader toolbar to see saved notes, excerpts, and page numbers. Select an entry to close the list and jump to the marked location or its page in reflow mode. Select text on one original page or within one reflow paragraph to highlight or underline it. Reflow annotations mark the entire corresponding paragraph in the original PDF. To write a note, open **Note**, choose a mark style, and select **Save annotation**. You can include the translation once it is ready for a selection within one paragraph. Reopen the panel to continue a draft on the same selection. Use **More actions** next to a saved annotation to read the full note, edit it, or delete the mark. Document history stores up to 1,000 annotations per document.
+Choose **Annotations → Hypothesis collaborative annotations** inside FluentRead’s PDF reader to toggle the official sidebar:
 
-**Export PDF** in the annotation panel saves a copy of the original PDF with standard annotations and preserves existing marks. You can also save this copy if history is unavailable or a save conflict occurs. Encrypted or damaged PDFs may fail to export.
+- Sends only the PDF fingerprint, title, selected text, and annotations to Hypothesis—never uploads the PDF file, local paths, LAN URLs, or query-string download URLs, and FluentRead never handles your Hypothesis login token.
+- Temporarily pauses while translating and resumes afterward; provides official proxy and local-PDF fallback links if connection fails.
 
-In the FluentRead PDF reader, choose **Annotations → Hypothesis annotations** to open or close the official sidebar. You can cancel a connection in progress.
+## Scanned PDF OCR & text correction
 
-Activation connects to the official service and shares document identity and selected text. The official origin handles login; FluentRead does not receive login tokens or upload the PDF. Original PDFs use the standard fingerprint. Local paths, recognized local hosts and download URLs with query parameters are withheld. Reflow and translated views save annotations against their own text view, keeping incompatible text offsets separate. The sidebar pauses during translation and resumes when it finishes. Starting collaboration in a translated-only fixed layout switches to reflow.
+Scanned PDFs or mixed scanned pages are handled automatically:
 
-Collaborative annotations belong to your Hypothesis account. The selection translation card leaves room for the Hypothesis toolbar. If the sidebar cannot connect, **Other ways to open** offers the [official proxy](https://web.hypothes.is/help/what-is-the-via-proxy/) or [local PDF guide](https://web.hypothes.is/help/annotating-locally-saved-pdfs/).
-
-Proofreading, full-passage comparisons, outline titles, and search terms each follow their own text direction, while the source and translation columns keep their order.
-
-Scanned PDFs and scanned pages within text PDFs are supported. Starting translation first recognizes text from the current page, then translates it. Missing recognition packs download automatically, so check the source language first. After recognition, you can select and copy text over the source image. Text positions are estimated from recognition; use the image when checking accuracy. Recognition, formulas, and technical terms can still be wrong; review important passages.
-
-For scanned papers, recognition uses higher-resolution page images and automatic column detection. Completed pages are saved as recognition proceeds. After pausing or a failure, continuation recognizes only the remaining scanned pages and keeps existing translations and edits. Pages with no recognized text remain available for retry and do not count as fully translated.
-
-Numeric superscripts and subscripts are checked using enlarged crops and their positions on the original page. Confirmed scientific notation and numeric subscripts are kept unchanged during translation. If a candidate cannot be confirmed, **Check original** opens the source page with dashed markers. This check does not guarantee that every formula or symbol is correct.
-
-After recognition, choose **Correct recognized text** in document settings to compare each line with the scan. You can also open the matching passage from the translation editor. Saving clears only the translations whose source text changed; previous translations remain available in saved revisions. **Restore recognition** undoes the source correction and keeps the manual source text in saved revisions.
-
-Choose **Recognize this page again** to reread only the current page without starting translation. Matching manual corrections are kept; edits that cannot be matched remain in saved revisions. The original PDF file stays unchanged.
-
-Numbers with low word confidence but complete matching glyph evidence retain their original reading with a review marker, instead of being silently dropped. These candidates can still contain misread or missing symbols; compare important values with the source image.
-
-Low-confidence Chinese characters receive two context reads at smaller scales. Automatic correction requires matching high-confidence results and changes confined to the original low-confidence Chinese character positions. Numbers, punctuation, and other text are kept. Unconfirmed readings remain marked for review; low-quality scans can still need manual correction. Small letter scripts misread as trademark and quote clusters are marked for review when their position provides evidence; they are not guessed as digits.
-
-Scanned list bullets are checked against their original shape and repeated indentation. Confirmed items are translated separately, and selecting the source keeps the bullets. Uncertain markers remain flagged for review; ordinary letters are not automatically treated as list symbols.
-
-Scanned diagrams stay as original images when their boundaries can be identified; captions remain translatable. Tables with clear rules and text cells receive a separate recognition pass to fill omissions. Borderless tables with a separate caption, aligned columns, and repeated numeric columns are also organized into cells and read after the preceding body columns. No rules are drawn on the source image. Text is translated within each cell, while numeric cells stay unchanged. Conflicting readings keep the first result and show a review marker. Full-passage controls and continuation pages keep long translations available.
-
-If extracted PDF text contains anomalous characters, a notice asks you to check it against the original. The notice does not repair characters or change the source or translation.
-
-You can select, copy, and translate original-page text. Selection uses your separate selection translation service; the whole document uses the document service. In the browser's own PDF viewer, select text and choose **Translate selected text** from the context menu to open a separate result window. Enable selection translation and its context-menu entry first. The limit is 4096 characters per selection.
+1. Verify the source language and click **Start translation**—FluentRead runs OCR from the current page onward (downloading missing OCR packs as needed) and then translates.
+2. Progress is saved page by page; after OCR finishes, you can select and copy recognized text directly over the scanned page.
+3. If OCR misreads text, open **Correct recognized text** in document settings to edit line by line (only modified paragraphs invalidate their translations), or choose **Re-recognize current page**.
 
 <details class="guide-details">
-<summary>PDF exports, long passages, and retained edits</summary>
+<summary>Scanned PDF verification & special layout handling</summary>
 
-Original-layout downloads keep the source-page order. Bilingual output places each source page beside its translation; translation-only output keeps translated pages. Long passages retain a full PDF comment and continue on extra text pages after their matching source page, so the exported file can have more pages. Translated text can be searched, selected, and copied.
+- **Superscripts, subscripts & numbers:** Numeric indices in scanned papers are zoomed and re-verified locally; unverified regions show dashed **Check original** markers. Low-confidence digits with solid glyph evidence keep their reading with a verification mark.
+- **Low-confidence CJK & bullet lists:** Low-confidence Chinese characters are double-checked at two downscales and auto-corrected only when both high-confidence passes agree; bullet symbols are verified by shape and indentation.
+- **Figures & tables:** Verified diagrams stay intact with translated captions; bordered tables and well-aligned borderless numeric tables are structured cell-by-cell while leaving pure numbers untouched.
+- **Native PDF details:** Double-stroked bold/shadow text counts once; text above formulas separates cleanly from tall integral/summation signs; text cards stay within their boxes.
 
-Downloading one document in **Reflowed text** uses fixed-size text with automatic page breaks. Bilingual output follows each source page with its translation. Figures and formulas stay together where possible; use Original layout when exact original glyphs matter. The first reflowed export prepares a font of about 5 MB online, then reuses it locally. Font requests contain no document text, translations, or credentials. Uncommon glyphs may depend on local fonts. Batch exports use Original layout.
+</details>
 
-Identical text painted again in place for bold or shadow effects is counted once in the analyzed source and translation input. Adjacent repeated words, different text, and partial overlaps are retained. Original-page pixels are unchanged.
+## Editing & downloading results {#edit-and-download}
 
-Explanatory text above a formula is separated from raised integral and summation symbols so it is not skipped as part of the formula. Table boundaries and original-page glyphs remain unchanged.
+1. Click **Edit translations** to search passages or filter untranslated segments and edit directly—edits are written into downloads.
+2. Click **Download**, select **Bilingual** or **Translation only**, and click the primary download button (**Download original** saves the source anytime).
+3. Partial documents require confirming **Download current results** (untranslated segments keep their originals). Downloads can be canceled cleanly without losing edits.
 
-Letter-spaced section names such as Abstract and References are identified with supporting body text and kept separate from nearby tables. Original letter spacing is preserved. Sparse textbook callouts with a heading and a list remain translatable text; a section heading with a vertical separator above the frame stays separate from the figure.
+| Format | Export preservation |
+| --- | --- |
+| **PDF** | Choose **Original layout** (side-by-side pages, overflow continuation pages with jump-back footers, translated bookmarks) or **Reflow layout** (fixed-size flowing pages; caches a ~5 MB open-license font on first use) |
+| **EPUB** | Preserves chapters, images, links, and styles, and syncs translated/edited chapter titles into the reader TOC |
+| **DOCX (Word)** | Preserves links, bold/italic styles, and tables in normal paragraphs; keep `<g1>…</g1>` format tags when editing |
+| **Markdown / HTML** | Preserves GFM tables, links, and code blocks; merges soft line wraps before translating |
+| **Subtitles / CSV / JSON** | Keeps cue numbers and timestamps; writes back chosen CSV/TSV columns; preserves JSON structure (up to 1,000 levels deep) |
 
-After a PDF is parsed again, edits are restored only when the source text and position can be identified safely. Other edits remain available to read and copy under retained revisions in proofreading. Clearly connected page fragments offer an optional cross-page context view; source passages and edits are not merged automatically.
+::: tip Local history & persistence
+Files, translations, and edits stay in browser IndexedDB (up to 20 documents / 80 MiB total original size) so you can resume from **Recent translations**. Cross-tab edits never silently overwrite newer work; download important documents before clearing browser data.
+:::
+
+<details class="guide-details">
+<summary>PDF overflow pages, cross-page context & recovery</summary>
+
+- In Original layout exports, translations that exceed the original box are placed on continuation pages immediately after the source page, with jump-back footers and full text searchability.
+- Existing bookmarks or detected headings update automatically to match translated titles and new page numbers.
+- If a PDF is re-parsed, unmatched manual edits are preserved under **Edit translations → Preserved previous edits**; adjacent pages can be compared via **Cross-page context**.
 
 </details>
 
 <details class="guide-details">
-<summary>Other formats, terminology, and AI context references</summary>
+<summary>Multi-segment batching, subtitle neighbor context & AI document context</summary>
 
-Markdown, HTML, and ePub aim to retain links, emphasis, and inline code. URLs, email addresses, code blocks, and program identifiers remain unchanged. If formatting cannot be preserved, retry or change services. JSON keeps its structure and non-text values; nesting beyond 1000 levels is unsupported. Word tables remain tables, and ePub downloads retain chapters, images, links, and styles.
-
-GitHub Flavored Markdown tables are translated one cell at a time. The reading view and downloads retain rows, columns, and alignment. Bilingual mode shows both texts in the same cell.
-
-Soft line breaks inside ordinary Markdown paragraphs are joined for translation. Blank lines still separate paragraphs, and headings, lists, quotes, and explicit line breaks keep their boundaries. Bilingual exports retain the original line breaks.
-
-Subtitle exports retain numbering, timing, and formatting tags. Translation-only output replaces the cue text; bilingual output keeps both texts in each cue. Fixed-width wrapped text is joined into paragraphs, while headings and lists stay separate where possible.
-
-**Translate multiple passages together** is enabled by default to reduce small requests. Disable it in the current document's settings without changing webpage settings. Format protection does not guarantee accurate or complete translation. Use a glossary for consistent terminology and review key passages.
-
-### Context references
-
-With **AI enhanced translation** enabled for an AI service that supports general prompts, translation can use current-chapter definitions, nearby source text, and completed translations. Edits confirmed in the current reading session take priority over machine references; your glossary has the highest priority.
-
-This mode processes passages one by one and can be slower. References cover a limited range and cannot guarantee that every ambiguity is resolved. Maintaining context makes no extra model calls and does not persist across documents.
+- **Multi-segment translation** is enabled by default to reduce small requests and can be toggled per document.
+- **Subtitle neighbor context:** Prompt-capable AI providers translating SRT/VTT/ASS automatically see up to 6 cues before and after (capped at 1,200 chars) for natural phrasing while preserving per-cue timestamps.
+- **AI document context:** When **AI refined translation** is enabled, each paragraph references chapter definitions, nearby originals, and completed translations (manual edits override machine context; glossaries take highest priority).
 
 </details>
 
 <details class="guide-details">
-<summary>Save a material and resume reading</summary>
+<summary>Save as learning material, batch queue & Obsidian integration</summary>
 
-## Save a material and resume reading
+### Save materials & resume reading {#save-materials-and-keep-reading}
 
-Choose **Add to learning materials** to keep the document with your saved expressions, questions, and notes. For an existing material, update the reading position. Continuing from the Learning Center returns to the saved passage. Materials and positions stay in this browser.
+Click **Add to learning materials** (or **Update reading position**) to organize saved quotes, notes, and location in [Learning Center](/en/guide/vocabulary-book). Re-selecting the same file restores your position even after local cleanup.
 
-If the local source has been cleared, select the same file again. A different file with the same name does not overwrite the old material. If the reader cannot identify the passage, it keeps the old location and asks you to save a new one. Older materials may restore only a page or chapter, so check the position. Scrolling manually stops automatic positioning.
+### Batch translation {#batch-translation}
 
-</details>
+Drop multiple files or use **Files → Add files**, then click **Translate remaining files** to process sequentially. Single failures never halt the queue; export completed items together via **Download completed files (ZIP)**.
 
-<details class="guide-details">
-<summary>Batch translation</summary>
+### Translate inside Obsidian {#translate-in-obsidian}
 
-## Batch translation
-
-Drop several files together or use **Files → Add files** in the sidebar. Confirm the service and language, then translate the remaining files in order. One file's failure does not stop the others; **Pause all** preserves completed work.
-
-Once the queue stops, read, edit, or download individual files. **Download completed files (ZIP)** includes completed documents only, with separate numbered folders for duplicate names. Changed settings require a separate restart confirmation for each partially translated file. Removing undownloaded results also asks for confirmation.
+Follow the [experimental Obsidian desktop plugin](https://github.com/FluentRead/FluentRead/tree/main/integrations/obsidian) guide to translate Markdown and text-layer PDFs into adjacent bilingual Markdown notes (currently uses Microsoft Translator without overwriting originals).
 
 </details>
 
-<details class="guide-details">
-<summary>Translate in Obsidian</summary>
+## Are my files uploaded?
 
-## Translate in Obsidian
-
-Follow the directory instructions to build and install the [experimental Obsidian desktop plugin](https://github.com/FluentRead/FluentRead/tree/main/integrations/obsidian). Translate Markdown notes or text-based PDFs from the command palette or file context menu. It saves a sibling bilingual Markdown note without overwriting the source. This plugin currently sends text to Microsoft Translator; PDF output does not retain the original layout.
-
-</details>
-
-## Does the file leave my computer?
-
-The browser parses files locally. Text to translate goes to your selected service. With a cloud service, the relevant text leaves your device. See [Data & privacy](/en/guide/privacy).
+Files are parsed and exported locally in your browser; only the text to be translated is sent to your chosen provider. See [Privacy policy](/en/guide/privacy).
 
 ## Related guides
 
-- [All guides](/en/docs/)
-- [Troubleshooting](/en/guide/faq)
+- [Glossaries (with paper term extraction)](/en/guide/glossary)
+- [Translation providers](/en/config/translation-engines)
+- [Troubleshooting & FAQ](/en/guide/faq)

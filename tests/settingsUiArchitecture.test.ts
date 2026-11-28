@@ -43,52 +43,6 @@ function settingsGroupTitles(content: string): string[] {
     .map((match) => match[1])
 }
 
-function minimalPopupSpacing(viewportWidth: number, skin: string, dark: boolean, footerLast: boolean) {
-  const { document } = parseHTML(`<html data-interface-skin="${skin}" class="${dark ? 'dark' : ''}">
-    <head><style>${source('src/ui/styles/interface-skins/minimal.css')}</style></head>
-    <body><main class="popup-shell"><div class="popup-content">
-      <footer data-popup-module-last="${footerLast}"></footer>
-    </div></main></body></html>`)
-  const rules = document.querySelector('style')!.sheet!.cssRules
-
-  // 解析真实 CSS 的像素间距与媒体覆盖，不模拟浏览器布局；渲染后的边界另由生产 UI 套件验证。
-  function spacingFor(selector: string) {
-    const element = document.querySelector(selector)!
-    const spacing = { 'padding-left': 0, 'padding-right': 0, 'margin-left': 0, 'margin-right': 0 }
-    function applyRules(cssRules: CSSRuleList) {
-      for (const rule of Array.from(cssRules)) {
-        if (rule.type === 4) {
-          const media = rule as CSSMediaRule
-          const maxWidth = media.conditionText.match(/^\(max-width:\s*(\d+)px\)$/u)
-          if (!maxWidth) throw new Error(`Unsupported spacing media query: ${media.conditionText}`)
-          if (viewportWidth <= Number(maxWidth[1])) applyRules(media.cssRules)
-          continue
-        }
-        if (rule.type !== 1) continue
-        const styleRule = rule as CSSStyleRule
-        if (!element.matches(styleRule.selectorText)) continue
-        for (let index = 0; index < styleRule.style.length; index += 1) {
-          const property = styleRule.style[index]
-          if (!(property in spacing) && property !== 'padding' && property !== 'margin') continue
-          const values = styleRule.style.getPropertyValue(property).trim().split(/\s+/u).map(value => {
-            if (!/^(?:-?\d+(?:\.\d+)?px|0)$/u.test(value)) throw new Error(`Unsupported spacing: ${value}`)
-            return Number.parseFloat(value)
-          })
-          if (property === 'padding' || property === 'margin') {
-            spacing[`${property}-left`] = values[3] ?? values[1] ?? values[0]
-            spacing[`${property}-right`] = values[1] ?? values[0]
-          } else {
-            spacing[property as keyof typeof spacing] = values[0]
-          }
-        }
-      }
-    }
-    applyRules(rules)
-    return spacing
-  }
-  return { shell: spacingFor('.popup-shell'), footer: spacingFor('footer') }
-}
-
 describe('options UI composition architecture', () => {
   it('keeps persistent all-node recognition in webpage translation strategy using the shared config and localized switch', () => {
     const sections = source('src/features/settings/ui/SettingsSections.vue')
@@ -100,32 +54,6 @@ describe('options UI composition architecture', () => {
     expect(translation).toContain(':aria-label="t(\'settings.pageRecognition.allNodes\')"')
     expect(sections.match(/v-model="config\.translationScope"/gu)).toHaveLength(1)
     expect(source('src/app/popup/PopupApp.vue')).not.toContain('translationScope')
-  })
-
-  it.each([380, 400, 420, 421, 900])('keeps the minimal last footer inside its shell at a %ipx viewport', viewportWidth => {
-    for (const dark of [false, true]) {
-      const { shell, footer } = minimalPopupSpacing(viewportWidth, 'minimal', dark, true)
-      const shellWidth = 380
-      const left = shell['padding-left'] + footer['margin-left']
-      const right = shellWidth - shell['padding-right'] - footer['margin-right']
-
-      expect(left).toBe(0)
-      expect(right).toBe(shellWidth)
-      expect(shell['padding-left']).toBe(viewportWidth <= 420 ? 12 : 16)
-      expect(shell['padding-right']).toBe(viewportWidth <= 420 ? 12 : 16)
-    }
-  })
-
-  it.each([400, 900])('preserves inset footers and does not apply minimal spacing to the default skin at %ipx', viewportWidth => {
-    const { shell, footer } = minimalPopupSpacing(viewportWidth, 'minimal', false, false)
-    expect(footer['margin-left']).toBe(0)
-    expect(footer['margin-right']).toBe(0)
-    expect(shell['padding-left']).toBe(viewportWidth <= 420 ? 12 : 16)
-    for (const dark of [false, true]) {
-      const defaultSpacing = minimalPopupSpacing(viewportWidth, 'default', dark, true)
-      expect(Object.values(defaultSpacing.shell)).toEqual([0, 0, 0, 0])
-      expect(Object.values(defaultSpacing.footer)).toEqual([0, 0, 0, 0])
-    }
   })
 
   it('keeps cache management inside advanced settings without another navigation or popup surface', () => {
@@ -281,8 +209,8 @@ describe('options UI composition architecture', () => {
     const popupEntry = source('src/app/popup/index.ts')
     const optionsEntry = source('src/app/options/index.ts')
     const skinStyles = source('src/ui/styles/interface-skins.css')
-    const minimalSkinStyles = source('src/ui/styles/interface-skins/minimal.css')
-    const paletteSkinStyles = source('src/ui/styles/interface-skins/palette.css')
+    const baseSkinStyles = source('src/ui/styles/interface-skins/popup-skins-base.css')
+    const themeSkinStyles = source('src/ui/styles/interface-skins/popup-skins-themes.css')
     const interfaceAppearance = source('src/ui/interfaceAppearance.ts')
     const popupHtml = source('entrypoints/popup/index.html')
     const configManagement = source('src/features/settings/ui/ConfigManagement.vue')
@@ -354,17 +282,24 @@ describe('options UI composition architecture', () => {
     expect(interfaceSettings).toContain('withPopupQuickFeatureVisibility(')
     expect(interfaceSettings).toContain('popupModuleOptions.map')
     expect(interfaceSettings).toContain('popupQuickFeatureOptions.map')
+    expect(optionsApp).not.toContain('applyInterfaceSkin')
+    expect(interfaceSettings).toContain('class="popup-skin-studio"')
     expect(interfaceSettings).toContain('class="interface-skin-option"')
-    expect(interfaceSettings).toContain('<template #copy>')
     expect(interfaceSettings).toContain('<InterfaceSkinPreview')
     expect(interfaceSettings).toContain('selectedSkinOption')
+    expect(interfaceSettings).toContain('activePreviewSkin')
     expect(interfaceSettings).toContain(':aria-label="translateLegacy(\'弹窗风格\')"')
     expect(interfaceSettings).toContain('const {t, translateLegacy} = useUiI18n()')
     expect(settingsItem).toContain('<slot name="copy">')
-    expect(interfaceSkinPreview).toContain('class="interface-skin-live-preview"')
+    expect(interfaceSkinPreview).toContain('class="interface-skin-live-preview popup-skin-scope"')
+    expect(interfaceSkinPreview).toContain(':data-interface-skin="skin.value"')
+    expect(interfaceSkinPreview).toContain(':data-popup-theme="effectiveTheme"')
     expect(interfaceSkinPreview).toContain(':data-preview-skin="skin.value"')
-    // 风格预览和菜单栏布局预览共用同一份真实 DOM 的菜单栏还原，两处不会再各画一套。
+    // 风格预览和菜单栏布局预览共用同一份真实 DOM 的菜单栏还原，并通过 .popup-skin-scope 与 Options 彻底隔离。
     expect(interfaceSkinPreview).toContain('<PopupPreview :skin="skin"')
+    expect(popupLayoutPreview).toContain('class="popup-layout-live-preview popup-skin-scope"')
+    expect(popupLayoutPreview).toContain(':data-interface-skin="skin.value"')
+    expect(popupLayoutPreview).toContain(':data-popup-theme="effectiveTheme"')
     expect(popupLayoutPreview).toContain('<PopupPreview')
     expect(popupLayoutPreview).toContain(':modules="visibleModules"')
     expect(popupLayoutPreview).toContain(':quick-features="visibleQuickFeatures"')
@@ -409,34 +344,23 @@ describe('options UI composition architecture', () => {
     expect(popupSiteRule).toContain('data-popup-module="siteRule"')
     expect(popupEntry).toContain("@/src/ui/styles/interface-skins.css")
     expect(optionsEntry).toContain("@/src/ui/styles/interface-skins.css")
+    expect(popupHtml).toContain('data-popup-root')
     expect(popupHtml).toContain('class="popup-page"')
     expect(skinStyles).toContain('body.popup-page')
     expect(skinStyles).toContain('data-popup-height="content"')
     expect(skinStyles).toContain('min-height: 0')
-    const nonDefaultSkins = ['minimal', 'compact', 'contrast', 'qinghua', 'zhusha', 'shuimo', 'zhuqing', 'ouhe', 'xiangse', 'qinglv', 'yuebai', 'xuanqing', 'wujin']
-    for (const skin of nonDefaultSkins) {
-      expect(skinStyles).toContain(`./interface-skins/${skin}.css`)
-      expect(source(`src/ui/styles/interface-skins/${skin}.css`)).toContain(`data-interface-skin="${skin}"`)
+    expect(skinStyles).toContain('./interface-skins/popup-skins-base.css')
+    expect(skinStyles).toContain('./interface-skins/popup-skins-themes.css')
+    const craftSkins = ['liquid-glass', 'aurora', 'tactile', 'brutalist', 'cyber', 'retro-os', 'terminal', 'editorial', 'sakura', 'matcha', 'midnight-gold']
+    for (const skin of craftSkins) {
+      expect(themeSkinStyles).toContain(`data-interface-skin="${skin}"`)
     }
-    expect(skinStyles).toContain('./interface-skins/palette.css')
-    expect(skinStyles).not.toContain('./interface-skins/plain.css')
-    expect(skinStyles).not.toContain('./interface-skins/soft.css')
-    expect(minimalSkinStyles).toContain('data-interface-skin="minimal"')
-    expect(minimalSkinStyles).toContain('overflow-wrap: anywhere')
-    expect(minimalSkinStyles).not.toContain('.beta-badge')
-    expect(paletteSkinStyles).not.toContain('.beta-badge')
-    // 品牌图标在任何风格下都保持原样：简约风格只调整它的尺寸，不再降低不透明度。
-    expect(minimalSkinStyles).not.toMatch(/\.brand img \{[^}]*(?:opacity|filter)/)
-    expect(minimalSkinStyles).not.toContain('saturate(')
-    expect(minimalSkinStyles).toContain('background: color-mix(in srgb, var(--brand) 16%, var(--surface-soft))')
-    // 简约风格的主操作是中性浅灰，不带品牌色底。
-    expect(minimalSkinStyles).not.toContain('background: color-mix(in srgb, var(--brand) 5%, var(--surface-soft))')
-    expect(minimalSkinStyles).toContain('.translate-button.translated .translate-hotkey')
-    expect(paletteSkinStyles).toContain('data-interface-skin-kind="palette"')
-    expect(paletteSkinStyles).toContain('.settings-card .service-catalog')
-    expect(paletteSkinStyles).toContain('.image-ocr-recommendation')
-    expect(paletteSkinStyles).toContain('.settings-card.vocabulary-view .vocabulary-book')
-    expect(paletteSkinStyles).toContain('--el-bg-color: var(--surface)')
+    expect(baseSkinStyles).toContain('data-interface-skin-kind="craft"')
+    expect(baseSkinStyles).toContain('--el-bg-color: var(--skin-surface)')
+    expect(baseSkinStyles).not.toContain('.settings-card')
+    expect(baseSkinStyles).not.toMatch(/\.sidebar(?:\s|\{|,|\.)/u)
+    expect(baseSkinStyles).not.toContain('.vocabulary-book')
+    expect(themeSkinStyles).not.toContain('.settings-card')
     expect(interfaceAppearance).toContain('dataset.interfaceSkinKind = skin.kind')
     expect(interfaceAppearance).toContain("style.setProperty('--interface-popup-width'")
     expect(settingsSections).toContain('<ImageOcrSettings v-if="viewActive && props.activeSection === \'settings-image-translation\'" compact embedded :active="config.imageTranslationOcrEngine === \'tesseract\'" v-model:source-language="config.from" />')
@@ -709,7 +633,8 @@ describe('options UI composition architecture', () => {
     expect(popup).toContain("import PopupSiteRule from './PopupSiteRule.vue'")
     expect(popupStyles).toContain('.popup-content > [data-popup-module] + .hero-card')
     expect(popupStyles).toContain('footer[data-popup-module-last="false"]')
-    expect(minimalSkinStyles).toContain('.popup-content > footer[data-popup-module-last="true"]')
+    expect(baseSkinStyles).toContain(':root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] footer')
+    expect(themeSkinStyles).toContain('[data-interface-skin="liquid-glass"]')
     expect(popup).toContain('popupUsesContentHeight')
     expect(popup).toContain('interfaceSkinUsesContentHeight(config.value.interfaceSkin)')
     expect(popup).not.toContain("config.value.interfaceSkin === 'minimal'")
@@ -1034,7 +959,7 @@ describe('options UI composition architecture', () => {
       expect(group.match(/data-configuration-group=/gu)).toHaveLength(1)
       expect(connectionGroup).not.toContain(group)
     }
-    expect(serviceConfiguration).toContain('<Teleport v-if="connectionActionTarget && !publicPlanBlocked && !browserTranslationUnavailable" :to="connectionActionTarget">')
+    expect(serviceConfiguration).toContain('<Teleport v-if="connectionActionTarget && !publicPlanBlocked && !browserTranslationUnavailable && service !== services.localTranslation" :to="connectionActionTarget">')
     expect(catalog).toContain('class="hero-connection-action"')
     expect(apiKeyList).not.toContain('data-connection-test-button')
     expect(serviceConfiguration).toContain(':disabled="connectionTestDisabled"')
@@ -1207,6 +1132,10 @@ describe('options UI composition architecture', () => {
     expect(item).toContain(':data-service-value="item.value"')
     expect(item).not.toContain('library-favorite')
     expect(item).toContain('<ServiceIcon')
+    expect(item).toContain('.library-item:has(> .library-select:focus-visible)')
+    expect(item).toContain('.library-select:focus-visible { outline: none; }')
+    expect(source('src/ui/styles/interface-skins/popup-skins-base.css')).not.toContain('.library-item')
+    expect(source('src/ui/styles/interface-skins/popup-skins-themes.css')).not.toContain('.library-item')
   })
 
   it('keeps webpage translation and interactions organized in clear layers', () => {

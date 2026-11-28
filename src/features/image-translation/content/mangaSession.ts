@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaSession.ts
- * 文件职责：管理当前漫画章节的连续翻译会话，保证一次开启、逐页执行、原文暂停与异步任务所有权。
- * 主要内容：接收可见页和有界提前翻译窗口，当前页优先、串行处理；同优先级按最新有效页序选取，缺失、重复或非法序号稳定保留进入顺序；阅读器移动期间暂停新识别但立即复用已完成结果，短暂离屏不取消在途推理，停稳后未译当前页可取消远处旧任务，最近页面仅保留不抢占队列；隐藏时停止新任务，换图、换章和关闭取消旧任务；显式单页重试进入同一队列并清除旧错误，不循环请求或并发绕过会话；未启动的延后任务重新排队，卸载后不再发送迟到通知。
+ * 文件职责：管理当前漫画章节的连续翻译会话，保证一次开启、受控并发调度、原文暂停与异步任务所有权。
+ * 主要内容：接收可见页和有界提前翻译窗口，当前页优先并支持可选 maxConcurrent 上限（默认 1 保持严格串行，开启并发时允许可见页与预译页重叠流水）；同优先级按最新有效页序选取，缺失、重复或非法序号稳定保留进入顺序；阅读器移动期间暂停新识别但立即复用已完成结果，短暂离屏不取消在途推理，停稳后未译当前页可取消远处旧任务，最近页面仅保留不抢占队列；隐藏时停止新任务，换图、换章和关闭取消旧任务；显式单页重试进入同一队列并清除旧错误，不循环请求或并发绕过会话；未启动的延后任务重新排队，卸载后不再发送迟到通知。
  * 模块边界：只依赖注入的页面翻译与恢复端口，图片和可读画布共用一个队列；不查询 DOM、保存配置或实现 OCR；位图缓存、宿主样式与语言包由图片运行时管理。
  */
 import type {ImageTranslationStage} from '../progress';
@@ -38,6 +38,7 @@ export interface MangaSnapshot<T = HTMLImageElement> {
 }
 
 export function createMangaSession<T = HTMLImageElement>(ports: {
+    maxConcurrent?: number;
     translate: (image: T) => Promise<void | 'deferred'>;
     reuse?: (image: T) => boolean;
     restore: (image: T) => void;
@@ -45,22 +46,25 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
     failed: (image: T) => boolean;
     changed: (status: MangaTranslationStatus) => void;
 }) {
+    const concurrency = Math.max(1, Math.floor(ports.maxConcurrent ?? 1));
     let route = '';
     let available = false;
     let active = false;
     let disposed = false;
     let epoch = 0;
     type Page = {identity: string; ordinal?: number; attempted: boolean; failed: boolean; completed: boolean; visible: boolean; retained: boolean; scheduled: boolean; ahead: boolean};
-    let running: {image: T; page: Page} | null = null;
+    const running = new Set<{image: T; page: Page}>();
     let suspended = false;
     let schedulingDeferred = false;
     const pages = new Map<T, Page>();
+    const isRunning = (image: T) => { for (const task of running) if (task.image === image) return true; return false; };
+    const isRunningPage = (image: T, page: Page) => { for (const task of running) if (task.image === image && task.page === page) return true; return false; };
 
     const status = (): MangaTranslationStatus => ({
-        available, active, pending: active && running !== null,
+        available, active, pending: active && running.size > 0,
         errors: Array.from(pages.values()).filter(page => page.failed).length,
         completed: Array.from(pages.values()).filter(page => page.completed && !page.failed).length,
-        prefetching: active && running !== null && !running.page.visible,
+        prefetching: active && running.size > 0 && Array.from(running).every(task => !task.page.visible),
         ahead: Array.from(pages.values()).filter(page => page.retained && page.ahead && !page.visible && page.completed && !page.failed).length,
     });
     const notify = (final = false) => {if (!disposed || final) ports.changed(status());};
@@ -74,51 +78,55 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
     }
 
     function pump(): void {
-        if (disposed || !active || suspended || schedulingDeferred || running) return;
-        let next: [T, Page] | undefined, first: [T, Page] | undefined, invalidOrdinal = false;
-        const ordinals = new Set<number>();
-        for (const [image, page] of pages) {
-            if (!page.retained || !page.scheduled || page.attempted) continue;
-            const current = next?.[1];
-            if (!current || (page.visible && !current.visible)) {
-                first = next = [image, page];invalidOrdinal = false;ordinals.clear();
-            } else if (page.visible !== current.visible) continue;
-            const ordinal = page.ordinal;
-            // 只比较同一优先级，全部为唯一正整数时才采用最新正文序号。
-            if (ordinal === undefined || !Number.isSafeInteger(ordinal) || ordinal <= 0 || ordinals.has(ordinal)) {
-                invalidOrdinal = true;next = first;
-            } else {
-                ordinals.add(ordinal);
-                if (!invalidOrdinal && ordinal < next![1].ordinal!) next = [image, page];
-            }
-        }
-        if (!next) return;
-        const [image, page] = next;
-        page.attempted = true;
-        const owner = epoch;
-        running = {image, page};
-        let started = false;
-        let deferred = false;
-        notify();
-        // 同步抛错和 Promise 拒绝都归入该页失败；取消后的迟到结果不更新新会话。
-        void Promise.resolve().then(() => {
-            if (owner !== epoch || !active || pages.get(image) !== page) return;
-            // scroll 可以在这个微任务前到达；尚未请求的页面回到队列，不能被当成已完成。
-            if (suspended || schedulingDeferred || !page.scheduled) {page.attempted = false;return;}
-            started = true;
-            return ports.translate(image).then(result => {deferred = result === 'deferred';});
-        }).catch(() => { if (owner === epoch && pages.get(image) === page) page.failed = true; })
-            .finally(() => {
-                if (started && owner === epoch && pages.get(image) === page) {
-                    if (page.retained && deferred) page.attempted = false;
-                    else if (page.retained) {page.failed ||= ports.failed(image);page.completed = true;}
-                    else {ports.release(image);pages.delete(image);}
+        while (!disposed && active && !suspended && !schedulingDeferred && running.size < concurrency) {
+            let next: [T, Page] | undefined, first: [T, Page] | undefined, invalidOrdinal = false;
+            const ordinals = new Set<number>();
+            for (const [image, page] of pages) {
+                if (!page.retained || !page.scheduled || page.attempted || isRunning(image)) continue;
+                const current = next?.[1];
+                if (!current || (page.visible && !current.visible)) {
+                    first = next = [image, page];invalidOrdinal = false;ordinals.clear();
+                } else if (page.visible !== current.visible) continue;
+                const ordinal = page.ordinal;
+                // 只比较同一优先级，全部为唯一正整数时才采用最新正文序号。
+                if (ordinal === undefined || !Number.isSafeInteger(ordinal) || ordinal <= 0 || ordinals.has(ordinal)) {
+                    invalidOrdinal = true;next = first;
+                } else {
+                    ordinals.add(ordinal);
+                    if (!invalidOrdinal && ordinal < next![1].ordinal!) next = [image, page];
                 }
-                // pump 在 running 非空时不会准入下一页；当前任务始终持有这个串行名额。
-                running = null;
-                notify();
-                pump();
-            });
+            }
+            if (!next) return;
+            const [image, page] = next;
+            page.attempted = true;
+            const owner = epoch;
+            const task = {image, page};
+            running.add(task);
+            let started = false;
+            let deferred = false;
+            notify();
+            // 同步抛错和 Promise 拒绝都归入该页失败；取消后的迟到结果不更新新会话。
+            void Promise.resolve().then(() => {
+                if (owner !== epoch || !active || pages.get(image) !== page) return;
+                // scroll 可以在这个微任务前到达；尚未请求的页面回到队列，不能被当成已完成。
+                if (suspended || schedulingDeferred || !page.retained || !page.scheduled) {page.attempted = false;return;}
+                started = true;
+                return ports.translate(image).then(result => {deferred = result === 'deferred';});
+            }).catch(() => { if (owner === epoch && pages.get(image) === page) page.failed = true; })
+                .finally(() => {
+                    if (owner === epoch && pages.get(image) === page) {
+                        if (!page.retained) {ports.release(image);pages.delete(image);}
+                        else if (started) {
+                            if (deferred) page.attempted = false;
+                            else {page.failed ||= ports.failed(image);page.completed = true;}
+                        }
+                    }
+                    // 当前任务结束前一直持有对应并发槽，避免旧代或取消中的任务被立即覆盖。
+                    running.delete(task);
+                    notify();
+                    pump();
+                });
+        }
     }
 
     function refresh(snapshot: MangaSnapshot<T>): void {
@@ -136,8 +144,8 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
         pages.forEach((page, image) => {
             const next = selected.get(image);
             if (next?.identity === page.identity) {page.ordinal=next.ordinal;page.visible = next.visible;page.retained = true;page.scheduled = next.visible || next.prefetch === true;page.ahead = next.prefetch === true;return;}
-            if (active && running?.image === image && current.get(image)?.identity === page.identity) {
-                page.visible = false;page.retained = false;return;
+            if (active && isRunningPage(image, page) && current.get(image)?.identity === page.identity) {
+                page.visible = false;page.retained = false;page.scheduled = false;return;
             }
             ports.release(image);
             pages.delete(image);
@@ -151,12 +159,15 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
                 page.attempted = true;page.completed = true;page.failed = false;
             }
         });
-        // 停稳后的远距离跳页才取消无保留价值的旧识别；缓存返页不抢占，取消完成前仍占用串行槽。
-        if (active && !suspended && !schedulingDeferred && running && !running.page.retained
-            && pages.get(running.image) === running.page
+        // 停稳后的远距离跳页才取消无保留价值的旧识别；缓存返页不抢占，取消完成前仍占用并发槽。
+        if (active && !suspended && !schedulingDeferred && running.size > 0
             && Array.from(pages.values()).some(page => page.visible && page.scheduled && !page.attempted)) {
-            ports.release(running.image);
-            pages.delete(running.image);
+            for (const task of running) {
+                if (!task.page.retained && pages.get(task.image) === task.page) {
+                    ports.release(task.image);
+                    pages.delete(task.image);
+                }
+            }
         }
         notify();
         pump();
@@ -197,14 +208,14 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
             if(disposed || !active || suspended || !page || page.identity!==identity
                 || !page.visible || !page.retained || !page.scheduled)return;
             if(page.failed)return 'error';
-            if(!page.completed && (!page.attempted || running?.image===image))return 'pending';
+            if(!page.completed && (!page.attempted || isRunning(image)))return 'pending';
         },
         // 事件到达时同步关闸，防止上一页的 finally 在下一次布局测量前启动排队预译。
         deferScheduling() { if (!disposed) schedulingDeferred = true; },
         retry(image: T): boolean {
             if (disposed || !active || suspended) return false;
             const page = pages.get(image);
-            if (!page?.retained || !page.scheduled || running?.image === image) return false;
+            if (!page?.retained || !page.scheduled || isRunning(image)) return false;
             schedulingDeferred = false;
             page.attempted = false;page.failed = false;page.completed = false;
             notify();pump();return true;

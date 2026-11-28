@@ -1,0 +1,511 @@
+/**
+ * @file src/ui/styles/interface-skins/popup-skins-base.css
+ * 文件职责：定义 Popup 专属皮肤系统的三层隔离基础样式，确保皮肤与明暗极性只作用于真实 Popup（:root[data-popup-root]）及设置页局部预览容器（.popup-skin-scope），绝不污染 Options 设置页。
+ * 主要内容：1) .popup-skin-scope[data-popup-theme="light"|"dark"] 完整令牌重绑以隔绝 Options 明暗串色；2) 常暗皮肤（cyber/terminal/midnight-gold）的明暗反馈令牌锁暗；3) craft 皮肤语义桥接与共享结构样式（含 --skin-page-bg 氛围画布、--skin-panel-bg/--skin-panel-backdrop 玻璃材质、字体族、物理按压反馈与减弱动态兜底）。
+ * 模块边界：不编写任何 Options 页面布局或设置卡片选择器；具体 11 套 craft 皮肤的色值、材质纹理与特化样式在 popup-skins-themes.css 定义。
+ */
+
+/* ==========================================================================
+   Layer 1: 预览作用域明暗隔离（彻底阻断 Options :root.dark 向浅色预览串色）
+   ========================================================================== */
+.popup-skin-scope[data-popup-theme="light"] {
+  color-scheme: light;
+  --fr-color-page: #f5f6f9;
+  --fr-color-surface: #ffffff;
+  --fr-color-surface-soft: #f5f6f9;
+  --fr-color-surface-hover: #f1f4f9;
+  --fr-color-surface-elevated: #ffffff;
+  --fr-color-ink: #172033;
+  --fr-color-ink-secondary: #475467;
+  --fr-color-muted: #667085;
+  --fr-color-line: #e5e8f0;
+  --fr-color-line-strong: #cfd5e0;
+  --fr-color-brand: #ef4776;
+  --fr-color-brand-strong: #d63362;
+  --fr-color-brand-soft: #fef0f4;
+  --fr-color-brand-border: #f3c4d1;
+  --fr-color-focus: #d63362;
+  --fr-color-danger: #d04457;
+  --fr-color-danger-soft: #fdf0f1;
+  --fr-color-success: #2ea47a;
+  --fr-color-success-soft: #ecf8f2;
+  --fr-color-warning: #d97706;
+  --fr-color-warning-soft: #fef5e7;
+  --fr-color-info: #4b7cf3;
+  --fr-color-info-soft: #eff4ff;
+  --fr-success-indicator: #37a169;
+  --fr-status-idle: #c5cdd9;
+  --fr-shadow-sm: 0 1px 2px rgba(23, 32, 51, 0.04);
+  --fr-shadow-md: 0 4px 12px rgba(23, 32, 51, 0.08);
+  --fr-shadow-lg: 0 12px 32px rgba(23, 32, 51, 0.14);
+  --preview-canvas-bg: #ffffff;
+}
+
+.popup-skin-scope[data-popup-theme="dark"] {
+  color-scheme: dark;
+  --fr-color-page: #14171c;
+  --fr-color-surface: #1b1f26;
+  --fr-color-surface-soft: #222731;
+  --fr-color-surface-hover: #282e3a;
+  --fr-color-surface-elevated: #232833;
+  --fr-color-ink: #eef1f6;
+  --fr-color-ink-secondary: #cfd5e0;
+  --fr-color-muted: #9ba4b5;
+  --fr-color-line: #2d3340;
+  --fr-color-line-strong: #3d4556;
+  --fr-color-brand: #f36a8d;
+  --fr-color-brand-strong: #f788a5;
+  --fr-color-brand-soft: rgba(243, 106, 141, 0.16);
+  --fr-color-brand-border: rgba(243, 106, 141, 0.36);
+  --fr-color-focus: #f788a5;
+  --fr-color-danger: #f07b8a;
+  --fr-color-danger-soft: rgba(240, 123, 138, 0.14);
+  --fr-color-success: #52c499;
+  --fr-color-success-soft: rgba(82, 196, 153, 0.14);
+  --fr-color-warning: #f5b44c;
+  --fr-color-warning-soft: rgba(245, 180, 76, 0.14);
+  --fr-color-info: #78a2fa;
+  --fr-color-info-soft: rgba(120, 162, 250, 0.14);
+  --fr-success-indicator: #4bc286;
+  --fr-status-idle: #525d72;
+  --fr-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --fr-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.36);
+  --fr-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.48);
+  --preview-canvas-bg: #14171c;
+}
+
+/* 在 .popup-skin-scope 自身重新绑定衍生短别名，防止从 :root.dark 继承已求值的深色变量 */
+.popup-skin-scope[data-popup-theme] {
+  --page: var(--fr-color-page);
+  --surface: var(--fr-color-surface);
+  --surface-soft: var(--fr-color-surface-soft);
+  --surface-hover: var(--fr-color-surface-hover);
+  --ink: var(--fr-color-ink);
+  --muted: var(--fr-color-muted);
+  --line: var(--fr-color-line);
+  --brand: var(--fr-color-brand);
+  --brand-strong: var(--fr-color-brand-strong);
+  --brand-soft: var(--fr-color-brand-soft);
+  --el-bg-color: var(--fr-color-surface);
+  --el-bg-color-overlay: var(--fr-color-surface-elevated);
+  --el-fill-color-light: var(--fr-color-surface-soft);
+  --el-fill-color-blank: var(--fr-color-surface);
+  --el-text-color-primary: var(--fr-color-ink);
+  --el-text-color-regular: var(--fr-color-ink-secondary);
+  --el-text-color-secondary: var(--fr-color-muted);
+  --el-border-color: var(--fr-color-line);
+  --el-border-color-light: var(--fr-color-line);
+  --el-border-color-lighter: var(--fr-color-line);
+  --el-color-primary: var(--fr-color-brand);
+}
+
+/* ==========================================================================
+   Layer 2: 常暗专属皮肤（cyber / terminal / midnight-gold）反馈色与色制兜底
+   ========================================================================== */
+:root[data-popup-root][data-interface-skin="cyber"],
+:root[data-popup-root][data-interface-skin="terminal"],
+:root[data-popup-root][data-interface-skin="midnight-gold"],
+.popup-skin-scope[data-interface-skin="cyber"],
+.popup-skin-scope[data-interface-skin="terminal"],
+.popup-skin-scope[data-interface-skin="midnight-gold"] {
+  color-scheme: dark;
+  --fr-color-danger: #ff7b93;
+  --fr-color-danger-soft: rgba(255, 123, 147, 0.16);
+  --fr-color-success: #52e3a4;
+  --fr-color-success-soft: rgba(82, 227, 164, 0.16);
+  --fr-color-warning: #f7c55f;
+  --fr-color-warning-soft: rgba(247, 197, 95, 0.16);
+  --fr-color-info: #78c2ff;
+  --fr-color-info-soft: rgba(120, 194, 255, 0.16);
+  --fr-success-indicator: #4ade80;
+  --fr-status-idle: #525d72;
+}
+
+/* ==========================================================================
+   Layer 3: Craft 皮肤共享语义桥接（11 套工艺皮肤统一复用）
+   ========================================================================== */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin],
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] {
+  --fr-color-page: var(--skin-page);
+  --fr-color-surface: var(--skin-surface);
+  --fr-color-surface-soft: var(--skin-surface-soft);
+  --fr-color-surface-hover: var(--skin-surface-hover);
+  --fr-color-surface-elevated: var(--skin-surface);
+  --fr-color-ink: var(--skin-ink);
+  --fr-color-ink-secondary: var(--skin-ink);
+  --fr-color-muted: var(--skin-muted);
+  --fr-color-line: var(--skin-line);
+  --fr-color-line-strong: var(--skin-line-strong);
+  --fr-color-brand: var(--skin-brand);
+  --fr-color-brand-strong: var(--skin-brand-strong);
+  --fr-color-brand-soft: var(--skin-brand-soft);
+  --fr-color-brand-border: color-mix(in srgb, var(--skin-brand) 36%, var(--skin-line));
+  --fr-color-focus: var(--skin-focus, var(--skin-brand-strong));
+  --fr-focus-color: var(--skin-focus, var(--skin-brand-strong));
+  --page: var(--skin-page);
+  --surface: var(--skin-surface);
+  --surface-soft: var(--skin-surface-soft);
+  --surface-hover: var(--skin-surface-hover);
+  --ink: var(--skin-ink);
+  --muted: var(--skin-muted);
+  --line: var(--skin-line);
+  --brand: var(--skin-brand);
+  --brand-strong: var(--skin-brand-strong);
+  --brand-soft: var(--skin-brand-soft);
+  --preview-canvas-bg: var(--skin-page);
+  --el-bg-color: var(--skin-surface);
+  --el-bg-color-overlay: var(--skin-surface);
+  --el-fill-color-light: var(--skin-surface-soft);
+  --el-fill-color-blank: var(--skin-surface);
+  --el-text-color-primary: var(--skin-ink);
+  --el-text-color-regular: var(--skin-ink);
+  --el-text-color-secondary: var(--skin-muted);
+  --el-border-color: var(--skin-line);
+  --el-border-color-light: var(--skin-line);
+  --el-border-color-lighter: var(--skin-line);
+  --el-color-primary: var(--skin-brand);
+}
+
+/* 弹窗画布、基础排版与预览外壳 */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin],
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] body {
+  color: var(--skin-ink);
+  background: var(--skin-page);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .popup-shell {
+  padding: var(--skin-shell-padding, 12px 12px 10px);
+  color: var(--skin-ink);
+  background: var(--skin-page-bg, var(--skin-page));
+  font-family: var(--skin-font-family, inherit);
+}
+
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-popup {
+  padding: var(--skin-shell-padding, 12px 12px 10px);
+  border: var(--skin-preview-border, 1px solid var(--skin-line));
+  border-radius: var(--skin-preview-radius, var(--skin-panel-radius, 12px));
+  color: var(--skin-ink);
+  background: var(--skin-page-bg, var(--skin-page));
+  font-family: var(--skin-font-family, inherit);
+  box-shadow: var(--skin-preview-shadow, 0 10px 26px rgba(15, 23, 42, 0.08));
+}
+
+/* 标题字体与字距覆盖（供画报衬线、终端等宽等皮肤定制） */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .brand strong,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card strong,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-brand strong,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-feature strong {
+  font-family: var(--skin-heading-font, var(--skin-font-family, inherit));
+}
+
+/* 顶部栏与快捷入口按钮 */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .popup-header,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-header {
+  margin-bottom: var(--skin-header-gap, 10px);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .brand small,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-brand small {
+  color: var(--skin-muted);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .settings-button,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .donation-button,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-header-button {
+  border: var(--skin-control-border, 1px solid var(--skin-line));
+  border-radius: var(--skin-control-radius, 8px);
+  color: var(--skin-ink);
+  background: var(--skin-control-bg, var(--skin-panel-bg, var(--skin-surface)));
+  box-shadow: var(--skin-control-shadow, none);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .settings-button:hover:not(:disabled),
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .donation-button:hover:not(:disabled) {
+  border-color: var(--skin-brand);
+  color: var(--skin-brand-strong);
+  background: var(--skin-surface-hover);
+}
+
+/* 核心翻译主卡（仅主卡/抽屉等大面板按需启用 backdrop-filter，保证流畅帧率） */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .hero-card,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-hero {
+  padding: var(--skin-hero-padding, 10px);
+  border: var(--skin-panel-border, 1px solid var(--skin-line));
+  border-radius: var(--skin-panel-radius, 12px);
+  background: var(--skin-panel-bg, var(--skin-surface));
+  box-shadow: var(--skin-panel-shadow, none);
+  -webkit-backdrop-filter: var(--skin-panel-backdrop, none);
+  backdrop-filter: var(--skin-panel-backdrop, none);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .language-field span,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .language-arrow,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .provider-summary > span,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-language-field span,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-arrow,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-service > span {
+  color: var(--skin-muted);
+}
+
+/* 语言选择框与翻译服务栏 */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .language-pair select,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .el-select__wrapper,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .provider-summary,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-language-select,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-service {
+  border: var(--skin-input-border, 1px solid var(--skin-line));
+  border-radius: var(--skin-control-radius, 8px);
+  color: var(--skin-ink);
+  background: var(--skin-input-bg, var(--skin-surface-soft));
+  box-shadow: var(--skin-input-shadow, none);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .provider-summary:hover:not(:disabled) {
+  border-color: var(--skin-brand);
+  background: var(--skin-surface-hover);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .provider-summary strong,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-service strong {
+  color: var(--skin-ink);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .provider-summary .chevron {
+  color: var(--skin-muted);
+}
+
+/* 主翻译按钮与局部翻译辅助按钮 */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .translate-button,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-action {
+  min-height: var(--skin-action-height, 42px);
+  border: var(--skin-action-border, 1px solid transparent);
+  border-radius: var(--skin-action-radius, var(--skin-control-radius, 8px));
+  color: var(--skin-action-text, #ffffff);
+  background: var(--skin-action-bg, var(--skin-brand));
+  font-family: var(--skin-heading-font, var(--skin-font-family, inherit));
+  letter-spacing: var(--skin-action-tracking, 0);
+  box-shadow: var(--skin-action-shadow, none);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .translate-button:hover:not(:disabled) {
+  background: var(--skin-action-hover, var(--skin-action-bg, var(--skin-brand-strong)));
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .translate-button:active:not(:disabled) {
+  transform: var(--skin-action-active-transform, scale(0.985));
+  box-shadow: var(--skin-action-active-shadow, var(--skin-action-shadow, none));
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .section-translate-button,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-secondary-action {
+  min-height: var(--skin-action-height, 42px);
+  border: var(--skin-control-border, 1px solid var(--skin-line));
+  border-radius: var(--skin-control-radius, 8px);
+  color: var(--skin-ink);
+  background: var(--skin-control-bg, var(--skin-panel-bg, var(--skin-surface)));
+  box-shadow: var(--skin-control-shadow, none);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .section-translate-button:hover:not(:disabled) {
+  border-color: var(--skin-brand);
+  color: var(--skin-brand-strong);
+  background: var(--skin-surface-hover);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .section-translate-button svg,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-secondary-action svg {
+  color: var(--skin-brand-strong);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .section-translate-button.active {
+  border-color: var(--skin-brand);
+  color: var(--skin-brand-strong);
+  background: var(--skin-brand-soft);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .translate-button.translated {
+  border: 1px solid color-mix(in srgb, var(--skin-brand) 48%, var(--skin-line));
+  color: var(--skin-action-translated-text, var(--skin-brand-strong));
+  background: var(--skin-brand-soft);
+  box-shadow: none;
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .translate-button.translated:hover:not(:disabled) {
+  border-color: var(--skin-brand);
+  background: color-mix(in srgb, var(--skin-brand) 16%, var(--skin-surface));
+  box-shadow: none;
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .translate-button .spinner {
+  border-color: color-mix(in srgb, currentColor 32%, transparent);
+  border-top-color: currentColor;
+}
+
+/* 网站规则按钮与右侧工具（Aa / 双语显示模式） */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .site-rule-button,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-site-rule-button {
+  border: var(--skin-tag-border, 1px solid color-mix(in srgb, var(--skin-brand) 28%, var(--skin-line)));
+  border-radius: var(--skin-tag-radius, min(var(--skin-control-radius, 6px), 8px));
+  color: var(--skin-brand-strong);
+  background: var(--skin-tag-bg, var(--skin-panel-bg, var(--skin-surface)));
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .site-rule-button.enabled {
+  border-color: color-mix(in srgb, var(--skin-brand) 46%, var(--skin-line));
+  color: var(--skin-site-enabled-color, var(--skin-brand-strong));
+  background: var(--skin-brand-soft);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .site-rule-button.enabled > i:not(.site-rule-saving) {
+  background: var(--skin-site-enabled-dot, var(--skin-brand-strong));
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .site-disable-rule-button,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-site-rule-button.preview-site-disable {
+  border-color: var(--skin-line);
+  color: var(--skin-muted);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .site-disable-rule-button.enabled {
+  border-color: var(--skin-line-strong);
+  color: var(--skin-ink);
+  background: var(--skin-surface-soft);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .display-mode-button,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-tools > * {
+  border: var(--skin-control-border, 1px solid transparent);
+  border-radius: var(--skin-tag-radius, min(var(--skin-control-radius, 6px), 7px));
+  color: var(--skin-brand-strong);
+  background: var(--skin-surface-soft);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .display-mode-button:hover:not(:disabled),
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .page-font-entry.is-browser-default {
+  border-color: var(--skin-brand);
+  background: var(--skin-brand-soft);
+}
+
+/* 快捷功能卡片与图标容器 */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .features {
+  margin-top: var(--skin-section-gap, 10px);
+}
+
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-flow {
+  gap: var(--skin-section-gap, 10px);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-grid,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-features {
+  --fluentread-popup-feature-gap: var(--skin-feature-gap, 8px);
+  gap: var(--fluentread-popup-feature-gap);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-feature {
+  min-height: var(--skin-feature-height, 48px);
+  padding: var(--skin-feature-padding, 7px 9px);
+  border: var(--skin-feature-border, 1px solid var(--skin-line));
+  border-radius: var(--skin-feature-radius, 10px);
+  background: var(--skin-feature-bg, var(--skin-panel-bg, var(--skin-surface)));
+  box-shadow: var(--skin-feature-shadow, none);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--skin-brand) 42%, var(--skin-line));
+  background: var(--skin-surface-hover);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card:active:not(:disabled) {
+  transform: var(--skin-feature-active-transform, none);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card .feature-icon,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card .feature-icon.rose,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card .feature-icon.violet,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card .feature-icon.blue,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card .feature-icon.amber,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card .feature-icon.teal,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-feature-icon,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-feature-icon.rose,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-feature-icon.violet,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-feature-icon.blue,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-feature-icon.amber,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-feature-icon.teal {
+  width: var(--skin-icon-size, 28px);
+  height: var(--skin-icon-size, 28px);
+  border: var(--skin-icon-border, 0);
+  border-radius: var(--skin-icon-radius, 7px);
+  color: var(--skin-icon-fg, var(--skin-brand-strong));
+  background: var(--skin-icon-bg, var(--skin-brand-soft));
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card > i.active,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-feature-status.active {
+  background: var(--skin-status-active, var(--fr-success-indicator));
+  box-shadow: var(--skin-status-ring, none);
+}
+
+/* 底部信息栏 */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] footer {
+  margin-top: var(--skin-section-gap, 10px);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] footer,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-footer {
+  border-color: var(--skin-line);
+  color: var(--skin-muted);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .opensource-link,
+.popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] .preview-open-source {
+  border-radius: var(--skin-pill-radius, 9999px);
+  color: var(--skin-muted);
+  background: var(--skin-surface-soft);
+}
+
+/* 抽屉、开关圆钮对比度、键盘按键提示与 Element Plus 气泡 */
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .switch[aria-checked="true"] {
+  background: var(--skin-switch-on-bg, var(--skin-brand));
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .switch[aria-checked="true"] i {
+  background: var(--skin-switch-knob, #ffffff);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .popup-drawer {
+  border-top: var(--skin-panel-border, 1px solid var(--skin-line));
+  background: var(--skin-panel-bg, var(--skin-surface)) !important;
+  color: var(--skin-ink);
+  -webkit-backdrop-filter: var(--skin-panel-backdrop, none);
+  backdrop-filter: var(--skin-panel-backdrop, none);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .donation-card {
+  border: var(--skin-panel-border, 1px solid var(--skin-line));
+  border-radius: var(--skin-panel-radius, 12px);
+  color: var(--skin-ink);
+  background: var(--skin-panel-bg, var(--skin-surface));
+  -webkit-backdrop-filter: var(--skin-panel-backdrop, none);
+  backdrop-filter: var(--skin-panel-backdrop, none);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .popup-brand-tooltip.el-popper.is-light,
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .translation-tool-tooltip.el-popper.is-light {
+  border-color: var(--skin-line);
+  color: var(--skin-ink);
+  background: var(--skin-surface);
+}
+
+:root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] :is(.interaction-preview, .area-translation-preview) kbd {
+  border: 1px solid var(--skin-line-strong);
+  color: var(--skin-ink);
+  background: var(--skin-surface-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .translate-button:active:not(:disabled),
+  :root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .feature-card:active:not(:disabled) {
+    transform: none;
+  }
+}

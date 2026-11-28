@@ -2,10 +2,11 @@
  * @file src/features/document-translation/services/history.ts
  * PDF 批注：高亮、下划线及备注与原文件同记录保存，恢复时校验页号、归一矩形和容量；删除或淘汰文档时一并清除。
  * 文件职责：在浏览器本地保存最近翻译过的文档及其译文，使文档翻译首页可以列出记录并一键恢复阅读。
- * 主要内容：以文件内容摘要为稳定标识，在独立的 IndexedDB 库中保存原始文件字节、解析结果快照、译文、进度与设置指纹；解析规则变化后按原文与双向唯一的原生位置或邻文恢复未变化片段的独立校订，歧义校订独立保留，复用同文件中页号、展示尺寸与旋转一致的已识别扫描页；原文件、逐行及逐项稳定几何均一致时，保留因字体指标修正而合并的连续普通文字段，使用新字形重建边界而不拼接译文；其余文字页保持新解析结果，统一重编号全文片段；本次复用的旧索引保留独立校订与空槽并从原文匹配池排除，不写入解析快照；列表与淘汰使用游标逐条提取摘要和原始字节数，不聚合持有所有原文件及解析快照，按事务内保存序列排序（旧记录按更新时间排序），并在超过条数或总字节上限时淘汰最旧的记录；普通查询在数据库不可用时降级为默认值，受检读取则明确报告不可用；其他标签页需要升级或删除时让出连接，不影响打开和翻译文档。
+ * 主要内容：以文件内容摘要为稳定标识（无拷贝摘要视图），在独立的 IndexedDB 库中保存原始文件字节、去重后的解析结果快照（保存时剥离与原文件一致的 parsed.binary.bytes 占位，读取时重新挂载 record.bytes 且不改写调用方对象）、译文、进度与设置指纹；字节校验采用按 32 位字宽比较的 bytesEqual，同快照恢复直接短路跳过位置扫描；解析规则变化后按原文与双向唯一的原生位置或邻文恢复未变化片段的独立校订，歧义校订独立保留，复用同文件中页号、展示尺寸与旋转一致的已识别扫描页；原文件、逐行及逐项稳定几何均一致时，保留因字体指标修正而合并的连续普通文字段，使用新字形重建边界而不拼接译文；其余文字页保持新解析结果，统一重编号全文片段；本次复用的旧索引保留独立校订与空槽并从原文匹配池排除，不写入解析快照；列表与淘汰使用游标逐条提取摘要和原始字节数，不聚合持有所有原文件及解析快照，同条原地更新且体积未增长时跳过全库淘汰扫描，按事务内保存序列排序（旧记录按更新时间排序），并在超过条数或总字节上限时淘汰最旧的记录；普通查询在数据库不可用时降级为默认值，受检读取则明确报告不可用；其他标签页需要升级或删除时让出连接，不影响打开和翻译文档。
  * 保存生命周期：提供可区分读取失败与确实没有记录的检查接口；超时撤销后续写入资格并取消活跃写事务，只有真实事务提交后才确认保存成功；放弃的数据库打开请求迟到成功时关闭旧连接，旧连接事件不能重置已恢复连接；重译跳过缓存只接受并保存显式 true，刷新后继续当前重译不会恢复旧缓存。
  * 模块边界：只负责本地存取与已有译文匹配，不解析文档、不发起翻译、不读取配置，也不把任何内容发送到网络；页面状态、解析版本与何时保存由文档页面组合根决定。
  */
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {documentSourceLocators, matchDocumentSourceLocators} from '../core/materialLocator';
 import {normalizePdfAnnotations, type PdfAnnotation} from '../core/pdfAnnotations';
 import {normalizeWebArticleProgress} from '../core/webArticle';
@@ -19,6 +20,31 @@ const META = 'metadata';
 const GENERATION = 'generation';
 const SEQUENCE = 'sequence';
 const ARTICLE_PROGRESS_PREFIX = 'article-position:';
+const EMPTY_BYTES = new Uint8Array(0);
+
+/** 按 32 位字宽快速比对二进制视图内容，优先命中引用和底层切片相等。 */
+export function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
+    if (left === right) return true;
+    const length = left.byteLength;
+    if (length !== right.byteLength) return false;
+    if (left.buffer === right.buffer && left.byteOffset === right.byteOffset) return true;
+    let index = 0;
+    if ((left.byteOffset & 3) === 0 && (right.byteOffset & 3) === 0) {
+        const words = length >>> 2;
+        if (words > 0) {
+            const leftWords = new Uint32Array(left.buffer, left.byteOffset, words);
+            const rightWords = new Uint32Array(right.buffer, right.byteOffset, words);
+            for (let word = 0; word < words; word += 1) {
+                if (leftWords[word] !== rightWords[word]) return false;
+            }
+            index = words * 4;
+        }
+    }
+    for (; index < length; index += 1) {
+        if (left[index] !== right[index]) return false;
+    }
+    return true;
+}
 
 export interface DocumentHistorySummary {
     id: string;
@@ -77,6 +103,10 @@ export interface DocumentHistory {
     clear(): Promise<boolean>;
 }
 
+function segmentSlot(segment: {id?: unknown}, index: number): number {
+    return typeof segment.id === 'number' && Number.isInteger(segment.id) && segment.id >= 0 ? segment.id : index;
+}
+
 /**
  * 重新解析时只复用原文完全相同且位置明确的片段；重复原文不猜测出现次序，空译文也占据自己的已确认位置。
  * 没有原文快照的旧记录仅在解析版本已知且一致、片段总数一致时按索引恢复。
@@ -88,6 +118,14 @@ function matchDocumentHistoryTranslations(
     segmentOrigins?: readonly (number | undefined)[],
 ): {translations: string[]; consumed: Set<number>} {
     const consumed = new Set<number>();
+    if (record.parsed === document && !segmentOrigins?.some(origin => origin !== undefined)) {
+        const translations = document.segments.map((segment, index) => {
+            consumed.add(index);
+            const translation = record.translations[segmentSlot(segment, index)];
+            return typeof translation === 'string' ? translation : '';
+        });
+        return {translations, consumed};
+    }
     const snapshot = record.parsed && typeof record.parsed === 'object'
         ? record.parsed as {segments?: unknown} : undefined;
     const previous = Array.isArray(snapshot?.segments) ? snapshot.segments : [];
@@ -96,12 +134,12 @@ function matchDocumentHistoryTranslations(
         if (!segment || typeof segment !== 'object') return;
         const candidate = segment as {source?: unknown; id?: unknown};
         if (typeof candidate.source !== 'string') return;
-        const slot = typeof candidate.id === 'number' && Number.isInteger(candidate.id) && candidate.id >= 0 ? candidate.id : index;
+        const slot = segmentSlot(candidate, index);
         slots.set(index, typeof record.translations[slot] === 'string' ? record.translations[slot] : '');
     });
     if (slots.size) {
         const origins = matchDocumentSourceLocators(documentSourceLocators(snapshot!), documentSourceLocators(document), segmentOrigins,
-            record.parsed === document || Number.isInteger(currentVersion) && currentVersion >= 0 && record.parsedVersion === currentVersion);
+            Number.isInteger(currentVersion) && currentVersion >= 0 && record.parsedVersion === currentVersion);
         return {translations: origins.map(origin => {
             if (origin === undefined) return '';
             consumed.add(origin);
@@ -150,10 +188,10 @@ export function restoreDocumentHistoryRevisions(
     const {translations, consumed} = matchDocumentHistoryTranslations(normalized, document, currentVersion, segmentOrigins);
     const snapshot = record.parsed && typeof record.parsed === 'object' ? record.parsed as {segments?: unknown} : undefined;
     const previous = Array.isArray(snapshot?.segments) ? snapshot.segments : [];
-    const unused = previous.flatMap((value, index) => {
+    const unused = consumed.size === previous.length ? [] : previous.flatMap((value, index) => {
         if (consumed.has(index) || !value || typeof value !== 'object') return [];
         const segment = value as {id?: unknown; source?: unknown; contextLabel?: unknown};
-        const slot = typeof segment.id === 'number' && Number.isInteger(segment.id) && segment.id >= 0 ? segment.id : index;
+        const slot = segmentSlot(segment, index);
         return [{source: segment.source, translation: normalized.translations[slot], contextLabel: segment.contextLabel}];
     });
     return {translations, retainedRevisions: normalizeDocumentRetainedRevisions([...(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : []), ...unused]),
@@ -254,8 +292,8 @@ export function restoreDocumentHistoryPdfOcr(
     const previous = snapshot?.binary;
     if (previous?.kind !== 'pdf' || !Array.isArray(previous.pages) || !Array.isArray(snapshot?.segments)) return {document};
     // 历史条目的原始字节与快照都必须属于当前文件，不能把另一份文件的识别框搬过来。
-    if (record.bytes?.length !== binary.bytes.length || previous.bytes?.length !== binary.bytes.length
-        || binary.bytes.some((byte, index) => byte !== record.bytes[index] || byte !== previous.bytes[index])) return {document};
+    if (!(record.bytes instanceof Uint8Array) || !(previous.bytes instanceof Uint8Array)
+        || !bytesEqual(binary.bytes, record.bytes) || !bytesEqual(binary.bytes, previous.bytes)) return {document};
     const oldSegments = snapshot.segments;
     const restored = binary.pages.map(page => {
         if (![page.width, page.height].every(value => Number.isFinite(value) && value > 0)) return undefined;
@@ -293,7 +331,7 @@ export function restoreDocumentHistoryPdfOcr(
 export async function documentHistoryId(bytes: Uint8Array, subtle: Pick<SubtleCrypto, 'digest'> | undefined = globalThis.crypto?.subtle): Promise<string> {
     if (!subtle) return '';
     try {
-        const digest = new Uint8Array(await subtle.digest('SHA-256', bytes.slice()));
+        const digest = new Uint8Array(await subtle.digest('SHA-256', asArrayBufferBytes(bytes)));
         return Array.from(digest.slice(0, 16), byte => byte.toString(16).padStart(2, '0')).join('');
     } catch {return '';}
 }
@@ -312,9 +350,44 @@ function summary(record: DocumentHistoryRecord): DocumentHistorySummary {
         ...(pendingOcrPages ? {pendingOcrPages} : {})};
 }
 
-/** 兼容旧记录；不把字符串、数字或其它 truthy 值当作用户确认的重译策略。 */
-function normalizeDocumentHistoryCachePolicy(record: DocumentHistoryRecord): DocumentHistoryRecord {
-    const {bypassCache, ...snapshot} = record;
+type StoredDocumentHistoryRecord = DocumentHistoryRecord & {parsedBinaryShared?: boolean};
+
+/** 与 record.bytes 一致的解析二进制字节只在主字段存一份，写入快照时用空视图占位，不改写调用方内存对象。 */
+function stripStoredParsedBinaryBytes(parsed: unknown, bytes: Uint8Array): {parsed: unknown; shared: boolean} {
+    if (!parsed || typeof parsed !== 'object') return {parsed, shared: false};
+    const snapshot = parsed as {binary?: unknown};
+    const binary = snapshot.binary;
+    if (!binary || typeof binary !== 'object') return {parsed, shared: false};
+    const binaryRecord = binary as {bytes?: unknown};
+    if (!(binaryRecord.bytes instanceof Uint8Array) || !bytesEqual(binaryRecord.bytes, bytes)) {
+        return {parsed, shared: false};
+    }
+    return {parsed: {...snapshot, binary: {...binaryRecord, bytes: EMPTY_BYTES}}, shared: true};
+}
+
+function prepareRecordForStorage(record: StoredDocumentHistoryRecord, storageVersion: string): StoredDocumentHistoryRecord {
+    const {bypassCache, parsedBinaryShared: _ignoredShared, ...snapshot} = record;
+    const {parsed, shared} = stripStoredParsedBinaryBytes(snapshot.parsed, record.bytes);
+    return {
+        ...snapshot,
+        ...(shared ? {parsed, parsedBinaryShared: true} : {}),
+        ...(bypassCache === true ? {bypassCache: true} : {}),
+        storageVersion,
+        bytes: record.bytes,
+        translations: [...record.translations],
+        retainedRevisions: normalizeDocumentRetainedRevisions(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : []),
+    };
+}
+
+/** 兼容旧记录；不把字符串、数字或其它 truthy 值当作用户确认的重译策略，并恢复共享的解析二进制视图。 */
+function hydrateDocumentHistoryRecord(record: StoredDocumentHistoryRecord): DocumentHistoryRecord {
+    const {bypassCache, parsedBinaryShared, ...snapshot} = record;
+    if (parsedBinaryShared === true && snapshot.parsed && typeof snapshot.parsed === 'object') {
+        const parsedRecord = snapshot.parsed as {binary?: unknown};
+        if (parsedRecord.binary && typeof parsedRecord.binary === 'object') {
+            snapshot.parsed = {...parsedRecord, binary: {...parsedRecord.binary, bytes: snapshot.bytes}};
+        }
+    }
     return bypassCache === true ? {...snapshot, bypassCache: true} : snapshot;
 }
 
@@ -484,7 +557,7 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
     const loadChecked: DocumentHistory['loadChecked'] = id => guarded<Awaited<ReturnType<DocumentHistory['loadChecked']>>>({status: 'unavailable'}, async signal => {
         let result: Awaited<ReturnType<DocumentHistory['loadChecked']>> = {status: 'unavailable'};
         await write(signal, (target, meta) => readVersion(target, meta, id, (record, version) => {
-            result = {status: 'ok', record: record ? normalizeDocumentHistoryCachePolicy(record) : null, version};
+            result = {status: 'ok', record: record ? hydrateDocumentHistoryRecord(record) : null, version};
         }));
         return result;
     });
@@ -492,12 +565,16 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
     const saveChecked: DocumentHistory['saveChecked'] = (record, expected) => guarded<CheckedSave>({status: 'unavailable'}, async signal => {
         if (!record.id || record.bytes.byteLength > DOCUMENT_HISTORY_MAX_BYTES) return {status: 'unavailable'};
         const version = `v:${globalThis.crypto.randomUUID()}`;
-        const saved = {...normalizeDocumentHistoryCachePolicy(record), storageVersion: version, bytes: record.bytes.slice(), translations: [...record.translations],
-            retainedRevisions: normalizeDocumentRetainedRevisions(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : [])};
+        const saved = prepareRecordForStorage(record, version);
         let conflict = false;
-        await write(signal, (target, meta) => readVersion(target, meta, record.id, (_current, actual) => {
+        await write(signal, (target, meta) => readVersion(target, meta, record.id, (current, actual) => {
             if (actual !== expected) {conflict = true;return;}
-            nextOrder(target, meta, order => {target.put({...saved, storageOrder: order});enforceLimit(target, meta, record.id, signal);});
+            nextOrder(target, meta, order => {
+                target.put({...saved, storageOrder: order});
+                if (!current || !(current.bytes instanceof Uint8Array) || saved.bytes.byteLength > current.bytes.byteLength) {
+                    enforceLimit(target, meta, record.id, signal);
+                }
+            });
         }));
         return conflict ? {status: 'conflict'} : {status: 'saved', version};
     });
@@ -510,8 +587,7 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
         saveChecked,
         save: record => guarded(false, async signal => {
             if (!record.id || record.bytes.byteLength > DOCUMENT_HISTORY_MAX_BYTES) return false;
-            const saved = {...normalizeDocumentHistoryCachePolicy(record), storageVersion: `v:${globalThis.crypto.randomUUID()}`, bytes: record.bytes.slice(), translations: [...record.translations],
-                retainedRevisions: normalizeDocumentRetainedRevisions(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : [])};
+            const saved = prepareRecordForStorage(record, `v:${globalThis.crypto.randomUUID()}`);
             await write(signal, (target, meta) => nextOrder(target, meta, order => {target.put({...saved, storageOrder: order});enforceLimit(target, meta, record.id, signal);}));
             return true;
         }),

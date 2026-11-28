@@ -1,14 +1,17 @@
 <!--
 @file src/features/settings/ui/components/PopupLayoutPreview.vue
 文件职责：在菜单栏布局设置中把用户当前的区域顺序、快捷入口顺序和显隐结果投影到真实的菜单栏预览上，并提供直接拖动排序。
-主要内容：按保存的顺序筛出可见区域与快捷入口，交给与风格预览共用的 PopupPreview 渲染；维护两级拖放与键盘排序控制器，切换编辑层级时结束未完成的拖放，并向读屏播报移动结果。
+主要内容：通过 `.popup-skin-scope` 局部容器按用户所选 Popup 皮肤与当前明暗模式渲染共用的 PopupPreview，既保持设置页自身不受皮肤污染，又让布局预览忠实呈现真实弹窗外观；维护两级拖放与键盘排序控制器，切换编辑层级时结束未完成的拖放，并向读屏播报移动结果。
 模块边界：本组件只消费外部投影后的布局数据，通过排序事件编辑布局，不读写配置或浏览器状态，不绘制菜单栏本身，也不执行 Popup 的业务行为。
 -->
 <template>
   <section
-    class="popup-layout-live-preview"
+    class="popup-layout-live-preview popup-skin-scope"
+    :data-interface-skin="skin.value"
+    :data-interface-skin-kind="skin.kind"
     :data-preview-skin="skin.value"
     :data-preview-kind="skin.kind"
+    :data-popup-theme="effectiveTheme"
     :style="{'--interface-popup-width': `${skin.popupWidth}px`}"
     role="group"
     :aria-label="previewAriaLabel"
@@ -39,7 +42,7 @@ interface PreviewLayoutItem {
   visible: boolean
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   skin: InterfaceSkinOption
   skinLabel: string
   moduleItems: readonly PreviewLayoutItem[]
@@ -47,7 +50,10 @@ const props = defineProps<{
   quickFeatureItems: readonly PreviewLayoutItem[]
   quickFeatureOrder: readonly string[]
   editScope: 'popupModule' | 'quickFeature'
-}>()
+  appDark?: boolean
+}>(), {
+  appDark: false,
+})
 const {t} = useUiI18n()
 const emit = defineEmits<{
   'update:moduleOrder': [order: string[]]
@@ -55,6 +61,7 @@ const emit = defineEmits<{
   'edit:scope': [scope: 'popupModule' | 'quickFeature']
 }>()
 const announcement = ref('')
+const effectiveTheme = computed<'light' | 'dark'>(() => props.skin.toneMode === 'dark' ? 'dark' : props.appDark ? 'dark' : 'light')
 
 function orderItems(items: readonly PreviewLayoutItem[], order: readonly string[]): PreviewLayoutItem[] {
   const byId = new Map(items.map((item) => [item.id, item]))

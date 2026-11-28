@@ -24,8 +24,9 @@ export function hasCustomPdfAssetRoot(): boolean {
 }
 
 export function getPdfResources(): PdfRuntimeResources {
+    const origin = typeof window === 'undefined' ? '' : window.location?.origin || '';
     return installed ?? {
-        assetRoot: typeof window === 'undefined' ? '' : `${window.location.origin}/pdfjs`,
+        assetRoot: origin && origin !== 'null' ? `${origin}/pdfjs` : '',
         workerUrl: defaultWorkerUrl,
     };
 }

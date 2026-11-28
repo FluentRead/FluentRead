@@ -26,8 +26,8 @@ import {
 import { Config, normalizeConfig } from '@/src/core/config/model'
 import { popupQuickFeatureIconPaths, popupQuickFeatureIconTones } from '@/src/ui/popupQuickFeatureIcons'
 
-describe('界面皮肤与栏目配置', () => {
-  it('默认保留当前界面并显示所有 Popup 栏目', () => {
+describe('Popup 皮肤与栏目配置', () => {
+  it('默认保留当前界面并注册 3 大系列 12 套全新 Popup 皮肤', () => {
     const config = new Config()
 
     expect(config.interfaceSkin).toBe('default')
@@ -38,55 +38,60 @@ describe('界面皮肤与栏目配置', () => {
     expect(config.popupQuickFeatureVisibility).toEqual(DEFAULT_POPUP_QUICK_FEATURE_VISIBILITY)
     const expectedSkins = [
       'default',
-      'minimal',
-      'compact',
-      'contrast',
-      'qinghua',
-      'zhusha',
-      'shuimo',
-      'zhuqing',
-      'ouhe',
-      'xiangse',
-      'qinglv',
-      'yuebai',
-      'xuanqing',
-      'wujin',
+      'liquid-glass',
+      'aurora',
+      'tactile',
+      'brutalist',
+      'cyber',
+      'retro-os',
+      'terminal',
+      'editorial',
+      'sakura',
+      'matcha',
+      'midnight-gold',
     ]
     expect(interfaceSkinOptions.map((item) => item.value)).toEqual(expectedSkins)
     expect(interfaceSkinOptions.map((item) => item.label)).toEqual([
-      '默认风格',
-      '简约风格',
-      '紧凑风格',
-      '高对比 ⚡',
-      '青花',
-      '朱砂',
-      '水墨',
-      '竹青',
-      '藕荷',
-      '缃色',
-      '青绿',
-      '月白',
-      '玄青',
-      '乌金',
+      '默认经典',
+      '液态玻璃',
+      '极光幻彩',
+      '拟物硬件',
+      '新粗野波普',
+      '赛博霓虹',
+      '经典复古桌面',
+      '极客终端',
+      '典藏画报',
+      '樱雾物语',
+      '宇治手账',
+      '黑金典藏',
     ])
-    expect(interfaceSkinGroups.map((item) => item.label)).toEqual(['效率与可读性', '传统色风格'])
-    expect(interfaceSkinGroups.map((item) => item.value)).toEqual(['utility', 'palette'])
-    expect(interfaceSkinOptions.filter((item) => item.group === 'utility')).toHaveLength(4)
-    expect(interfaceSkinOptions.filter((item) => item.group === 'palette')).toHaveLength(10)
-    expect(new Set(interfaceSkinOptions.map((item) => JSON.stringify(item.preview))).size).toBe(14)
-    // 缩略图用注册表里的静态取值画出版面、品牌行、卡片与主按钮；风格不再登记任何背景图案。
+    expect(interfaceSkinGroups.map((item) => item.value)).toEqual(['atmosphere', 'expressive', 'editorial'])
+    expect(interfaceSkinGroups.map((item) => item.label)).toEqual(['光影与材质', '潮流与个性', '东方与人文'])
+    for (const group of interfaceSkinGroups) {
+      expect(interfaceSkinOptions.filter((item) => item.group === group.value)).toHaveLength(4)
+    }
+    expect(new Set(interfaceSkinOptions.map((item) => JSON.stringify(item.preview))).size).toBe(12)
+
     const hex = /^#[0-9a-f]{6}$/
-    const fill = /^(#[0-9a-f]{6}|linear-gradient\(\d+deg(, #[0-9a-f]{6}){2,3}\))$/
-    for (const {kind, preview} of interfaceSkinOptions) {
-      for (const color of [preview.canvas, preview.surface, preview.border, preview.ink, preview.title, preview.accent]) expect(color).toMatch(hex)
-      expect(preview.backdrop).toMatch(fill)
-      expect(preview.action).toMatch(fill)
-      expect(preview.radius).toBeGreaterThanOrEqual(0)
-      expect(preview.radius).toBeLessThanOrEqual(10)
-      // 传统色风格全部平涂：缩略图里的版面与主按钮也只能是纯色。
-      if (kind === 'palette') {
-        expect(preview.backdrop).toBe(preview.canvas)
-        expect(preview.action).toMatch(hex)
+    const fill = /^(#[0-9a-f]{6}|linear-gradient\(\d+deg(, #[0-9a-f]{6}( \d+%)?){2,3}\))$/
+    for (const skin of interfaceSkinOptions) {
+      expect(['default', 'craft']).toContain(skin.kind)
+      expect(['adaptive', 'dark']).toContain(skin.toneMode)
+      expect(skin.preview.cardStyle).toBe(skin.value)
+      expect(skin.preview.panelRadius).toBeGreaterThanOrEqual(0)
+      expect(skin.preview.panelRadius).toBeLessThanOrEqual(14)
+      expect(skin.preview.controlRadius).toBeGreaterThanOrEqual(0)
+      expect(skin.preview.controlRadius).toBeLessThanOrEqual(10)
+      expect([0, 1, 2]).toContain(skin.preview.borderWidth)
+      expect(['square', 'rounded', 'circle']).toContain(skin.preview.iconShape)
+      for (const tone of [skin.preview.light, skin.preview.dark]) {
+        for (const color of [tone.mat, tone.canvas, tone.surface, tone.surfaceSoft, tone.border, tone.ink, tone.muted, tone.accent, tone.actionInk, tone.iconBg, tone.iconFg, ...tone.swatches]) {
+          expect(color).toMatch(hex)
+        }
+        expect(tone.actionBg).toMatch(fill)
+      }
+      if (skin.toneMode === 'dark') {
+        expect(skin.preview.light).toEqual(skin.preview.dark)
       }
     }
     expect(interfaceSkinOptions.some(item => 'motif' in item)).toBe(false)
@@ -104,12 +109,16 @@ describe('界面皮肤与栏目配置', () => {
     ])
     expect(interfaceFontOptions.every((item) => item.fontFamily.includes('sans-serif'))).toBe(true)
     expect(interfaceFontOptions.every((item) => item.labelKey.startsWith('settings.interface.font.'))).toBe(true)
-    expect(normalizeConfig({interfaceSkin: 'shuimo'}).interfaceSkin).toBe('shuimo')
+    expect(normalizeConfig({interfaceSkin: 'liquid-glass'}).interfaceSkin).toBe('liquid-glass')
     expect(normalizeConfig({interfaceFont: 'noto-sans-sc'}).interfaceFont).toBe('noto-sans-sc')
     expect(interfaceSkinOptions.every((item) => interfaceSkinUsesContentHeight(item.value))).toBe(true)
-    expect(interfaceSkinOptions.filter((item) => !['minimal', 'compact'].includes(item.value)).every((item) => item.popupWidth === 320)).toBe(true)
-    expect(getInterfaceSkinOption('minimal').popupWidth).toBe(310)
-    expect(getInterfaceSkinOption('compact').popupWidth).toBe(300)
+    expect(getInterfaceSkinOption('default').popupWidth).toBe(320)
+    expect(getInterfaceSkinOption('liquid-glass').popupWidth).toBe(324)
+    expect(getInterfaceSkinOption('aurora').popupWidth).toBe(322)
+    expect(getInterfaceSkinOption('retro-os').popupWidth).toBe(320)
+    expect(getInterfaceSkinOption('cyber').toneMode).toBe('dark')
+    expect(getInterfaceSkinOption('terminal').toneMode).toBe('dark')
+    expect(getInterfaceSkinOption('midnight-gold').toneMode).toBe('dark')
     expect(interfaceVisibilityOptions.map((item) => item.key)).toEqual([
       'popupQuickFeatures',
       'popupSiteRule',
@@ -217,21 +226,30 @@ describe('界面皮肤与栏目配置', () => {
     expect(Object.keys(popupQuickFeatureIconPaths).sort()).toEqual(ids)
     expect(Object.keys(popupQuickFeatureIconTones).sort()).toEqual(ids)
     for (const id of ids) {
-      // 线条图标画在 24×24 的画布上，路径由若干以 M 开头的子路径组成。
       expect(popupQuickFeatureIconPaths[id]).toMatch(/^M[\d\s.a-zA-Z-]+$/)
       expect(['rose', 'violet', 'amber', 'teal', 'blue']).toContain(popupQuickFeatureIconTones[id])
     }
     expect(new Set(Object.values(popupQuickFeatureIconTones)).size).toBe(5)
   })
 
-  it('只接受注册皮肤，并为升级旧配置补齐栏目开关', () => {
+  it('所有历史旧皮肤与未知 ID 稳定兜底回到默认皮肤，并保留当前注册皮肤', () => {
     for (const skin of interfaceSkinOptions) {
       expect(normalizeInterfaceSkin(skin.value)).toBe(skin.value)
     }
-    expect(normalizeInterfaceSkin('plain')).toBe('default')
-    expect(normalizeInterfaceSkin('soft')).toBe('default')
-    expect(normalizeInterfaceSkin('unknown')).toBe('default')
-    expect(normalizeInterfaceSkin(null)).toBe('default')
+    const legacyOrUnknownSkins = [
+      'plain', 'soft', 'minimal', 'compact', 'contrast',
+      'qinghua', 'zhusha', 'shuimo', 'zhuqing', 'ouhe',
+      'xiangse', 'qinglv', 'yuebai', 'xuanqing', 'wujin',
+      'cheese', 'ocean', 'emoji', 'midnight', 'paper', 'arcade', 'sunset',
+      'zen', 'dense', 'high-contrast', 'linear', 'nordic', 'raycast',
+      'obsidian', 'washi', 'craft', 'botanical', 'braun',
+      'constructor', '__proto__', 'unknown', '', null, undefined, 42,
+    ]
+    for (const legacy of legacyOrUnknownSkins) {
+      expect(normalizeInterfaceSkin(legacy), String(legacy)).toBe('default')
+      expect(getInterfaceSkinOption(legacy).value, String(legacy)).toBe('default')
+      expect(normalizeConfig({interfaceSkin: legacy as string}).interfaceSkin, String(legacy)).toBe('default')
+    }
     for (const font of interfaceFontOptions) {
       expect(normalizeInterfaceFont(font.value)).toBe(font.value)
     }
@@ -239,37 +257,10 @@ describe('界面皮肤与栏目配置', () => {
     expect(normalizeInterfaceFont(null)).toBe(DEFAULT_INTERFACE_FONT)
     expect(getInterfaceFontOption('noto-sans-sc').fontFamily).toContain('Noto Sans SC')
     expect(getInterfaceFontOption('unknown').value).toBe(DEFAULT_INTERFACE_FONT)
-    expect(getInterfaceSkinOption('qinghua').label).toBe('青花')
-    expect(getInterfaceSkinOption('qinghua').preview.action).toBe('#183a65')
-    expect(getInterfaceSkinOption('zhusha').preview.accent).toBe('#c3272b')
-    expect(getInterfaceSkinOption('xiangse').preview.action).toBe('#f0c239')
-    expect(getInterfaceSkinOption('yuebai').preview.canvas).toBe('#d6ecf0')
-    expect(getInterfaceSkinOption('wujin').description).toContain('始终为深色')
-    // 已下线的十套风格换成接替它的传统色风格，保存过旧 ID 的配置不会退回默认界面。
-    expect(Object.fromEntries(['cheese', 'ocean', 'matcha', 'sakura', 'emoji', 'midnight', 'paper', 'aurora', 'arcade', 'sunset']
-      .map((retired) => [retired, normalizeInterfaceSkin(retired)]))).toEqual({
-      cheese: 'xiangse',
-      ocean: 'yuebai',
-      matcha: 'zhuqing',
-      sakura: 'ouhe',
-      emoji: 'ouhe',
-      midnight: 'xuanqing',
-      paper: 'shuimo',
-      aurora: 'xuanqing',
-      arcade: 'qinglv',
-      sunset: 'zhusha',
-    })
-    expect(normalizeConfig({interfaceSkin: 'midnight'}).interfaceSkin).toBe('xuanqing')
-    expect(getInterfaceSkinOption('constructor').value).toBe('default')
-    expect(getInterfaceSkinOption('unknown').value).toBe('default')
-    expect(getInterfaceSkinOption(null).value).toBe('default')
     expect(interfaceSkinUsesContentHeight('default')).toBe(true)
-    expect(interfaceSkinUsesContentHeight('minimal')).toBe(true)
-    expect(interfaceSkinUsesContentHeight('shuimo')).toBe(true)
+    expect(interfaceSkinUsesContentHeight('liquid-glass')).toBe(true)
+    expect(interfaceSkinUsesContentHeight('cyber')).toBe(true)
     expect(interfaceSkinUsesContentHeight('unknown')).toBe(true)
-    expect(getInterfaceSkinOption('default').popupWidth).toBe(320)
-    expect(getInterfaceSkinOption('minimal').popupWidth).toBe(310)
-    expect(getInterfaceSkinOption('compact').popupWidth).toBe(300)
     expect(getInterfaceSkinOption('unknown').popupWidth).toBe(320)
 
     expect(normalizeInterfaceVisibility({popupQuickFeatures: false})).toEqual({
@@ -291,14 +282,14 @@ describe('界面皮肤与栏目配置', () => {
 
   it('normalizeConfig 会清洗畸形的皮肤和栏目配置', () => {
     const normalized = normalizeConfig({
-      interfaceSkin: 'zhuqing',
+      interfaceSkin: 'matcha',
       interfaceVisibility: {popupQuickFeatures: false},
       popupModuleOrder: ['quickFeatures', 'translation', 'unknown', 'quickFeatures'],
       popupQuickFeatureOrder: ['document', 'hover', 'unknown', 'document'],
       popupQuickFeatureVisibility: {image: false},
     })
 
-    expect(normalized.interfaceSkin).toBe('zhuqing')
+    expect(normalized.interfaceSkin).toBe('matcha')
     expect(normalized.interfaceVisibility).toEqual({
       popupQuickFeatures: false,
       popupSiteRule: true,

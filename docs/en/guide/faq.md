@@ -1,79 +1,93 @@
----
-outline: false
----
+# Troubleshooting & FAQ
 
-# Frequently asked questions
+Before diving in, verify two basics: (1) the master extension toggle is on, and (2) you refreshed the webpage after installing or updating FluentRead. Browse common solutions by topic below.
 
-Make sure FluentRead is enabled. Refresh webpages after installation or an update, then follow the relevant checks below.
+## 1. Basics & webpage translation
 
-## Page translation does nothing
+### Nothing happens when clicking “Translate”
 
-1. Check the main switch and target language.
-2. Browser settings and extension stores are protected pages; try an ordinary article.
-3. Check the selected service under **Settings → Translation services**. Wait or switch services if it is busy.
+1. Verify the master switch is on and your **target language** differs from the page language.
+2. Browser settings pages (`chrome://`, `edge://`) and extension stores block scripts—test on a normal article.
+3. Run **Check connection** under **Settings → Translation providers**, or [switch providers](/en/config/translation-engines) if a free node is busy.
 
-## Only part of the page is translated
+### Only part of the page translates
 
-Scroll down: the default mode translates near your reading position. For missing menus, buttons, or article areas, check [Website reading area](/en/config/site-adaptation). Use [image](/en/guide/image-translation) or [area translation](/en/guide/area-translation) for text inside pictures and charts.
+Translation runs progressively as you scroll by default. If menus, buttons, or main content are still skipped, check [Site rules & reading area](/en/config/site-adaptation); for text inside images or charts, use [Image translation](/en/guide/image-translation) or [Area translation](/en/guide/area-translation).
 
-## Selection works, but whole-page translation fails
+### Selection works, but full-page translation does not
 
-Try a single paragraph, then check the [reading area](/en/config/site-adaptation). Content recognition or the larger number of page requests can cause this. Also check the service connection and allowance.
+Test a single paragraph with hover translation, then check [Site rules & reading area](/en/config/site-adaptation) and provider rate limits under [Request limits](/en/config/#request-limits).
 
-## How do I restore the original?
+### How do I restore the original or apply a new language/provider?
 
-Use the restore-page action in the extension menu. After changing languages, services, or base styles, restore the original before translating again.
+Click **Restore** in the popup (or press `Alt+T` / `Option+T`). After changing target language, provider, or base style, restore original first and translate again.
 
-## Why does Japanese appear in a Chinese translation?
+### Why did Japanese appear inside a Chinese translation?
 
-Check the target language, restore the original, and retry. Clear wrong-language responses trigger a retry or another free candidate; repeated failures are shown instead of cached. Short names, terms, and quotations may retain their original language.
+Verify your target language, restore, and retry. When a provider returns the wrong language for an entire passage, FluentRead retries or switches free candidates without caching broken output; short brand names or quotes may stay in their original script.
 
-## Can webmail messages be translated?
+### Can FluentRead translate webmail bodies?
 
-The older QQ Mail reading page and NetEase 163, 126, and yeah JS6 pages support email-body recognition. Open a message and try page or selection translation; refresh if needed. Compose editors are not treated as message bodies.
+Yes—legacy QQ Mail reading views and NetEase 163 / 126 / yeah JS6 reading views are supported (compose editors are left alone). Open an individual message and trigger full-page or selection translation.
 
-If text is still missed, report the domain, page path with parameters such as `sid` removed, browser version, and a redacted screenshot. Do not submit the email or login details.
+## 2. Selection, AI explanations & specific sites
 
-## Why is there no AI explanation?
+### Selection does not respond on DeepSeek pages
 
-Ordinary selection translation provides a translation only. Enable the [reading card](/en/guide/deepseek-harness), choose a configured AI service, select text, and start an action such as an explanation.
+Confirm **Selection translation** is enabled, update FluentRead, refresh DeepSeek, and select ordinary text inside an answer. FluentRead allows explicit user selections inside DeepSeek’s page-level `notranslate` wrapper while keeping inputs and hidden elements protected.
 
-## Image translation is still preparing
+### Why aren’t AI explanations showing in the selection card?
 
-Local OCR needs a recognition language pack on first use. Follow the download prompt and check the source language. Area translation can use model recognition when enabled and supported. For unreadable images, use a clearer original or a smaller selection.
+Selection cards default to fast translation and dictionary lookup without calling AI automatically. Enable **AI explanations** under [Selection translation settings](/en/guide/deepseek-harness), or click **Free AI explanations** in the card to try the keyless Bilibili option.
 
-## No subtitles appeared
+## 3. Images, video & local models
 
-Check that subtitle translation is enabled and the video has captions. X videos without captions may use local AI recognition after a model download; some videos cannot be read. See [Video subtitles](/en/guide/video-subtitles).
+### Image translation stays on “Preparing”
 
-## Where does my API key go?
+Local OCR downloads model files on first use (PaddleOCR ~30 MB by default). Confirm the prompt and verify your source language, or enable **Prefer model vision** in [Area translation](/en/guide/area-translation).
 
-Choose the service under **Settings → Translation services**, enter its URL, key, and model, then check the connection. Check account allowance too: a chat subscription may not include API use. Ollama also needs a running local server, a downloaded model, and permission for the extension to connect. See [Translation services](/en/config/translation-engines).
+### Video captions do not appear
 
-## Duplicate translations or broken layout
+Verify **Video subtitle translation** is enabled and the video provides native captions. For captionless X, Bilibili, or HTML media, trigger local AI transcription manually from the player menu (see [Video & meeting captions](/en/guide/video-subtitles)).
 
-Restore the original and disable browser translation or other translation extensions before trying again. If it persists, record the URL, steps, and a screenshot with private content removed.
+### Where are local models stored? Does uninstalling delete them?
 
-## Why do translations disappear when Font Rendering is enabled?
+- By default, models stay in your browser’s extension cache and can be deleted individually in model settings.
+- If **Share models across browsers** is enabled, files live in your chosen local folder and are **not** deleted when uninstalling or disconnecting.
+- Chrome/Edge built-in language packs are managed by the browser; manually extracted offline extension folders must be removed manually.
 
-Update FluentRead and refresh the webpage. If the conflict remains, temporarily disable the font script’s bold correction and report both versions with a public reproduction URL.
+### Do local models reload on every request or stay in memory forever? {#do-local-models-reload-on-every-request-or-stay-in-memory-forever}
 
-## Where are local translation models stored? Are they cleared on uninstall?
+Disk storage is separate from runtime RAM. Local translation, TTS, Whisper ASR, and OCR reuse loaded instances and **automatically unload when idle** (~1 minute on low-memory devices, ~3 minutes on standard devices, ~2 minutes when memory info is unavailable; active jobs are never interrupted). Unloading memory never deletes downloaded files. Built-in browser models and Ollama manage their own memory lifecycle.
 
-By default, downloaded models live in this browser’s extension cache. If you enable a shared model folder, those files live in the folder you selected; uninstalling or disconnecting does not delete them. You can delete browser-local cached models in settings. Chrome manages its own built-in translation packs. Manually downloaded extension archives and extracted folders need separate cleanup.
+## 4. API keys & connection errors
 
-## Do local models reload on every request or stay in memory forever?
+### Where do I enter API keys, and why does connection fail?
 
-Downloaded files and runtime memory are different. Local translation, read-aloud, speech recognition, and OCR reuse loaded resources and release them when idle. The usual wait is one minute on known low-memory devices, three minutes on other known devices, or two minutes when memory information is unavailable. Active tasks are not interrupted by the idle timer.
+Open **Settings → Translation providers**, pick your provider, enter endpoint/key/model, and run **Check connection**:
 
-Releasing memory keeps downloaded files for later loading. Several tools can use memory at once, so these times are not hard memory caps. Chrome’s built-in models and Ollama manage their own residency.
+- Consumer chat plans rarely include API credits—verify billing in the provider’s API console.
+- An HTTP 404 returning an HTML page usually means an incorrect endpoint path rather than an invalid key.
+- Ollama requires running locally with pulled models and allowed extension origin. See [Translation providers](/en/config/translation-engines).
 
-## Can I import an older backup?
+## 5. Layout conflicts & backups
 
-Import an older configuration JSON or backup under **Settings → Backup and restore → Local backup**, review the preview, and confirm. Full backups may include API keys and are unencrypted; keep them private.
+### Duplicate translations or broken layout
 
-If validation fails, keep the original file, update the extension, and retry. Report only the version and error message if it still fails, without attaching the full backup. See [Backup and sync](/en/config/backup-sync).
+Restore the original, disable built-in browser translation and other translation extensions so only FluentRead translates the page, then retry.
 
-## Still need help?
+### Translations disappear when using Font Rendering scripts
 
-Report browser and extension versions, a public URL, reproduction steps, and a redacted screenshot on [GitHub Issues](https://github.com/FluentRead/FluentRead/issues). Do not provide keys, cookies, or account details.
+Update FluentRead and refresh. If conflicts persist, temporarily disable bold-correction in the font script and report both versions with a public test URL.
+
+### Can I still import older backups?
+
+Import legacy JSON configs or backups under **Settings → Backup & restore → Local backup** and review the preview first (full backups are unencrypted and may contain API keys—keep them private). See [Backup & sync](/en/config/backup-sync).
+
+## Still stuck?
+
+Open an issue on [GitHub Issues](https://github.com/FluentRead/FluentRead/issues) with:
+
+1. Browser and FluentRead version numbers;
+2. A public URL and clear reproduction steps;
+3. Error codes or screenshots with all private data, cookies, and API keys removed.

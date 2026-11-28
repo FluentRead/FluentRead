@@ -47,7 +47,7 @@ defineProps<{
 }
 
 .settings-group-body {
-  overflow: hidden;
+  overflow: clip;
   border-radius: calc(var(--fr-card-radius, 14px) - 1px);
   background: transparent;
 }

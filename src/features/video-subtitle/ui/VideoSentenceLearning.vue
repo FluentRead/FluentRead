@@ -1,12 +1,12 @@
 <!--
  * @file src/features/video-subtitle/ui/VideoSentenceLearning.vue
  * 文件职责：为视频提供可关闭的完整句学习面板，可移出播放器并调整浮动高度。
- * 主要内容：普通 HTML 媒体增加有界虚拟字幕列表、点击原词的词典/翻译弹层及取消归属；以双语阅读卡呈现原句、可选本地读音、译文和按需讲解；服务与后台错误仅在错误展示边界本地化，字幕、译文与模型正文保留原值；索引跟随播放、合并快速换句的翻译请求，读音独立跟随固定句或历史句、失败可单独重试、收起时取消且不新增请求；短高换句只归顶自有整卡滚动区，按配置身份管理自动译文、人工草稿与准确的异步收藏状态。
+ * 主要内容：普通 HTML 媒体增加帧节流虚拟字幕列表、点击原词的词典/翻译弹层（含失败重试）及取消归属；以双语阅读卡呈现原句、可选共享或本地读音、译文（含防抖与有界瞬态重试）和按需讲解（重讲失败保留旧讲解、内联重试及 45s 停滞看门狗）；服务与后台错误仅在错误展示边界本地化，字幕、译文与模型正文保留原值；支持 s 重播、f 跟随与面板根部空格启停并跳过滑块快捷键；短高换句只归顶自有整卡滚动区，按配置身份管理自动译文、人工草稿与准确的异步收藏状态。
  * 材料关联：完整句收藏与问答引用归于可靠视频来源与原始时间，关闭、更换句子和隐私状态禁止迟到关联。规则断句沿用原字幕范围，切换共享时间的句子不重复跳转。
- * 模块边界：不创建或定位播放器，学习键只接受包含当前视频的显式逻辑播放器及面板自身，菜单让位限定已验证同视频范围；不采集音频或计算掌握状态，翻译沿用注入服务，卸载取消控制与迟到回写。
+ * 模块边界：不创建或定位播放器，学习键只接受包含当前视频的显式逻辑播放器及面板自身，菜单让位限定已验证同视频范围；不采集音频或计算掌握状态，翻译沿用注入服务，卸载取消控制、计时器与迟到回写。
  -->
 <template>
-  <section ref="panel" class="fr-video-learning" :class="{'is-collapsed': !expanded}" :style="appearanceStyle" :data-learning-layout="appearance.layout" role="region" :aria-label="t('video.learning.title')" tabindex="-1"
+  <section ref="panel" class="fr-video-learning" :class="{'is-collapsed': !expanded}" :data-learning-collapsed="!expanded ? 'true' : undefined" :style="appearanceStyle" :data-learning-layout="appearance.layout" role="region" :aria-label="t('video.learning.title')" tabindex="-1"
     :data-learning-sentence-id="sentence?.id" :data-learning-sentence-index="index" :data-learning-pinned="pinned"
     :data-start-ms="sentence?.startMs" :data-end-ms="sentence?.endMs" @click.stop @pointerdown.stop>
     <header class="fr-video-learning-header">
@@ -26,7 +26,7 @@
         <p class="fr-video-learning-original" data-learning-original><template v-if="platform === 'html'"><template v-for="(part, partIndex) in wordParts" :key="partIndex"><button v-if="part.weight > 0" type="button" class="fr-video-learning-word" aria-haspopup="dialog" :aria-expanded="wordLookup?.token === part.text" @click="lookupWord(part.text)">{{ part.text }}</button><template v-else>{{ part.text }}</template></template></template><template v-else>{{ sentence.text }}</template></p>
         <div v-if="wordLookup" class="fr-video-learning-word-popup" role="dialog" :aria-label="wordLookup.word" data-learning-word-popup>
           <button type="button" class="fr-video-learning-icon" :aria-label="t('video.learning.close')" data-learning-action="close-word" @click="closeWordLookup">×</button>
-          <strong>{{ wordLookup.word }}</strong><p role="status">{{ wordLookup.text || t('video.learning.wordLoading') }}</p><p v-for="definition in wordLookup.definitions" :key="definition">{{ definition }}</p>
+          <strong>{{ wordLookup.word }}</strong><p role="status">{{ wordLookup.text || t('video.learning.wordLoading') }}</p><button v-if="wordLookup.failed" type="button" class="fr-video-learning-text-button" data-learning-action="retry-word" @click="lookupWord(wordLookup.token)">{{ t('video.retryTranslation') }}</button><p v-for="definition in wordLookup.definitions" :key="definition">{{ definition }}</p>
         </div>
         <p v-if="splitSentence" class="fr-video-learning-hint" data-learning-timing-precision>{{ t('video.learning.cueEnvelope') }}</p>
         <p v-if="readingText" class="fr-video-learning-reading" :lang="`${readingLanguage}-Latn`" :aria-label="t(`video.readingAnnotation.${readingLanguage}`)" data-learning-reading>{{ readingText }}</p>
@@ -36,7 +36,7 @@
           <div class="fr-video-learning-card-heading"><span>{{ t('video.learning.translationTitle') }}</span><button type="button" class="fr-video-learning-text-button" :data-learning-action="editingTranslation ? 'done-translation' : 'edit-translation'" @click="editTranslation">{{ t(editingTranslation ? 'video.learning.done' : 'video.learning.edit') }}</button></div>
           <textarea v-if="editingTranslation" ref="translationEditor" v-model="translation" data-learning-translation :aria-label="t('video.learning.translation')" :placeholder="t('video.learning.editPlaceholder')" rows="2" maxlength="6000" @focus="pinCurrent" @input="onTranslationInput" />
           <p v-else class="fr-video-learning-translation" data-learning-translation-display :aria-busy="translating && !translationEdited" :class="{'is-loading': translating && !translation}">{{ translation || (translating ? t('video.learning.translating') : '') }}</p>
-          <div v-if="translationError" class="fr-video-learning-inline-error" role="alert"><span>{{ translateLegacy(translationError) }}</span><button type="button" class="fr-video-learning-text-button" @click="loadTranslation">{{ t('video.retryTranslation') }}</button></div>
+          <div v-if="translationError" class="fr-video-learning-inline-error" role="alert"><span>{{ translateLegacy(translationError) }}</span><button type="button" class="fr-video-learning-text-button" @click="loadTranslation()">{{ t('video.retryTranslation') }}</button></div>
         </div>
         <p class="fr-video-learning-mode-caption">{{ t('video.learning.mode') }}</p>
         <div class="fr-video-learning-mode" role="group" :aria-label="t('video.learning.mode')">
@@ -51,7 +51,7 @@
         </div>
         <details v-if="platform === 'html'" class="fr-video-learning-transcript" @toggle="onTranscriptToggle">
           <summary>{{ t('video.learning.transcript') }} · {{ sentences.length }}</summary>
-          <div v-if="transcriptOpen" ref="transcriptList" class="fr-video-learning-transcript-scroll" :style="{height: `${Math.min(4, sentences.length) * 56}px`}" @scroll="transcriptScroll = ($event.target as HTMLElement).scrollTop">
+          <div v-if="transcriptOpen" ref="transcriptList" class="fr-video-learning-transcript-scroll" :style="{height: `${Math.min(4, sentences.length) * 56}px`}" @scroll="onTranscriptScroll">
             <div :style="{height: `${sentences.length * 56}px`, position: 'relative'}">
               <button v-for="(item, offset) in visibleTranscript" :key="item.id" type="button" :style="{top: `${(transcriptStart + offset) * 56}px`}" :aria-current="index === transcriptStart + offset ? 'true' : undefined" :title="item.text" @click="chooseSentence(transcriptStart + offset, true)"><time>{{ formatTranscriptTime(item.startMs) }}</time>{{ item.text }}</button>
             </div>
@@ -61,7 +61,7 @@
         <p v-if="saved" role="status" class="fr-video-learning-status fr-video-learning-saved-status"><span>{{ t('video.learning.savedShort') }}</span><button type="button" class="fr-video-learning-text-button" data-learning-action="library" @click="openLibrary">{{ t('video.learning.library') }} ↗</button></p>
         <p v-if="helpOpen" class="fr-video-learning-hint" data-learning-help>{{ t('video.learning.hint') }}</p>
         <p v-if="notice" role="status" class="fr-video-learning-status">{{ notice }}</p>
-        <p v-if="error" role="alert" class="fr-video-learning-inline-error">{{ translateLegacy(error) }}</p>
+        <div v-if="error" class="fr-video-learning-inline-error"><span role="alert">{{ translateLegacy(error) }}</span><button v-if="explanationFailed" type="button" class="fr-video-learning-text-button" data-learning-action="retry-explanation" @click="explain">{{ t('video.retryTranslation') }}</button></div>
       </template>
       <p v-else class="fr-video-learning-empty">{{ t('video.learning.empty') }}</p>
     </div>
@@ -76,7 +76,7 @@
         <button type="button" class="fr-video-learning-save" data-learning-action="save" :data-learning-saved="saved" :disabled="saved || saving || explaining || !translation.trim() || (translating && !translationEdited)" :title="!translation.trim() ? t('video.learning.editPlaceholder') : undefined" @click="save"><svg v-if="saved" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m4 10 4 4 8-8" /></svg>{{ t(saving ? 'video.learning.saving' : saved ? 'video.learning.savedShort' : savedSnapshot ? 'video.learning.update' : 'video.learning.save') }}</button>
       </div>
     </footer>
-    <div v-show="floating" class="fr-video-learning-resize-handle" data-learning-resize-handle role="slider" tabindex="0" aria-orientation="vertical" :aria-label="t('video.learning.resize')" :title="t('video.learning.resize')" aria-valuemin="180" aria-valuemax="640" aria-valuenow="640"><span aria-hidden="true" /></div>
+    <div v-show="floating && expanded" class="fr-video-learning-resize-handle" data-learning-resize-handle role="slider" tabindex="0" aria-orientation="vertical" :aria-label="t('video.learning.resize')" :title="t('video.learning.resize')" aria-valuemin="180" aria-valuemax="640" aria-valuenow="640"><span aria-hidden="true" /></div>
   </section>
 </template>
 <script setup lang="ts">
@@ -87,6 +87,8 @@ import {config, subscribeConfig} from '@/src/services/config/store';
 import {getVideoSentenceLearningAppearanceCssVars, normalizeVideoSentenceLearningAppearance} from '@/src/core/config/videoSentenceLearningAppearance';
 import {sendRuntimeMessage} from '@/src/platform/browser/runtimeMessages';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
+import {getFullscreenElement} from '@/src/platform/dom/fullscreen';
+import {getReadingAnnotationLanguage} from '@/src/core/readingAnnotation';
 import {ReadingAnswer} from '@/src/features/reading-assistant/ui/answer/public';
 import {streamReading} from '@/src/features/reading-assistant/public';
 import {beginMaterialCapture, completeMaterialCapture, type MaterialSelection} from '@/src/features/vocabulary/material/public';
@@ -102,7 +104,8 @@ import {VideoReadingAnnotationSession} from '../content/readingAnnotationSession
 import {annotateVideoReading} from '../content/readingAnnotationClient';
 
 const props = defineProps<{video: HTMLMediaElement; player?: HTMLElement; cues: VideoSubtitleCue[]; platform: 'youtube' | 'x' | 'html'; sourceUrl?: string;
-  title: string; sourceLanguage: string; targetLanguage: string; translate: (text: string, signal: AbortSignal) => Promise<string>}>();
+  title: string; sourceLanguage: string; targetLanguage: string; translate: (text: string, signal: AbortSignal) => Promise<string>;
+  readingSession?: VideoReadingAnnotationSession}>();
 const emit = defineEmits<{close: []}>();
 const {t, translateLegacy} = useUiI18n();
 const appearance = ref(normalizeVideoSentenceLearningAppearance(config.videoSentenceLearningAppearance));
@@ -114,15 +117,36 @@ const sentenceTimeIndex = computed(() => createSemanticLearningTimeIndex(sentenc
 const index = ref(0);
 const sentence = computed(() => sentences.value[index.value]);
 const wordParts = computed(() => splitVideoKaraokeParts(sentence.value?.text || ''));
-const wordLookup = ref<{word: string; token: string; text: string; definitions: string[]} | null>(null);
+const wordLookup = ref<{word: string; token: string; text: string; definitions: string[]; failed: boolean} | null>(null);
 let wordAbort: AbortController | undefined;
 const transcriptOpen = ref(false), transcriptScroll = ref(0), transcriptList = ref<HTMLElement>();
+let transcriptScrollFrame: number | undefined;
 const transcriptStart = computed(() => Math.max(0, Math.floor(transcriptScroll.value / 56) - 3));
 const visibleTranscript = computed(() => sentences.value.slice(transcriptStart.value, transcriptStart.value + 14));
 const formatTranscriptTime = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+function cancelTranscriptScrollFrame(): void {
+  if (transcriptScrollFrame !== undefined) {
+    cancelAnimationFrame(transcriptScrollFrame);
+    transcriptScrollFrame = undefined;
+  }
+}
+function onTranscriptScroll(event: Event): void {
+  const target = event.target as HTMLElement | null;
+  if (!target) return;
+  if (typeof requestAnimationFrame !== 'function') {
+    transcriptScroll.value = target.scrollTop;
+    return;
+  }
+  if (transcriptScrollFrame !== undefined) return;
+  transcriptScrollFrame = requestAnimationFrame(() => {
+    transcriptScrollFrame = undefined;
+    transcriptScroll.value = target.scrollTop;
+  });
+}
 function onTranscriptToggle(event: Event): void {
   transcriptOpen.value = (event.target as HTMLDetailsElement).open;
-  if (transcriptOpen.value) void nextTick(() => {if (transcriptList.value) transcriptList.value.scrollTop = index.value * 56;});
+  if (!transcriptOpen.value) { cancelTranscriptScrollFrame(); return; }
+  void nextTick(() => {if (transcriptList.value) transcriptList.value.scrollTop = index.value * 56;});
 }
 function closeWordLookup(): void {wordAbort?.abort(); wordAbort = undefined; wordLookup.value = null;}
 async function lookupWord(text: string): Promise<void> {
@@ -130,14 +154,17 @@ async function lookupWord(text: string): Promise<void> {
   if (!word) return;
   closeWordLookup(); pinned.value = true;
   const abort = new AbortController(); wordAbort = abort;
-  const lookup = {word, token: text, text: '', definitions: [] as string[]}; wordLookup.value = lookup;
+  const lookup = {word, token: text, text: '', definitions: [] as string[], failed: false}; wordLookup.value = lookup;
   const current = () => active && wordAbort === abort && !abort.signal.aborted;
   const dictionary = sendRuntimeMessage({type: 'selectionWordLookup', word, targetLanguage: props.targetLanguage, translateFields: false})
     .then(response => {if (!current()) return; const data = (response as {data?: {meanings?: {definitions: {definition: string}[]}[]}})?.data;
       wordLookup.value!.definitions = data?.meanings?.flatMap(meaning => meaning.definitions.map(item => item.definition)).slice(0, 3) || [];});
   const translated = props.translate(word, abort.signal).then(value => {if (current()) wordLookup.value!.text = value;});
   const results = await Promise.allSettled([dictionary, translated]);
-  if (current() && results[1].status === 'rejected') wordLookup.value!.text = t('video.learning.translationFailed');
+  if (current() && results[1].status === 'rejected') {
+    wordLookup.value!.text = t('video.learning.translationFailed');
+    wordLookup.value!.failed = true;
+  }
 }
 watch(index, () => {
   if (transcriptOpen.value && !pinned.value) void nextTick(() => {if (transcriptList.value) transcriptList.value.scrollTop = index.value * 56;});
@@ -146,12 +173,17 @@ const splitSentence = computed(() => sentence.value?.id !== sentence.value?.play
 const replayLabel = computed(() => t(splitSentence.value ? 'video.learning.replaySource' : 'video.learning.replay'));
 const mode = ref<SentencePlaybackMode>('off');
 const translating = ref(false); const translation = ref(''); const translationEdited = ref(false); const translationError = ref('');
-const explanation = ref(''); const explaining = ref(false); const saving = ref(false); const notice = ref(''); const error = ref('');
+const explanation = ref(''); const explaining = ref(false); const explanationFailed = ref(false); const saving = ref(false); const notice = ref(''); const error = ref('');
+const EXPLANATION_STALL_TIMEOUT_MS = 45_000;
+const TRANSLATION_RETRY_DELAY_MS = 1_200;
 let controller: SentencePlaybackController | undefined;
 let request: {cancel: () => void} | undefined;
+let explanationStallTimer: ReturnType<typeof setTimeout> | undefined;
 let translationAbort: AbortController | undefined;
 let translationTimer: ReturnType<typeof setTimeout> | undefined;
+let translationRetryTimer: ReturnType<typeof setTimeout> | undefined;
 let deferredSentenceId: string | undefined;
+let initialized = false;
 let generation = 0; let active = true; let explanationGeneration = 0;
 const pinned = ref(false); const expanded = ref(true); const editingTranslation = ref(false); const editingExplanation = ref(false); const explanationStopped = ref(false);
 const translationEditor = ref<HTMLTextAreaElement>(); const explanationEditor = ref<HTMLTextAreaElement>();
@@ -172,11 +204,26 @@ const timeLabel = computed(() => {
   const format = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
   return sentence.value ? `${format(sentence.value.startMs)}–${format(sentence.value.endMs)}` : '';
 });
-function cancelExplanation(): void { explanationGeneration++; request?.cancel(); request = undefined; explaining.value = false; }
-function cancelTranslationTimer(): void { if (translationTimer !== undefined) clearTimeout(translationTimer); translationTimer = undefined; }
+function clearExplanationStallTimer(): void {
+  if (explanationStallTimer !== undefined) clearTimeout(explanationStallTimer);
+  explanationStallTimer = undefined;
+}
+function cancelExplanation(): void { clearExplanationStallTimer(); explanationGeneration++; request?.cancel(); request = undefined; explaining.value = false; }
+function cancelTranslationTimer(): void {
+  if (translationTimer !== undefined) clearTimeout(translationTimer);
+  translationTimer = undefined;
+  if (translationRetryTimer !== undefined) clearTimeout(translationRetryTimer);
+  translationRetryTimer = undefined;
+}
 function cancelTranslation(): void { cancelTranslationTimer(); translationAbort?.abort(); translationAbort = undefined; translating.value = false; }
 function cancelPending(): void { closeWordLookup(); generation++; cancelExplanation(); cancelTranslation(); }
 function canTranslate(): boolean { return active && expanded.value && config.on && config.videoTranslationEnabled && config.videoSubtitleVisible; }
+function isRetryableTranslationError(cause: unknown): boolean {
+  if (!(cause instanceof Error)) return false;
+  const message = cause.message;
+  if (/\b(?:400|401|403|invalid[_\s-]?api[_\s-]?key|unauthorized|forbidden)\b/i.test(message)) return false;
+  return /\b(?:429|500|502|503|504|timeout|timed?\s*out|network|fetch|rate\s*limit|temporar|unavailable|overloaded|econnreset)\b|超时|网络|繁忙|限流|暂不可用/i.test(message);
+}
 function scheduleTranslation(delay = 0): void {
   if (!canTranslate() || !sentence.value || translation.value || translationEdited.value) return;
   if (translating.value && translationAbort && !translationAbort.signal.aborted) return;
@@ -187,7 +234,10 @@ function scheduleTranslation(delay = 0): void {
 function followPlayback(): void {
   if (pinned.value || mode.value !== 'off' || props.video.seeking) return;
   const current = sentenceTimeIndex.value.findIndexAtTime(props.video.currentTime * 1000, index.value);
-  if (current >= 0 && current !== index.value) index.value = current;
+  if (current >= 0 && current !== index.value) {
+    if (initialized) deferredSentenceId = sentences.value[current].id;
+    index.value = current;
+  }
 }
 function onSeeking(): void { if (!controller?.getState().sentence) pinned.value = false; }
 function pinCurrent(): void { pinned.value = true; }
@@ -196,14 +246,24 @@ function editTranslation(): void { editingTranslation.value = !editingTranslatio
 function editExplanation(): void { editingExplanation.value = !editingExplanation.value; if (editingExplanation.value) { pinCurrent(); void nextTick(() => { if (active && editingExplanation.value) explanationEditor.value?.focus(); }); } }
 function onContextToggle(event: Event): void { if ((event.target as HTMLDetailsElement).open) pinCurrent(); }
 function returnToCurrent(): void { controller?.stop(); pinned.value = false; editingTranslation.value = false; editingExplanation.value = false; followPlayback(); }
-function stopExplanation(): void { cancelExplanation(); explanationStopped.value = true; notice.value = t('video.learning.stopped'); }
+function stopExplanation(): void { cancelExplanation(); explanationFailed.value = false; explanationStopped.value = true; notice.value = t('video.learning.stopped'); }
 function loadReadingAnnotation(): void {
   const current = ++readingGeneration;
   readingSession.cancelPending();
   readingText.value = ''; readingLanguage.value = ''; readingError.value = false;
   if (!active || !expanded.value || !readingEnabled.value || !sentence.value) return;
   const source = sentence.value.text;
-  void readingSession.request(source, props.sourceLanguage || config.from || 'auto').then(result => {
+  const readingLang = getReadingAnnotationLanguage(source, props.sourceLanguage || config.from || 'auto');
+  if (!readingLang) return;
+  const shared = props.readingSession?.peek(source, readingLang);
+  if (shared !== undefined) {
+    if (shared?.text) {
+      readingText.value = shared.text;
+      readingLanguage.value = shared.language.split('-')[0];
+    }
+    return;
+  }
+  void readingSession.request(source, readingLang).then(result => {
     if (!active || current !== readingGeneration || !expanded.value || !readingEnabled.value || !result?.text) return;
     readingText.value = result.text; readingLanguage.value = result.language.split('-')[0];
   }).catch(() => {
@@ -238,9 +298,10 @@ watch([() => sentence.value?.id, () => props.sourceLanguage, () => props.targetL
   cancelPending(); const draft = drafts.get(JSON.stringify(next));
   translationEdited.value = draft?.edited || false;
   translation.value = draft && (draft.edited || draft.revision === translationRevision) ? draft.translation : '';
-  explanation.value = draft?.explanation || ''; explanationStopped.value = draft?.stopped || false; savedSnapshot.value = draft?.savedSnapshot || '';
+  explanation.value = draft?.explanation || ''; explanationStopped.value = draft?.stopped || false; explanationFailed.value = false; savedSnapshot.value = draft?.savedSnapshot || '';
   editingTranslation.value = false; editingExplanation.value = false; error.value = ''; notice.value = ''; translationError.value = '';
   scheduleTranslation(next[0] === deferredSentenceId ? 120 : 0); deferredSentenceId = undefined;
+  initialized = true;
   if (next[0] !== previous?.[0]) void nextTick(() => {
     if (!active || !body.value) return;
     body.value.scrollTop = 0;
@@ -249,9 +310,9 @@ watch([() => sentence.value?.id, () => props.sourceLanguage, () => props.targetL
 }, {immediate: true});
 watch(expanded, (open) => {
   if (open) scheduleTranslation();
-  else if (translationTimer !== undefined) { cancelTranslationTimer(); translating.value = false; }
+  else if (translationTimer !== undefined || translationRetryTimer !== undefined) { cancelTranslationTimer(); translating.value = false; }
 });
-async function loadTranslation(): Promise<void> {
+async function loadTranslation(attempt = 0): Promise<void> {
   cancelTranslationTimer();
   if (!sentence.value || !canTranslate() || translationEdited.value) return;
   translationAbort?.abort(); const abort = new AbortController(); translationAbort = abort;
@@ -263,7 +324,15 @@ async function loadTranslation(): Promise<void> {
       translation.value = result;
     }
   } catch (cause) {
-    if (active && owner === generation && translationAbort === abort && !abort.signal.aborted) translationError.value = cause instanceof Error ? cause.message : t('video.learning.translationFailed');
+    if (active && owner === generation && translationAbort === abort && !abort.signal.aborted) {
+      translationError.value = cause instanceof Error ? cause.message : t('video.learning.translationFailed');
+      if (attempt === 0 && isRetryableTranslationError(cause) && canTranslate()) {
+        translationRetryTimer = setTimeout(() => {
+          translationRetryTimer = undefined;
+          void loadTranslation(1);
+        }, TRANSLATION_RETRY_DELAY_MS);
+      }
+    }
   } finally { if (active && owner === generation && translationAbort === abort) translating.value = false; }
 }
 function step(direction: number): void { chooseSentence(Math.max(0, Math.min(sentences.value.length - 1, index.value + direction))); }
@@ -280,7 +349,7 @@ async function replay(): Promise<void> {
   if (!sentence.value) return;
   pinned.value = true; controller?.select(sentence.value, mode.value, true);
   const owner = generation;
-  try { await props.video.play(); } catch { if (active && owner === generation) error.value = t('video.learning.playFailed'); }
+  try { await props.video.play(); } catch { if (active && owner === generation) { explanationFailed.value = false; error.value = t('video.learning.playFailed'); } }
 }
 function toggleMode(next: SentencePlaybackMode): void {
   if (!sentence.value) return;
@@ -302,26 +371,51 @@ function explain(): void {
     notice.value = t('video.learning.enableExplain');
     void sendRuntimeMessage({type: 'openOptionsPage', section: 'settings-selection'}).catch(() => undefined); return;
   }
+  const previousExplanation = explanation.value;
   cancelExplanation(); const owner = generation; const explanationOwner = explanationGeneration; const owns = () => active && owner === generation && explanationOwner === explanationGeneration;
-  pinned.value = true; editingExplanation.value = false; explanationStopped.value = false; explanation.value = ''; error.value = ''; notice.value = ''; explaining.value = true;
+  const restoreOnFailure = (message: string) => {
+    clearExplanationStallTimer();
+    request = undefined;
+    explaining.value = false;
+    if (previousExplanation) explanation.value = previousExplanation;
+    explanationFailed.value = true;
+    error.value = message;
+  };
+  const armStallWatchdog = () => {
+    clearExplanationStallTimer();
+    explanationStallTimer = setTimeout(() => {
+      explanationStallTimer = undefined;
+      if (!owns()) return;
+      explanationGeneration += 1;
+      request?.cancel();
+      restoreOnFailure(t('video.learning.explainFailed'));
+    }, EXPLANATION_STALL_TIMEOUT_MS);
+  };
+  pinned.value = true; editingExplanation.value = false; explanationStopped.value = false; explanationFailed.value = false; explanation.value = ''; error.value = ''; notice.value = ''; explaining.value = true;
   const context = config.harness.contextMode === 'paragraph'
     ? [sentence.value.previousText.slice(-800), sentence.value.text, sentence.value.nextText.slice(0, 800)].filter(Boolean).join('\n') : '';
   try {
     const materialOperation = beginMaterialCapture(videoMaterial(), browser.extension?.inIncognitoContext === true);
     request = streamReading({type: 'fluentReadHarness', action: 'run', requestId: crypto.randomUUID(), intent: 'usage', studyMode: 'sentence',
       selection: {text: sentence.value.text, context, sentence: ''}, question: '简短解释这个句子的含义与一个关键表达；只依据原句和允许参考的字幕语境。'}, {
-      progress(progress) { if (owns() && progress.kind === 'text') explanation.value = progress.text; },
-      result(result) { if (!owns()) return; request = undefined; explaining.value = false;
-        if (result.success) {explanation.value = result.text; if (result.sessionId) void materialOperation.then(operation => completeMaterialCapture(operation, {kind: 'session', id: result.sessionId!, excerpt: operation?.selection.locator?.quote}, owns));} else error.value = result.error; },
-      error(cause) { if (owns()) { request = undefined; explaining.value = false; error.value = cause.message; } },
+      progress(progress) {
+        if (!owns()) return;
+        armStallWatchdog();
+        if (progress.kind === 'text') explanation.value = progress.text;
+      },
+      result(result) { if (!owns()) return; clearExplanationStallTimer(); request = undefined; explaining.value = false;
+        if (result.success) { explanation.value = result.text; if (result.sessionId) void materialOperation.then(operation => completeMaterialCapture(operation, {kind: 'session', id: result.sessionId!, excerpt: operation?.selection.locator?.quote}, owns)); }
+        else restoreOnFailure(result.error); },
+      error(cause) { if (owns()) restoreOnFailure(cause.message); },
     });
-  } catch (cause) { explaining.value = false; error.value = cause instanceof Error ? cause.message : t('video.learning.explainFailed'); }
+    armStallWatchdog();
+  } catch (cause) { restoreOnFailure(cause instanceof Error ? cause.message : t('video.learning.explainFailed')); }
 }
 async function save(): Promise<void> {
   if (!sentence.value || saved.value || saving.value || explaining.value) return;
-  if (!translation.value.trim()) { error.value = t('video.learning.editPlaceholder'); return; }
-  if (!normalizeLearningSourceText(sentence.value.text) || explanation.value.length > 2000) { error.value = t('video.learning.tooLong'); return; }
-  const selected = sentence.value; const selectedKey = draftKey(); const selectedSnapshot = snapshot(); saving.value = true; error.value = ''; pinned.value = true;
+  if (!translation.value.trim()) { explanationFailed.value = false; error.value = t('video.learning.editPlaceholder'); return; }
+  if (!normalizeLearningSourceText(sentence.value.text) || explanation.value.length > 2000) { explanationFailed.value = false; error.value = t('video.learning.tooLong'); return; }
+  const selected = sentence.value; const selectedKey = draftKey(); const selectedSnapshot = snapshot(); saving.value = true; explanationFailed.value = false; error.value = ''; pinned.value = true;
   const input: VocabularyUpsertInput = {sourceLanguage: props.sourceLanguage || 'auto', targetLanguage: props.targetLanguage,
     term: selected.text, kind: 'sentence', translation: translation.value.trim(), note: explanation.value.trim(),
     context: {text: [selected.previousText.slice(-800), selected.text, selected.nextText.slice(0, 800)].filter(Boolean).join('\n'), sourceUrl: props.sourceUrl, pageTitle: props.title,
@@ -336,22 +430,23 @@ async function save(): Promise<void> {
       const draft = drafts.get(selectedKey); if (draft) draft.savedSnapshot = selectedSnapshot;
       if (selectedKey === draftKey()) { savedSnapshot.value = selectedSnapshot; notice.value = ''; }
     }
-  } catch (cause) { if (active && selectedKey === draftKey()) error.value = cause instanceof Error ? cause.message : t('video.learning.saveFailed'); }
+  } catch (cause) { if (active && selectedKey === draftKey()) { explanationFailed.value = false; error.value = cause instanceof Error ? cause.message : t('video.learning.saveFailed'); } }
   finally { if (active) saving.value = false; }
 }
 function onPlayerKeydown(event: Event): void {
   const ownPanel = panel.value;
   const target = event.target;
   if (!ownPanel || !target || typeof (target as Node).nodeType !== 'number') return;
+  if ((target as Element).closest?.('[role="slider"]')) return;
   const player = props.player && playerOwnsMedia(props.player, props.video) ? props.player : null;
   const insidePanel = ownPanel.contains(target as Node);
   if (!player && !insidePanel) return;
   const menu = player ? getYoutubeSubtitleControlsScope(player, props.video).querySelector<HTMLElement>('#fluent-read-video-subtitle-menu') : null;
   if (menu?.contains(target as Node) || (event as KeyboardEvent).key === 'Escape' && menu?.hidden === false) return;
   // 面板打开期间，焦点回到当前播放器也能继续学习；页面其他区域保留站点快捷键。
-  const document = props.video.ownerDocument;
-  const fullscreenPlayer = document?.fullscreenElement?.contains(props.video);
-  const fullscreenPageFocus = fullscreenPlayer && (target === document.body || target === document.documentElement);
+  const doc = props.video.ownerDocument;
+  const fullscreenPlayer = getFullscreenElement(doc)?.contains(props.video);
+  const fullscreenPageFocus = fullscreenPlayer && (target === doc.body || target === doc.documentElement);
   if (!insidePanel && !player?.contains(target as Node) && !fullscreenPageFocus) return;
   onKeydown(event as KeyboardEvent);
 }
@@ -360,13 +455,16 @@ function onKeydown(event: KeyboardEvent): void {
   const target = event.target as HTMLElement | null;
   if (!active || event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
     || target?.closest?.('textarea,input,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]')) return;
-  const document = props.video.ownerDocument;
-  if (event.key === 'Escape' && document?.fullscreenElement?.contains(props.video)) {
-    if (!event.repeat) void document.exitFullscreen?.().catch(() => undefined);
+  const doc = props.video.ownerDocument;
+  if (event.key === 'Escape' && doc && getFullscreenElement(doc)?.contains(props.video)) {
+    if (!event.repeat) void doc.exitFullscreen?.().catch(() => undefined);
     return;
   }
   const key = event.key.toLowerCase();
-  if (!['Escape', 'ArrowLeft', 'ArrowRight'].includes(event.key) && key !== 'r' && key !== 'q') return;
+  const insidePanel = Boolean(panel.value && target && panel.value.contains(target));
+  const isPanelRootSpace = event.key === ' ' && target === panel.value;
+  const isPanelFollow = key === 'f' && insidePanel;
+  if (!['Escape', 'ArrowLeft', 'ArrowRight'].includes(event.key) && key !== 'r' && key !== 'q' && key !== 's' && !isPanelFollow && !isPanelRootSpace) return;
   // window capture 先于站点 document 监听，避免同键同时改速或跳转；长按只消费重复事件。
   event.preventDefault(); event.stopImmediatePropagation();
   if (event.repeat) return;
@@ -374,7 +472,11 @@ function onKeydown(event: KeyboardEvent): void {
   else if (event.key === 'ArrowLeft') step(-1);
   else if (event.key === 'ArrowRight') step(1);
   else if (key === 'r') toggleMode('loop');
-  else toggleMode('pause');
+  else if (key === 'q') toggleMode('pause');
+  else if (key === 's') void replay();
+  else if (isPanelFollow) returnToCurrent();
+  else if (props.video.paused) void props.video.play().catch(() => { if (active) { explanationFailed.value = false; error.value = t('video.learning.playFailed'); } });
+  else props.video.pause();
 }
 // subscribeConfig 会立即发送当前快照；统计计数等无关变更不能取消首句或用户循环。
 const learningConfigFingerprint = () => JSON.stringify([config.on, config.videoTranslationEnabled, config.videoSubtitleVisible,
@@ -392,7 +494,7 @@ const unsubscribe = subscribeConfig(() => {
   if (wasExplaining) explanationStopped.value = true;
   scheduleTranslation(); notice.value = t('video.learning.settingsChanged');
 });
-onBeforeUnmount(() => { active = false; readingGeneration++; readingError.value = false; readingSession.destroy(); cancelPending(); controller?.destroy(); unsubscribe();
+onBeforeUnmount(() => { active = false; readingGeneration++; readingError.value = false; cancelTranscriptScrollFrame(); readingSession.destroy(); cancelPending(); controller?.destroy(); unsubscribe();
   (props.video.ownerDocument?.defaultView ?? props.video.ownerDocument)?.removeEventListener('keydown', onPlayerKeydown, true);
   props.video.removeEventListener('timeupdate', followPlayback); props.video.removeEventListener('seeking', onSeeking); });
 </script>

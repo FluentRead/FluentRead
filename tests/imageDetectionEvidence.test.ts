@@ -180,7 +180,7 @@ describe('同次检测概率的独占有界位图',()=>{
     it.each([
         null,{},geometry({pageWidth:0}),geometry({pageHeight:0}),geometry({pageWidth:8193}),geometry({pageHeight:8193}),
         geometry({pageWidth:4097,pageHeight:4096}),geometry({x:.1}),geometry({y:-1}),geometry({x:-1}),
-        geometry({width:0}),geometry({height:0}),geometry({width:1537,pageWidth:2000}),geometry({height:1537,pageHeight:2000}),
+        geometry({width:0}),geometry({height:0}),geometry({width:1729,pageWidth:2000}),geometry({height:1729,pageHeight:2000}),
         geometry({x:1,width:64}),geometry({y:1,height:48}),geometry({resizeRatio:.5}),geometry({rotation:90}),
     ])('无效原帧/非原比例拒绝: %j',bad=>{
         const b=createImageDetectionEvidenceBudget();b.capture(new Float32Array(64*64),64,64,asSource(bad));expect(b.frames()).toEqual([]);

@@ -6,7 +6,7 @@ vi.mock('@/src/shared/onnx/resources', async original => ({
 }));
 import {createLocalInferenceBudget} from '@/src/shared/onnx/resources';
 import * as modelCache from '@/src/features/video-subtitle/offscreen/modelCache';
-import {removeLocalVideoTranscriptionModel, cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
+import {disposeLocalVideoTranscriber, removeLocalVideoTranscriptionModel, cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
 import {sharedDirectoryFixture} from './helpers/sharedVideoModelDirectory';
 import {moveVideoAiModelToSharedDirectory, getVideoAiModelFileUrl, VIDEO_AI_Q4_MODEL_FILES} from '@/src/features/video-subtitle/offscreen/modelCache';
 
@@ -56,6 +56,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    disposeLocalVideoTranscriber();
     vi.unstubAllGlobals();
     vi.clearAllTimers();
     vi.useRealTimers();
@@ -223,16 +224,16 @@ describe('video AI offscreen queue', () => {
         await expect(pending).resolves.toMatchObject({model: 'small'});
         await cancelLocalVideoTranscription('small-long-first');
     });
-    it('Small remains bounded to one 90-second primary and one remaining CPU retry', async () => {
+    it('Small remains bounded to one 117-second primary and one remaining CPU retry', async () => {
         vi.useFakeTimers();installWorker();
         const pending = transcribeLocalVideoAudio({streamId: 'small-total-budget', audioPcm16Base64: audio, model: 'small'});
-        const checked = expect(pending).rejects.toThrow('超过 90 秒');
+        const checked = expect(pending).rejects.toThrow('超过 63 秒');
         await drain();
-        await vi.advanceTimersByTimeAsync(90_000);
+        await vi.advanceTimersByTimeAsync(117_000);
         expect(FakeWorker.instances).toHaveLength(2);
         expect(FakeWorker.instances[0].terminated).toBe(true);
         expect(FakeWorker.instances[1].messages[0].device).toBe('wasm');
-        await vi.advanceTimersByTimeAsync(90_000);
+        await vi.advanceTimersByTimeAsync(63_000);
         await checked;
         expect(FakeWorker.instances[1].terminated).toBe(true);
         await cancelLocalVideoTranscription('small-total-budget');
@@ -334,7 +335,7 @@ describe('video AI offscreen queue', () => {
         installWorker();
         const pending = transcribeLocalVideoAudio({streamId: 'timeout-fallback', audioPcm16Base64: audio, model: 'tiny'});
         await tick();
-        vi.advanceTimersByTime(16_001);
+        vi.advanceTimersByTime(20_801);
         await tick();
         expect(FakeWorker.instances).toHaveLength(2);
         const replacement = FakeWorker.instances[1];
@@ -342,6 +343,43 @@ describe('video AI offscreen queue', () => {
         replacement.reply({requestId: (replacement as any).lastMessage.requestId, success: true, text: 'cpu-timeout', segments: [], model: 'tiny'});
         await expect(pending).resolves.toMatchObject({text: 'cpu-timeout'});
         await cancelLocalVideoTranscription('timeout-fallback');
+    });
+
+    it('sticks to wasm with full timeout and zero retryAudio copy after GPU fallback until explicit dispose', async () => {
+        vi.useFakeTimers();
+        installWorker();
+        const first = transcribeLocalVideoAudio({streamId: 'sticky-wasm', audioPcm16Base64: audio, model: 'tiny'});
+        await tick();
+        FakeWorker.instances[0].fail('GPU crashed');
+        await tick();
+        const fallback = FakeWorker.instances[1];
+        expect(fallback.messages[0].device).toBe('wasm');
+        completeWorker(fallback);
+        await expect(first).resolves.toMatchObject({text: 'budget result'});
+
+        const sliceSpy = vi.spyOn(Float32Array.prototype, 'slice');
+        const second = transcribeLocalVideoAudio({streamId: 'sticky-wasm', audioPcm16Base64: audio, model: 'tiny'});
+        await tick();
+        expect(sliceSpy).not.toHaveBeenCalled();
+        expect(fallback.messages.at(-1).device).toBe('wasm');
+        // Sticky WASM receives the full 32s timeout rather than halving.
+        await vi.advanceTimersByTimeAsync(25_000);
+        expect(fallback.terminated).toBe(false);
+        const failed = expect(second).rejects.toThrow('超过 32 秒');
+        await vi.advanceTimersByTimeAsync(7_000);
+        await failed;
+        expect(fallback.terminated).toBe(true);
+        expect(FakeWorker.instances).toHaveLength(2);
+        sliceSpy.mockRestore();
+
+        // Explicit dispose resets preferredDevice back to auto.
+        disposeLocalVideoTranscriber();
+        const third = transcribeLocalVideoAudio({streamId: 'after-dispose', audioPcm16Base64: audio, model: 'tiny'});
+        await tick();
+        expect(FakeWorker.instances.at(-1)!.messages[0].device).toBeUndefined();
+        completeWorker(FakeWorker.instances.at(-1)!);
+        await expect(third).resolves.toMatchObject({text: 'budget result'});
+        await cancelLocalVideoTranscription('after-dispose');
     });
 
     it.each([undefined, 'GPU inference failed'])('retries explicit GPU fallback messages on a fresh worker (%s)', async (error) => {
@@ -540,8 +578,7 @@ describe('video AI shared inference budget and worker generation', () => {
         expect(FakeWorker.instances).toHaveLength(2);
         const replacement = FakeWorker.instances[1];
         expect(replacement.messages).toHaveLength(1);
-        expect(replacement.messages[0]).toMatchObject({type: 'transcribe', model: 'base', languageSessionKey: 'new-after-retry'});
-        expect(replacement.messages[0].device).toBeUndefined();
+        expect(replacement.messages[0]).toMatchObject({type: 'transcribe', model: 'base', languageSessionKey: 'new-after-retry', device: 'wasm'});
         expect(budgetMocks.run).toHaveBeenCalledTimes(4);
         completeWorker(replacement, 'base');await expect(fresh).resolves.toMatchObject({model: 'base'});
         await cancelLocalVideoTranscription('new-after-retry');

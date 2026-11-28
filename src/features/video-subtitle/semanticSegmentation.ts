@@ -22,12 +22,12 @@ export interface SemanticUnit {
 }
 type PlayableSemanticUnit = SemanticUnit & {playback: NonNullable<SemanticUnit['playback']>};
 
-const terminal = /[.!?。！？؟۔।॥]$/u;
+const terminal = /[.!?。！？؟۔।॥…⁉⁈‼⁇]$/u;
 const abbreviation = /(?:\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|vs|etc|e\.g|i\.e)|(?<!['’&])\b[A-Za-z])\.$/iu;
 
 /** Punctuation evidence for a source boundary, not a guarantee of grammatical completeness. */
 export function hasRuleSentenceEnd(text: string): boolean {
-  const tail = text.slice(-80).trimEnd().replace(/["'”’»」』）)\]]+$/u, '');
+  const tail = text.slice(-80).trimEnd().replace(/["'”’»」』）)\]】》〉〕}›]+$/u, '');
   return terminal.test(tail) && !abbreviation.test(tail);
 }
 
@@ -35,7 +35,7 @@ export function hasRuleSentenceEnd(text: string): boolean {
 export function canUseWholeCueSemanticUnit(text: string): boolean {
   // 原始码元数量也限制了候选数。此长度内无长句惩罚，加入任何弱边界只增加代价。
   return segmenters !== undefined && text.length <= MAX_BOUNDARY_PREDECESSORS
-    && /^[^.!?。！？؟۔।॥]*[.!?。！？؟۔।॥]["'”’»」』）)\]]*\s*$/u.test(text)
+    && /^[^.!?。！？؟۔।॥…⁉⁈‼⁇]*[.!?。！？؟۔।॥…⁉⁈‼⁇]["'”’»」』）)\]】》〉〕}›]*\s*$/u.test(text)
     && hasRuleSentenceEnd(text);
 }
 
@@ -67,7 +67,7 @@ export function createSemanticDocument(cues: readonly VideoSubtitleCue[]): Seman
     const previous = text.slice(Math.max(0, offset - 80), offset).trimEnd();
     const next = graphemes[i + 1]?.segment || '';
     // Repeated/mixed terminal marks form one punctuation run, not standalone sentences.
-    if (/^[.!?。！？؟۔।॥]$/u.test(part.segment) && /^[.!?。！？؟۔।॥]$/u.test(next)) continue;
+    if (/^[.!?。！？؟۔।॥…⁉⁈‼⁇]$/u.test(part.segment) && /^[.!?。！？؟۔।॥…⁉⁈‼⁇]$/u.test(next)) continue;
     while (protectedIndex < protectedSpans.length && protectedSpans[protectedIndex].end <= offset) protectedIndex++;
     if (protectedIndex < protectedSpans.length && protectedSpans[protectedIndex].start < offset
       && offset < protectedSpans[protectedIndex].end) continue;
@@ -77,7 +77,7 @@ export function createSemanticDocument(cues: readonly VideoSubtitleCue[]): Seman
     if (offset === text.length || wordEnds.has(offset) || /\s/u.test(part.segment) || strong
       || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(part.segment)) {
       // 标点后有空白时只在空白末尾选边界，避免形成空白独立句。
-      if (/^[\s"'”’»」』）)\]]/u.test(next)) continue;
+      if (/^[\s"'”’»」』）)\]】》〉〕}›]/u.test(next)) continue;
       boundaries.push({offset, score: strong ? 8 : -4});
       if (boundaries.length > 2048) throw new Error('Too many subtitle boundaries');
     }

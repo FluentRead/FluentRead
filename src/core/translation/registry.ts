@@ -11,5 +11,12 @@ import {compileSiteRulePack} from '../site-adaptation/compiler';
 import type {TranslationSiteAdapter} from './types';
 
 /** JSON 规则是内置适配的唯一来源，不再维护平行的逐站 TypeScript 定义。 */
+let cachedDefaultTranslationAdapters: readonly TranslationSiteAdapter[] | undefined;
+
+/** 按需编译内置站点规则并缓存只读结果，避免在页面首帧前同步编译全部规则。 */
+export function getDefaultTranslationAdapters(): readonly TranslationSiteAdapter[] {
+    return cachedDefaultTranslationAdapters ??= Object.freeze(compileSiteRulePack(builtinSiteRulePack));
+}
+
 export const defaultTranslationAdapters: readonly TranslationSiteAdapter[] =
-    Object.freeze(compileSiteRulePack(builtinSiteRulePack));
+    /*#__PURE__*/ getDefaultTranslationAdapters();

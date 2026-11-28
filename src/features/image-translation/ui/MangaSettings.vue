@@ -1,7 +1,7 @@
 <!--
  * @file src/features/image-translation/ui/MangaSettings.vue
  * 文件职责：以分层方式组织网页图片翻译、漫画连续翻译、圈选区域及按需展开的识别资源与支持网站列表。
- * 主要内容：关闭网页图片或漫画开关时收起下属配置；移除重复的全局语言/翻译服务选择、重复右键开关与静态装饰预览，识别后端、本地模型、OCR 语言包与漫画网站目录收进默认折叠的进阶分组。
+ * 主要内容：关闭网页图片或漫画开关时收起下属配置；移除重复的全局语言/翻译服务选择、重复右键开关与静态装饰预览，识别后端、本地模型、OCR 语言包与漫画网站目录收进默认折叠的进阶分组，自定义漫画网站规则提供常用图片选择器一键点选预设。
  * 模块边界：编辑父级配置副本，由既有设置持久化负责保存；不调用漫画翻译、不扫描其他网站、不访问会员或章节接口。
  -->
 <template>
@@ -75,6 +75,9 @@
           <form @submit.prevent="addSite">
             <label>{{ t('阅读页或阅读路径') }}<input v-model="url" type="url" required placeholder="https://example.com/chapter/" :aria-label="t('阅读页或阅读路径')" /></label>
             <label>{{ t('漫画图片选择器') }}<input v-model="selector" required placeholder="main img, article img" :aria-label="t('漫画图片选择器')" /></label>
+            <div class="manga-selector-presets" role="group" :aria-label="t('常用选择器')">
+              <button v-for="preset in selectorPresets" :key="preset" type="button" class="manga-selector-chip" :aria-pressed="selector.trim() === preset" @click="selector = preset">{{ preset }}</button>
+            </div>
             <p v-if="error" role="alert" class="manga-settings-error" data-i18n-ignore>{{ t(error) }}</p><button type="submit">{{ t('添加网站') }}</button>
           </form>
         </details>
@@ -108,6 +111,7 @@ const resourceOrder = computed(() => imageOcrEngine.value === 'paddle'
   ? ['local-models', 'language-packs']
   : ['language-packs', 'local-models']);
 const url = ref(''), selector = ref('main img, article img'), error = ref('');
+const selectorPresets = ['main img', 'article img', 'canvas'] as const;
 const siteSearch = ref('');
 const filteredSites = computed(() => {
   const search = siteSearch.value.trim().toLocaleLowerCase();
@@ -148,6 +152,9 @@ function addSite() {
 .manga-custom-sites-details { margin-top: 14px; }
 .manga-custom-sites-details form { display: grid; gap: 12px; margin-top: 12px; }
 .manga-custom-sites-details button { justify-self: start; font: inherit; cursor: pointer; border: 1px solid var(--line); border-radius: 7px; padding: 6px 12px; background: var(--surface); color: var(--ink); font-size: 12px; }
+.manga-selector-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.manga-custom-sites-details button.manga-selector-chip { padding: 4px 10px; border-radius: 999px; font-size: 12px; color: var(--muted); background: var(--surface-soft, var(--surface)); }
+.manga-custom-sites-details button.manga-selector-chip[aria-pressed="true"] { border-color: var(--brand); color: var(--brand-strong); background: var(--brand-soft); }
 .manga-custom-site { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; overflow-wrap: anywhere; font-size: 12.5px; }
 .manga-settings-error { color: var(--el-color-danger) !important; }
 @media (max-width: 480px) { .manga-resource-body, .manga-sites { padding: 14px 12px; } }

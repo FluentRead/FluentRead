@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/materialLocator.ts
  * 文件职责：为文档校订恢复与材料学习入口提供无副作用的材料身份、原文位置契约。
- * 主要内容：以本地历史的文件内容摘要为材料身份，优先提取 PDF 页及首行、EPUB 章节、DOCX 段落等原生位置，只有结构化 JSON 才使用路径标签；引用保留创建时相同位置候选数，避免目标删除后误指向剩余重复句；原文逐字符一致是恢复的前提，重复片段仅接受双向唯一的位置或邻文证据，歧义位置不按出现次序猜测。
+ * 主要内容：以本地历史的文件内容摘要为材料身份，优先提取 PDF 页及首行、EPUB 章节、DOCX 段落等原生位置，只有结构化 JSON 才使用路径标签；使用 WeakMap 缓存解析快照的定位结果并按 format、segments 引用与长度及二进制结构引用校验失效，使滚动捕获与历史匹配中的重复查询保持 O(1)；引用保留创建时相同位置候选数，避免目标删除后误指向剩余重复句；原文逐字符一致是恢复的前提，重复片段仅接受双向唯一的位置或邻文证据，歧义位置不按出现次序猜测。
  * 模块边界：只消费解析模型，不读取文件、配置、数据库或网络；引用包含原文，仅供本地使用，不含 URL、令牌或用户配置，调用方不得将其自动上传或写入日志。
  */
 import type {DocumentSegment, ParsedDocument} from './document';
@@ -55,10 +55,37 @@ export function normalizeDocumentMaterialReference(input: unknown, materialId: s
 
 type SourceSnapshot = {format?: unknown; segments?: unknown; binary?: unknown};
 
+interface LocatorCacheEntry {
+    format: unknown;
+    segments: unknown;
+    segmentCount: number;
+    binary: unknown;
+    binaryStructure: unknown;
+    binaryStructureLength: number;
+    locators: readonly (DocumentSourceLocator | undefined)[];
+}
+
+const locatorCache = new WeakMap<SourceSnapshot, LocatorCacheEntry>();
+
+function binaryStructureOf(binary: ParsedDocument['binary']): unknown {
+    if (binary?.kind === 'pdf') return binary.pages;
+    if (binary?.kind === 'epub') return binary.chapters;
+    if (binary?.kind === 'docx') return binary.parts;
+    return undefined;
+}
+
 /** 为旧快照容忍缺失结构，但不把脏数据解释为有效位置。 */
-export function documentSourceLocators(snapshot: SourceSnapshot): Array<DocumentSourceLocator | undefined> {
+export function documentSourceLocators(snapshot: SourceSnapshot): readonly (DocumentSourceLocator | undefined)[] {
     const segments = Array.isArray(snapshot.segments) ? snapshot.segments : [];
     const binary = snapshot.binary as ParsedDocument['binary'];
+    const binaryStructure = binaryStructureOf(binary);
+    const binaryStructureLength = Array.isArray(binaryStructure) ? binaryStructure.length : -1;
+    const cached = locatorCache.get(snapshot);
+    if (cached && cached.format === snapshot.format && cached.segments === snapshot.segments
+        && cached.segmentCount === segments.length && cached.binary === binary
+        && cached.binaryStructure === binaryStructure && cached.binaryStructureLength === binaryStructureLength) {
+        return cached.locators;
+    }
     const locators = segments.map((value: unknown): DocumentSourceLocator | undefined => {
         if (!value || typeof value !== 'object' || typeof (value as DocumentSegment).source !== 'string') return undefined;
         const segment = value as DocumentSegment;
@@ -90,8 +117,8 @@ export function documentSourceLocators(snapshot: SourceSnapshot): Array<Document
                 if (!block) continue;
                 const line = block.lines?.[0];
                 const x = line?.x ?? block.x, y = line?.baseline ?? line?.y ?? block.y;
-                const position = [x, y].every(value => typeof value === 'number' && Number.isFinite(value))
-                    ? JSON.stringify([x, y]) : undefined;
+                const position = typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)
+                    ? `[${x},${y}]` : undefined;
                 assign(block.segmentIndex, `pdf:${page.pageNumber}`, position);
             }
         }
@@ -115,7 +142,17 @@ export function documentSourceLocators(snapshot: SourceSnapshot): Array<Document
         locator.before = locators[index - 1]?.source;
         locator.after = locators[index + 1]?.source;
     });
-    return locators;
+    const frozen = Object.freeze(locators);
+    locatorCache.set(snapshot, {
+        format: snapshot.format,
+        segments: snapshot.segments,
+        segmentCount: segments.length,
+        binary,
+        binaryStructure,
+        binaryStructureLength,
+        locators: frozen,
+    });
+    return frozen;
 }
 
 /** 学习工作区可保存此引用并在重新解析后调用 resolveDocumentMaterialReference；片段 id 只是当前模型索引。 */

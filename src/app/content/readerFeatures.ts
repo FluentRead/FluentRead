@@ -18,6 +18,7 @@ import {
     mountMangaEntry,
     mountSelectionTranslator,
     mountTranslationProgressPanel,
+    setMangaPeekOriginal,
     startAreaTranslationFromContextMenu,
     unmountAreaTranslator,
     unmountFloatingBall,
@@ -55,7 +56,7 @@ export function createReaderContentFeatures(ctx: ContentScriptContext, config: C
             mount: () => mountImageTranslator(), unmount: unmountImageTranslator},
         {id: 'manga-entry', requiredCapability: 'imageTranslation',
             isEnabled: () => config.on && config.imageTranslationMangaEnabled && isMangaReaderPage(),
-            mount: () => mountMangaEntry(ctx, {startAreaTranslation: startAreaTranslationFromContextMenu}), unmount: unmountMangaEntry},
+            mount: () => mountMangaEntry(ctx, {startAreaTranslation: startAreaTranslationFromContextMenu, onPeekOriginal: setMangaPeekOriginal}), unmount: unmountMangaEntry},
         {
             id: 'translation-progress-panel',
             isEnabled: () => config.on && config.translationProgressPanelEnabled === true,

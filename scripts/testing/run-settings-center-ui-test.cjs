@@ -1958,20 +1958,18 @@ async function main() {
       throw new Error('界面布局仍向用户显示 Popup 布局旧名称');
     }
     const expectedInterfaceSkins = [
-      {value: 'default', label: '默认风格', kind: 'default', contentHeight: true, popupWidth: 320, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
-      {value: 'minimal', label: '简约风格', kind: 'minimal', contentHeight: true, popupWidth: 310, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
-      {value: 'compact', label: '紧凑风格', kind: 'compact', contentHeight: true, popupWidth: 300, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
-      {value: 'contrast', label: '高对比 ⚡', kind: 'contrast', contentHeight: true, popupWidth: 320, brand: '#111', surface: '#fff', darkSurface: '#050505'},
-      {value: 'qinghua', label: '青花', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#183a65', surface: '#ffffff', darkSurface: '#111d31'},
-      {value: 'zhusha', label: '朱砂', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#c3272b', surface: '#ffffff', darkSurface: '#211a17'},
-      {value: 'shuimo', label: '水墨', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#3d3b4f', surface: '#ffffff', darkSurface: '#17181d'},
-      {value: 'zhuqing', label: '竹青', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#057748', surface: '#ffffff', darkSurface: '#17221b'},
-      {value: 'ouhe', label: '藕荷', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#574266', surface: '#ffffff', darkSurface: '#221b27'},
-      {value: 'xiangse', label: '缃色', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#8a6200', surface: '#ffffff', darkSurface: '#1f1c16'},
-      {value: 'qinglv', label: '青绿', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#205580', surface: '#ffffff', darkSurface: '#142430'},
-      {value: 'yuebai', label: '月白', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#576d93', surface: '#ffffff', darkSurface: '#1b2c37'},
-      {value: 'xuanqing', label: '玄青', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#8db4dc', surface: '#1e2030', darkSurface: '#1e2030'},
-      {value: 'wujin', label: '乌金', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#f2be45', surface: '#1b1a16', darkSurface: '#1b1a16'},
+      {value: 'default', label: '默认经典', kind: 'default', contentHeight: true, popupWidth: 320, brand: '#ef4776', surface: '#ffffff', darkSurface: '#1b1f26'},
+      {value: 'liquid-glass', label: '液态玻璃', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#1466e6', surface: '#f4f9ff', darkSurface: '#142036'},
+      {value: 'aurora', label: '极光幻彩', kind: 'craft', contentHeight: true, popupWidth: 322, brand: '#7c3aed', surface: '#fdfaff', darkSurface: '#13172c'},
+      {value: 'tactile', label: '拟物硬件', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#cc3f10', surface: '#f1eee8', darkSurface: '#23252a'},
+      {value: 'brutalist', label: '新粗野波普', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#d91b60', surface: '#ffffff', darkSurface: '#222028'},
+      {value: 'cyber', label: '赛博霓虹', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#00e5ff', surface: '#0f0d24', darkSurface: '#0f0d24'},
+      {value: 'retro-os', label: '经典复古桌面', kind: 'craft', contentHeight: true, popupWidth: 320, brand: '#0b3d91', surface: '#dfded6', darkSurface: '#2e313a'},
+      {value: 'terminal', label: '极客终端', kind: 'craft', contentHeight: true, popupWidth: 320, brand: '#4ade80', surface: '#0a140e', darkSurface: '#0a140e'},
+      {value: 'editorial', label: '典藏画报', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#881c28', surface: '#faf6ee', darkSurface: '#1e1b18'},
+      {value: 'sakura', label: '樱雾物语', kind: 'craft', contentHeight: true, popupWidth: 322, brand: '#d4356f', surface: '#ffffff', darkSurface: '#231720'},
+      {value: 'matcha', label: '宇治手账', kind: 'craft', contentHeight: true, popupWidth: 322, brand: '#2b6946', surface: '#fbf8f0', darkSurface: '#18241c'},
+      {value: 'midnight-gold', label: '黑金典藏', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#dfc076', surface: '#131218', darkSurface: '#131218'},
     ];
     const skinCards = interfaceSettingsGroup.locator('.interface-skin-option');
     if (await skinCards.count() !== expectedInterfaceSkins.length) {

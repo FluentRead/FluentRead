@@ -189,6 +189,86 @@ describe('学习卡浮动层与底部高度把手', () => {
         value = {position: 'top-right'}; notify(); f.flush(); expect(left(f.host)).toBe(632); expect(top(f.host)).toBe(8);
         second.destroy(); owner.dispose();
     });
+
+    it('浮动层响应 fullscreenchange 迁移，收起时高度回退为 auto，指针捕获和 ARIA 写入有保护', () => {
+        const f = floatingFixture();
+        const card = f.document.createElement('section');
+        card.className = 'fr-video-learning';
+        card.innerHTML = '<button data-learning-action="collapse">Collapse</button><button data-learning-peek>Peek</button>';
+        f.host.appendChild(card);
+        const placement = createVideoSentenceLearningPlacement({host: f.host, player: f.player, appearance: appearance({position: 'top-left'}), onDragPosition: vi.fn()});
+        f.toggle();
+        f.key('End');
+        expect(f.host.style.height).toBe('784px');
+
+        // 触发收起后高度必须回退为 auto，展开后恢复记录高度。
+        card.classList.add('is-collapsed');
+        f.emit(card.querySelector('[data-learning-action="collapse"]')!, 'click');
+        f.flush();
+        expect(f.host.style.height).toBe('auto');
+        card.classList.remove('is-collapsed');
+        f.emit(card.querySelector('[data-learning-peek]')!, 'click');
+        f.flush();
+        expect(f.host.style.height).toBe('784px');
+
+        // 贴底浮动卡收起时在测量前先重置 height='auto'，首帧即按真实折叠高度计算 top。
+        placement.setAppearance(appearance({position: 'bottom-right'}));
+        f.flush();
+        expect(top(f.host)).toBe(8);
+        card.classList.add('is-collapsed');
+        f.emit(card.querySelector('[data-learning-action="collapse"]')!, 'click');
+        f.flush();
+        expect(f.host.style.height).toBe('auto');
+        expect(top(f.host)).toBe(592);
+        card.classList.remove('is-collapsed');
+        f.emit(card.querySelector('[data-learning-peek]')!, 'click');
+        f.flush();
+        expect(f.host.style.height).toBe('784px');
+
+        // fullscreenchange 与 webkitfullscreenchange 立即迁移浮动绘制层，并支持 Safari webkitFullscreenElement。
+        const frame = f.host.parentElement!;
+        Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: f.player});
+        f.emit(f.document, 'fullscreenchange'); f.flush();
+        expect(frame.parentElement).toBe(f.player);
+        Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: null});
+        Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: f.player});
+        f.emit(f.document, 'webkitfullscreenchange'); f.flush();
+        expect(frame.parentElement).toBe(f.player);
+        Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: null});
+        f.emit(f.document, 'webkitfullscreenchange'); f.flush();
+        expect(frame.parentElement).toBe(f.document.documentElement);
+
+        // 指针捕获成功与抛错都被保护；ARIA 相同值不重复写入，把手替换后重新获取。
+        const setAria = vi.spyOn(f.handle, 'setAttribute');
+        f.resize(); f.flush();
+        expect(setAria).not.toHaveBeenCalled();
+
+        const dragHandle = f.host.querySelector<HTMLElement>('[data-learning-drag-handle]')!;
+        const setCapture = vi.fn(), releaseCapture = vi.fn();
+        Object.assign(dragHandle, {setPointerCapture: setCapture, releasePointerCapture: releaseCapture});
+        f.emit(f.host.querySelector('.title')!, 'pointerdown', {pointerId: 12});
+        expect(setCapture).toHaveBeenCalledWith(12);
+        f.emit(f.document, 'pointerup', {pointerId: 12, clientX: 110, clientY: 110});
+        expect(releaseCapture).toHaveBeenCalledWith(12);
+
+        setCapture.mockImplementationOnce(() => { throw new Error('capture failed'); });
+        f.emit(f.host.querySelector('.title')!, 'pointerdown', {pointerId: 13});
+        f.emit(f.document, 'pointerup', {pointerId: 13, clientX: 120, clientY: 120});
+
+        const handleSet = vi.fn(), handleRelease = vi.fn(() => { throw new Error('release failed'); });
+        Object.assign(f.handle, {setPointerCapture: handleSet, releasePointerCapture: handleRelease});
+        f.emit(f.handle, 'pointerdown', {pointerId: 14, clientY: 300});
+        expect(handleSet).toHaveBeenCalledWith(14);
+        f.emit(f.document, 'pointerup', {pointerId: 14, clientY: 320});
+        expect(handleRelease).toHaveBeenCalledWith(14);
+
+        const replacementHandle = f.document.createElement('div');
+        replacementHandle.setAttribute('data-learning-resize-handle', '');
+        f.handle.replaceWith(replacementHandle);
+        f.resize(); f.flush();
+        expect(replacementHandle.getAttribute('aria-valuemin')).toBe('180');
+        placement.destroy();
+    });
 });
 
 function mobileFixture() {
@@ -431,7 +511,7 @@ describe('学习面板拖动与 DOM 生命周期', () => {
         expect(changed).not.toHaveBeenCalled(); expect(f.observers[0].disconnect).toHaveBeenCalledOnce();
         expect(f.observers[0].observe).toHaveBeenCalledTimes(2); expect(f.frames.size).toBe(0);
         expect(hostRemove.mock.calls.map(call => call[0])).toEqual(['pointerdown', 'click', 'keydown']);
-        expect(docRemove.mock.calls.map(call => call[0])).toEqual(['pointermove', 'pointerup', 'pointercancel']);
+        expect(docRemove.mock.calls.map(call => call[0])).toEqual(['pointermove', 'pointerup', 'pointercancel', 'fullscreenchange', 'webkitfullscreenchange']);
         expect(f.removeWindow).toHaveBeenCalledWith('resize', expect.any(Function));
     });
 });

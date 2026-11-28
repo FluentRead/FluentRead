@@ -1,6 +1,6 @@
 /** @file tests/imageSourceAlignment.test.ts 原图共同边线的独立几何回归；不把几何关系当作语义合段、擦除或额外绘字权限。 */
 import {describe,it,expect} from 'vitest';
-import {inferImageSourceAlignments} from '@/src/features/image-translation/services/sourceAlignment';
+import {detectImageSingleLineAlignment,inferImageSourceAlignments} from '@/src/features/image-translation/services/sourceAlignment';
 import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 const row=(x0=100,y0=40,x1=500,y1=60):ImageTextRegion=>({text:'SOURCE',bbox:{x0,y0,x1,y1}});
 const pair=()=>[row(),row(100,95,400,115)];
@@ -48,5 +48,50 @@ describe('相邻原图长横排的明确共同边线',()=>{
         const rows=[...pair(),...Array.from({length:258},()=>row(700,1400,1100,1420))];expect(infer(rows).size).toBe(0);
         const heads=Array.from({length:9},(_,i)=>[row(100,40+i*150,500,60+i*150),row(100,95+i*150,400,115+i*150)]).flat();
         const all=[...heads,...Array.from({length:4000},()=>row(700,1400,1100,1420))];expect(infer(all,new Set(heads)).size).toBe(0);
+    });
+});
+
+describe('单行有界控件居中对齐检测',()=>{
+    const makePill=(w=200,h=100,x0=40,y0=30,x1=160,y1=60)=>{
+        const pixels=new Uint8ClampedArray(w*h*4);
+        for(let i=0;i<pixels.length;i+=4)pixels.set([255,255,255,255],i);
+        for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)pixels.set([0,174,66,255],(y*w+x)*4);
+        return pixels;
+    };
+    it('对称胶囊返回 center，左对齐、无上下边框、透明像素、越界或非法参数均返回 undefined',()=>{
+        const bbox={x0:85,y0:38,x1:115,y1:52};
+        const pill=makePill();
+        expect(detectImageSingleLineAlignment(pill,200,100,bbox)).toBe('center');
+
+        // 非法尺寸、缓冲或过小/过高文本框
+        expect(detectImageSingleLineAlignment(pill,0,100,bbox)).toBeUndefined();
+        expect(detectImageSingleLineAlignment(new Uint8ClampedArray(4),200,100,bbox)).toBeUndefined();
+        expect(detectImageSingleLineAlignment(pill,200,100,{x0:85,y0:38,x1:87,y1:52})).toBeUndefined();
+        expect(detectImageSingleLineAlignment(pill,200,100,{x0:85,y0:10,x1:115,y1:95})).toBeUndefined();
+
+        // 水平扫描遇到透明像素
+        const hAlpha=makePill();
+        hAlpha[(45*200+70)*4+3]=128;
+        expect(detectImageSingleLineAlignment(hAlpha,200,100,bbox)).toBeUndefined();
+
+        // 左对齐输入框（左右边距均在搜索半径内但不对称）
+        expect(detectImageSingleLineAlignment(pill,200,100,{x0:50,y0:38,x1:110,y1:52})).toBeUndefined();
+
+        // 纵向扫描撞到图边（无上边框）
+        const topOpen=makePill(200,100,40,0,160,60);
+        expect(detectImageSingleLineAlignment(topOpen,200,100,{x0:85,y0:10,x1:115,y1:24})).toBeUndefined();
+
+        // 纵向扫描遇到透明像素
+        const vAlpha=makePill();
+        vAlpha[(34*200+100)*4+3]=100;
+        expect(detectImageSingleLineAlignment(vAlpha,200,100,bbox)).toBeUndefined();
+
+        // 纵向超出搜索半径无上下边框（例如同排间隔文字而非按钮）
+        const tallNoBorder=makePill(200,140,40,0,160,140);
+        expect(detectImageSingleLineAlignment(tallNoBorder,200,140,{x0:85,y0:60,x1:115,y1:74})).toBeUndefined();
+
+        // 仅有上边框无下边框
+        const bottomOpen=makePill(200,140,40,30,160,140);
+        expect(detectImageSingleLineAlignment(bottomOpen,200,140,{x0:85,y0:38,x1:115,y1:52})).toBeUndefined();
     });
 });

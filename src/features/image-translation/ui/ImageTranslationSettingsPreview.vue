@@ -1,14 +1,14 @@
 <!--
  @file src/features/image-translation/ui/ImageTranslationSettingsPreview.vue
- 文件职责：用本地示意图说明图片和漫画翻译的原图、译图对照方式。
- 主要内容：切换固定英文原图与中文译图样本，分别呈现清晰排版文字和漫画气泡；气泡均衡换行以减少窄屏中的孤立尾字，明确样本不随翻译语言变化。
+ 文件职责：用本地示意图说明图片和漫画翻译的原图、译图对照方式，并完整本地化所有切换按钮与说明文案。
+ 主要内容：切换固定英文原图与中文译图样本，分别呈现清晰排版文字和漫画气泡；通过统一界面 i18n 渲染原图/译图按钮和示例说明，气泡均衡换行以减少窄屏中的孤立尾字，明确样本不随翻译语言变化。
  模块边界：不运行 OCR、不修补背景、不读取网页图片、不联网；仅供设置效果预览使用。
 -->
 <template>
   <div class="image-example">
     <div class="image-example-tabs" role="group" :aria-label="translateLegacy(manga ? '漫画示例对照' : '图片示例对照')">
-      <button type="button" :aria-pressed="!translated" @click="translated = false">原图</button>
-      <button type="button" :aria-pressed="translated" @click="translated = true">译图</button>
+      <button type="button" :aria-pressed="!translated" @click="translated = false">{{ translateLegacy('原图') }}</button>
+      <button type="button" :aria-pressed="translated" @click="translated = true">{{ translateLegacy('译图') }}</button>
     </div>
     <div v-if="manga" class="image-example-comic" data-i18n-ignore>
       <div class="image-example-bubble">{{ translated ? '一起去看看更大的世界吧！' : 'Let’s explore a bigger world!' }}</div>
@@ -21,7 +21,7 @@
       <p>{{ translated ? '每一种语言，都带来一种看世界的新方式。' : 'Every language offers a new way to see the world.' }}</p>
       <div class="image-example-paper-lines" aria-hidden="true"><i /><i /><i /></div>
     </div>
-    <p class="image-example-note">固定英中示例，仅说明原图与译图的对照方式</p>
+    <p class="image-example-note">{{ translateLegacy('固定英中示例，仅说明原图与译图的对照方式') }}</p>
   </div>
 </template>
 <script setup lang="ts">

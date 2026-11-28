@@ -6,6 +6,8 @@ For precise areas, open **Settings → Tools & learning → Website rules → Co
 
 <GuideVisual kind="rules" en />
 
+<DocDiagram kind="site-rules-priority" en />
+
 ## Start with an existing rule
 
 1. Export a rule backup, then search by website name, domain, or rule ID.

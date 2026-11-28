@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/inpainting.ts
  * 文件职责：依据有效 OCR 文本框在像素缓冲区中修复原文字，保留修复区域以外的图像内容。
- * 主要内容：按源行框及有界边缘修补，提供与实际蒙版一致的碰撞判断，保留行间图案；相接簇用链表连接成员后一次展开，避免重复复制和参数展开；已确认低 alpha 行段既不可写也不可作为扩散背景，隔离无种子的原字岛时显式拒绝；纯色边界省去队列，独立不透明矩形在完整边界符合平滑渐变时重建渐变，避免扩散造成条纹；共享渐变规划只在完整外周匹配且内部不含透明像素时冻结颜色，失败不写入，供漫画按原清字框复用；默认保留输入，也可显式复用调用方独占的像素缓冲。
+ * 主要内容：按源行框及有界边缘修补，非透明保护路径先感知不透明按钮/输入框锐利边沿、一像素细边框与相邻图标缝隙，将扩边夹紧在控件内部，避免切坏胶囊边角或下拉箭头；提供与实际蒙版一致的碰撞判断和最小脏矩形归并，保留行间图案；相接簇用链表连接成员后一次展开，避免重复复制和参数展开；已确认低 alpha 行段既不可写也不可作为扩散背景，隔离无种子的原字岛时显式拒绝；纯色边界省去队列，紧凑控件在成对内边纯色且外边触及边框跳变时直接平滑填满内底色，消除彩色按钮缺口与白底按钮灰晕；独立不透明矩形在完整边界符合平滑渐变时重建渐变，避免扩散造成条纹；共享渐变规划只在完整外周匹配且内部不含透明像素时冻结颜色，失败不写入，供漫画按原清字框复用；默认保留输入，也可显式复用调用方独占的像素缓冲。
  * 模块边界：本模块是无 DOM、无网络的轻量像素算法，不进行 OCR 或译文绘制，也不宣称能够重建复杂纹理；输入和输出保持原图尺寸，无保护参数时保持原有无边界行为；保护路径失败由调用方在发布前撤回。
  * 细线背景：在原纯色与渐变规则之后，按单次修补共享的预付面积预算验证细线背景；只在完整不透明蒙版内采用源线条与横截面计划，保留已确认背景，少量跨度外像素仍走原扩散；透明保护路径保持原样。
  * 旋转短标签：独立物理字框可先验证书脊的逐列底色和真实墨迹，原清字蒙版与保护规则继续生效。
@@ -63,7 +63,7 @@ function sampleBoundaryRow(pixels: Uint8ClampedArray, start: number, width: numb
 function planBoundarySampleRows(pixels: Uint8ClampedArray, imageWidth: number, imageHeight: number, box: MaskRectangle,
     budget: BoundarySampleBudget): BoundarySampleRows | undefined {
     const width = box.right - box.left, height = box.bottom - box.top;
-    if (width < 32 || width > 512 || height < 8 || height > 64 || width < height * 2 || width * height > 16_384) return;
+    if (width < 16 || width > 512 || height < 8 || height > 64 || width < height || width * height > 16_384) return;
     const left = box.left - 4, top = box.top - 4, right = box.right + 4, bottom = box.bottom + 4;
     const area = (right - left) * (bottom - top);
     if (left < 0 || top < 0 || right > imageWidth || bottom > imageHeight || area > budget.pixels) return;
@@ -132,11 +132,195 @@ function getMaskRectangle(line: OcrLine, width: number, height: number): MaskRec
     };
 }
 
+function pixelL1(pixels: Uint8ClampedArray, offset: number, r: number, g: number, b: number): number {
+    return Math.abs(pixels[offset] - r) + Math.abs(pixels[offset + 1] - g) + Math.abs(pixels[offset + 2] - b);
+}
+
+/** 采样原始 OCR 框内周不透明主底色；任意透明点或缺乏共识时返回 undefined。 */
+function sampleInteriorBackground(pixels: Uint8ClampedArray, imageWidth: number,
+    left: number, top: number, right: number, bottom: number): [number, number, number] | undefined {
+    const buckets = new Map<number, [number, number, number, number]>();
+    let total = 0;
+    const add = (x: number, y: number): boolean => {
+        const p = (y * imageWidth + x) * 4;
+        if (pixels[p + 3] !== 255) return false;
+        const r = pixels[p], g = pixels[p + 1], b = pixels[p + 2];
+        const key = ((r & 0xf0) << 4) | (g & 0xf0) | (b >>> 4);
+        let group = buckets.get(key);
+        if (!group) { group = [0, 0, 0, 0]; buckets.set(key, group); }
+        group[0] += r; group[1] += g; group[2] += b; group[3]++; total++;
+        return true;
+    };
+    for (let x = left; x < right; x++) {
+        if (!add(x, top) || !add(x, bottom - 1)) return;
+    }
+    for (let y = top + 1; y < bottom - 1; y++) {
+        if (!add(left, y) || !add(right - 1, y)) return;
+    }
+    let best: [number, number, number, number] = [0, 0, 0, 0];
+    for (const group of buckets.values()) if (group[3] > best[3]) best = group;
+    if (best[3] < total * 0.45) return;
+    return [Math.round(best[0] / best[3]), Math.round(best[1] / best[3]), Math.round(best[2] / best[3])];
+}
+
+/** 外扩前逐边检查不透明控件边框与独立图标缝隙，防止掩码切过按钮边沿或下拉箭头。 */
+function clampMaskRectangleToInterior(pixels: Uint8ClampedArray, imageWidth: number, imageHeight: number,
+    bbox: OcrLine['bbox'], expanded: MaskRectangle): MaskRectangle {
+    const baseLeft = Math.max(0, Math.min(imageWidth, Math.floor(bbox.x0)));
+    const baseTop = Math.max(0, Math.min(imageHeight, Math.floor(bbox.y0)));
+    const baseRight = Math.max(baseLeft, Math.min(imageWidth, Math.ceil(bbox.x1)));
+    const baseBottom = Math.max(baseTop, Math.min(imageHeight, Math.ceil(bbox.y1)));
+    if (baseRight - baseLeft < 6 || baseBottom - baseTop < 6) return expanded;
+    const bg = sampleInteriorBackground(pixels, imageWidth, baseLeft, baseTop, baseRight, baseBottom);
+    if (!bg) return expanded;
+    const [bgR, bgG, bgB] = bg;
+    const isDiff = (x: number, y: number): boolean => {
+        if (x < 0 || x >= imageWidth || y < 0 || y >= imageHeight) return false;
+        const p = (y * imageWidth + x) * 4;
+        return pixels[p + 3] === 255 && pixelL1(pixels, p, bgR, bgG, bgB) >= 45;
+    };
+    const rowDiffs = (y: number): number => {
+        let count = 0;
+        for (let x = baseLeft; x < baseRight; x++) if (isDiff(x, y)) count++;
+        return count;
+    };
+    const colDiffs = (x: number): number => {
+        let count = 0;
+        for (let y = baseTop; y < baseBottom; y++) if (isDiff(x, y)) count++;
+        return count;
+    };
+    const spanW = baseRight - baseLeft, spanH = baseBottom - baseTop;
+    let top = baseTop;
+    for (let y = baseTop - 1; y >= expanded.top; y--) {
+        if (rowDiffs(y) >= spanW * 0.6 && ((y > 0 && rowDiffs(y - 1) >= spanW * 0.6)
+            || isDiff(baseLeft - 2, y) || isDiff(baseRight + 1, y))) break;
+        top = y;
+    }
+    let bottom = baseBottom;
+    for (let y = baseBottom; y < expanded.bottom; y++) {
+        if (rowDiffs(y) >= spanW * 0.6 && ((y + 1 < imageHeight && rowDiffs(y + 1) >= spanW * 0.6)
+            || isDiff(baseLeft - 2, y) || isDiff(baseRight + 1, y))) break;
+        bottom = y + 1;
+    }
+    let left = baseLeft, sawCleanLeft = false;
+    for (let x = baseLeft - 1; x >= expanded.left; x--) {
+        const diffs = colDiffs(x);
+        if (diffs >= spanH * 0.6 && ((x > 0 && colDiffs(x - 1) >= spanH * 0.6)
+            || isDiff(x, baseTop - 2) || isDiff(x, baseBottom + 1))) break;
+        if (sawCleanLeft && diffs >= 1) break;
+        if (diffs === 0) sawCleanLeft = true;
+        left = x;
+    }
+    let right = baseRight, sawCleanRight = false;
+    for (let x = baseRight; x < expanded.right; x++) {
+        const diffs = colDiffs(x);
+        if (diffs >= spanH * 0.6 && ((x + 1 < imageWidth && colDiffs(x + 1) >= spanH * 0.6)
+            || isDiff(x, baseTop - 2) || isDiff(x, baseBottom + 1))) break;
+        if (sawCleanRight && diffs >= 1) break;
+        if (diffs === 0) sawCleanRight = true;
+        right = x + 1;
+    }
+    return { ...expanded, left, top, right, bottom };
+}
+
+/** 紧凑按钮或输入框的蒙版贴边时，用成对均匀内侧边确认控件底色，防止外部底色或边框渗入形成缺口与灰晕。 */
+function planCompactInteriorFill(pixels: Uint8ClampedArray, imageWidth: number,
+    bounds: MaskRectangle): [number, number, number] | undefined {
+    const w = bounds.right - bounds.left, h = bounds.bottom - bounds.top;
+    if (w < 8 || w > 512 || h < 8 || h > 96 || w * h > 32_768) return;
+    for (let x = bounds.left - 1; x <= bounds.right; x++) {
+        if (pixels[((bounds.top - 1) * imageWidth + x) * 4 + 3] !== 255
+            || pixels[(bounds.bottom * imageWidth + x) * 4 + 3] !== 255) return;
+    }
+    for (let y = bounds.top; y < bounds.bottom; y++) {
+        if (pixels[(y * imageWidth + bounds.left - 1) * 4 + 3] !== 255
+            || pixels[(y * imageWidth + bounds.right) * 4 + 3] !== 255) return;
+    }
+    const uniformPair = (horizontal: boolean): [number, number, number] | undefined => {
+        const firstOffset = horizontal
+            ? (bounds.top * imageWidth + bounds.left - 1) * 4
+            : ((bounds.top - 1) * imageWidth + bounds.left) * 4;
+        const r0 = pixels[firstOffset], g0 = pixels[firstOffset + 1], b0 = pixels[firstOffset + 2];
+        let sumR = 0, sumG = 0, sumB = 0, count = 0;
+        const check = (x: number, y: number): boolean => {
+            const p = (y * imageWidth + x) * 4;
+            if (pixelL1(pixels, p, r0, g0, b0) > 6) return false;
+            sumR += pixels[p]; sumG += pixels[p + 1]; sumB += pixels[p + 2]; count++;
+            return true;
+        };
+        if (horizontal) {
+            for (let y = bounds.top; y < bounds.bottom; y++) {
+                if (!check(bounds.left - 1, y) || !check(bounds.right, y)) return;
+            }
+        } else {
+            for (let x = bounds.left; x < bounds.right; x++) {
+                if (!check(x, bounds.top - 1) || !check(x, bounds.bottom)) return;
+            }
+        }
+        return [Math.round(sumR / count), Math.round(sumG / count), Math.round(sumB / count)];
+    };
+    const lr = uniformPair(true);
+    if (lr) {
+        const [r, g, b] = lr;
+        let topInner = 0, bottomInner = 0, outerJumps = 0;
+        for (let x = bounds.left; x < bounds.right; x++) {
+            if (pixelL1(pixels, (bounds.top * imageWidth + x) * 4, r, g, b) <= 12) topInner++;
+            if (pixelL1(pixels, ((bounds.bottom - 1) * imageWidth + x) * 4, r, g, b) <= 12) bottomInner++;
+            if (pixelL1(pixels, ((bounds.top - 1) * imageWidth + x) * 4, r, g, b) >= 45
+                || pixelL1(pixels, (bounds.bottom * imageWidth + x) * 4, r, g, b) >= 45) outerJumps++;
+        }
+        if (outerJumps >= w * 0.5 && topInner >= w * 0.5 && bottomInner >= w * 0.5) return lr;
+    }
+    const tb = uniformPair(false);
+    if (tb) {
+        const [r, g, b] = tb;
+        let leftInner = 0, rightInner = 0, outerJumps = 0;
+        for (let y = bounds.top; y < bounds.bottom; y++) {
+            if (pixelL1(pixels, (y * imageWidth + bounds.left) * 4, r, g, b) <= 12) leftInner++;
+            if (pixelL1(pixels, (y * imageWidth + bounds.right - 1) * 4, r, g, b) <= 12) rightInner++;
+            if (pixelL1(pixels, (y * imageWidth + bounds.left - 1) * 4, r, g, b) >= 45
+                || pixelL1(pixels, (y * imageWidth + bounds.right) * 4, r, g, b) >= 45) outerJumps++;
+        }
+        if (outerJumps >= h * 0.5 && leftInner >= h * 0.5 && rightInner >= h * 0.5) return tb;
+    }
+}
+
+function applyMaskClamp(rectangle: MaskRectangle, clamp: OcrLine['bbox'] | undefined): MaskRectangle | undefined {
+    if (!clamp) return rectangle;
+    const left = Math.max(rectangle.left, Math.floor(clamp.x0));
+    const top = Math.max(rectangle.top, Math.floor(clamp.y0));
+    const right = Math.min(rectangle.right, Math.ceil(clamp.x1));
+    const bottom = Math.min(rectangle.bottom, Math.ceil(clamp.y1));
+    if (right <= left || bottom <= top) return;
+    return { ...rectangle, left, top, right, bottom };
+}
+
 /** 仅导出普通图原有修补几何，供低 alpha 保护使用；不套用漫画字号描边余量。 */
 export function imageMaskBoxes(line: ImageTextRegion, width: number, height: number): OcrLine['bbox'][] {
     return (line.sourceBoxes ?? [line.bbox]).flatMap(bbox => {
         const rectangle = getMaskRectangle({text: line.text, bbox}, width, height);
         return rectangle ? [{x0:rectangle.left,y0:rectangle.top,x1:rectangle.right,y1:rectangle.bottom}] : [];
+    });
+}
+
+/** 归并待修补区域的最小脏矩形集合，供 Canvas 局部 putImageData 上传使用。 */
+export function getInpaintDirtyRects(
+    lines: readonly ImageTextRegion[],
+    width: number,
+    height: number,
+    clamps?: ReadonlyMap<ImageTextRegion, OcrLine['bbox']>,
+): OcrLine['bbox'][] {
+    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || lines.length === 0) return [];
+    const rectangles = lines.flatMap(line => {
+        const clamp = clamps?.get(line);
+        return (line.sourceBoxes ?? [line.bbox]).map(bbox => {
+            const rectangle = getMaskRectangle({text: line.text, bbox}, width, height);
+            return rectangle ? applyMaskClamp(rectangle, clamp) : undefined;
+        });
+    }).filter((rectangle): rectangle is MaskRectangle => rectangle !== undefined);
+    return clusters(rectangles).map(group => {
+        const bounds = group.reduce(union);
+        return {x0: bounds.left, y0: bounds.top, x1: bounds.right, y1: bounds.bottom};
     });
 }
 
@@ -155,6 +339,7 @@ export function inpaintTextRegions(
     lines: ImageTextRegion[],
     inPlace = false,
     protection?: MangaAlphaProtection,
+    clamps?: ReadonlyMap<ImageTextRegion, OcrLine['bbox']>,
 ): Uint8ClampedArray {
     const result = inPlace ? source : new Uint8ClampedArray(source);
     if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height)
@@ -162,9 +347,15 @@ export function inpaintTextRegions(
 
     const rectangles = lines.flatMap(line => {
         const sources=line.sourceBoxes??[line.bbox];
+        const clamp=clamps?.get(line);
         return sources.map(bbox=>{
-            const rectangle=getMaskRectangle({text:line.text,bbox},width,height);
-            if(rectangle&&line.quarterTurn&&sources.length===1)rectangle.rotatedSource=bbox;
+            const expanded=getMaskRectangle({text:line.text,bbox},width,height);
+            if(!expanded)return;
+            let rectangle=protection?expanded:clampMaskRectangleToInterior(result,width,height,bbox,expanded);
+            const clamped=applyMaskClamp(rectangle,clamp);
+            if(!clamped)return;
+            rectangle=clamped;
+            if(line.quarterTurn&&sources.length===1)rectangle.rotatedSource=bbox;
             return rectangle;
         });
     })
@@ -267,6 +458,19 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
             if(maskedCount===0)return;
         } else if (hasFullBorder && !bounds.rotatedSource) {
             if (repairDirectionalImageBackground(result,imageWidth,left,top,width,height,directionBudget)) return;
+            const compactFill = planCompactInteriorFill(result, imageWidth, bounds);
+            if (compactFill) {
+                for (let y = bounds.top; y < bounds.bottom; y++) {
+                    for (let x = bounds.left; x < bounds.right; x++) {
+                        const offset = (y * imageWidth + x) * 4;
+                        result[offset] = compactFill[0];
+                        result[offset + 1] = compactFill[1];
+                        result[offset + 2] = compactFill[2];
+                        result[offset + 3] = 255;
+                    }
+                }
+                return;
+            }
             boundaryRows = planBoundarySampleRows(result,imageWidth,imageHeight,bounds,boundaryBudget);
         }
     }

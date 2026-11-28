@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/karaoke.ts
  * 文件职责：把 FluentRead 字幕行渲染成可逐字点亮的高亮单元，并在视频播放期间按句子时间驱动 KTV 式扫光。
- * 主要内容：统一字幕行写入（文本未变时不触碰 DOM）、构建与复用高亮单元、仅在单元切换时改写状态并每帧只更新当前单元的一个 CSS 变量；控制器自行监听播放、暂停与拖动事件，只在功能开启、视频播放且有字幕时保持帧循环，其余时间停在准确位置。
+ * 主要内容：统一字幕行写入（文本与模式未变时在分词前短路）、支持多控制器共存的行变更注册表、按目标媒体过滤事件、仅在单元切换与 0.5% 步进变化时写入样式；句末完成后暂停帧循环并在 timeupdate/seeked/换句时恢复，同步时即时刷新偏移时间与回跳估算。
  * 模块边界：只操作传入的字幕行节点，时间轴与开关状态经端口注入；不读取配置、不发起翻译，样式由 ui.ts 的字幕样式表提供。
  */
 import {
@@ -18,6 +18,7 @@ export const VIDEO_KARAOKE_STATE_ATTRIBUTE = 'data-fluent-read-karaoke-state';
 export const VIDEO_KARAOKE_FILL_PROPERTY = '--fluent-read-video-karaoke-fill';
 
 interface VideoKaraokeLine {
+  text: string;
   units: HTMLElement[];
   ends: number[];
   index: number;
@@ -25,10 +26,10 @@ interface VideoKaraokeLine {
 }
 
 /** 这些事件之后要么需要重启帧循环，要么需要在静止画面上重画一次；媒体事件不冒泡，统一在捕获阶段监听。 */
-const VIDEO_KARAOKE_EVENTS = ['play', 'playing', 'pause', 'seeked', 'ended'];
+const VIDEO_KARAOKE_EVENTS = ['play', 'playing', 'pause', 'seeked', 'ended', 'timeupdate'];
 
 const lines = new WeakMap<Element, VideoKaraokeLine>();
-let notifyLineChange: (() => void) | undefined;
+const lineChangeListeners = new Set<() => void>();
 
 function getVideoKaraokeLine(element: Element): VideoKaraokeLine | undefined {
   const line = lines.get(element);
@@ -36,14 +37,17 @@ function getVideoKaraokeLine(element: Element): VideoKaraokeLine | undefined {
 }
 
 /**
- * 字幕行的唯一写入口：文本与渲染方式都没变时直接返回，避免播放期间反复重建节点；
+ * 字幕行的唯一写入口：文本与渲染方式都没变时在切分前直接返回，避免播放期间反复分词或重建节点；
  * 开启逐字高亮时拆成单元，关闭时退回纯文本。textContent 在两种方式下保持一致。
  */
 export function setVideoCaptionText(element: Element, text: string, karaoke: boolean): void {
+  const existing = getVideoKaraokeLine(element);
+  if (karaoke && existing && existing.text === text) return;
+  if (!karaoke && !existing && element.textContent === text) return;
   const parts = karaoke ? splitVideoKaraokeParts(text) : [];
   const highlighted = parts.some(part => part.weight > 0);
-  if (element.textContent === text && Boolean(getVideoKaraokeLine(element)) === highlighted) return;
   if (!highlighted) {
+    if (!existing && element.textContent === text) return;
     lines.delete(element);
     element.textContent = text;
     return;
@@ -51,7 +55,7 @@ export function setVideoCaptionText(element: Element, text: string, karaoke: boo
 
   const document = element.ownerDocument;
   const fragment = document.createDocumentFragment();
-  const line: VideoKaraokeLine = {units: [], ends: [], index: -1, fill: ''};
+  const line: VideoKaraokeLine = {text, units: [], ends: [], index: -1, fill: ''};
   let total = 0;
   for (const part of parts) {
     if (!part.weight) {
@@ -69,7 +73,7 @@ export function setVideoCaptionText(element: Element, text: string, karaoke: boo
   }
   element.replaceChildren(fragment);
   lines.set(element, line);
-  notifyLineChange?.();
+  for (const listener of lineChangeListeners) listener();
 }
 
 /** 把一行字幕画到指定进度；返回该行是否处于逐字高亮状态。 */
@@ -89,7 +93,7 @@ export function paintVideoKaraokeLine(element: Element, progress: number): boole
       if (cursor !== index) unit.style.removeProperty(VIDEO_KARAOKE_FILL_PROPERTY);
     }
   }
-  const fill = index > last ? '' : `${(fraction * 100).toFixed(1)}%`;
+  const fill = index > last ? '' : `${(Math.round(fraction * 200) / 2).toFixed(1)}%`;
   if (index !== line.index || fill !== line.fill) {
     if (fill) line.units[index].style.setProperty(VIDEO_KARAOKE_FILL_PROPERTY, fill);
     line.index = index;
@@ -110,7 +114,7 @@ interface VideoKaraokePorts {
 }
 
 export interface VideoKaraokeController {
-  /** 开关等外部状态变化后调用：立即重画一次，并按需启动或停止帧循环；字幕写入与播放事件会自动触发。 */
+  /** 开关或时间偏移等外部状态变化后调用：立即重画一次，并按需启动或停止帧循环；字幕写入与播放事件会自动触发。 */
   sync(): void;
   destroy(): void;
 }
@@ -121,25 +125,37 @@ export function createVideoKaraokeController(ports: VideoKaraokePorts): VideoKar
   let timing: VideoKaraokeTiming | null = null;
   let timingKey = '';
   let timingStale = true;
+  let timingEstimated = false;
 
   const stop = () => {
     if (frame !== undefined) ports.window.cancelAnimationFrame(frame);
     frame = undefined;
   };
 
-  /** 只在字幕行重建后重新确认句子；原文与译文共用同一段时间，先后到达也保持同步。 */
-  const resolveTiming = (elements: Element[], currentMs: number): VideoKaraokeTiming => {
+  /** 只在字幕行重建或显式同步后重新确认句子；原文与译文共用同一段时间，先后到达也保持同步。 */
+  const resolveTiming = (elements: Element[], currentMs: number, playbackRate: number): VideoKaraokeTiming => {
     if (timingStale || !timing) {
-      const key = elements.find(element => getVideoKaraokeLine(element))!.textContent!;
-      if (key !== timingKey || !timing) {
+      const key = getVideoKaraokeLine(elements.find(element => getVideoKaraokeLine(element))!)!.text;
+      const next = ports.getTiming();
+      if (next) {
         timingKey = key;
-        timing = ports.getTiming() || {startMs: currentMs, durationMs: estimateVideoKaraokeDurationMs(key)};
+        timing = next;
+        timingEstimated = false;
+      } else if (key !== timingKey || !timing || !timingEstimated || currentMs < timing.startMs) {
+        timingKey = key;
+        timing = {startMs: currentMs, durationMs: estimateVideoKaraokeDurationMs(key, playbackRate)};
+        timingEstimated = true;
       }
       timingStale = false;
     } else if (currentMs < timing.startMs || currentMs >= timing.startMs + timing.durationMs) {
-      // 连续两句文本相同时节点不会重建；时间轴给出新的一句就从头再扫，估算的时长不循环。
+      // 连续两句文本相同时节点不会重建；时间轴给出新的一句就从头再扫，估算时长仅在回跳前重置。
       const next = ports.getTiming();
-      if (next && next.startMs !== timing.startMs) timing = next;
+      if (next && (next.startMs !== timing.startMs || next.durationMs !== timing.durationMs)) {
+        timing = next;
+        timingEstimated = false;
+      } else if (!next && timingEstimated && currentMs < timing.startMs) {
+        timing = {startMs: currentMs, durationMs: estimateVideoKaraokeDurationMs(timingKey, playbackRate)};
+      }
     }
     return timing;
   };
@@ -149,12 +165,13 @@ export function createVideoKaraokeController(ports: VideoKaraokePorts): VideoKar
     const elements = ports.getLines();
     if (!ports.isEnabled() || !video || !elements.some(element => getVideoKaraokeLine(element))) {
       timing = null;
+      timingEstimated = false;
       return false;
     }
     const currentMs = video.currentTime * 1000;
-    const progress = getVideoKaraokeProgress(resolveTiming(elements, currentMs), currentMs);
+    const progress = getVideoKaraokeProgress(resolveTiming(elements, currentMs, video.playbackRate ?? 1), currentMs);
     for (const element of elements) paintVideoKaraokeLine(element, progress);
-    return !video.paused && !video.ended;
+    return !video.paused && !video.ended && progress < 1;
   };
 
   const tick = () => {
@@ -164,25 +181,36 @@ export function createVideoKaraokeController(ports: VideoKaraokePorts): VideoKar
 
   const sync = () => {
     if (destroyed) return;
+    timingStale = true;
     stop();
     tick();
   };
 
-  notifyLineChange = () => {
+  const onMediaEvent = (event: Event) => {
+    if (event.target !== ports.getVideo()) return;
+    if (event.type === 'timeupdate') {
+      if (frame === undefined) tick();
+      return;
+    }
+    sync();
+  };
+
+  const onLineChange = () => {
     timingStale = true;
     // 同一轮里原文与译文先后写入时合并到下一帧一起上色。
     if (frame === undefined) frame = ports.window.requestAnimationFrame(tick);
   };
+  lineChangeListeners.add(onLineChange);
 
-  VIDEO_KARAOKE_EVENTS.forEach(name => ports.document.addEventListener(name, sync, true));
+  VIDEO_KARAOKE_EVENTS.forEach(name => ports.document.addEventListener(name, onMediaEvent, true));
 
   return {
     sync,
     destroy: () => {
       destroyed = true;
       stop();
-      notifyLineChange = undefined;
-      VIDEO_KARAOKE_EVENTS.forEach(name => ports.document.removeEventListener(name, sync, true));
+      lineChangeListeners.delete(onLineChange);
+      VIDEO_KARAOKE_EVENTS.forEach(name => ports.document.removeEventListener(name, onMediaEvent, true));
     },
   };
 }

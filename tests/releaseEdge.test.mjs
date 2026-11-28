@@ -7,10 +7,10 @@ import JSZip from 'jszip';
 import {verifyEdgeArchive, verifyEdgeBackground, verifyEdgeManifest} from '../scripts/release/verify-edge.mjs';
 
 test('Edge release identity rejects Chrome permissions, foreign browser targets and stale versions', () => {
-  const manifest = {manifest_version: 3, version: '0.0.40', permissions: ['storage', 'offscreen'], background: {service_worker: 'background.js'}};
+  const manifest = {manifest_version: 3, minimum_chrome_version: '137', version: '0.0.40', permissions: ['storage', 'offscreen'], background: {service_worker: 'background.js'}};
   assert.equal(verifyEdgeManifest(manifest, '0.0.40'), manifest);
   for (const patch of [
-    {manifest_version: 2}, {version: '0.0.39'}, {key: 'chrome-key'}, {oauth2: {}},
+    {manifest_version: 2}, {minimum_chrome_version: undefined}, {minimum_chrome_version: '136'}, {version: '0.0.39'}, {key: 'chrome-key'}, {oauth2: {}},
     {permissions: ['offscreen', 'identity']}, {permissions: ['offscreen', 'offscreen']},
     {permissions: []}, {background: {service_worker: '../background.js'}},
     {browser_specific_settings: {gecko: {id: 'firefox'}}},

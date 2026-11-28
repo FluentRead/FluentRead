@@ -1,14 +1,14 @@
 /**
  * @file src/features/image-translation/services/sourceAppearance.ts
  * 文件职责：从尚未修补的同帧原像素确认可复用的文字颜色，并验证普通译文字框的少量垂直扩展。
- * 主要内容：复用闭环静区和共同墨色端点观察，只接受不透明、整段背景一致的源区域；注音不决定正文字色，混色正文不猜测。源色对背景至少4.5:1时才提供字色，其余保留高对比默认；全部候选预付有界像素预算，避免顺序决定大页只有前半部换色。扩展仅扫描新增像素、保持原横向边界、避开所有其他文字，并要求完整新增范围仍是同一不透明底色。
+ * 主要内容：复用闭环静区和共同墨色端点观察，只接受不透明、整段背景一致的源区域；注音不决定正文字色，混色正文不猜测。源色对背景满足 4.5:1 或饱和彩色 UI 控件上高亮浅字满足 2.6:1 时提供字色，其余保留高对比默认；绘字外扩触及紧凑按钮边沿时回退至同源紧凑控件观察；全部像素比较使用标量读取并预付有界预算，避免顺序决定大页只有前半部换色。扩展仅扫描新增像素、保持原横向边界、避开所有其他文字，并要求完整新增范围仍是同一不透明底色。
  * 模块边界：只读像素和几何，不授权清字、不扩大擦除mask、不改变OCR或翻译，也不读取DOM；调色板不替代原透明保护和原文保护。对比度是局部采用门槛，不代表整页符合可访问性规范。
  * 渐变观察：原静区观察不足时，可在整段完整边界及物理字框内验证共同墨色；渐变只提供字色与细对比描边，不提供纯色背景或扩框权限，注音和已确认的混色/行间图案不进入此后备路径。
  * 字号旁证：保留每个已验证物理行的独立墨迹边界，复用本次调色板观察，不追加Canvas读回；它与颜色一起仅描述原图，不修改原OCR行高、清字掩码或绘字边界。
  */
 import type {ImageTextRegion} from '../paragraphs';
 import {imageMatteObservationBox,observeImageMattePalette} from './imageMatteRepair';
-import {getImageRgbContrast} from './rendering';
+import {isAcceptableImageSourceInk} from './rendering';
 import {observeImageSourceInk,type ImageSourceInk} from './sourceInk';
 
 type Box=ImageTextRegion['bbox'];
@@ -16,11 +16,12 @@ export type ImageSourceAppearance=ImageSourceInk;
 const sameBox=(a:Box,b:Box)=>a.x0===b.x0&&a.y0===b.y0&&a.x1===b.x1&&a.y1===b.y1;
 const intersects=(a:Box,b:Box)=>a.x0<b.x1&&a.x1>b.x0&&a.y0<b.y1&&a.y1>b.y0;
 const valid=(b:Box|undefined|null,w:number,h:number):b is Box=>!!b&&[b.x0,b.y0,b.x1,b.y1].every(Number.isFinite)&&b.x0>=0&&b.y0>=0&&b.x1<=w&&b.y1<=h&&b.x1>b.x0&&b.y1>b.y0;
-const equalColor=(a:readonly number[],b:readonly number[])=>a.every((value,index)=>value===b[index]);
+const equalColor=(a:readonly number[],b:readonly number[])=>a[0]===b[0]&&a[1]===b[1]&&a[2]===b[2]&&a[3]===b[3];
 
 /** 整段的非文字间隙也必须是已观测底色，不能跨图案把原色应用到另一种背景。 */
 function flatBetweenSources(pixels:Uint8ClampedArray,width:number,box:Box,sources:Box[],background:readonly number[]):boolean {
     const left=Math.floor(box.x0),right=Math.ceil(box.x1);
+    const b0=background[0],b1=background[1],b2=background[2],b3=background[3];
     for(let y=Math.floor(box.y0);y<Math.ceil(box.y1);y++){
         const spans=sources.filter(b=>y>=Math.floor(b.y0)&&y<Math.ceil(b.y1)).map(b=>[Math.floor(b.x0),Math.ceil(b.x1)]).sort((a,b)=>a[0]-b[0]);
         let x=left,index=0;
@@ -28,7 +29,7 @@ function flatBetweenSources(pixels:Uint8ClampedArray,width:number,box:Box,source
             while(index<spans.length&&spans[index][1]<=x)index++;
             if(index<spans.length&&spans[index][0]<=x){x=Math.min(right,spans[index][1]);continue;}
             const offset=(y*width+x)*4;
-            if(!background.every((value,c)=>pixels[offset+c]===value))return false;
+            if(pixels[offset]!==b0||pixels[offset+1]!==b1||pixels[offset+2]!==b2||pixels[offset+3]!==b3)return false;
             x++;
         }
     }
@@ -67,8 +68,14 @@ export function observeImageSourceAppearances(pixels:Uint8ClampedArray,width:num
         }
         const first=palettes[0]!;
         if(!palettes.every(p=>equalColor(p!.background,first.background)&&equalColor(p!.ink,first.ink)))continue;
-        if(!flatBetweenSources(pixels,width,bounds,[...sources,...palettes.map(p=>p!.supportBox)],first.background))continue;
-        const foreground=getImageRgbContrast(first.ink,first.background)>=4.5?`rgb(${first.ink.slice(0,3).join(',')})`:undefined;
+        if(!flatBetweenSources(pixels,width,bounds,[...sources,...palettes.map(p=>p!.supportBox)],first.background)){
+            if(!region.ruby?.length&&sources.length===1){
+                const appearance=observeImageSourceInk(pixels,width,height,bounds,sources,region.quarterTurn!==undefined);
+                if(appearance)result.set(region,appearance);
+            }
+            continue;
+        }
+        const foreground=isAcceptableImageSourceInk(first.ink,first.background)?`rgb(${first.ink[0]},${first.ink[1]},${first.ink[2]})`:undefined;
         result.set(region,{background:first.background,...(foreground?{foreground}:{}),inkBoxes:palettes.map(p=>({...p!.supportBox}))});
     }
     return result;
@@ -89,11 +96,12 @@ export function expandImageTextBounds(pixels:Uint8ClampedArray,width:number,heig
         if(--budget.remaining<cost||!valid(obstacle,width,height)||intersects(obstacle,proposed))return original;
     }
     budget.remaining-=cost;
+    const b0=appearance.background[0],b1=appearance.background[1],b2=appearance.background[2],b3=appearance.background[3];
     for(let y=top;y<bottom;y++){
         if(y>=Math.ceil(original.y0)&&y<Math.floor(original.y1))continue;
         for(let x=left;x<right;x++){
             const offset=(y*width+x)*4;
-            if(!appearance.background.every((value,c)=>pixels[offset+c]===value))return original;
+            if(pixels[offset]!==b0||pixels[offset+1]!==b1||pixels[offset+2]!==b2||pixels[offset+3]!==b3)return original;
         }
     }
     return proposed;

@@ -6,6 +6,8 @@
 
 <GuideVisual kind="rules" />
 
+<DocDiagram kind="site-rules-priority" />
+
 ## 从已有规则开始
 
 1. 先导出规则备份，再搜索网站名、域名或规则标识。

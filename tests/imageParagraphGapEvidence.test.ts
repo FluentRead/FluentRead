@@ -389,7 +389,7 @@ describe('段落间隙预算与画外墨迹回退',()=>{
                 pixels.set([230,240,250,255],(yy*width+xx)*4);
         };
         for(let index=0;index<25;index++)addPair(String(index),100,10+index*200,250,75);
-        addPair('SMALL',100,5000,60,75);
+        addPair('SMALL',100,5000,30,65);
         addPair('TARGET',100,5210,60,75,true);
         for(const row of results.filter(item=>item.text.includes('TARGET')))
             for(let y=row.box.y-8;y<row.box.y+row.box.height+8;y++)for(let x=92;x<168;x++)pixels.set([34,54,54,255],(y*width+x)*4);
@@ -398,7 +398,7 @@ describe('段落间隙预算与画外墨迹回退',()=>{
             for(let y=row.box.y;y<row.box.y+30;y++)if(y!==row.box.y+14)
                 for(let x=103;x<158;x+=8)for(let xx=x;xx<x+3;xx++)if(Math.abs(xx-(row.box.x+row.box.width/2))>2)pixels.set([230,240,250,255],(y*width+xx)*4);
         results.push(
-            {text:'LEFT GUARD',confidence:.99,box:{x:40,y:5210,width:20,height:30}},
+            {text:'LEFT GUARD',confidence:.99,box:{x:49,y:5210,width:20,height:30}},
             {text:'RIGHT GUARD',confidence:.99,box:{x:191,y:5210,width:20,height:30}},
         );
         for(let y=5245;y<5310;y++)for(let x=100;x<160;x++){const value=24+Math.round((x-100)*20/59);pixels.set([value,value+20,value+20,255],(y*width+x)*4);}
@@ -593,7 +593,7 @@ describe('几何、预算与取消的保守失败',()=>{
         const page={results:[f.page.results[0],...Array(125).fill(f.page.results[1])]},proofs=produceImageParagraphGapProofs(page,200,200,f.pixels);expect(proofs.length).toBeGreaterThan(0);expect(proofs.length).toBeLessThan(128);expect(proofs.reduce((n,p)=>n+p.pixels,0)).toBeLessThanOrEqual(1_048_576);
     });
     it('消费者逐proof重复收费，伪造超1Mi tile receipt不被可调数字蒙混',()=>{
-        const f=basic(),p=produceImageParagraphGapProofs(f.page,200,200,f.pixels)[0];f.page.results.push({text:'OTHER',confidence:.99,box:{x:180,y:150,width:14,height:14}});
+        const f=basic(),p=produceImageParagraphGapProofs(f.page,200,200,f.pixels)[0];f.page.results.push({text:'OTHER',confidence:.99,box:{x:180,y:40,width:14,height:14}});
         const tiles=Array.from({length:1025},(_,index)=>({left:(index%64)*32,top:Math.floor(index/64)*32,width:32,height:32}));
         expect(adopt({...f,width:2048,height:1024},[{...p,width:2048,height:1024,topology:{owner:{x0:20,y0:20,x1:180,y1:120},tiles}}]).support).toBeUndefined();
     });

@@ -365,6 +365,124 @@ describe('Offscreen Chrome 翻译域', () => {
         expect(destroy).toHaveBeenCalledOnce();
     });
 
+    it('同时具备 translate 与 translateStreaming 时短文本直调 translate，超 4000 字符使用流式，无流式时仍回退 translate', async () => {
+        const translate = vi.fn(async (text: string) => `direct:${text.length}`);
+        const translateStreaming = vi.fn(async function* (text: string) {
+            yield `stream:${text.length}`;
+        });
+        const environment = modernTranslator({translate, translateStreaming, destroy: vi.fn()});
+        const boundaryText = 'a'.repeat(4_000);
+        const longText = 'b'.repeat(4_001);
+
+        await expect(performChromeTranslation('short paragraph', 'en', 'zh', environment))
+            .resolves.toBe('direct:15');
+        await expect(performChromeTranslation(boundaryText, 'en', 'zh', environment))
+            .resolves.toBe('direct:4000');
+        expect(translate).toHaveBeenCalledTimes(2);
+        expect(translateStreaming).not.toHaveBeenCalled();
+
+        await expect(performChromeTranslation(longText, 'en', 'zh', environment))
+            .resolves.toBe('stream:4001');
+        expect(translate).toHaveBeenCalledTimes(2);
+        expect(translateStreaming).toHaveBeenCalledOnce();
+        disposeChromeTranslationModels(environment);
+
+        const directOnlyTranslate = vi.fn(async (text: string) => `only-direct:${text.length}`);
+        const directOnlyEnv = modernTranslator({translate: directOnlyTranslate, destroy: vi.fn()});
+        await expect(performChromeTranslation(longText, 'en', 'zh', directOnlyEnv))
+            .resolves.toBe('only-direct:4001');
+        expect(directOnlyTranslate).toHaveBeenCalledOnce();
+        disposeChromeTranslationModels(directOnlyEnv);
+    });
+
+    it('detectChromeLanguage 按环境 LRU 记忆化检测样本，支持 256 容量淘汰、跳过超长/带状态回调并在卸载时清空', async () => {
+        const detect = vi.fn(async () => [{detectedLanguage: 'fr', confidence: 0.95}]);
+        const environment = {
+            LanguageDetector: {create: vi.fn(async () => ({detect, destroy: vi.fn()}))},
+        };
+
+        await expect(detectChromeLanguage('Bonjour le monde.', environment)).resolves.toBe('fr');
+        await expect(detectChromeLanguage('Bonjour le monde.', environment)).resolves.toBe('fr');
+        expect(detect).toHaveBeenCalledTimes(1);
+
+        // 传入 reporter 时仍执行完整检测流程以保留状态回调。
+        const statuses: ChromeModelStatus[] = [];
+        await expect(detectChromeLanguage('Bonjour le monde.', environment, undefined, status => statuses.push(status)))
+            .resolves.toBe('fr');
+        expect(detect).toHaveBeenCalledTimes(2);
+        expect(statuses).toContainEqual({model: 'language-detector', phase: 'ready', loaded: 1});
+
+        // 超过 2000 字符的长样本不进入记忆化缓存。
+        const oversized = 'x'.repeat(2_001);
+        await expect(detectChromeLanguage(oversized, environment)).resolves.toBe('fr');
+        await expect(detectChromeLanguage(oversized, environment)).resolves.toBe('fr');
+        expect(detect).toHaveBeenCalledTimes(4);
+
+        // 其他环境不共享缓存。
+        const otherDetect = vi.fn(async () => [{detectedLanguage: 'de', confidence: 0.95}]);
+        const otherEnvironment = {
+            LanguageDetector: {create: vi.fn(async () => ({detect: otherDetect, destroy: vi.fn()}))},
+        };
+        await expect(detectChromeLanguage('Bonjour le monde.', otherEnvironment)).resolves.toBe('de');
+        expect(otherDetect).toHaveBeenCalledTimes(1);
+        disposeChromeTranslationModels(otherEnvironment);
+
+        // 超过 256 条时淘汰最久未命中条目，最近命中条目保留。
+        detect.mockClear();
+        const lruEnvironment = {
+            LanguageDetector: {create: vi.fn(async () => ({detect, destroy: vi.fn()}))},
+        };
+        for (let i = 0; i < 256; i += 1) {
+            await expect(detectChromeLanguage(`sample-${i}`, lruEnvironment)).resolves.toBe('fr');
+        }
+        expect(detect).toHaveBeenCalledTimes(256);
+        // 刷新 sample-0 为最新，插入 sample-256 应淘汰 sample-1 而保留 sample-0。
+        await expect(detectChromeLanguage('sample-0', lruEnvironment)).resolves.toBe('fr');
+        expect(detect).toHaveBeenCalledTimes(256);
+        await expect(detectChromeLanguage('sample-256', lruEnvironment)).resolves.toBe('fr');
+        expect(detect).toHaveBeenCalledTimes(257);
+        await expect(detectChromeLanguage('sample-0', lruEnvironment)).resolves.toBe('fr');
+        expect(detect).toHaveBeenCalledTimes(257);
+        await expect(detectChromeLanguage('sample-1', lruEnvironment)).resolves.toBe('fr');
+        expect(detect).toHaveBeenCalledTimes(258);
+
+        disposeChromeTranslationModels(lruEnvironment);
+        await expect(detectChromeLanguage('sample-0', lruEnvironment)).rejects.toMatchObject({name: 'AbortError'});
+        disposeChromeTranslationModels(environment);
+    });
+
+    it('同一 environment 替换 LanguageDetector 引用时清空检测缓存并释放旧检测器', async () => {
+        const firstDestroy = vi.fn();
+        const firstDetect = vi.fn(async () => [{detectedLanguage: 'fr', confidence: 0.95}]);
+        const secondDestroy = vi.fn();
+        const secondDetect = vi.fn(async () => [{detectedLanguage: 'de', confidence: 0.95}]);
+        const environment: {
+            Translator?: ChromeTranslationEnvironment['Translator'];
+            LanguageDetector?: ChromeTranslationEnvironment['LanguageDetector'];
+        } = {
+            ...modernTranslator({translate: vi.fn(async () => 'translated'), destroy: vi.fn()}),
+            LanguageDetector: {create: vi.fn(async () => ({detect: firstDetect, destroy: firstDestroy}))},
+        };
+
+        // 先通过 Translator 建立环境缓存，再首次运行检测器，覆盖无旧检测器槽位的 detectorRef 初始化分支。
+        await expect(performChromeTranslation('hello', 'en', 'zh', environment)).resolves.toBe('translated');
+        await expect(detectChromeLanguage('same sample', environment)).resolves.toBe('fr');
+        await expect(detectChromeLanguage('same sample', environment)).resolves.toBe('fr');
+        expect(firstDetect).toHaveBeenCalledTimes(1);
+
+        environment.LanguageDetector = {
+            create: vi.fn(async () => ({detect: secondDetect, destroy: secondDestroy})),
+        };
+        await expect(detectChromeLanguage('same sample', environment)).resolves.toBe('de');
+        expect(firstDestroy).toHaveBeenCalledOnce();
+        expect(secondDetect).toHaveBeenCalledTimes(1);
+        await expect(detectChromeLanguage('same sample', environment)).resolves.toBe('de');
+        expect(secondDetect).toHaveBeenCalledTimes(1);
+
+        disposeChromeTranslationModels(environment);
+        expect(secondDestroy).toHaveBeenCalledOnce();
+    });
+
     it('现代 Translator 优先，availability 使用映射后语言对并把 signal 传到 create/translate', async () => {
         const controller = new AbortController();
         const statuses: ChromeModelStatus[] = [];

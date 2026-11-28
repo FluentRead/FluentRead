@@ -146,6 +146,29 @@ describe('补充核心绑定到当前页原像素视图',()=>{
             const c=createMangaDetectionCore();c.beginPage();const f=refinementFrame(c,scope===undefined?null:scope);c.bindBoxes(f.ticket,f.boxes);c.endFrame(f.ticket);expect(c.takeRefinements()).toEqual([]);expect(c.refinementUsage.pixels).toBe(0);
         }
         for(const [w,h]of [[1537,128],[128,1537]]){const c=createMangaDetectionCore();c.beginPage();const f=refinementFrame(c,{pageWidth:2000,pageHeight:2000,x:0,y:0,width:w,height:h},1,w,h);c.bindBoxes(f.ticket,f.boxes);c.endFrame(f.ticket);expect(c.takeRefinements()).toEqual([]);}
+        // maxSide=1728 支持 1600×900 与 1728 边界原像素补救，超过 1728 仍拒绝
+        const ok1600=createMangaDetectionCore();ok1600.beginPage();
+        const t1600=ok1600.beginFrame(1600,900,1728,{pageWidth:1600,pageHeight:900,x:0,y:0,width:1600,height:900});
+        expect(t1600).toBeDefined();
+        const d1600=new Float32Array(1600*928);
+        for(let y=16;y<112;y++)for(let x=16;x<112;x++)d1600[y*1600+x]=.1;
+        for(let y=48;y<60;y++)for(let x=32;x<96;x++)d1600[y*1600+x]=.9;
+        ok1600.observe(t1600,{dims:[1,3,928,1600]},{dims:[1,1,928,1600],data:d1600});
+        ok1600.observeRegion(t1600,1600,928,{x0:16,y0:16,x1:112,y1:112},{x0:8,y0:8,x1:120,y1:120});
+        ok1600.bindBoxes(t1600,[{x:8,y:8,width:112,height:112}]);ok1600.endFrame(t1600);
+        expect(ok1600.takeRefinements()).toHaveLength(1);
+        for(const [w,h]of [[1729,128],[128,1729]]){
+            const over=createMangaDetectionCore();over.beginPage();
+            const ratio=1728/Math.max(w,h),mw=Math.ceil(Math.round(w*ratio)/32)*32,mh=Math.ceil(Math.round(h*ratio)/32)*32;
+            const t=over.beginFrame(w,h,1728,{pageWidth:2000,pageHeight:2000,x:0,y:0,width:w,height:h});
+            const data=new Float32Array(mw*mh);
+            for(let y=16;y<112;y++)for(let x=16;x<112;x++)data[y*mw+x]=.1;
+            for(let y=48;y<60;y++)for(let x=32;x<96;x++)data[y*mw+x]=.9;
+            over.observe(t,{dims:[1,3,mh,mw]},{dims:[1,1,mh,mw],data});
+            over.observeRegion(t,mw,mh,{x0:16,y0:16,x1:112,y1:112},{x0:8,y0:8,x1:120,y1:120});
+            over.bindBoxes(t,[{x:8,y:8,width:112,height:112}]);over.endFrame(t);
+            expect(over.takeRefinements()).toEqual([]);
+        }
     });
     it('重复区域、重复Box、Box坐标漂移和非法绑定撤回不明确候选',()=>{
         for(const mode of ['region','boxes','mutation','unknown']){

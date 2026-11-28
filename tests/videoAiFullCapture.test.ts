@@ -30,6 +30,33 @@ describe('PCM AudioWorklet renderer', () => {
     expect(first[0].pcm[0]).toBeCloseTo(.4); expect(first[0].pcm[2047]).toBeCloseTo(.4);
     expect(first[1]).toEqual([first[0].pcm.buffer]); expect(second[0].pcm).not.toBe(first[0].pcm);
   });
+
+  it('uses mono fast-path and flushes partial buffered samples only on explicit flush message', () => {
+    const postMessage = vi.fn();
+    const port: {postMessage: typeof postMessage; onmessage?: ((event: {data?: unknown}) => void) | null} = {postMessage};
+    let Processor!: new () => {process(inputs: Float32Array[][]): boolean};
+    const scope: PcmWorkletScope = {
+      sampleRate: 16000,
+      AudioWorkletProcessor: class {port = port;},
+      registerProcessor(_name, value) {Processor = value;},
+    };
+    registerVideoPcmWorklet(scope);
+    const processor = new Processor();
+    port.onmessage?.({data: {type: 'noop'}});
+    port.onmessage?.({data: {type: 'flush'}});
+    expect(postMessage).not.toHaveBeenCalled();
+
+    processor.process([[new Float32Array(300).fill(0.25)]]);
+    expect(postMessage).not.toHaveBeenCalled();
+    port.onmessage?.({data: {type: 'flush'}});
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    const flushed = postMessage.mock.calls[0]!;
+    expect(flushed[0].pcm).toHaveLength(300);
+    expect(flushed[0].pcm[0]).toBeCloseTo(0.25);
+    expect(flushed[1]).toEqual([flushed[0].pcm.buffer]);
+    port.onmessage?.({data: {type: 'flush'}});
+    expect(postMessage).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('本地 AI 完整视频字幕合并', () => {
@@ -1538,14 +1565,102 @@ describe('HTML live and long-media playback capture', () => {
     Worklet.last.onprocessorerror!(); expect(f.error).toHaveBeenCalledOnce();
     expect(Worklet.last.port.close).toHaveBeenCalledOnce(); expect(Worklet.last.onprocessorerror).toBeNull(); f.controller.destroy();
   });
-  it.each(['worklet', 'constructor', 'module'])('reports unavailable %s without invoking deprecated capture', async missing => {
+  it.each(['worklet', 'constructor', 'module'])('falls back to ScriptProcessor when %s is unavailable, and fails only when ScriptProcessor is also missing', async missing => {
     const f = worklet();
     if (missing === 'worklet') FullFakeContext.worklet = undefined;
     if (missing === 'constructor') vi.stubGlobal('AudioWorkletNode', undefined);
     if (missing === 'module') FullFakeContext.worklet!.addModule = vi.fn(async () => {throw new Error('Module denied');});
     const legacy = vi.spyOn(FullFakeContext.prototype, 'createScriptProcessor');
-    f.controller.start(); await vi.waitFor(() => expect(f.error).toHaveBeenCalledOnce());
-    expect(legacy).not.toHaveBeenCalled(); expect(FullFakeContext.instances.at(-1)!.state).toBe('closed'); f.controller.destroy(); legacy.mockRestore();
+    f.controller.start();
+    await vi.waitFor(() => expect(legacy).toHaveBeenCalledOnce());
+    expect(f.error).not.toHaveBeenCalled();
+    expect(f.controller.getPhase()).toBe('capturing');
+    f.controller.destroy();
+    legacy.mockRestore();
+
+    const noFallback = worklet();
+    if (missing === 'worklet') FullFakeContext.worklet = undefined;
+    if (missing === 'constructor') vi.stubGlobal('AudioWorkletNode', undefined);
+    if (missing === 'module') FullFakeContext.worklet!.addModule = vi.fn(async () => {throw new Error('Module denied');});
+    const originalCreate = FullFakeContext.prototype.createScriptProcessor;
+    (FullFakeContext.prototype as unknown as {createScriptProcessor?: unknown}).createScriptProcessor = undefined;
+    try {
+      noFallback.controller.start();
+      await vi.waitFor(() => expect(noFallback.error).toHaveBeenCalledOnce());
+      expect(FullFakeContext.instances.at(-1)!.state).toBe('closed');
+      noFallback.controller.destroy();
+    } finally {
+      FullFakeContext.prototype.createScriptProcessor = originalCreate;
+    }
+  });
+  it('uses shorter initial playback window (4.5s) then 8s steady windows, routes Firefox mozCaptureStream audio to destination at default sampleRate, and falls back to default AudioContext sampleRate when 16kHz is unsupported', async () => {
+    const chunks: VideoAiAudioChunk[] = [];
+    const f = live({
+      transcribe: vi.fn(async chunk => {
+        chunks.push({...chunk, pcm: new Float32Array()});
+        return {text: `Window ${chunk.sequence} spoken.`, segments: [{startMs: 0, endMs: 1_000, text: `Window ${chunk.sequence} spoken.`}]};
+      }),
+    });
+    const connectSpies: Array<ReturnType<typeof vi.spyOn>> = [];
+    const mozContextOptions: Array<AudioContextOptions | undefined> = [];
+    class RecordingContext extends FullFakeContext {
+      constructor(options?: AudioContextOptions) {
+        mozContextOptions.push(options);
+        super();
+        connectSpies.push(vi.spyOn(this.source, 'connect'));
+      }
+    }
+    vi.stubGlobal('window', {AudioContext: RecordingContext, setTimeout, clearTimeout});
+    f.source.captureStream = undefined as unknown as () => MediaStream;
+    f.source.mozCaptureStream = () => new FullFakeMediaStream([f.capturedTrack]) as unknown as MediaStream;
+    f.source.currentTime = 4.5;
+    expect(f.controller.start()).toBe(true);
+    for (let n = 0; n < 8; n++) await Promise.resolve();
+    const context = FullFakeContext.instances.at(-1)!;
+    // Firefox mozCaptureStream routes directly to destination; must NOT lock AudioContext to 16 kHz.
+    expect(mozContextOptions).toEqual([{latencyHint: 'playback'}]);
+    expect(connectSpies[0]).toHaveBeenCalledWith(context.destination);
+
+    // Emit 4.5s: triggers first playback window immediately without waiting 10s.
+    context.processor.emit(new Float32Array(4.5 * 16_000).fill(0.04));
+    await vi.waitFor(() => expect(chunks).toHaveLength(1));
+    expect(chunks[0].durationMs).toBe(4_500);
+
+    // Emit 8s more: triggers steady 8s window starting at 3.3s.
+    f.source.currentTime = 12.5;
+    context.processor.emit(new Float32Array(8 * 16_000).fill(0.04));
+    await vi.waitFor(() => expect(chunks).toHaveLength(2));
+    expect(chunks[1].durationMs).toBe(8_000);
+    f.controller.finishPlaybackCapture();
+    await vi.waitFor(() => expect(f.controller.getPhase()).toBe('ready'));
+    f.controller.destroy();
+
+    // Standard captureStream requests 16 kHz and gracefully falls back to default AudioContext when unsupported.
+    const fallbackAttempts: Array<AudioContextOptions | undefined> = [];
+    class FallbackRateContext extends FullFakeContext {
+      constructor(options?: AudioContextOptions) {
+        fallbackAttempts.push(options);
+        if (options?.sampleRate === 16_000) throw new DOMException('Unsupported sampleRate', 'NotSupportedError');
+        super();
+      }
+    }
+    const std = live();
+    vi.stubGlobal('window', {AudioContext: FallbackRateContext, setTimeout, clearTimeout});
+    expect(std.controller.start()).toBe(true);
+    for (let n = 0; n < 8; n++) await Promise.resolve();
+    expect(fallbackAttempts).toEqual([{sampleRate: 16_000, latencyHint: 'playback'}, undefined]);
+    std.controller.destroy();
+  });
+  it('rejects a worklet module failure that finishes after cancellation without falling back to ScriptProcessor', async () => {
+    const f = worklet(); let rejectModule!: (error: Error) => void;
+    FullFakeContext.worklet!.addModule = vi.fn(() => new Promise<void>((_yes, no) => {rejectModule = no;}));
+    const legacy = vi.spyOn(FullFakeContext.prototype, 'createScriptProcessor');
+    f.controller.start(); await vi.waitFor(() => expect(rejectModule).toBeTypeOf('function'));
+    f.controller.cancel(); rejectModule(new Error('late module failure')); await new Promise(yes => setTimeout(yes, 0));
+    expect(legacy).not.toHaveBeenCalled();
+    expect(f.error).not.toHaveBeenCalled();
+    f.controller.destroy();
+    legacy.mockRestore();
   });
   it('rejects a worklet module that finishes loading after cancellation', async () => {
     const f = worklet(); let resolve!: () => void;

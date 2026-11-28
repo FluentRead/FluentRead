@@ -1,8 +1,8 @@
 /**
  * @file src/app/background/imageGlossaryContext.ts
- * 文件职责：在图片与圈选 OCR 跨越 Offscreen 后恢复其真实原页面术语范围，并保证一次识别翻译事务使用开始时的术语版本。
- * 主要内容：包装已通过能力门控的图片和圈选 handler，以活跃 requestId 保存可信隐私、只读页面、源语言和版本快照；只有当前扩展精确的无标签页 Offscreen 发送者能取回事务，结束后立即清理。
- * 模块边界：本文件是可独立验证的后台装配规则，通过依赖注入接收配置就绪状态及 Offscreen URL；不访问 browser、不传输词表、不执行 OCR，也不信任消息中的页面 URL 或版本声明。
+ * 文件职责：在图片与圈选 OCR 跨越 Offscreen 后恢复其真实原页面术语范围与漫画模式标记，并保证一次识别翻译事务使用开始时的术语版本。
+ * 主要内容：包装已通过能力门控的图片和圈选 handler，以活跃 requestId 保存可信隐私、只读页面、源语言、漫画事务标记和版本快照；只有当前扩展精确的无标签页 Offscreen 发送者能取回事务，结束后立即清理，并剥离不可信载荷中的漫画标记。
+ * 模块边界：本文件是可独立验证的后台装配规则，通过依赖注入接收配置就绪状态及 Offscreen URL；不访问 browser、不传输词表、不执行 OCR，也不信任消息中的页面 URL、漫画标记或版本声明。
  */
 import type {BackgroundMessage, BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
 import {AREA_TRANSLATE_CAPTURE_MESSAGE_TYPE} from './handlers/areaTranslation';
@@ -16,11 +16,13 @@ interface ImageGlossarySnapshot {
     readonly privateContext?: boolean;
     readonly sourceLanguage: string;
     readonly glossaryRevision: string;
+    readonly manga?: true;
 }
 
 interface ImageGlossaryMessage extends BackgroundMessage {
     requestId?: unknown;
     sourceLanguage?: unknown;
+    manga?: unknown;
 }
 
 export interface ImageGlossaryContextDependencies {
@@ -47,12 +49,13 @@ export function createImageGlossaryContext<TContext extends ImageGlossarySenderC
 ): {wrap(handlers: readonly BackgroundMessageHandler<TContext>[]): BackgroundMessageHandler<TContext>[]} {
     const active = new Map<string, Readonly<ImageGlossarySnapshot>>();
     let sequence = 0;
-    const snapshot = (context: TContext, sourceLanguage: unknown): Readonly<ImageGlossarySnapshot> => Object.freeze({
+    const snapshot = (context: TContext, sourceLanguage: unknown, manga = false): Readonly<ImageGlossarySnapshot> => Object.freeze({
         pageUrl: pageUrlFromSender(context),
         ...translationPrivacyContext(context),
         sourceLanguage: typeof sourceLanguage === 'string' && sourceLanguage.trim()
             ? sourceLanguage : dependencies.getSourceLanguage(),
         glossaryRevision: dependencies.getGlossaryRevision(),
+        ...(manga ? {manga: true as const} : {}),
     });
     const requestId = (value: unknown): string => {
         if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/u.test(value)) {
@@ -81,7 +84,8 @@ export function createImageGlossaryContext<TContext extends ImageGlossarySenderC
                             do { id = `legacy-image-glossary-${++sequence}`; } while (active.has(id));
                         } else id = requestId(message.requestId);
                         if (active.has(id)) throw new Error('图片 OCR requestId 正在执行');
-                        const frozen = snapshot(context, message.sourceLanguage);
+                        const isManga = handler.type === IMAGE_TRANSLATE_MESSAGE_TYPE && message.manga === true;
+                        const frozen = snapshot(context, message.sourceLanguage, isManga);
                         active.set(id, frozen);
                         try {
                             const forwarded = Object.defineProperties({}, {
@@ -98,10 +102,15 @@ export function createImageGlossaryContext<TContext extends ImageGlossarySenderC
                     const frozen = fromOffscreen ? active.get(requestId(message.requestId)) : snapshot(context, undefined);
                     if (!frozen) throw new Error('图片翻译上下文已失效，请重新翻译');
                     const descriptors = Object.getOwnPropertyDescriptors(message);
+                    delete descriptors.manga;
                     if (!fromOffscreen) delete descriptors.imageLabelSlots;
                     const forwarded = Object.defineProperties({}, {
                         ...descriptors,
-                        ...Object.getOwnPropertyDescriptors({glossaryRevision: frozen.glossaryRevision, sourceLanguage: frozen.sourceLanguage}),
+                        ...Object.getOwnPropertyDescriptors({
+                            glossaryRevision: frozen.glossaryRevision,
+                            sourceLanguage: frozen.sourceLanguage,
+                            ...(frozen.manga ? {manga: true as const} : {}),
+                        }),
                     }) as BackgroundMessage;
                     return handler.handle(attachTranslationGlossaryContext(forwarded, {pageUrl: frozen.pageUrl, context: 'page',
                         ...(frozen.privateContext === undefined ? {} : {privateContext: frozen.privateContext})}), context);

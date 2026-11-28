@@ -761,12 +761,13 @@ async function main() {
         settingsText: '调整设置', sidebarOpen: true, addFile: [{inSidebar: true, text: '添加文件'}], addFileInBar: 0, saveNote: 0, noticesInBar: true, selectionHint: 0}, `新工具栏与侧栏结构不符：${JSON.stringify(chrome)}`);
       assert.match(chrome.status, /准备就绪/); assert.deepEqual(chrome.readingModes, ['原文', '双语', '译文']);
       assert(chrome.translateRight > chrome.downloadRight && chrome.downloadRight > chrome.languageRight, `翻译按钮应在最右侧，下载按钮在其左：${JSON.stringify(chrome)}`);
-      // PDF 总有“目录”页；其他格式只有带标题的文档才有（HTML、Markdown、ePub 预览里的标题，Word 的标题样式段落），并且此时侧栏里必须真的列出目录项。
+      // PDF 总有“目录”页；JSON 命名空间目录与带标题的文档（HTML、Markdown、ePub 预览里的标题，Word 的标题样式段落）也展示侧栏目录。
       const outlineItems = await page.locator('.document-sidebar .document-outline-item').count();
       const richHeadings = (await page.locator('.rich-preview-frame').count() ? await page.locator('.rich-preview-frame').contentFrame().locator('h1,h2,h3,h4,h5,h6').count() : 0)
         + await page.locator('.docx-paragraph.docx-role-heading, .docx-paragraph.docx-role-title').count();
-      assert.deepEqual(chrome.sidebarTabs, name === 'sample.pdf' || richHeadings ? ['文件', '目录'] : ['文件'], `侧栏页签与文档是否带目录不符：${JSON.stringify({name, tabs: chrome.sidebarTabs, richHeadings, outlineItems})}`);
-      if (name !== 'sample.pdf') assert.equal(outlineItems > 0, richHeadings > 0, `目录项应与文档中的标题同时出现：${JSON.stringify({name, richHeadings, outlineItems})}`);
+      const expectsOutline = name === 'sample.pdf' || name.endsWith('.json') || richHeadings > 0;
+      assert.deepEqual(chrome.sidebarTabs, expectsOutline ? ['文件', '目录'] : ['文件'], `侧栏页签与文档是否带目录不符：${JSON.stringify({name, tabs: chrome.sidebarTabs, richHeadings, outlineItems})}`);
+      if (name !== 'sample.pdf') assert.equal(outlineItems > 0, expectsOutline, `目录项应与文档结构同时出现：${JSON.stringify({name, richHeadings, outlineItems})}`);
       if (name === 'sample.pdf') {
         // PDF 打开即为双语两栏的原版排版；阅读器把页码、缩放等控件传送到工具栏槽位，目录托管在侧栏“目录”页。
         const viewer = page.locator('.pdf-layout-viewer');

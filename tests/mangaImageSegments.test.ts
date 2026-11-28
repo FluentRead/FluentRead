@@ -26,7 +26,7 @@ function fixture(lightCacheLimits?:{pages:number;bytes:number}) {
             const canvas=element as HTMLCanvasElement;canvases.push(canvas);let source:unknown;
             canvas.getContext=vi.fn(()=>missing?null:{
                 drawImage:(...args:unknown[])=>{draws.push(args);source=args[0];if(drawError)throw new Error('draw failed');},
-                getImageData:()=>{if(taint&&source===image)throw new DOMException('tainted','SecurityError');return {data:new Uint8ClampedArray(4)};},
+                getImageData:()=>{if(taint&&source&&typeof source==='object'&&'tagName' in source&&source.tagName==='IMG')throw new DOMException('tainted','SecurityError');return {data:new Uint8ClampedArray(4)};},
             }) as typeof canvas.getContext;
             canvas.toDataURL=vi.fn(()=>`data:image/png;base64,${canvas.width}x${canvas.height}`);
         }
@@ -150,10 +150,96 @@ describe('超长漫画图片的稳定分段与原始分辨率',()=>{
         f.image.naturalHeight=16000;expect(f.runtime.identity(second)).toBeNull();const third=f.segments()[0];expect(third).not.toBe(second);
         f.runtime.prepare([]);expect(f.runtime.identity(third)).toBeNull();f.runtime.resetCache();f.runtime.dispose();
     });
-    it('受污染原图只读取当前授权来源，完整解码后仅绘制该段并立即释放解码资源',async()=>{
-        const f=fixture(),segment=f.segments()[2];f.rect.top=-2048;f.taint();const task=f.runtime.translate(segment);await flush();
-        expect(f.ports.readSource).toHaveBeenCalledWith(f.image,expect.any(AbortSignal));expect(f.decoded).toHaveLength(1);f.decoded[0].onload!();await task;
-        expect(f.decoded[0].src).toBe('');expect(f.ports.translate.mock.calls[0][0]).toBe('data:image/png;base64,800x2560');expect(f.image.src).toBe('https://cdn.example/chapter.webp');f.runtime.dispose();
+    it('受污染原图只读取当前授权来源，同长图多段复用单条解码缓存并立即释放 img.src，换图和卸载关闭位图',async()=>{
+        const bitmaps: Array<{width:number;height:number;close:ReturnType<typeof vi.fn>}>=[];
+        vi.stubGlobal('createImageBitmap',vi.fn(async(img:HTMLImageElement)=>{
+            const bmp={width:img.naturalWidth,height:img.naturalHeight,close:vi.fn()};bitmaps.push(bmp);return bmp;
+        }));
+        const f=fixture(),segments=f.segments();f.rect.top=-2048;f.taint();
+        const task=f.runtime.translate(segments[2]);await flush();
+        expect(f.ports.readSource).toHaveBeenCalledWith(f.image,expect.any(AbortSignal));expect(f.decoded).toHaveLength(1);
+        f.decoded[0].onload!();await task;
+        // ImageBitmap 捕获后立即释放临时 HTMLImageElement 的 data URL。
+        expect(f.decoded[0].src).toBe('');expect(bitmaps).toHaveLength(1);
+        // 第二段直接复用已缓存的 ImageBitmap，不重复 readSource 或新建 Image 解码。
+        f.rect.top=-3072;await f.runtime.translate(segments[3]);
+        expect(f.ports.readSource).toHaveBeenCalledOnce();expect(f.decoded).toHaveLength(1);
+        expect(f.ports.translate.mock.calls[0][0]).toBe('data:image/png;base64,800x2560');expect(f.image.src).toBe('https://cdn.example/chapter.webp');
+        // 换图或卸载立即关闭位图。
+        f.runtime.dispose();expect(bitmaps[0].close).toHaveBeenCalledOnce();
+    });
+    it('createImageBitmap 异步完成期间取消或换源立即关闭迟到位图且不缓存',async()=>{
+        let resolveBitmap!:(bmp:{width:number;height:number;close:ReturnType<typeof vi.fn>})=>void;
+        vi.stubGlobal('createImageBitmap',vi.fn(()=>new Promise(resolve=>{resolveBitmap=resolve;})));
+        const f=fixture(),segments=f.segments();f.taint();
+        const task=f.runtime.translate(segments[0]);await flush();
+        f.decoded[0].onload!();await flush();
+        f.image.src='https://cdn.example/changed.webp';
+        const lateBmp={width:800,height:15744,close:vi.fn()};
+        resolveBitmap(lateBmp);await task;
+        expect(lateBmp.close).toHaveBeenCalledOnce();
+        expect(f.ports.translate).not.toHaveBeenCalled();f.runtime.dispose();
+    });
+    it('并发读取同一受污染长图去重 readSource，单等待者取消不中断其余段，换源或换图立即驱逐旧缓存',async()=>{
+        const f=fixture(),segments=f.segments();f.taint();
+        let resolveSource!:(value:string)=>void;
+        f.ports.readSource.mockImplementationOnce(()=>new Promise<string>(resolve=>{resolveSource=resolve;}));
+        const first=f.runtime.translate(segments[0]),second=f.runtime.translate(segments[1]);
+        await flush();
+        expect(f.ports.readSource).toHaveBeenCalledOnce();
+        // 取消首个等待者后，第二个等待者仍复用同一次 readSource 完成解码。
+        f.runtime.restore(segments[0]);await first;
+        resolveSource('data:image/webp;base64,shared');await flush();
+        expect(f.decoded).toHaveLength(1);f.decoded[0].onload!();await second;
+        expect(f.decoded[0].src).toBe('');expect(f.ports.translate).toHaveBeenCalledOnce();
+        // 同长图再次翻译复用单条缓存，不重复调用 readSource。
+        const third=f.runtime.translate(segments[2]);await flush();
+        expect(f.ports.readSource).toHaveBeenCalledOnce();
+        f.decoded[1].onload!();await third;
+        // 换到另一条长图时驱逐旧缓存。
+        const other=f.document.createElement('img') as {-readonly [K in keyof HTMLImageElement]: HTMLImageElement[K]};
+        other.src='https://cdn.example/chapter-2.webp';
+        Object.defineProperties(other,{complete:{value:true,writable:true},naturalWidth:{value:800,writable:true},naturalHeight:{value:15744,writable:true}});
+        other.getBoundingClientRect=f.image.getBoundingClientRect;f.document.getElementById('reader')!.append(other);
+        const otherSegments=f.runtime.prepare([f.image,other]).get(other)!;
+        const otherTask=f.runtime.translate(otherSegments[0]);await flush();
+        expect(f.ports.readSource).toHaveBeenCalledTimes(2);
+        f.decoded[2].onload!();await otherTask;
+        // prepare 中原图移除后立即驱逐该解码缓存。
+        f.runtime.prepare([]);
+        // 并发读取失败时所有等待者均拒绝且不污染缓存。
+        const refreshed=f.segments();
+        let rejectSource!:(error:Error)=>void;
+        f.ports.readSource.mockImplementationOnce(()=>new Promise<string>((_resolve,reject)=>{rejectSource=reject;}));
+        const failA=f.runtime.translate(refreshed[0]),failB=f.runtime.translate(refreshed[1]);
+        await flush();
+        rejectSource(new Error('network down'));
+        await expect(failA).rejects.toThrow('network down');
+        await expect(failB).rejects.toThrow('network down');
+        // resetCache 取消在途读取并清空缓存。
+        f.ports.readSource.mockImplementationOnce(()=>new Promise<string>(()=>{/* pending */}));
+        const pending=f.runtime.translate(refreshed[0]);await flush();
+        f.runtime.resetCache();await pending;
+        f.runtime.dispose();
+    });
+    it('withFrame 帧级缓存将同一长图多段的样式、身份与矩形查询收敛为 O(1)，嵌套调用安全复用并在结束释放',async()=>{
+        const f=fixture();f.style.objectFit='contain';
+        const styleSpy=vi.fn(()=>f.style);vi.stubGlobal('getComputedStyle',styleSpy);
+        const rectSpy=vi.spyOn(f.image,'getBoundingClientRect');
+        const segments=f.segments();
+        styleSpy.mockClear();rectSpy.mockClear();
+        f.runtime.withFrame(()=>{
+            f.runtime.withFrame(()=>{
+                for(const segment of segments){
+                    expect(f.runtime.identity(segment)).not.toBeNull();
+                    f.runtime.bounds(segment);
+                }
+            });
+        });
+        expect(styleSpy).toHaveBeenCalledOnce();expect(rectSpy).toHaveBeenCalledOnce();
+        // 离开帧缓存后立即恢复实时查询。
+        f.rect.height=100;expect(f.runtime.identity(segments[0])).toBeNull();
+        f.runtime.dispose();
     });
     it('取消解码后迟到的已排队 load 和 error 不重新分配快照或启动 OCR',async()=>{
         const f=fixture(),segment=f.segments()[0];f.taint();const task=f.runtime.translate(segment);await flush();
@@ -181,5 +267,125 @@ describe('超长漫画图片的稳定分段与原始分辨率',()=>{
         const task=f.runtime.translate(segment);
         if(['abort','late-read','source-during-read'].includes(mode))await task;else await expect(task).rejects.toThrow();
         expect(f.ports.translate).not.toHaveBeenCalled();expect(f.decoded).toHaveLength(0);f.runtime.dispose();
+    });
+    it('并发加载两条受污染长图期间 dispose/resetCache 中止全部在途加载且不泄漏位图，引用计数防止提前关闭在用位图',async()=>{
+        const bitmaps: Array<{id:string;width:number;height:number;closed:boolean;close:ReturnType<typeof vi.fn>}>=[];
+        const pendingBitmaps: Array<(bmp: {id:string;width:number;height:number;closed:boolean;close:ReturnType<typeof vi.fn>})=>void>=[];
+        vi.stubGlobal('createImageBitmap',vi.fn(()=>new Promise(resolve=>{
+            pendingBitmaps.push(bmp=>{bitmaps.push(bmp);resolve(bmp);});
+        })));
+        const makeBitmap=(id:string)=>{
+            const bmp={id,width:800,height:15744,closed:false,close:vi.fn(()=>{bmp.closed=true;})};
+            return bmp;
+        };
+        const f=fixture();f.taint();
+        const other=f.document.createElement('img') as {-readonly [K in keyof HTMLImageElement]: HTMLImageElement[K]};
+        other.src='https://cdn.example/chapter-b.webp';
+        Object.defineProperties(other,{complete:{value:true,writable:true},naturalWidth:{value:800,writable:true},naturalHeight:{value:15744,writable:true}});
+        other.getBoundingClientRect=f.image.getBoundingClientRect;f.document.getElementById('reader')!.append(other);
+        const prepared=f.runtime.prepare([f.image,other]);
+        const segA=prepared.get(f.image)!,segB=prepared.get(other)!;
+        // 1. 两条不同长图同时在途 readSource，resetCache 必须中止全部 pendingStrips 并在迟到完成时立刻关闭位图。
+        const resolvers: Array<(value:string)=>void>=[];
+        f.ports.readSource.mockImplementation(()=>new Promise<string>(resolve=>{resolvers.push(resolve);}));
+        const taskA1=f.runtime.translate(segA[0]),taskB1=f.runtime.translate(segB[0]);
+        await flush();
+        expect(resolvers).toHaveLength(2);
+        resolvers[0]('data:image/webp;base64,a1');resolvers[1]('data:image/webp;base64,b1');
+        await flush();
+        expect(f.decoded).toHaveLength(2);
+        f.decoded[0].onload!();f.decoded[1].onload!();
+        await flush();
+        expect(pendingBitmaps).toHaveLength(2);
+        const lateA1=makeBitmap('lateA1'),lateB1=makeBitmap('lateB1');
+        // 等待 decodeImageData 收尾后再触发 resetCache，精准命中 .then(strip => ...) 的中止清理分支，确保两张位图关闭且不入缓存。
+        pendingBitmaps[0](lateA1);pendingBitmaps[1](lateB1);
+        await Promise.resolve();await Promise.resolve();
+        f.runtime.resetCache();
+        await Promise.all([taskA1,taskB1]);
+        await flush();
+        expect(lateA1.close).toHaveBeenCalledOnce();
+        expect(lateB1.close).toHaveBeenCalledOnce();
+        // 2. 两条长图并发读取，A 正在使用缓存（users=1）时 B 进入并驱逐 A，A 的位图不得在 draw 期间被关闭（无 InvalidStateError），A 结束后自动关闭。
+        const prepared2=f.runtime.prepare([f.image,other]);
+        const segA2=prepared2.get(f.image)!,segB2=prepared2.get(other)!;
+        resolvers.length=0;pendingBitmaps.length=0;f.decoded.length=0;
+        f.ports.readSource.mockReset().mockResolvedValue('data:image/webp;base64,default');
+        const activeA=makeBitmap('activeA'),activeB=makeBitmap('activeB');
+        // 先让 A 完整进入 decodedStrip 缓存。
+        f.ports.readSource.mockResolvedValueOnce('data:image/webp;base64,a2');
+        const warmA=f.runtime.translate(segA2[0]);await flush();
+        f.decoded[0].onload!();await flush();
+        pendingBitmaps[0](activeA);await warmA;
+        expect(activeA.closed).toBe(false);
+        // 先启动 A[1]（同步命中缓存并 users++），在 A[1] 恢复 draw 前启动 B[0]（同步 evictDecodedStrip 将 A 标为 evicted，因 users=1 暂不关闭）。
+        let resolveB!: (value:string)=>void;
+        f.ports.readSource.mockImplementationOnce(()=>new Promise<string>(resolve=>{resolveB=resolve;}));
+        const useA=f.runtime.translate(segA2[1]);
+        const useB=f.runtime.translate(segB2[0]);
+        expect(activeA.closed).toBe(false);
+        await useA;
+        // A[1] draw 成功完成后，因 A 已被 B 驱逐且 users 归零，activeA 恰好关闭一次。
+        expect(activeA.close).toHaveBeenCalledOnce();
+        resolveB('data:image/webp;base64,b2');await flush();
+        f.decoded[1].onload!();await flush();
+        pendingBitmaps[1](activeB);
+        await useB;
+        expect(activeB.closed).toBe(false);
+        // 3. 在途加载期间 dispose()，迟到 resolve 的位图立即关闭且不进入缓存。
+        const third=f.document.createElement('img') as {-readonly [K in keyof HTMLImageElement]: HTMLImageElement[K]};
+        third.src='https://cdn.example/chapter-c.webp';
+        Object.defineProperties(third,{complete:{value:true,writable:true},naturalWidth:{value:800,writable:true},naturalHeight:{value:15744,writable:true}});
+        third.getBoundingClientRect=f.image.getBoundingClientRect;f.document.getElementById('reader')!.append(third);
+        const segC=f.runtime.prepare([f.image,other,third]).get(third)!;
+        pendingBitmaps.length=0;f.decoded.length=0;
+        f.ports.readSource.mockResolvedValueOnce('data:image/webp;base64,c');
+        const taskC=f.runtime.translate(segC[0]);await flush();
+        f.decoded[0].onload!();await flush();
+        const lateC=makeBitmap('lateC');
+        pendingBitmaps[0](lateC);
+        await Promise.resolve();await Promise.resolve();
+        f.runtime.dispose();
+        await taskC;await flush();
+        expect(lateC.close).toHaveBeenCalledOnce();
+        expect(activeB.close).toHaveBeenCalledOnce();
+    });
+    it('capture 绘制失败时只驱逐仍是当前 decodedStrip 的缓存，不误删已被其他长图替换的缓存',async()=>{
+        const bitmaps: Array<{width:number;height:number;close:ReturnType<typeof vi.fn>}>=[];
+        vi.stubGlobal('createImageBitmap',vi.fn(async(img:HTMLImageElement)=>{
+            const bmp={width:img.naturalWidth,height:img.naturalHeight,close:vi.fn()};bitmaps.push(bmp);return bmp;
+        }));
+        const f=fixture();f.taint();
+        const other=f.document.createElement('img') as {-readonly [K in keyof HTMLImageElement]: HTMLImageElement[K]};
+        other.src='https://cdn.example/chapter-b2.webp';
+        Object.defineProperties(other,{complete:{value:true,writable:true},naturalWidth:{value:800,writable:true},naturalHeight:{value:15744,writable:true}});
+        other.getBoundingClientRect=f.image.getBoundingClientRect;f.document.getElementById('reader')!.append(other);
+        const prepared=f.runtime.prepare([f.image,other]);
+        const segA=prepared.get(f.image)!;
+        // 先加载 A 进入 decodedStrip，再篡改缓存 bitmap 尺寸使 draw(strip.bitmap) 抛错，验证当前 decodedStrip 被驱逐并关闭。
+        const warmA=f.runtime.translate(segA[0]);await flush();f.decoded[0].onload!();await warmA;
+        bitmaps[0].width=801;
+        const failA=f.runtime.translate(segA[1]);
+        await expect(failA).rejects.toThrow('漫画图片来源已更换');
+        expect(bitmaps[0].close).toHaveBeenCalledOnce();
+        // 再测试 strip 已被 B 替换时 A 的 draw 抛错不误删 B：用无 createImageBitmap 的异步 decodeImageData 路径覆盖。
+        vi.stubGlobal('createImageBitmap',undefined);
+        const f2=fixture();f2.taint();
+        const other2=f2.document.createElement('img') as {-readonly [K in keyof HTMLImageElement]: HTMLImageElement[K]};
+        other2.src='https://cdn.example/chapter-b3.webp';
+        Object.defineProperties(other2,{complete:{value:true,writable:true},naturalWidth:{value:800,writable:true},naturalHeight:{value:15744,writable:true}});
+        other2.getBoundingClientRect=f2.image.getBoundingClientRect;f2.document.getElementById('reader')!.append(other2);
+        const p2=f2.runtime.prepare([f2.image,other2]);
+        const sA=p2.get(f2.image)!,sB=p2.get(other2)!;
+        const tA=f2.runtime.translate(sA[0]);await flush();
+        // sA 进入 decodeImageData 等待 onload；此时 sB 完成并把 decodedStrip 换成 B。
+        const tB=f2.runtime.translate(sB[0]);await flush();
+        f2.decoded[1].onload!();await tB;
+        // sA 的 decodeImageData 失败，此时 decodedStrip 是 B，不应误驱逐 B。
+        f2.decoded[0].onerror!();await expect(tA).rejects.toThrow('漫画图片无法读取');
+        const tB2=f2.runtime.translate(sB[1]);await flush();
+        expect(f2.ports.readSource).toHaveBeenCalledTimes(2);
+        f2.decoded[2].onload!();await tB2;
+        f.runtime.dispose();f2.runtime.dispose();
     });
 });

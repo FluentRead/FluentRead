@@ -1,20 +1,25 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {LOCAL_TRANSLATION_MODEL_IDS as ids} from '@/src/core/config/localTranslation';
+import {LOCAL_TRANSLATION_MODELS, LOCAL_TRANSLATION_MODEL_IDS as ids} from '@/src/core/config/localTranslation';
 
 const fake = vi.hoisted(() => ({
   bytes: new Map<string, number>(), complete: new Set<string>(),
   gates: new Map<string, () => void>(), download: vi.fn(), remove: vi.fn(), invalidate: vi.fn(),
   supported: true,
+  opusSupported: true,
   legacyCached: false,
   check: vi.fn(),
+  files: undefined as Record<string, Array<{repo: string; path: string; size: number; revision: string; sha256: string}>> | undefined,
 }));
-vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: () => fake.supported}));
+vi.mock('@/src/platform/browser/localTranslationSupport', () => ({
+  supportsHunyuanTranslation: () => fake.supported,
+  supportsOpusTranslation: () => fake.opusSupported,
+}));
 vi.mock('@/src/features/local-translation/offscreen/artifactStore', () => ({
   LOCAL_MODEL_CACHE: 'download-test-cache',
-  getTranslationArtifacts: (model: string) => [ids.opusZhEn, ids.opusJaEn, ids.hunyuan].includes(model as any)
-    ? [{repo: model, path: 'weights', size: 12, revision: 'fixed', sha256: 'hash'}] : [],
-  artifactComplete: (file: {repo: string}) => fake.check(file),
-  artifactDownloadedBytes: async (file: {repo: string}) => fake.bytes.get(file.repo) || 0,
+  getTranslationArtifacts: (model: string) => fake.files?.[model] ?? ([ids.opusZhEn, ids.opusJaEn, ids.hunyuan, ids.hunyuan3].includes(model as any)
+    ? [{repo: model, path: 'weights', size: 12, revision: 'fixed', sha256: 'hash'}] : []),
+  artifactComplete: (file: {repo: string; path: string}) => fake.check(file),
+  artifactDownloadedBytes: async (file: {repo: string; path: string}) => fake.bytes.get(`${file.repo}/${file.path}`) ?? fake.bytes.get(file.repo) ?? 0,
   downloadTranslationArtifact: (...args: any[]) => fake.download(...args),
   removeTranslationArtifact: (...args: any[]) => fake.remove(...args),
   invalidateTranslationArtifactReceipt: (...args: any[]) => fake.invalidate(...args),
@@ -28,7 +33,9 @@ import {createLocalTranslationDownloadManager} from '@/src/features/local-transl
 const entries = new Map<string, Response>();
 beforeEach(() => {
   fake.bytes.clear(); fake.complete.clear(); fake.gates.clear(); entries.clear();
+  fake.files = undefined;
   fake.supported = true;
+  fake.opusSupported = true;
   fake.legacyCached = false;
   fake.check.mockReset().mockImplementation(async (file: {repo: string}) => fake.complete.has(file.repo));
   vi.stubGlobal('navigator', {storage: {estimate: async () => ({quota: 10_000_000_000, usage: 0})}});
@@ -484,6 +491,12 @@ describe('page-independent local model jobs', () => {
     await vi.waitFor(async () => expect(await phase(manager)).toBe('ready'));
   });
 
+  it('refuses OPUS downloads when the browser lacks ONNX JSPI support', async () => {
+    fake.opusSupported = false;
+    const manager = createLocalTranslationDownloadManager();
+    await expect(manager.start(ids.opusZhEn)).rejects.toThrow('LOCAL_TRANSLATION_BROWSER_UNSUPPORTED');
+  });
+
   it('reports insufficient disk space before opening a download', async () => {
     vi.stubGlobal('navigator', {storage: {estimate: async () => ({quota: 10, usage: 9})}});
     const manager = createLocalTranslationDownloadManager();
@@ -491,6 +504,162 @@ describe('page-independent local model jobs', () => {
     await vi.waitFor(async () => expect(await phase(manager)).toBe('error'));
     expect((await manager.status()).tasks.find((task) => task.model === ids.opusZhEn)?.error).toBe('storage');
     expect(fake.download).not.toHaveBeenCalled();
+  });
+
+  it('downloads multi-file models with bounded concurrency 3 and preserves model order on init', async () => {
+    fake.files = {
+      [ids.opusZhEn]: Array.from({length: 5}, (_, index) => ({
+        repo: ids.opusZhEn, path: `file-${index}.onnx`, size: 10, revision: 'fixed', sha256: `hash-${index}`,
+      })),
+    };
+    let inFlight = 0;
+    let peakInFlight = 0;
+    const resolvers = new Map<string, () => void>();
+    fake.download.mockImplementation((file, _signal: AbortSignal, progress) => new Promise<void>((resolve) => {
+      inFlight++;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      progress(5, false);
+      resolvers.set(file.path, () => {
+        inFlight--;
+        progress(10, true);
+        resolve();
+      });
+    }));
+    const manager = createLocalTranslationDownloadManager();
+    const initial = await manager.status();
+    expect(initial.tasks.map((task) => task.model)).toEqual(LOCAL_TRANSLATION_MODELS.map((model) => model.value));
+    await manager.start(ids.opusZhEn);
+    await vi.waitFor(() => expect(resolvers.size).toBe(3));
+    expect(peakInFlight).toBe(3);
+    resolvers.get('file-0.onnx')!();
+    await vi.waitFor(() => expect(resolvers.has('file-3.onnx')).toBe(true));
+    expect(peakInFlight).toBe(3);
+    resolvers.get('file-1.onnx')!();
+    await vi.waitFor(() => expect(resolvers.has('file-4.onnx')).toBe(true));
+    for (const key of ['file-2.onnx', 'file-3.onnx', 'file-4.onnx']) resolvers.get(key)!();
+    await vi.waitFor(async () => expect(await phase(manager)).toBe('ready'));
+    expect((await manager.status()).tasks.find((task) => task.model === ids.opusZhEn)?.downloadedBytes).toBe(50);
+  });
+
+  it('aborts sibling file downloads on error without misclassifying the model as paused', async () => {
+    fake.files = {
+      [ids.opusZhEn]: Array.from({length: 5}, (_, index) => ({
+        repo: ids.opusZhEn, path: `part-${index}.onnx`, size: 10, revision: 'fixed', sha256: `hash-${index}`,
+      })),
+    };
+    const controls = new Map<string, {signal: AbortSignal; resolve: () => void; reject: (error: unknown) => void}>();
+    fake.download.mockImplementation((file, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
+      controls.set(file.path, {signal, resolve, reject});
+      signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), {once: true});
+    }));
+    const manager = createLocalTranslationDownloadManager();
+    await manager.start(ids.opusZhEn);
+    await vi.waitFor(() => expect(controls.size).toBe(3));
+    controls.get('part-0.onnx')!.reject(new Error('LOCAL_TRANSLATION_INTEGRITY'));
+    await vi.waitFor(async () => expect(await phase(manager)).toBe('error'));
+    expect(controls.get('part-1.onnx')!.signal.aborted).toBe(true);
+    expect(controls.get('part-2.onnx')!.signal.aborted).toBe(true);
+    expect(controls.has('part-3.onnx')).toBe(false);
+    expect((await manager.status()).tasks.find((task) => task.model === ids.opusZhEn)?.error).toBe('integrity');
+  });
+
+  it('keeps an incomplete multi-file model paused when pause lands right as in-flight files resolve', async () => {
+    fake.files = {
+      [ids.opusZhEn]: Array.from({length: 5}, (_, index) => ({
+        repo: ids.opusZhEn, path: `race-${index}.onnx`, size: 10, revision: 'fixed', sha256: `hash-${index}`,
+      })),
+    };
+    const resolvers = new Map<string, () => void>();
+    fake.download.mockImplementation((file) => new Promise<void>((resolve) => {
+      resolvers.set(file.path, resolve);
+    }));
+    const manager = createLocalTranslationDownloadManager();
+    await manager.status();
+    await manager.start(ids.opusZhEn);
+    await vi.waitFor(() => expect(resolvers.size).toBe(3));
+    // Resolve all 3 in-flight files, then queue pause so controller.abort() fires between downloadFile resolving and the worker loop re-checking.
+    resolvers.get('race-0.onnx')!();
+    resolvers.get('race-1.onnx')!();
+    resolvers.get('race-2.onnx')!();
+    const pausing = manager.pause(ids.opusZhEn);
+    await pausing;
+    await vi.waitFor(async () => expect(await phase(manager)).toBe('paused'));
+    expect(resolvers.has('race-3.onnx')).toBe(false);
+    expect(resolvers.has('race-4.onnx')).toBe(false);
+  });
+
+  it('restores downloading phase when verifying siblings finish while another file is still transferring', async () => {
+    fake.files = {
+      [ids.opusZhEn]: Array.from({length: 3}, (_, index) => ({
+        repo: ids.opusZhEn, path: `verify-${index}.onnx`, size: 10, revision: 'fixed', sha256: `hash-${index}`,
+      })),
+    };
+    const controls = new Map<string, {progress: (bytes: number, verifying: boolean) => void; resolve: () => void}>();
+    fake.download.mockImplementation((file, _signal: AbortSignal, progress) => new Promise<void>((resolve) => {
+      controls.set(file.path, {progress, resolve});
+      progress(5, false);
+    }));
+    const notify = vi.fn(async () => undefined);
+    const manager = createLocalTranslationDownloadManager({onChange: notify});
+    await manager.start(ids.opusZhEn);
+    await vi.waitFor(() => expect(controls.size).toBe(3));
+    // Two files enter verifying concurrently while file 2 stays downloading.
+    controls.get('verify-0.onnx')!.progress(10, true);
+    controls.get('verify-1.onnx')!.progress(10, true);
+    expect(await phase(manager)).toBe('verifying');
+    // Finishing file 0 keeps phase verifying because file 1 is still verifying.
+    controls.get('verify-0.onnx')!.resolve();
+    await Promise.resolve();
+    expect(await phase(manager)).toBe('verifying');
+    // Finishing file 1 restores phase to downloading because file 2 is still transferring.
+    controls.get('verify-1.onnx')!.resolve();
+    await vi.waitFor(async () => expect(await phase(manager)).toBe('downloading'));
+    expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({
+      tasks: expect.arrayContaining([expect.objectContaining({model: ids.opusZhEn, phase: 'downloading'})]),
+    }));
+    controls.get('verify-2.onnx')!.progress(10, true);
+    controls.get('verify-2.onnx')!.resolve();
+    await vi.waitFor(async () => expect(await phase(manager)).toBe('ready'));
+  });
+
+  it('ignores late progress callbacks after pause so paused state is never overwritten', async () => {
+    let emitProgress!: (bytes: number, verifying: boolean) => void;
+    let rejectTransfer!: (error: unknown) => void;
+    fake.download.mockImplementationOnce((_file, _signal: AbortSignal, progress) => new Promise<void>((_resolve, reject) => {
+      emitProgress = progress;
+      rejectTransfer = reject;
+      progress(4, false);
+    }));
+    const manager = createLocalTranslationDownloadManager();
+    await manager.start(ids.opusZhEn);
+    await vi.waitFor(() => expect(emitProgress).toBeTypeOf('function'));
+    await manager.pause(ids.opusZhEn);
+    expect(await phase(manager)).toBe('paused');
+    // Late progress tick after pause must not flip phase back to downloading or overwrite downloadedBytes.
+    emitProgress(8, false);
+    const duringPause = (await manager.status()).tasks.find((task) => task.model === ids.opusZhEn)!;
+    expect(duringPause).toMatchObject({phase: 'paused', downloadedBytes: 4});
+    rejectTransfer(new DOMException('Paused', 'AbortError'));
+    await vi.waitFor(async () => expect(await phase(manager)).toBe('paused'));
+  });
+
+  it('supports the full download, pause, resume, and unsupported-runtime lifecycle for Hy-MT3', async () => {
+    fake.supported = false;
+    await expect(createLocalTranslationDownloadManager().start(ids.hunyuan3)).rejects.toThrow('BROWSER_UNSUPPORTED');
+    expect(fake.download).not.toHaveBeenCalled();
+
+    fake.supported = true;
+    const manager = createLocalTranslationDownloadManager();
+    await manager.start(ids.hunyuan3);
+    await vi.waitFor(() => expect(fake.gates.has(ids.hunyuan3)).toBe(true));
+    expect(await phase(manager, ids.hunyuan3)).toBe('downloading');
+    await manager.pause(ids.hunyuan3);
+    await vi.waitFor(async () => expect(await phase(manager, ids.hunyuan3)).toBe('paused'));
+    fake.gates.clear();
+    await manager.start(ids.hunyuan3);
+    await vi.waitFor(() => expect(fake.gates.has(ids.hunyuan3)).toBe(true));
+    fake.gates.get(ids.hunyuan3)!();
+    await vi.waitFor(async () => expect(await phase(manager, ids.hunyuan3)).toBe('ready'));
   });
 });
 

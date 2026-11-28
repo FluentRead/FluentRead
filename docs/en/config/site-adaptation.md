@@ -1,56 +1,48 @@
-# Website reading area
+# Site rules & reading area
 
-If text is missing or too much is translated, check the reading area first. Use site preferences to remember how a particular website should behave.
+Fix missed article text, automatically translate favorite sites, or disable FluentRead on specific domains using clear, predictable priority rules.
 
 <GuideVisual kind="rules" en />
 
-## Missing content
+<DocDiagram kind="site-rules-priority" en />
 
-1. Refresh the page after installing or updating.
-2. Scroll down: the default mode translates near your reading position.
-3. To include menus and buttons, enable all-node recognition under **Advanced settings → Page recognition**, then restore the original and translate again.
-4. For text inside an image or chart, use [area translation](/en/guide/area-translation).
+## Step 1: Fix missed content {#missing-article-text}
 
-Some sites keep author names, timestamps, votes, and navigation unchanged while translating articles, comments, or product descriptions. If the area you need is still missed, adjust its content rule or report the URL and area.
+1. Refresh the webpage after installing or updating FluentRead.
+2. Scroll down—translations run progressively around your viewport by default.
+3. To include menus, buttons, and navigation, enable **Recognize all nodes** under **Advanced settings → Page recognition**, restore the page, and translate again.
+4. For non-selectable text inside images or charts, use [Image translation](/en/guide/image-translation) or [Area translation](/en/guide/area-translation).
 
-Explicit topic tags and Discourse category badges retain their original text. Examples include `chatgpt`, `rate-limit`, and `API` on forums, as well as standard tag links on blogs. Full-page and hover translation share this rule, including with **all-node recognition** enabled. Post titles and body text remain translatable.
+### Built-in site protections
 
-The X timeline keeps the native **Show more** button in its original language. The post text revealed by the button is still translatable.
+Common platforms include tailored rules so navigation and identifiers stay clean:
 
-In the OpenAI Developer Community, navigation, filters, and activity dates also stay in their original language. Bilingual translations appear below topic titles and excerpts, and discussion text remains translatable.
+- **Topic tags & Discourse badges:** Explicit tags such as `chatgpt`, `rate-limit`, and `API` stay untranslated (even with Recognize all nodes enabled) while titles and body text translate normally.
+- **GitHub:** Header breadcrumbs (usernames, orgs, repo names) and PR author handles stay original while PR titles and discussions translate.
+- **X / OpenAI Community / Google Search / Twitch / Llamaperf:** Preserves X “Show more” controls and OpenAI filters; translates Google AI Overviews, Llamaperf benchmark summaries, and Twitch chat messages & sidebar display names (preserving handles, `@` mentions, and emote buttons).
 
-Full-page translation on Google Search also includes recognized AI Overview text.
+## Step 2: Set per-site preferences {#always-translate-or-leave-a-site-untouched}
 
-Full-page translation includes Twitch live chat messages, pinned and reply preview text, and streamer display names in the left sidebar while preserving login handles, chat `@` mentions, and emote buttons.
+Open **Settings → Tools & learning → Website rules → Site preferences** (or toggle directly in the extension popup):
 
-## Translate every time—or leave it alone
-
-Open **Settings → Tools & learning → Website rules → Site preferences**:
-
-| Preference | Effect |
+| Preference | Behavior |
 | --- | --- |
-| Always translate | Translate new pages on that website automatically |
-| Disable extension | Restore the original and stop the extension on that site; overrides automatic translation |
-| Hide floating button | Hide the button while keeping shortcuts and other features available |
-| Translation only | Show only translated text on this website; other websites keep the global display mode |
+| **Always translate** | Automatically translates new pages on this site (manually restoring keeps the current page original until you open another article) |
+| **Disable extension** | Restores original text and stops all extension features on this domain—**overrides Always translate** |
+| **Hide floating ball** | Hides only the floating ball while shortcuts and menus remain active |
+| **Translation only** | Hides originals on this site without changing your global display mode; updates existing translations immediately |
 
-Preferences use the root domain and include its subdomains, without paths or ports. Re-enabling a disabled site restores its other preferences. Removing preferences returns to global defaults. Global automatic translation applies to non-disabled sites and keeps your saved list.
+::: info Domain matching
+Site preferences apply by **main domain** and cover all subdomains, regardless of path or port. Enabling **Auto-translate all sites** continues to respect sites marked as disabled.
+:::
 
-Choose **Translation only** when adding a site, or check it on an existing row. It does not enable automatic translation. Existing translations change display without another request; unchecking it returns to the global mode. **Restore** still returns the original text. A shortcut profile with an explicit display mode keeps its one-time choice.
+## Step 3: Fine-tune content rules & `forceTranslate` {#still-not-matching-the-right-area}
 
-The extension menu also offers always-translate and disable-site controls. Restoring the current article keeps it original, including when following its table-of-contents links. Always-translate takes effect again on the next article. Turning it off affects future automatic triggers and leaves current translations in place.
+When a site still needs precise DOM targeting, open **Website rules → Content adaptation** and verify precedence in **Applied rules preview** (see [Custom site rules](/en/guide/custom-site-rules)).
 
-## Still wrong?
+### Override `notranslate` wrappers (`forceTranslate`) {#a-section-is-blocked-by-no-translate-markers}
 
-Content rules select article and protected areas by domain, path, and CSS selector. Effective preview checks saved matching rules and priority without visiting the website. Check the actual page after saving.
-
-If you know webpage structure, follow [Custom site rules](/en/guide/custom-site-rules) and export a backup first. Otherwise, report a public URL, browser version, and a screenshot with private information removed on [GitHub Issues](https://github.com/FluentRead/FluentRead/issues). Explain which areas should translate and which should stay original.
-
-Detailed fields are in the [rule reference](https://github.com/FluentRead/FluentRead/blob/main/docs/maintainers/product-reference/site-adaptation-20260906.md).
-
-## Content blocked by a no-translate marker
-
-In the advanced JSON editor, use `forceTranslate` with CSS selectors matching the **element carrying the marker**, for example:
+If a website wraps readable text with `translate="no"`, `.notranslate`, or `data-notranslate="true"`, add `forceTranslate` in advanced JSON targeting **the element carrying the marker itself** (already built in for itch.io comments):
 
 ```json
 {
@@ -65,4 +57,13 @@ In the advanced JSON editor, use `forceTranslate` with CSS selectors matching th
 }
 ```
 
-This overrides only the matched element's `translate="no"`, `.notranslate`, or `data-notranslate="true"` marker without editing page attributes. Separate markers on descendants, editors, code, hidden content, and `protect`/`exclude` rules remain protected. Match every marked ancestor you intend to override. Full-page, hover, and section translation share the result. Templates, export, overrides, and disabled rules retain the same behavior. Rules apply to content scope by default; set `allScopes: true` explicitly for all-node scope. The built-in itch.io rule includes this comment-shell exception.
+- `forceTranslate` only overrides the marker on matched elements without modifying webpage DOM attributes; nested editors, code blocks, hidden elements, and `protect` / `exclude` rules remain protected.
+- Match each layer if multiple nested containers carry markers; add `allScopes: true` if it should also apply under Recognize all nodes.
+
+Not familiar with CSS selectors? Open an issue on [GitHub Issues](https://github.com/FluentRead/FluentRead/issues) with a public URL, browser version, and redacted screenshot. Full schema reference: [site adaptation reference](https://github.com/FluentRead/FluentRead/blob/main/docs/maintainers/product-reference/site-adaptation-20260906.md).
+
+## Related guides
+
+- [Custom site rules](/en/guide/custom-site-rules)
+- [Page & section translation](/en/guide/webpage-translation)
+- [Troubleshooting & FAQ](/en/guide/faq)

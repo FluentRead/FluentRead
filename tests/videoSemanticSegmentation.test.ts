@@ -123,3 +123,8 @@ it.each(['J. Smith spoke.', 'Dr. Smith spoke.', 'The U.S. team spoke.'])(
     const doc = createSemanticDocument([cue(`${first} Next sentence.`)]);
     expect(segmentSemanticDocument(doc).map(unit => unit.text)).toEqual([`${first} `, 'Next sentence.']);
   });
+
+it('recognizes ellipsis, compound terminal punctuation and extended closing brackets', () => {
+  const doc = createSemanticDocument([cue('【真的吗⁉】 下一句… 结束》')]);
+  expect(segmentSemanticDocument(doc).map(unit => unit.text)).toEqual(['【真的吗⁉】 ', '下一句… ', '结束》']);
+});

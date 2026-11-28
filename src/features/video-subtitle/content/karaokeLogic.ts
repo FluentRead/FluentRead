@@ -77,8 +77,8 @@ export function splitVideoKaraokeParts(text: string): VideoKaraokePart[] {
   return parts;
 }
 
-/** 没有时间轴的字幕按阅读速度估算一句话的时长，限制在 1.2–7 秒之间。 */
-export function estimateVideoKaraokeDurationMs(text: string): number {
+/** 没有时间轴的字幕按阅读速度估算一句话在媒体时间轴上的时长，限制在 1.2–7 秒之间（媒体时钟已随倍速推进）。 */
+export function estimateVideoKaraokeDurationMs(text: string, _playbackRate?: number): number {
   const weight = splitVideoKaraokeParts(text).reduce((total, part) => total + part.weight, 0);
   return Math.min(7000, Math.max(1200, Math.round(weight * 230)));
 }
@@ -93,10 +93,11 @@ export function getVideoKaraokeProgress(timing: VideoKaraokeTiming, currentMs: n
 /** ends 是各单元权重的累计值；返回进度落在第几个单元以及该单元内的比例。 */
 export function locateVideoKaraokePosition(ends: readonly number[], progress: number): VideoKaraokePosition {
   const total = ends[ends.length - 1] || 0;
-  const target = total * progress;
   if (progress >= 1 || total <= 0) return {index: ends.length, fraction: 0};
+  const target = total * Math.max(0, progress);
   let index = 0;
-  while (ends[index] <= target) index += 1;
+  while (index < ends.length && ends[index] <= target) index += 1;
+  if (index >= ends.length) return {index: ends.length, fraction: 0};
   const start = index > 0 ? ends[index - 1] : 0;
   return {index, fraction: Math.max(0, (target - start) / (ends[index] - start))};
 }

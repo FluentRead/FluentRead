@@ -103,6 +103,7 @@ async function send(workerScope: WorkerScope, request: Record<string, unknown>, 
 }
 
 beforeEach(() => {
+    vi.stubGlobal('WebAssembly', {...WebAssembly, Suspending: function () {}, promising: function () {}});
     mocks.probeWebGpu.mockReset();
     mocks.probeWebGpu.mockResolvedValue({available: true, info: 'test-gpu'});
     mocks.fromPretrained.mockReset();

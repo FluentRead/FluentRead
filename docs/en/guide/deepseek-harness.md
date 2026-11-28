@@ -1,90 +1,103 @@
 # Selection translation
 
-Select a word or sentence to translate, look up a word, listen to it or request an AI explanation in one card.
+Select any word or sentence on a webpage to translate, look up dictionary definitions, listen with multi-source TTS, explore AI explanations, or save to your Learning Center in a single card.
 
 <GuideVisual kind="selection" en />
 
-## Translation card
+## Quick start
 
-1. Enable **Settings → Selection translation**.
-2. Select text on a webpage and click the icon beside it.
-3. The card opens on **Translate**. English dictionary lookup works without AI setup.
+1. Enable **Settings → Specialized translation → Selection translation**.
+2. Drag to select text on a webpage and click the nearby FluentRead icon.
+3. The card opens on **Translate**, displaying **Original** above **Translation** with individual copy and read-aloud controls. English dictionary lookup works immediately without configuring AI.
 
-A bilingual card shows the **Original** above the **Translation**, each with its own copy and playback controls. The tabs wrap in narrow cards. In very short cards, scroll the toolbar horizontally.
+### Card interactions & quick fixes
 
-Use the share or save buttons to keep a result. Drag the top or blank space around the card to move it, and drag its edges to resize. Long content scrolls inside. The next selection restores the default size near the selected text.
+- **Move & resize freely:** Drag the header or blank margins around text to move the card (dragging across text still copies normally); drag edges to resize. Long content scrolls inside, and the next selection resets to default size near the new selection.
+- **Save & share:** Click the top-right buttons to save to [Learning Center](/en/guide/vocabulary-book) or create a [Bilingual share card](/en/guide/share-cards).
+- **“Invalid key or permission”:** Click **Configure service** in the card, check credentials under **General → Service assignments → Selection translation → Configure connection**, then return and retry manually.
 
-For “Invalid key or permission”, choose **Configure service**, then check the key and permissions under **General → Service assignments → Selection translation → Configure connection**. Return and retry manually.
+## On-demand AI explanations
 
-## Optional AI explanations
+Enable **AI explanations** in selection settings and choose a provider and model. Opening the card never calls AI automatically—choose an action when you want deeper insight:
 
-Enable **AI explanations** in selection settings, choose a service and model, then select an action in the card. Opening the card alone does not request an AI explanation.
-
-| Action | What it explains |
-| --- | --- |
-| Understand | Meaning, tone and references |
-| Parts of speech & syntax | Sentence structure, word classes and syntactic roles |
-| Usage | Common collocations and natural expressions |
-| Practice | A short exercise based on the source |
+| Action | What it explains | Free Bilibili service | General AI service |
+| --- | --- | --- | --- |
+| **Understand** | Core meaning, tone, and contextual references | ✓ Basic | ✓ Full |
+| **Parts of speech & syntax** | Sentence backbone, clause roles, and word classes | — | ✓ Full |
+| **Usage** | Common collocations and natural expressions | ✓ Basic | ✓ Full |
+| **Practice** | Short targeted exercise based on the original | — | ✓ Full |
 
 <GrammarDemo en />
 
-**Bilibili translation · Free** provides basic **Understand** and **Usage** without an API key. Select **Free AI explanations** in the card to use it for the current selection. Syntax, practice and follow-up conversations require a general AI service; configure it under [Translation providers](/en/config/translation-engines). Existing service and action preferences are preserved.
+- **Try without an API key:** **Bilibili translation · Free** supports basic **Understand** and **Usage** without a key. Click **Free AI explanations** in the card for the current selection without overwriting your saved AI preferences.
+- **Interactive chunks & source quotes:** Click grammar chunks or press `← / →` to inspect roles. Hover end-of-sentence quote markers to inspect original evidence, or click / press `Enter / Space` to jump back to the source sentence.
+- **More actions (⋯):** View original, regenerate, expand to full sentence, listen, or open history. Switching tabs reuses completed answers until the source, model, or language changes.
 
-Click a grammar fragment or use the left/right arrow keys to explore it. The original appears above its role and word class. Analysis that cannot be matched to the source remains a text answer. AI explanations can be wrong; check them against the original.
+## Multi-source read-aloud & playback controls {#read-aloud-settings}
 
-## Check the source behind an explanation
+Configure voices and playback speed (`0.5×–2.0×` with presets) under selection speech settings:
 
-Small quote marks at sentence ends show source references. Hover to read a quote; click or press **Enter / Space** to return to the original sentence. After the page changes or you leave it, old references remain readable but no longer locate the current page.
+| Speech source | Details |
+| --- | --- |
+| **Multi-source online TTS (auto-fallback)** | Supports **Edge Neural** (free natural voices), **Youdao** (fast word & phrase audio), **Google TTS** (broadest language coverage fallback), and **OpenAI / compatible TTS** (reuses configured key/proxy; supports `gpt-4o-mini-tts`, `tts-1`, `tts-1-hd`) |
+| **On-device local speech (Local only)** | Downloads local voice models to your browser; **Local only** never falls back to online sources |
+| **Browser system speech** | Uses OS-provided voices (5-second seek is unavailable for system speech) |
 
-Use **More actions** (⋯) to view the original, regenerate an answer, expand to a sentence, listen or open history. Switching learning actions within the card reuses completed answers. After changing the source, model, language or explanation preferences, old answers are not reused; request an explanation again when needed.
-
-## Read-aloud settings
-
-Choose an online voice or local speech in selection settings. An empty voice is selected by language. **Local only** never uses an online fallback; local models must first be downloaded to this browser.
-
-Use the bottom bar to stop, see playback time or skip backward and forward 5 seconds. Skipping is unavailable for browser system speech. Word highlighting follows playback; audio without word timestamps uses estimated timing and may be imprecise. Stopping, closing the card or changing the selection ends playback.
+Use the bottom bar to stop, view elapsed time, or skip ±5 seconds with synchronized word highlighting (audio without word timestamps uses estimated progress). Closing the card or changing selections stops playback.
 
 <details class="guide-details">
-<summary>Activation and display</summary>
+<summary>Activation modes, auto-dismiss, and two-point selection</summary>
 
-## Activation and display
+### Activation and display
 
-Choose an icon, dot, direct popup, hover-over-icon, shortcut or context-menu activation under **Activation and display**. Adjust the delay there. Hover mode opens after you pause over the icon. Shortcut and context-menu modes hide floating entries.
+Choose **Show icon (default)**, **Dot**, **Direct popup**, **Hover icon**, **Shortcut**, or **Context menu only**, and adjust delay under **Activation and display**.
 
-The default **Show icon** lets you open the card when needed. **Dismiss when continuing to read** is on by default: scrolling the page, copying the original or leaving an unopened entry hides it. Scrolling and copying inside the card keep it open. Turn this off to compare a translation while scrolling the page.
-
-Press **Escape** or click another page control to close. The old selection does not reopen on its own; select again or use your shortcut. Disabling selection translation stops the card and learning features while keeping their preferences.
+- **Dismiss when continuing to read (on by default):** Scrolling the page, copying original text, or leaving an unopened icon hides it; scrolling or copying inside the card keeps it open. Turn this off to compare while scrolling.
+- **Close:** Press `Esc` or click another page control.
+- **Hands-free multi-line selection:** Enable [Two-point selection](/en/guide/custom-hotkey#two-point-selection) (`Alt+Shift+S` by default).
 
 </details>
 
 <details class="guide-details">
-<summary>English dictionary and bidirectional translation</summary>
+<summary>English dictionary sources and bidirectional lookup</summary>
 
-## Dictionary and card controls
+### Dictionary and card controls
 
-Choose a source in **Selection translation → Translation card → Dictionary source**. **Default (automatic)** uses the local dictionary first, then online sources when needed. You can also select ECDICT, Youdao, Free Dictionary API, Wiktionary, WiktApi, or Datamuse. ECDICT is available in the browser extension. A selected source is queried on its own; if it has no entry, the ordinary translation remains available and you can retry the dictionary. Changing the source refreshes an open English word card while keeping its ordinary translation.
+Under **Selection translation → Translation card → Dictionary source**, **Default (automatic)** queries local entries first and falls back online. You can also select ECDICT, Youdao, Free Dictionary API, Wiktionary, WiktApi, Datamuse, or custom [offline/API dictionaries](/en/guide/dictionaries).
 
-The default strategy and ECDICT source include 3,000 common English entries with no extra download. A missing entry starts a background download of the verified complete dictionary, about 3.9 MB, for later local lookup; the default strategy also queries online sources. Common entries remain available if the download fails. The dictionary download URL does not include the queried word.
-
-Dictionary word classes describe possible uses, not necessarily a word's role in the current sentence. For a Chinese or English target language, enable bidirectional selection translation to reverse direction based on the selected text.
+- **ECDICT local dictionary (extension):** Ships with 3,000 common English words out of the box; uncached words trigger a background download of the verified ~3.9 MB full dictionary (download URLs never include your queried word).
+- **Bidirectional selection:** When your target language is Chinese or English, automatically translates in reverse based on the selected text’s language.
 
 </details>
 
 <details class="guide-details">
-<summary>Context and records</summary>
+<summary>Context scope, history, and privacy boundaries</summary>
 
-## Context and records
+### Context and records
 
-**Source context** can send the selection alone or allow its paragraph up to a length limit; it does not read the entire page. **Custom instructions** affect AI explanations only, leaving translation and dictionary lookup unchanged.
+- **Source context:** Limit to **Selection only** or allow a bounded **Current paragraph**—never reads the whole page.
+- **Saving & study notes:** **Save original** goes to **Words & sentences** in [Learning Center](/en/guide/vocabulary-book); **Save study note** goes to **Study notes**. **Use study notes in answers** is off by default.
+- **30-day local history:** Q&A threads stay on-device for 30 days (viewing does not call AI); private windows do not read or save history. See [Data & privacy](/en/guide/privacy).
 
-**Save original** adds text to **Words & sentences** in the [Learning center](/en/guide/vocabulary-book). **Save study note** adds the source and explanation to **Study notes**, where you can keep, edit or delete them. **Use study notes in answers** is off by default; enabling it supplies relevant notes to explanations and writing. Turning it off keeps the notes.
+</details>
 
-Reading conversations stay on this device for 30 days. Viewing history does not call AI, and private windows do not read or save history. Only requesting an action, regeneration or follow-up sends the selection, permitted context and necessary conversation to your chosen provider. See [Data and privacy](/en/guide/privacy).
+<details class="guide-details">
+<summary>Advanced: Chat Completions parameter & token-limit compatibility</summary>
+
+### Chat Completions compatibility
+
+**Understand** and the writing assistant inherit top-level custom request-body fields (such as `service_tier` and `reasoning_effort`) from your chosen Chat Completions provider, while core fields (model, messages, tools, response format, streaming) stay managed by FluentRead. Invalid JSON fails before sending.
+
+Output token limits adapt by endpoint and Azure deployment:
+- Official `https://api.openai.com/v1/chat/completions` and Azure GPT-5 / GPT-6 / o1 / o3 / o4 deployments use `max_completion_tokens`.
+- Third-party compatible endpoints keep `max_tokens` unless you explicitly set `max_completion_tokens` in the custom body (never sending both).
+- Reasoning effort and service tier are forwarded strictly as configured, with no silent fallback or paid retry.
 
 </details>
 
 ## Related guides
 
-- [Parts of speech & syntax](/en/guide/sentence-analysis)
-- [Troubleshooting](/en/guide/faq)
+- [Sentence structure](/en/guide/sentence-analysis)
+- [Dictionaries & study cards](/en/guide/dictionaries)
+- [Learning center](/en/guide/vocabulary-book)
+- [Troubleshooting & FAQ](/en/guide/faq)

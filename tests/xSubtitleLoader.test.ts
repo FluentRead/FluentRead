@@ -97,18 +97,39 @@ describe('XSubtitleLoader', () => {
     await tick();
   });
 
-  it('限制已访问资源容量为 96，并忽略非法、重复和大响应', async () => {
+  it('滑动淘汰已访问资源（上限 256）且不截断超过 32 段的子清单，并忽略非法、重复和大响应', async () => {
     const calls: string[] = [];
+    const loaded: string[] = [];
     const loader = new XSubtitleLoader({
       fetch: async (url) => { calls.push(url); return new Response(cueText); },
-      language: () => 'en', onCues: () => undefined,
+      language: () => 'en', onCues: (url) => loaded.push(url),
     });
     loader.load(resource('bad'), cueText);
     loader.load({url: 'https://example.com/captions/no.vtt', offsetMs: 0}, cueText);
     loader.load(resource('bad'), cueText);
-    for (let i = 0; i < 100; i += 1) loader.load(resource(`capacity-${i}`), '');
+    // 超过 96 和 256 段时不会永久停载，而是滑动淘汰最旧已访问记录。
+    for (let i = 0; i < 260; i += 1) loader.load(resource(`capacity-${i}`), cueText);
     await tick();
     expect(calls).toHaveLength(0);
+    expect(loaded).toHaveLength(261);
+    expect(loaded.at(-1)).toBe(resource('capacity-259').url);
+
+    // 子清单超过 32 段时全部加载，不再在 32 段处截断。
+    const playlistLines = ['#EXTM3U', '#EXT-X-TARGETDURATION:2'];
+    for (let i = 0; i < 40; i += 1) {
+      playlistLines.push('#EXTINF:2.0,', `segment_${i}.vtt`);
+    }
+    const playlistLoaded: string[] = [];
+    const playlistLoader = new XSubtitleLoader({
+      fetch: async () => new Response(cueText),
+      language: () => 'en',
+      onCues: (url) => playlistLoaded.push(url),
+    });
+    playlistLoader.load({url: 'https://video.twimg.com/captions/list.m3u8', offsetMs: 0}, playlistLines.join('\n'));
+    await new Promise<void>(resolve => setTimeout(resolve, 20));
+    expect(playlistLoaded).toHaveLength(40);
+    expect(playlistLoaded.at(-1)).toBe('https://video.twimg.com/captions/segment_39.vtt');
+
     const responseLoader = new XSubtitleLoader({
       fetch: async (url) => { calls.push(url); return new Response('x', {status: 200, headers: {'content-length': '1000001'}}); },
       language: () => 'en', onCues: () => undefined,
@@ -220,5 +241,65 @@ describe('XSubtitleLoader', () => {
     loader.load(resource('inline-normal'), cueText);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     expect(cues).toEqual([resource('inline-normal').url]);
+  });
+
+  it('按 URL 执行有界失败指数退避（最多 3 次），永久 403/404 立即停试且支持容量淘汰与 reset', async () => {
+    vi.useFakeTimers();
+    const fetch = vi.fn(async (url: string) => {
+      if (url.includes('forbidden')) return new Response('', {status: 403});
+      return new Response('', {status: 503});
+    });
+    const loader = new XSubtitleLoader({fetch, language: () => 'en', onCues: () => undefined});
+
+    // 瞬态 503：第 1 次失败后立即重试被退避阻止；推进 1000ms 允许第 2 次；推进 3000ms 允许第 3 次；第 3 次失败后耗尽不再请求。
+    loader.load(resource('flaky'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    loader.load(resource('flaky'));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(500);
+    loader.load(resource('flaky'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(2_999);
+    loader.load(resource('flaky'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(1);
+    loader.load(resource('flaky'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(3);
+
+    // 达到 3 次上限后即使等待很久也不再自动重试。
+    await vi.advanceTimersByTimeAsync(60_000);
+    loader.load(resource('flaky'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(3);
+
+    // 永久 HTTP 403 首次失败后即停止重试。
+    loader.load(resource('forbidden'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(4);
+    await vi.advanceTimersByTimeAsync(60_000);
+    loader.load(resource('forbidden'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(4);
+
+    // 失败表超过 256 条时淘汰最旧记录。
+    for (let i = 0; i < 260; i += 1) {
+      loader.load(resource(`fail-cap-${i}`), '');
+    }
+    await vi.advanceTimersByTimeAsync(0);
+
+    // reset 清空失败记录后允许重新尝试。
+    loader.reset();
+    loader.load(resource('forbidden'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(5);
   });
 });

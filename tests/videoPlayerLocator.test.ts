@@ -806,3 +806,56 @@ it('discovers open Shadow DOM videos, honors webkit fullscreen, prefers playing 
   onlyShadow.appendChild(onlyVideo);
   expect(selectVideoPlayerTarget(shadowOnly.document, {window: shadowOnly.window})?.video).toBe(onlyVideo);
 });
+
+it('skips ambient muted autoplay previews, tiny/transparent HTML videos, and ignores native player ticks under detached host', () => {
+  vi.useFakeTimers();
+  const f = setup(
+    '<section class="card"><video id="preview" muted autoplay></video><video id="tiny" controls></video><video id="offset-tiny" controls></video><video id="invisible" controls></video><div class="real-player"><video id="main" controls></video><span class="timer">00:01</span></div></section>',
+    'https://podcast.example/',
+  );
+  const preview = f.document.getElementById('preview') as HTMLVideoElement;
+  const tiny = f.document.getElementById('tiny') as HTMLVideoElement;
+  const offsetTiny = f.document.getElementById('offset-tiny') as HTMLVideoElement;
+  const invisible = f.document.getElementById('invisible') as HTMLVideoElement;
+  const main = f.document.getElementById('main') as HTMLVideoElement;
+  const timer = f.document.querySelector('.timer')!;
+  const realPlayer = f.document.querySelector('.real-player')!;
+  Object.defineProperty(tiny, 'getBoundingClientRect', {configurable: true, value: () => ({width: 80, height: 40, top: 0, left: 0, right: 80, bottom: 40})});
+  Object.defineProperty(tiny, 'offsetWidth', {configurable: true, value: 80});
+  Object.defineProperty(tiny, 'offsetHeight', {configurable: true, value: 40});
+  Object.defineProperty(offsetTiny, 'getBoundingClientRect', {configurable: true, value: () => ({width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0})});
+  Object.defineProperty(offsetTiny, 'offsetWidth', {configurable: true, value: 100});
+  Object.defineProperty(offsetTiny, 'offsetHeight', {configurable: true, value: 40});
+  invisible.style.opacity = '0';
+  const origComputed = f.window.getComputedStyle;
+  Object.defineProperty(f.window, 'getComputedStyle', {
+    configurable: true,
+    value: (el: Element) => ({...(origComputed?.(el) || {}), opacity: (el as HTMLElement).style?.opacity || '1'}),
+  });
+  let mutation!: (records: MutationRecord[]) => void;
+  let frameCount = 0;
+  Object.defineProperty(f.window, 'requestAnimationFrame', {configurable: true, value: (cb: () => void) => { frameCount += 1; cb(); return frameCount; }});
+  vi.stubGlobal('MutationObserver', class {
+    constructor(callback: (records: MutationRecord[]) => void) { mutation = callback; }
+    observe() {}
+    disconnect() {}
+  });
+  const host = f.document.createElement('div');
+  f.document.body.appendChild(host);
+  const locator = createVideoPlayerLocator({document: f.document, window: f.window, includeAudio: true, getPlayer: () => host});
+  expect(locator.sync()?.video).toBe(main);
+  preview.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('play', {bubbles: true}));
+  expect(locator.getTarget()?.video).toBe(main);
+
+  frameCount = 0;
+  mutation([{type: 'childList', target: timer, addedNodes: [f.document.createTextNode('00:02')], removedNodes: []} as unknown as MutationRecord]);
+  vi.advanceTimersByTime(300);
+  expect(frameCount).toBe(0);
+
+  realPlayer.className = 'real-player active';
+  mutation([{type: 'attributes', attributeName: 'class', oldValue: 'real-player', target: realPlayer, addedNodes: [], removedNodes: []} as unknown as MutationRecord]);
+  expect(frameCount).toBe(0);
+  vi.advanceTimersByTime(260);
+  expect(frameCount).toBe(1);
+  locator.destroy();
+});

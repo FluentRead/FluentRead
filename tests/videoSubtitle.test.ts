@@ -161,6 +161,12 @@ describe('YouTube 视频字幕识别', () => {
         expect(isXHostPage({ hostname: 'twitter.com' })).toBe(true);
         expect(isXHostPage({ hostname: 'example.com' })).toBe(false);
         expect(isSupportedVideoPage({ hostname: 'x.com', pathname: '/cerebras/status/2089870131291943228' })).toBe(true);
+        expect(isSupportedVideoPage({ hostname: 'www.douyin.com', pathname: '/jingxuan/search/demo' })).toBe(false);
+        expect(isSupportedVideoPage({ hostname: 'www.kuaishou.com', pathname: '/short-video/123' })).toBe(false);
+        expect(isSupportedVideoPage({ hostname: 'www.xiaohongshu.com', pathname: '/explore/123' })).toBe(false);
+        expect(isSupportedVideoPage({ hostname: 'live.bilibili.com', pathname: '/123' })).toBe(false);
+        expect(isSupportedVideoPage({ hostname: 'www.bilibili.com', pathname: '/video/BV1xx411c7mD' })).toBe(true);
+        expect(isSupportedVideoPage({ hostname: 'podcast.example', pathname: '/episode' })).toBe(true);
     });
 
     it('X 覆盖链接在 isolate 播放器外时提升到当前 post 的最近共同祖先', () => {

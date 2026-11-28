@@ -8,7 +8,7 @@
  */
 
 import {serializeSubtitleFile, type SubtitleExportFormat} from './subtitleExport';
-import {htmlMediaForPlayer} from './htmlMedia';
+import {htmlMediaForPlayer, isExcludedHtmlMediaHost} from './htmlMedia';
 import {getVideoSubtitleAppearanceCssVars, normalizeVideoSubtitleAppearance, type VideoSubtitleAppearance} from '@/src/core/config/videoSubtitleAppearance';
 import {config} from '@/src/services/config/store';
 import {type VideoSubtitleDisplayMode} from '@/src/core/config/model';
@@ -296,6 +296,7 @@ export function isXHostPage(locationLike: Pick<Location, 'hostname'> = window.lo
 export function isHtmlMediaPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {
   const platform = getCaptionPlatform(locationLike);
   return Boolean(locationLike.hostname) && !YOUTUBE_HOST_PATTERN.test(locationLike.hostname) && !isXVideoPage(locationLike)
+    && !isExcludedHtmlMediaHost(locationLike.hostname)
     && (!platform || (import.meta.env.BROWSER !== 'userscript' && platform === 'coursera'));
 }
 
@@ -1240,6 +1241,9 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
     .${VIDEO_PLAYER_HOST_CLASS}:fullscreen .${VIDEO_FALLBACK_CONTROLS_CLASS},
     .${VIDEO_PLAYER_HOST_CLASS}[data-fluent-read-video-fullscreen="true"] .${VIDEO_FALLBACK_CONTROLS_CLASS} {
       display: flex !important;
+    }
+    .fluent-read-html-media-host[hidden] {
+      display: none !important;
     }
     .fluent-read-html-media-host > .fluent-read-video-controls {
       top: 4px !important; bottom: auto !important; right: 4px !important;

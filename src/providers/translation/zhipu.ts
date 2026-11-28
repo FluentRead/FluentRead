@@ -124,7 +124,7 @@ async function zhipu(message: TranslationProviderRequest<string>) {
         }
         const rawText = choice?.message?.content;
         const translatedText = typeof rawText === 'string'
-            ? (compactBatch ? rawText : contentPostHandler(rawText))
+            ? (!compactBatch && /<think>/i.test(rawText) ? contentPostHandler(rawText) : rawText)
             : '';
         if (!translatedText.trim()) {
             throw new Error('智谱返回数据格式异常：缺少文本内容');

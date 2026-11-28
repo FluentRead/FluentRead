@@ -180,7 +180,7 @@ export const runtimeFeedbackPatterns: readonly LocalizedLegacyPattern[] = [
         'Invalid JSON file format: {1}', 'JSON ファイルの形式が無効です：{1}', 'JSON 파일 형식이 올바르지 않습니다: {1}', 'Format de fichier JSON non valide : {1}', 'Некорректный формат файла JSON: {1}', 'Formato de archivo JSON no válido: {1}'),
     pattern("^第 (\\d+) 章$", [],
         'Chapter {1}', '第 {1} 章', '{1}장', 'Chapitre {1}', 'Глава {1}', 'Capítulo {1}'),
-    pattern("^(PDF|ePub|DOCX) 解析失败：(.+)$", [],
+    pattern("^(PDF|ePub|DOCX|PPTX|XLSX) 解析失败：(.+)$", [],
         'Could not parse the {1} file: {2}', '{1} ファイルを解析できませんでした：{2}', '{1} 파일을 분석하지 못했습니다: {2}', 'Impossible d’analyser le fichier {1} : {2}', 'Не удалось разобрать файл {1}: {2}', 'No se pudo analizar el archivo {1}: {2}'),
     pattern("^第 (\\d+) 段文档翻译失败：(.+)$", [2],
         'Could not translate document segment {1}: {2}', '文書の {1} 番目のセグメントを翻訳できませんでした：{2}', '문서 {1}번째 구간을 번역하지 못했습니다: {2}', 'Impossible de traduire le segment {1} du document : {2}', 'Не удалось перевести фрагмент документа {1}: {2}', 'No se pudo traducir el segmento {1} del documento: {2}'),

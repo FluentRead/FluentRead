@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/services/binary.ts
- * 文件职责：处理 PDF、EPUB 与 DOCX 二进制文档的受限解析和导出，把压缩包或页面文本转换为统一 ParsedDocument，并生成可下载的双语产物；扫描页以图像并集和原生正文证据判定，兼容独立页码、图像外的少量原生页眉页脚及拼接扫描图。
- * 主要内容：相同译文回退原文；Word 段落记下表格单元格供阅读视图排版；按实际字节限制导入、按需加载二进制依赖，包含归档安全上限、可取消 PDF 提取与译文回填；原生旋转内容必要时沿用 sourceRotation 展示坐标，PDF 字形边界回退无效的零/负 ascent 并包含有限负 descent，原始字号与基线保持不变；复用已加载数学字形轮廓收紧通用字体边界，非剪切拉伸分隔符的横向字号只供行归组；零宽文字项使用受限同行位置估算，不把组合标记当作额外字形；默认逐页原版左右对照，保留旋转裁剪并直接嵌入 JPEG，支持文字几何的光栅端口添加可搜索复制的 Unicode 层（连接符与相邻字符共用 CID，保留组合表情及原行 advance）和溢出段落的可见全文续页，批注仍保留完整译文，候选标记避让复用已有几何数组而不逐候选复制；ePub/DOCX 导出让出主线程并使用可取消归档流，ePub 保持首项 mimetype 无压缩及 XHTML 章节格式；未改资源保留原压缩方式，文本导出直接使用 core 的回退规则避免重复规范化。
+ * 文件职责：处理 PDF、EPUB、DOCX、PPTX 与 XLSX 二进制文档的受限解析和导出，把压缩包或页面文本转换为统一 ParsedDocument，并生成可下载的双语产物；扫描页以图像并集和原生正文证据判定，兼容独立页码、图像外的少量原生页眉页脚及拼接扫描图。
+ * 主要内容：相同译文回退原文；Word 段落记下表格单元格供阅读视图排版，PowerPoint 按演示清单或编号解析幻灯片与演讲者备注，Excel 按工作簿顺序解析多工作表与共享/行内字符串并安全追加共享字符串表；按实际字节限制导入、按需加载二进制依赖，包含归档安全上限、可取消 PDF 提取与译文回填；原生旋转内容必要时沿用 sourceRotation 展示坐标，PDF 字形边界回退无效的零/负 ascent 并包含有限负 descent，原始字号与基线保持不变；复用已加载数学字形轮廓收紧通用字体边界，非剪切拉伸分隔符的横向字号只供行归组；零宽文字项使用受限同行位置估算，不把组合标记当作额外字形；默认逐页原版左右对照，保留旋转裁剪并直接嵌入 JPEG，支持文字几何的光栅端口添加可搜索复制的 Unicode 层（连接符与相邻字符共用 CID，保留组合表情及原行 advance）和溢出段落的可见全文续页，批注仍保留完整译文，候选标记避让复用已有几何数组而不逐候选复制；ePub/DOCX/PPTX/XLSX 导出让出主线程并使用可取消归档流，ePub 保持首项 mimetype 无压缩及 XHTML 章节格式；未改资源保留原压缩方式，文本导出直接使用 core 的回退规则避免重复规范化。
  * EPUB 目录在归档时复用实际导出的章节标题译文，兼容原有阅读和历史记录。
  * Word 由 core/docxInline 验证和回填链接与字符样式；复杂段落原位保留，译文另起一段。
  * 文本上传在此按原始字节检查大小并识别 UTF-8 或带 BOM 的 UTF-16，防止乱码进入后续分段。
@@ -38,9 +38,11 @@ import {
     type ParsedDocument,
     type PdfDocumentBlock,
     type PdfDocumentPage,
+    type PptxDocumentPart,
+    type XlsxDocumentSheet,
 } from '@/src/features/document-translation/core/document';
 
-const BINARY_DOCUMENT_FORMATS = new Set<DocumentFormat>(['pdf', 'epub', 'docx']);
+const BINARY_DOCUMENT_FORMATS = new Set<DocumentFormat>(['pdf', 'epub', 'docx', 'pptx', 'xlsx']);
 const DOCX_PARAGRAPH_PATTERN = /<w:p(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*?(?:\/>|>[\s\S]*?<\/w:p\s*>)/gu;
 
 /**
@@ -265,7 +267,7 @@ function readArchiveText(entry: JSZip.JSZipObject, signal?: AbortSignal): Promis
     });
 }
 
-export function assertArchiveSafety(zip: JSZip, label: 'ePub' | 'DOCX'): void {
+export function assertArchiveSafety(zip: JSZip, label: 'ePub' | 'DOCX' | 'PPTX' | 'XLSX'): void {
     const entries = Object.values(zip.files);
     if (entries.length > ARCHIVE_ENTRY_LIMIT) {
         throw new Error(`${label} 文件包含过多压缩项，已停止解析`);
@@ -1165,16 +1167,193 @@ async function parseDocx(fileName: string, bytes: Uint8Array, signal?: AbortSign
     };
 }
 
+async function parsePptx(fileName: string, bytes: Uint8Array, signal?: AbortSignal): Promise<ParsedDocument> {
+    let zip: JSZip;
+    try {
+        const {default: JSZip} = await import('jszip');
+        zip = await awaitDocumentRead(JSZip.loadAsync(bytes), signal);
+    } catch (error) {
+        signal?.throwIfAborted();
+        throw new Error(`PPTX 解析失败：${String(error)}`);
+    }
+    signal?.throwIfAborted();
+    assertArchiveSafety(zip, 'PPTX');
+
+    const availablePaths = Object.entries(zip.files).filter(([, entry]) => !entry.dir).map(([path]) => path);
+    const hasSlide = availablePaths.some(path => /^ppt\/slides\/slide\d+\.xml$/iu.test(path));
+    if (!zip.file('[Content_Types].xml') || (!zip.file('ppt/presentation.xml') && !hasSlide)) {
+        throw new Error('PPTX 文件结构无效，文件可能已损坏或扩展名不正确');
+    }
+
+    const {parsePptxPartXml, parsePptxPresentationSlides, parsePptxSlideNotesTarget, resolveOpcTargetPath} = await import('../core/pptxXml');
+    const presentationEntry = zip.file('ppt/presentation.xml');
+    const presentationRelsEntry = zip.file('ppt/_rels/presentation.xml.rels');
+    const presentationXml = presentationEntry ? await readArchiveText(presentationEntry, signal) : undefined;
+    const presentationRelsXml = presentationRelsEntry ? await readArchiveText(presentationRelsEntry, signal) : undefined;
+    const slideEntries = parsePptxPresentationSlides(presentationXml, presentationRelsXml, availablePaths);
+
+    const explicitNotesBySlide = new Map<string, string>();
+    const claimedNotes = new Set<string>();
+    for (const {path} of slideEntries) {
+        const slash = path.lastIndexOf('/');
+        const relsPath = `${path.slice(0, slash + 1)}_rels/${path.slice(slash + 1)}.rels`;
+        const relsEntry = zip.file(relsPath);
+        if (!relsEntry) continue;
+        const target = parsePptxSlideNotesTarget(await readArchiveText(relsEntry, signal));
+        if (!target) continue;
+        const resolved = resolveOpcTargetPath(path, target);
+        if (zip.file(resolved) && !claimedNotes.has(resolved)) {
+            explicitNotesBySlide.set(path, resolved);
+            claimedNotes.add(resolved);
+        }
+    }
+
+    const orderedParts: Array<{path: string; kind: 'slide' | 'notes'; slideNumber: number}> = [];
+    const seenNotes = new Set<string>();
+
+    for (const {path, slideNumber} of slideEntries) {
+        orderedParts.push({path, kind: 'slide', slideNumber});
+        let notesPath = explicitNotesBySlide.get(path);
+        if (!notesPath) {
+            const fileNumber = /^ppt\/slides\/slide(\d+)\.xml$/iu.exec(path)?.[1];
+            const fallbackNotes = fileNumber ? `ppt/notesSlides/notesSlide${fileNumber}.xml` : undefined;
+            if (fallbackNotes && !claimedNotes.has(fallbackNotes) && zip.file(fallbackNotes)) notesPath = fallbackNotes;
+        }
+        if (notesPath && !seenNotes.has(notesPath)) {
+            seenNotes.add(notesPath);
+            orderedParts.push({path: notesPath, kind: 'notes', slideNumber});
+        }
+    }
+
+    const extraNotes = availablePaths
+        .map(path => ({path, match: /^ppt\/notesSlides\/notesSlide(\d+)\.xml$/iu.exec(path)}))
+        .filter((item): item is {path: string; match: RegExpExecArray} => Boolean(item.match) && !seenNotes.has(item.path))
+        .sort((left, right) => Number(left.match[1]) - Number(right.match[1]));
+    for (const {path, match} of extraNotes) {
+        orderedParts.push({path, kind: 'notes', slideNumber: Number(match[1])});
+    }
+
+    const segments: DocumentSegment[] = [];
+    const parts: PptxDocumentPart[] = [];
+    for (const entry of orderedParts) {
+        signal?.throwIfAborted();
+        const source = await readArchiveText(zip.file(entry.path)!, signal);
+        const extracted = parsePptxPartXml(source, entry.kind);
+        if (extracted.length === 0) continue;
+        const label = entry.kind === 'notes' ? `Slide ${entry.slideNumber} Notes` : `Slide ${entry.slideNumber}`;
+        const paragraphSegments: PptxDocumentPart['paragraphSegments'] = [];
+        extracted.forEach((paragraph, index) => {
+            const segmentIndex = segments.length;
+            segments.push({
+                id: segmentIndex,
+                source: paragraph.text,
+                contextLabel: index === 0 ? label : undefined,
+                pathLabel: label,
+                role: paragraph.role,
+            });
+            paragraphSegments.push({paragraphIndex: paragraph.paragraphIndex, segmentIndex});
+        });
+        parts.push({path: entry.path, source, kind: entry.kind, slideNumber: entry.slideNumber, paragraphSegments});
+    }
+
+    if (segments.length === 0) throw new Error('PPTX 中没有找到可翻译的幻灯片文字');
+    return {
+        fileName,
+        format: 'pptx',
+        label: getDocumentFormatLabel('pptx'),
+        parts: [],
+        segments,
+        binary: {kind: 'pptx', bytes, parts},
+    };
+}
+
+async function parseXlsx(fileName: string, bytes: Uint8Array, signal?: AbortSignal): Promise<ParsedDocument> {
+    let zip: JSZip;
+    try {
+        const {default: JSZip} = await import('jszip');
+        zip = await awaitDocumentRead(JSZip.loadAsync(bytes), signal);
+    } catch (error) {
+        signal?.throwIfAborted();
+        throw new Error(`XLSX 解析失败：${String(error)}`);
+    }
+    signal?.throwIfAborted();
+    assertArchiveSafety(zip, 'XLSX');
+
+    const availablePaths = Object.entries(zip.files).filter(([, entry]) => !entry.dir).map(([path]) => path);
+    const hasWorksheet = availablePaths.some(path => /^xl\/worksheets\/sheet\d+\.xml$/iu.test(path));
+    if (!zip.file('[Content_Types].xml') || (!zip.file('xl/workbook.xml') && !hasWorksheet)) {
+        throw new Error('XLSX 文件结构无效，文件可能已损坏或扩展名不正确');
+    }
+
+    const {parseXlsxSharedStrings, parseXlsxWorkbookSheets, parseXlsxWorksheetXml} = await import('../core/xlsxXml');
+    const workbookEntry = zip.file('xl/workbook.xml');
+    const relsEntry = zip.file('xl/_rels/workbook.xml.rels');
+    const workbookXml = workbookEntry ? await readArchiveText(workbookEntry, signal) : undefined;
+    const relsXml = relsEntry ? await readArchiveText(relsEntry, signal) : undefined;
+    const descriptors = parseXlsxWorkbookSheets(workbookXml, relsXml, availablePaths);
+
+    const sharedStringsEntry = zip.file('xl/sharedStrings.xml');
+    const sharedStringsSource = sharedStringsEntry ? await readArchiveText(sharedStringsEntry, signal) : undefined;
+    const sharedStrings = sharedStringsSource ? parseXlsxSharedStrings(sharedStringsSource) : [];
+
+    const segments: DocumentSegment[] = [];
+    const sheets: XlsxDocumentSheet[] = [];
+    for (const descriptor of descriptors) {
+        signal?.throwIfAborted();
+        const source = await readArchiveText(zip.file(descriptor.path)!, signal);
+        const cells = parseXlsxWorksheetXml(source, sharedStrings);
+        if (cells.length === 0) continue;
+        const cellSegments: XlsxDocumentSheet['cellSegments'] = [];
+        for (const cell of cells) {
+            const segmentIndex = segments.length;
+            const label = `${descriptor.name}!${cell.cellRef}`;
+            segments.push({
+                id: segmentIndex,
+                source: cell.source,
+                contextLabel: label,
+                pathLabel: label,
+            });
+            cellSegments.push({
+                cellRef: cell.cellRef,
+                kind: cell.kind,
+                ...(cell.sharedIndex !== undefined ? {sharedIndex: cell.sharedIndex} : {}),
+                segmentIndex,
+            });
+        }
+        sheets.push({name: descriptor.name, path: descriptor.path, source, cellSegments});
+    }
+
+    if (segments.length === 0) throw new Error('XLSX 中没有找到可翻译的单元格文字');
+    return {
+        fileName,
+        format: 'xlsx',
+        label: getDocumentFormatLabel('xlsx'),
+        parts: [],
+        segments,
+        binary: {
+            kind: 'xlsx',
+            bytes,
+            sheets,
+            ...(sharedStringsSource !== undefined ? {sharedStringsPath: 'xl/sharedStrings.xml', sharedStringsSource} : {}),
+        },
+    };
+}
+
 export async function parseBinaryDocument(fileName: string, input: ArrayBuffer | Uint8Array, options: ParseDocumentFileOptions = {}): Promise<ParsedDocument> {
     options.signal?.throwIfAborted();
     const format = getDocumentFormat(fileName);
     if (!format || !isBinaryDocumentFormat(format)) {
-        throw new Error('该文件不是 PDF、ePub 或 DOCX 二进制文档');
+        throw new Error('该文件不是 PDF、ePub、DOCX、PPTX 或 XLSX 二进制文档');
     }
     assertDocumentSize(input.byteLength, fileName);
     const bytes = toUint8Array(input);
-    const parsed = await (format === 'pdf' ? parsePdf(fileName, bytes, options.signal, options.onPdfProgress)
-        : format === 'epub' ? parseEpub(fileName, bytes, options.signal) : parseDocx(fileName, bytes, options.signal));
+    const parsed = await (
+        format === 'pdf' ? parsePdf(fileName, bytes, options.signal, options.onPdfProgress)
+            : format === 'epub' ? parseEpub(fileName, bytes, options.signal)
+                : format === 'docx' ? parseDocx(fileName, bytes, options.signal)
+                    : format === 'pptx' ? parsePptx(fileName, bytes, options.signal)
+                        : parseXlsx(fileName, bytes, options.signal)
+    );
     options.signal?.throwIfAborted();
     return parsed;
 }
@@ -1825,6 +2004,80 @@ async function renderDocx(document: ParsedDocument, translations: readonly strin
     }, {signal: options.signal, onProgress: options.onArchiveProgress});
 }
 
+async function renderPptx(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode, options: CreateDocumentDownloadOptions): Promise<Uint8Array> {
+    if (document.binary?.kind !== 'pptx') throw new Error('PPTX 文档状态无效，请重新打开文件');
+    const {default: JSZip} = await import('jszip');
+    options.signal?.throwIfAborted();
+    const zip = await awaitDocumentRead(JSZip.loadAsync(document.binary.bytes), options.signal);
+    options.signal?.throwIfAborted();
+    assertArchiveSafety(zip, 'PPTX');
+    const {renderPptxPartXml} = await import('../core/pptxXml');
+    preserveStoredDocumentEntries(zip, document.binary.bytes, new Set(document.binary.parts.map(part => part.path)));
+    for (const part of document.binary.parts) {
+        await yieldDocumentTask();
+        options.signal?.throwIfAborted();
+        const updated = renderPptxPartXml(part.source, part.paragraphSegments, document.segments, translations, mode);
+        zip.file(part.path, updated, {createFolders: false});
+    }
+    return generateDocumentArchive(zip, {
+        mimeType: getDocumentMimeType('pptx'),
+        compression: 'DEFLATE',
+        compressionOptions: {level: 3},
+    }, {signal: options.signal, onProgress: options.onArchiveProgress});
+}
+
+async function renderXlsx(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode, options: CreateDocumentDownloadOptions): Promise<Uint8Array> {
+    if (document.binary?.kind !== 'xlsx') throw new Error('XLSX 文档状态无效，请重新打开文件');
+    const {default: JSZip} = await import('jszip');
+    options.signal?.throwIfAborted();
+    const zip = await awaitDocumentRead(JSZip.loadAsync(document.binary.bytes), options.signal);
+    options.signal?.throwIfAborted();
+    assertArchiveSafety(zip, 'XLSX');
+    const {appendXlsxSharedStringsXml, parseXlsxSharedStrings, renderXlsxWorksheetXml} = await import('../core/xlsxXml');
+    const sharedStringsSource = document.binary.sharedStringsSource;
+    const sharedStrings = sharedStringsSource ? parseXlsxSharedStrings(sharedStringsSource) : [];
+    const appendedStrings: string[] = [];
+    const appendedIndexByValue = new Map<string, number>();
+    const appendSharedString = (value: string): number => {
+        const existing = appendedIndexByValue.get(value);
+        if (existing !== undefined) return existing;
+        const index = sharedStrings.length + appendedStrings.length;
+        appendedStrings.push(value);
+        appendedIndexByValue.set(value, index);
+        return index;
+    };
+
+    const changedPaths = new Set<string>();
+    for (const sheet of document.binary.sheets) {
+        await yieldDocumentTask();
+        options.signal?.throwIfAborted();
+        const updated = renderXlsxWorksheetXml(
+            sheet.source,
+            sheet.cellSegments,
+            document.segments,
+            translations,
+            sharedStrings,
+            mode,
+            appendSharedString,
+        );
+        if (updated !== sheet.source) {
+            zip.file(sheet.path, updated, {createFolders: false});
+            changedPaths.add(sheet.path);
+        }
+    }
+    if (appendedStrings.length > 0 && document.binary.sharedStringsPath && sharedStringsSource !== undefined) {
+        const updatedShared = appendXlsxSharedStringsXml(sharedStringsSource, appendedStrings, sharedStrings.length);
+        zip.file(document.binary.sharedStringsPath, updatedShared, {createFolders: false});
+        changedPaths.add(document.binary.sharedStringsPath);
+    }
+    preserveStoredDocumentEntries(zip, document.binary.bytes, changedPaths);
+    return generateDocumentArchive(zip, {
+        mimeType: getDocumentMimeType('xlsx'),
+        compression: 'DEFLATE',
+        compressionOptions: {level: 3},
+    }, {signal: options.signal, onProgress: options.onArchiveProgress});
+}
+
 export async function createDocumentDownload(
     document: ParsedDocument,
     translations: readonly string[],
@@ -1849,6 +2102,10 @@ export async function createDocumentDownload(
         data = await renderEpub(document, resolved, mode, options);
     } else if (document.format === 'docx') {
         data = await renderDocx(document, resolved, mode, options);
+    } else if (document.format === 'pptx') {
+        data = await renderPptx(document, resolved, mode, options);
+    } else if (document.format === 'xlsx') {
+        data = await renderXlsx(document, resolved, mode, options);
     } else {
         data = renderDocument(document, resolved, mode);
     }

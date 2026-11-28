@@ -1,7 +1,7 @@
 /**
  * @file src/app/document-translation/materialResume.ts
  * 文件职责：在文档组合根将文件内容身份、精确原文引用与材料位置连接，输出可明确展示的恢复结果。
- * 主要内容：精确引用调用文档公共解析契约；旧记录只提供粗略页码或章节，失配引用不跨页寻找相同文字，也不建议自动覆盖旧定位。
+ * 主要内容：精确引用调用文档公共解析契约，覆盖 PDF 页码、ePub 章节、DOCX 部分与 XLSX 工作表分页定位；旧记录只提供粗略页码或章节，失配引用不跨页寻找相同文字，也不建议自动覆盖旧定位。
  * 模块边界：不访问 DOM、Vue、数据库和网络，不控制阅读器初始化；调用方仍拥有恢复代次、挂载时序和用户确认。
  */
 import {createDocumentMaterialReference, normalizeDocumentMaterialReference, resolveDocumentMaterialReference} from '@/src/features/document-translation/material/public';
@@ -27,6 +27,10 @@ function segmentLocation(document: ParsedDocument, index: number, pageSize: numb
     if (binary?.kind === 'docx') {
         const paragraphs = binary.parts.flatMap((part, at) => part.paragraphSegments.flatMap((paragraph, paragraphIndex) => paragraph.segmentIndex === index ? [{at, paragraphIndex}] : []));
         return paragraphs.length === 1 ? {page: Math.floor(paragraphs[0].paragraphIndex / pageSize) + 1, section: `docx:${paragraphs[0].at}`} : undefined;
+    }
+    if (binary?.kind === 'xlsx') {
+        const cells = binary.sheets.flatMap((sheet, at) => sheet.cellSegments.flatMap((cell, cellIndex) => cell.segmentIndex === index ? [{at, cellIndex}] : []));
+        return cells.length === 1 ? {page: Math.floor(cells[0].cellIndex / pageSize) + 1, section: `xlsx:${cells[0].at}`} : undefined;
     }
     return {page: Math.floor(index / pageSize) + 1};
 }
@@ -58,17 +62,21 @@ export function resolveMaterialDocumentResume(locator: MaterialLocator | undefin
     if (!locator || locator.page === undefined && locator.section === undefined) return unlocated('no-position');
     const binary = document.binary;
     let section: string | undefined, maxPage: number;
-    if (binary?.kind === 'epub' || binary?.kind === 'docx') {
+    if (binary?.kind === 'epub' || binary?.kind === 'docx' || binary?.kind === 'xlsx') {
         const prefix = binary.kind;
         const input = locator.section;
-        const pattern = prefix === 'epub' ? /^(?:epub:)?(\d+)$/u : /^docx:(\d+)$/u;
+        const pattern = prefix === 'epub' ? /^(?:epub:)?(\d+)$/u : prefix === 'docx' ? /^docx:(\d+)$/u : /^xlsx:(\d+)$/u;
         const match = typeof input === 'string' ? pattern.exec(input) : undefined;
         if (!match) return unlocated('invalid-position');
         const at = Number(match[1]);
-        const count = binary.kind === 'epub' ? binary.chapters.length : binary.parts.length;
+        const count = binary.kind === 'epub' ? binary.chapters.length : binary.kind === 'docx' ? binary.parts.length : binary.sheets.length;
         if (!Number.isSafeInteger(at) || at >= count) return unlocated('invalid-position');
         section = `${prefix}:${at}`;
-        maxPage = binary.kind === 'epub' ? 1 : Math.max(1, Math.ceil(binary.parts[at].paragraphSegments.length / pageSize));
+        maxPage = binary.kind === 'epub'
+            ? 1
+            : binary.kind === 'docx'
+                ? Math.max(1, Math.ceil(binary.parts[at].paragraphSegments.length / pageSize))
+                : Math.max(1, Math.ceil(binary.sheets[at].cellSegments.length / pageSize));
     } else {
         if (locator.section !== undefined) return unlocated('invalid-position');
         maxPage = binary?.kind === 'pdf' ? binary.pages.length : Math.max(1, Math.ceil(document.segments.length / pageSize));

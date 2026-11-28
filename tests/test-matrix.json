@@ -633,6 +633,8 @@
       "tests/documentTranslationApi.test.ts",
       "tests/documentTranslationBinary.test.ts",
       "tests/documentTranslationBinaryEdge.test.ts",
+      "tests/documentLatex.test.ts",
+      "tests/documentOfficeFormats.test.ts",
       "tests/documentUserActions.test.ts",
       "tests/documentWorkflows.test.ts",
       "tests/webArticleWorkbench.test.ts",

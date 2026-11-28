@@ -59,7 +59,7 @@
             :aria-label="t('options.aboutWebsite')"
             :data-animated="config.animations"
           >
-            <img src="/icon/128.png" alt="" />
+            <PopupBrandIcon :skin="config.interfaceSkin" src="/icon/128.png" />
           </a>
         </ElTooltip>
         <div class="brand-copy">
@@ -466,6 +466,7 @@ import {
   subscribeConfig,
 } from '@/src/services/config/store';
 import { Setting } from '@element-plus/icons-vue';
+import PopupBrandIcon from '@/src/ui/components/PopupBrandIcon.vue';
 import {getVisualViewportRect, observeVisualViewport} from '@/src/platform/dom/visualViewport';
 import {normalizeConfig} from '@/src/core/config/model';
 import {createApiKeyCheckRevision} from '@/src/core/config/apiKeyCheckIdentity';

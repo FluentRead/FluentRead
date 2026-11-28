@@ -306,30 +306,29 @@ describe('settings center CLI remaining current UI contracts', () => {
         expect(matrix?.getText(ast)).toContain('layoutMetrics.featureCount !== expectedExpandedQuickFeatureCount');
     });
 
-    it('uses the flat palette surface and the declared action background for every light/dark skin', () => {
+    it('uses the popup-only craft surface and declared action background for every light/dark skin', () => {
         const {matchesPalettePopupSurfaces} = bindings(['parseHexColor', 'parseCssColor', 'matchesPalettePopupSurfaces']);
-        const palette = cssDeclarations('src/ui/styles/interface-skins/palette.css', ':root[data-interface-skin-kind="palette"][data-interface-skin] .popup-shell');
-        const button = cssDeclarations('src/ui/styles/interface-skins/palette.css', ':root[data-interface-skin-kind="palette"][data-interface-skin] .translate-button');
-        expect(palette.background).toBe('var(--skin-page)');
-        expect(button.background).toBe('var(--skin-action-background, var(--brand))');
-        for (const skin of interfaceSkinOptions.filter(skin => skin.kind === 'palette')) {
-            for (const theme of ['', '.dark']) {
-                const file = `src/ui/styles/interface-skins/${skin.value}.css`;
-                const light = cssDeclarations(file, `:root[data-interface-skin="${skin.value}"]`);
-                // Dark declarations override the still-matching light rule; some skins
-                // intentionally inherit the action fill or share one light/dark rule.
-                const tokens = theme ? {...light, ...cssDeclarations(file, `:root${theme}[data-interface-skin="${skin.value}"]`)} : light;
-                const declared = tokens['--skin-action-background'];
-                expect(declared, `${skin.value}${theme} action background`).toMatch(/^#[\da-f]{3,6}$/i);
+        const baseFile = 'src/ui/styles/interface-skins/popup-skins-base.css';
+        const themesFile = 'src/ui/styles/interface-skins/popup-skins-themes.css';
+        const shell = cssDeclarations(baseFile, ':root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .popup-shell');
+        const button = cssDeclarations(baseFile, ':root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] .translate-button');
+        expect(shell.background).toBe('var(--skin-page-bg, var(--skin-page))');
+        expect(button.background).toBe('var(--skin-action-bg, var(--skin-brand))');
+        for (const skin of interfaceSkinOptions.filter(skin => skin.kind === 'craft')) {
+            const selectors = skin.toneMode === 'dark'
+                ? [`:root[data-popup-root][data-interface-skin="${skin.value}"]`]
+                : [`:root[data-popup-root]:not(.dark)[data-interface-skin="${skin.value}"]`, `:root.dark[data-popup-root][data-interface-skin="${skin.value}"]`];
+            for (const selector of selectors) {
+                const tokens = cssDeclarations(themesFile, selector);
+                const declared = tokens['--skin-action-bg'];
+                expect(declared, `${skin.value} (${selector}) action background`).toMatch(/^(#[\da-f]{6}|linear-gradient\()/i);
+                const solid = declared.match(/#[\da-f]{6}/i)?.[0] ?? '';
                 expect(matchesPalettePopupSurfaces({
-                    actionContrast: 4.5, declaredActionBackground: declared, translateButtonBackground: declared,
+                    actionContrast: 4.5, declaredActionBackground: solid, translateButtonBackground: solid,
                     translateButtonBackgroundImage: 'none', shellBackgroundImage: 'none',
                 })).toBe(true);
             }
         }
-        const shuimo = cssDeclarations('src/ui/styles/interface-skins/shuimo.css', ':root[data-interface-skin="shuimo"]');
-        expect(shuimo['--skin-action-background']).not.toBe(shuimo['--brand']);
-        expect(source).toContain("declaredActionBackground: rootStyle.getPropertyValue('--skin-action-background').trim()");
     });
 
     it.each([

@@ -5,7 +5,7 @@
  * 模块边界：不读取网页历史或存储、不请求翻译服务；动作交给校订控制器，原文和译文始终以纯文本呈现。
  -->
 <template>
-  <div v-ui-i18n class="correction-ui" :class="{dark}" :style="{'--accent': accent}">
+  <div v-ui-i18n class="correction-ui" :class="{dark}">
     <button v-if="state.candidate && !state.open" class="correction-entry" data-testid="correction-entry" type="button" @click="controller.open(state.candidate)">
       校订译文 <span>Alt ⇧ E</span>
     </button>
@@ -48,7 +48,6 @@
 <script setup lang="ts">
 import {computed, nextTick, onBeforeUnmount, ref, watch} from 'vue';
 import {config, subscribeConfig} from '@/src/services/config/store';
-import {getInterfaceSkinOption} from '@/src/core/config/interfaceAppearance';
 import {translationLanguageOptions} from '@/src/core/language/catalog';
 import {normalizeLanguageCode} from '@/src/core/language/codes';
 import {getMultilingualTargetLanguageLabel} from '@/src/core/config/catalog';
@@ -118,13 +117,12 @@ function deferScopeHelpClose(): void {
   if (root?.activeElement === scopeHelpButton.value) return;
   helpCloseTimer = setTimeout(closeScopeHelp, 100);
 }
-const prefs = ref({theme: config.theme, interfaceSkin: config.interfaceSkin});
+const prefs = ref({theme: config.theme});
 const media = window.matchMedia('(prefers-color-scheme: dark)'); const systemDark = ref(media.matches);
 const mediaChanged = (event: MediaQueryListEvent) => {systemDark.value = event.matches;};
 media.addEventListener('change', mediaChanged);
-const stopConfig = subscribeConfig(value => {prefs.value = {theme: value.theme, interfaceSkin: value.interfaceSkin};});
+const stopConfig = subscribeConfig(value => {prefs.value = {theme: value.theme};});
 const dark = computed(() => prefs.value.theme === 'dark' || (prefs.value.theme === 'auto' && systemDark.value));
-const accent = computed(() => getInterfaceSkinOption(prefs.value.interfaceSkin).preview.accent);
 let previousFocus: HTMLElement | null = null;
 function restoreFocus(): void {if (previousFocus?.isConnected) previousFocus.focus({preventScroll: true}); previousFocus = null;}
 watch(() => state.open, async open => {

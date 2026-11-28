@@ -341,6 +341,13 @@ describe('OptionsApp mounted hash navigation', () => {
     await runtime.nextTick();await runtime.nextTick();
     expect(theme).not.toHaveBeenCalled();expect(skin).not.toHaveBeenCalled();expect(font).not.toHaveBeenCalled();
   });
+  it('never applies popup interfaceSkin to Options root on mount or config updates', async () => {
+    const {skin, theme, font} = await mountOptions('#settings-interface', Promise.resolve());
+    await runtime.nextTick();
+    expect(skin).not.toHaveBeenCalled();
+    expect(theme).toHaveBeenCalled();
+    expect(font).toHaveBeenCalled();
+  });
   it('cancels deferred scrolling and rejects stale navigation after unmount', async () => {
     const {state, scrollTo, location} = await mountOptions();scrollTo.mockClear();
     state.selectSection('settings-general');unmount?.();unmount = undefined;

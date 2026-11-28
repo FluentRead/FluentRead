@@ -6,7 +6,18 @@
  */
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {configureOnnxWasmBackend, loadCompressedWasmBinary, resolveOnnxWasmAssetPaths, resolveOnnxWasmVariant, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
+import {
+    assertOnnxWasmRuntimeSupported,
+    configureOnnxWasmBackend,
+    isOnnxJspiUnsupportedError,
+    loadCompressedWasmBinary,
+    ONNX_WASM_JSPI_UNSUPPORTED_CODE,
+    resolveOnnxWasmAssetPaths,
+    resolveOnnxWasmVariant,
+    supportsOnnxJspi,
+    supportsOnnxWasmRuntime,
+    withCompressedWasmBinary,
+} from '@/src/shared/onnx/wasmBinary';
 
 const wasmBytes = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
 
@@ -62,6 +73,29 @@ describe('compressed ONNX WASM loader', () => {
             mjs: 'safari-web-extension://id/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs',
             wasm: 'safari-web-extension://id/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm',
         });
+    });
+
+    it('检测 WebAssembly JSPI 能力并按打包变体在缺少 JSPI 时快速拒绝', () => {
+        vi.stubGlobal('WebAssembly', {Suspending: function () {}, promising: function () {}});
+        expect(supportsOnnxJspi()).toBe(true);
+        expect(supportsOnnxWasmRuntime('jspi')).toBe(true);
+        expect(supportsOnnxWasmRuntime('asyncify')).toBe(true);
+        expect(() => assertOnnxWasmRuntimeSupported('jspi')).not.toThrow();
+
+        vi.stubGlobal('WebAssembly', {});
+        expect(supportsOnnxJspi()).toBe(false);
+        expect(supportsOnnxWasmRuntime('jspi')).toBe(false);
+        expect(supportsOnnxWasmRuntime('asyncify')).toBe(true);
+        expect(() => assertOnnxWasmRuntimeSupported('asyncify')).not.toThrow();
+        expect(() => assertOnnxWasmRuntimeSupported('jspi')).toThrow(ONNX_WASM_JSPI_UNSUPPORTED_CODE);
+
+        const throwingWasm = Object.defineProperty({}, 'Suspending', {get() { throw new Error('blocked'); }});
+        vi.stubGlobal('WebAssembly', throwingWasm);
+        expect(supportsOnnxJspi()).toBe(false);
+
+        expect(isOnnxJspiUnsupportedError(new Error(`${ONNX_WASM_JSPI_UNSUPPORTED_CODE}: missing`))).toBe(true);
+        expect(isOnnxJspiUnsupportedError(new Error('other error'))).toBe(false);
+        expect(isOnnxJspiUnsupportedError('not-an-error')).toBe(false);
     });
 
     it('无解压能力时加载原始 WASM，拒绝损坏资源且初始化后释放引用', async () => {

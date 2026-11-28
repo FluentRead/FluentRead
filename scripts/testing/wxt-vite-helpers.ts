@@ -7,7 +7,8 @@
  * - 提供模块 Worker 分组与扩展 UI 页面共享 chunk 拆分函数。
  * 模块边界：纯构建期 Vite/Rolldown 配置变换函数，不涉及浏览器清单、归档压缩或运行时状态。
  */
-import {resolve} from 'node:path';
+import fs from 'node:fs';
+import {basename, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import type {Entrypoint, EntrypointGroup} from 'wxt';
 import type {InlineConfig} from 'vite';
@@ -16,6 +17,10 @@ import {scopedChineseCatalogBuildPlugin} from '../i18n/scopedChineseCatalogPlugi
 const PROJECT_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
 const SUBFRAME_CONTENT_SCRIPT_NAMES = new Set(['youtubeEmbed', 'supportedFrame', 'neteaseMailFrame']);
+const SUBFRAME_CATALOG_HOSTS: Readonly<Record<string, readonly string[]>> = {
+    neteaseMailFrame: ['mail.163.com', 'mail.126.com', 'mail.yeah.net'],
+    supportedFrame: ['hf.space', 'disqus.com', 'www.kaggleusercontent.com', 'mail.qq.com', 'courses.edx.org'],
+};
 const BRIDGE_OR_WORKLET_NAMES = new Set([
     'bilibiliCaptionBridge',
     'shadowBridge',
@@ -138,6 +143,77 @@ export function extendSubframeSiteRulesBuildConfig(
     if (entrypoints.length === 0 || !entrypoints.every((entrypoint) =>
         entrypoint.type === 'content-script' && typeof entrypoint.name === 'string' && SUBFRAME_CONTENT_SCRIPT_NAMES.has(entrypoint.name))) return;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), subframeSiteRulesBuildPlugin()];
+}
+
+function hostPatternMatchesSubframeHost(pattern: string, host: string): boolean {
+    const normalizedPattern = pattern.trim().toLowerCase();
+    const normalizedHost = host.trim().toLowerCase();
+    if (!normalizedPattern || normalizedPattern === '*') return true;
+    const base = normalizedPattern.startsWith('*.') ? normalizedPattern.slice(2) : normalizedPattern;
+    if (base.includes('*')) return true;
+    return base === normalizedHost
+        || base.endsWith(`.${normalizedHost}`)
+        || normalizedHost.endsWith(`.${base}`);
+}
+
+/**
+ * 受限子 frame（neteaseMailFrame、supportedFrame）只在固定白名单主机上运行，
+ * 构建期按其允许主机静态裁剪站点适配 JSON（established、websites、profiles），避免把全量 129 KB 规则复制进每个子 frame。
+ */
+export function subframeSiteCatalogBuildPlugin(entrypointName: string, projectRoot = PROJECT_ROOT) {
+    const allowedHosts = SUBFRAME_CATALOG_HOSTS[entrypointName];
+    if (!allowedHosts) return null;
+    const catalogDir = resolve(projectRoot, 'src/core/site-adaptation/catalog');
+    const targetFiles = new Set(['established.json', 'websites.json', 'profiles.json'].map(name => resolve(catalogDir, name)));
+    const virtualPrefix = `\0fluentread-subframe-site-catalog:${entrypointName}:`;
+    let cached: {established: unknown[]; websites: unknown[]; profiles: Record<string, unknown>} | undefined;
+    const loadFiltered = () => {
+        if (cached) return cached;
+        type RawRule = {match?: {hosts?: unknown}; profile?: unknown};
+        const matchesAllowed = (rule: RawRule): boolean => {
+            const hosts = rule.match?.hosts;
+            if (!Array.isArray(hosts) || hosts.length === 0) return true;
+            return hosts.some(pattern => typeof pattern === 'string'
+                && allowedHosts.some(host => hostPatternMatchesSubframeHost(pattern, host)));
+        };
+        const established = (JSON.parse(fs.readFileSync(resolve(catalogDir, 'established.json'), 'utf8')) as RawRule[]).filter(matchesAllowed);
+        const websites = (JSON.parse(fs.readFileSync(resolve(catalogDir, 'websites.json'), 'utf8')) as RawRule[]).filter(matchesAllowed);
+        const allProfiles = JSON.parse(fs.readFileSync(resolve(catalogDir, 'profiles.json'), 'utf8')) as Record<string, unknown>;
+        const usedProfiles = new Set<string>();
+        for (const rule of [...established, ...websites]) {
+            if (typeof rule.profile === 'string' && rule.profile in allProfiles) usedProfiles.add(rule.profile);
+        }
+        const profiles = Object.fromEntries([...usedProfiles].sort().map(name => [name, allProfiles[name]]));
+        cached = {established, websites, profiles};
+        return cached;
+    };
+    return {
+        name: 'fluentread-subframe-site-catalog',
+        enforce: 'pre' as const,
+        resolveId(source: string, importer?: string) {
+            if (!importer || !source.endsWith('.json')) return null;
+            const resolved = resolve(importer.split('?')[0], '..', source);
+            if (!targetFiles.has(resolved)) return null;
+            return `${virtualPrefix}${basename(resolved, '.json')}.js`;
+        },
+        load(id: string) {
+            if (!id.startsWith(virtualPrefix)) return null;
+            const key = id.slice(virtualPrefix.length, -'.js'.length) as 'established' | 'websites' | 'profiles';
+            return `export default ${JSON.stringify(loadFiltered()[key])};`;
+        },
+    };
+}
+
+export function extendSubframeSiteCatalogBuildConfig(
+    entrypoints: readonly {type: string; name?: string}[],
+    viteConfig: {plugins?: unknown[]},
+): void {
+    if (entrypoints.length !== 1) return;
+    const [entrypoint] = entrypoints;
+    if (entrypoint.type !== 'content-script' || typeof entrypoint.name !== 'string') return;
+    const plugin = subframeSiteCatalogBuildPlugin(entrypoint.name);
+    if (!plugin) return;
+    viteConfig.plugins = [...(viteConfig.plugins ?? []), plugin];
 }
 
 /** 内容脚本与后台仅注入其产物实际可达的中文界面条目；所有扩展 UI 页面继续共享完整中文目录块。 */

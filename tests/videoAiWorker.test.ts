@@ -40,6 +40,7 @@ vi.mock('@huggingface/transformers', () => ({...workerMocks,
     },
 }));
 const wasmMocks = vi.hoisted(() => ({
+    assertOnnxWasmRuntimeSupported: vi.fn(),
     configureOnnxWasmBackend: vi.fn(),
     withCompressedWasmBinary: (_backend: unknown, _url: string, initialize: () => Promise<unknown>) => initialize(),
 }));

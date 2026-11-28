@@ -33,9 +33,19 @@ export const EXTENSION_HOST_PERMISSIONS: readonly string[] = [
     'https://*/*',
 ];
 
-/** 按目标浏览器选择本地 ONNX WASM 变体：Chrome/Edge/Firefox 采用无栈改写且小 9 MB 的 JSPI，Safari 保留 Asyncify。 */
+/**
+ * 按目标浏览器选择本地 ONNX WASM 变体：
+ * - Chrome / Edge（已通过 minimum_chrome_version 137 锁定 JSPI）：使用体积更小且无栈改写开销的 JSPI 变体；
+ * - Firefox（strict_min_version 140.0，JSPI 直到 Firefox 153 才默认开启，且 Thunderbird 复用 Firefox 产物）与 Safari：使用兼容更广的 Asyncify 变体。
+ */
 export function resolveOnnxWasmVariant(browser: string): 'jspi' | 'asyncify' {
-    return browser === 'safari' ? 'asyncify' : 'jspi';
+    return browser === 'chrome' || browser === 'edge' ? 'jspi' : 'asyncify';
+}
+
+/** 生成 Chromium（Chrome / Edge）最低版本要求，与打包的 ONNX JSPI WASM 变体对齐（Chrome/Edge 137+）。 */
+export function createChromiumManifest(env: Pick<ConfigEnv, 'browser'>): Partial<UserManifest> {
+    if (env.browser !== 'chrome' && env.browser !== 'edge') return {};
+    return {minimum_chrome_version: '137'} as Partial<UserManifest>;
 }
 
 /** Safari 的自动 MV2 后台页没有编码声明；显式页面在任何宿主语言下均按 UTF-8 加载原后台脚本。 */

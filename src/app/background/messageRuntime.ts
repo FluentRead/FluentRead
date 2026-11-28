@@ -29,6 +29,7 @@ import {createLocalInsightsHandlers} from './localInsightsHandlers';
 import {createFreeTranslationWeightsHandler} from './handlers/freeTranslationWeights';
 import {createPopupNavigationHandlers} from './popupNavigation';
 import {createDownloadProgressHandler, createDownloadProgressQueryHandler} from './handlers/downloadProgress';
+import {createUiLanguageBaseHandler} from './handlers/uiLanguageBase';
 import {createTranslationCancelHandler, createTranslationRequestFallback, createTranslationRequestRegistry} from './handlers/translation';
 import {createSelectionWordLookupHandler} from './handlers/selectionWordLookup';
 import {isBrowserTabId} from './tabTranslationState';
@@ -122,7 +123,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
         }),
         ...createVideoSubtitleBackgroundRuntime(),
         ...createLocalModelMessageHandlers<BackgroundRuntimeContext>(),
-        createDownloadProgressHandler({runtimeId: browser.runtime.id, offscreenUrl: browser.runtime.getURL('/offscreen.html'), storage: browser.storage.local}), createDownloadProgressQueryHandler({runtimeId: browser.runtime.id, storage: browser.storage.local}),
+        createDownloadProgressHandler({runtimeId: browser.runtime.id, offscreenUrl: browser.runtime.getURL('/offscreen.html'), storage: browser.storage.local}), createDownloadProgressQueryHandler({runtimeId: browser.runtime.id, storage: browser.storage.local}), createUiLanguageBaseHandler({runtimeId: browser.runtime.id}),
     ];
     const router = createBackgroundMessageRouter(handlers,
         createTranslationRequestFallback({

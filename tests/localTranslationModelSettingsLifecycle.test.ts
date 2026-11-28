@@ -56,7 +56,7 @@ vi.mock('vue', async importOriginal => {
 vi.mock('element-plus', () => ({ElMessageBox: {confirm: (...args: any[]) => ports.confirm(...args)}}));
 vi.mock('@element-plus/icons-vue', () => Object.fromEntries(['Check', 'Close', 'Cpu', 'Delete', 'Download', 'Promotion', 'Refresh', 'TopRight', 'VideoPause'].map(name => [name, {render: () => Vue.h('svg')}])));
 vi.mock('@/src/platform/browser/capabilities', () => ({browserCapabilities: {extensionDom: true}}));
-vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: () => true}));
+vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: () => true, supportsOpusTranslation: () => true}));
 vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({t: (key: string, values?: unknown) => values ? `${key}:${JSON.stringify(values)}` : key})}));
 vi.mock('@/src/features/settings/ui/components/FieldHelp.vue', () => ({default: {setup: (_: unknown, {slots}: any) => () => Vue.h('span', slots.default?.())}}));
 function task(phase: models.LocalTranslationDownloadPhase, downloadedBytes = 0, updatedAt = 1, model: models.LocalTranslationModelId = primary): models.LocalTranslationDownloadState {

@@ -1,6 +1,7 @@
 /** 固定读音数据的可信下载与离线复用：使用小型确定性数据覆盖失败、超时和并发边界。 */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {sha256} from '@noble/hashes/sha256';
+import {resetPreferredMirrorOrigins} from '@/src/core/assets/mirrors';
 import {createReadingAssetStore, type ReadingAssetFile} from '@/src/features/video-subtitle/reading/assetStore';
 
 const digest = (bytes: Uint8Array) => Array.from(sha256(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
@@ -28,7 +29,7 @@ describe('on-demand reading data store', () => {
         };
         vi.stubGlobal('caches', {open: vi.fn(async () => cache)});
     });
-    afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals();});
+    afterEach(() => {resetPreferredMirrorOrigins(); vi.useRealTimers(); vi.unstubAllGlobals();});
     const create = (files = [file()], overrides = {}) => createReadingAssetStore({cacheName: 'reading-test-v1', files, ...overrides});
 
     it('does no work until requested, shares initialization, and verifies cached bytes offline', async () => {
@@ -67,6 +68,7 @@ describe('on-demand reading data store', () => {
         ['partial HTTP status', () => new Response(data, {status: 206})],
         ['missing body', () => new Response(null)],
         ['oversized header', () => new Response(data, {headers: {'Content-Length': '999'}})],
+        ['HTML error page', () => new Response(data, {headers: {'Content-Type': 'text/html; charset=utf-8'}})],
         ['oversized body', () => new Response(new Uint8Array([1, 2, 3, 4]))],
         ['truncated body', () => new Response(new Uint8Array([1, 2]))],
         ['wrong digest', () => new Response(new Uint8Array([3, 2, 1]))],
@@ -85,6 +87,21 @@ describe('on-demand reading data store', () => {
         const fetcher = vi.fn(async () => new Response(data));
         expect(new Uint8Array(await create(undefined, {fetch: fetcher}).get(item.name))).toEqual(data);
         expect(cache.delete).toHaveBeenCalledWith(key); expect(fetcher).toHaveBeenCalledOnce();
+    });
+
+    it('reuses a valid legacy cached response without network and allows Content-Encoding with oversized Content-Length', async () => {
+        const item = file(), legacyKey = `${item.urls[0]}?fluent-read-verified=${item.sha256}`;
+        entries.set(legacyKey, new Response(data));
+        const fetcher = vi.fn(async () => { throw new Error('should not fetch'); });
+        expect(new Uint8Array(await create(undefined, {fetch: fetcher}).get(item.name))).toEqual(data);
+        expect(fetcher).not.toHaveBeenCalled();
+
+        entries.clear();
+        const encodedFetch = vi.fn(async () => new Response(data, {
+            headers: {'Content-Length': '999', 'Content-Encoding': 'gzip', 'Content-Type': 'application/octet-stream'},
+        }));
+        expect(new Uint8Array(await create(undefined, {fetch: encodedFetch}).get(item.name))).toEqual(data);
+        expect(encodedFetch).toHaveBeenCalledOnce();
     });
 
     it('retries after complete failure and retains separately verified files', async () => {

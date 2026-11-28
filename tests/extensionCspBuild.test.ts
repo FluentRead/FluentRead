@@ -161,23 +161,63 @@ describe('extension dependency CSP packaging', () => {
     });
 });
 
-describe('ONNX static Emscripten invoker', () => {
+describe.each([
+    {
+        variant: 'onnx-asyncify' as const,
+        startMarker: 'function Pb(',
+        endMarker: 'function Rb(',
+        entry: 'Pb',
+        voidField: 'ee',
+        toWireField: 'Sc',
+        fromWireField: 'Rc',
+        lookupTypes: 'Jg',
+        lookupName: 'Mg',
+        wrapResult: 'Kg',
+        registerInvoker: 'Ig',
+    },
+    {
+        variant: 'onnx-jspi' as const,
+        startMarker: 'function Db(',
+        endMarker: 'function Fb(',
+        entry: 'Db',
+        voidField: 'J',
+        toWireField: 'l',
+        fromWireField: 'j',
+        lookupTypes: 'Ge',
+        lookupName: 'Je',
+        wrapResult: 'He',
+        registerInvoker: 'Fe',
+    },
+])('ONNX static Emscripten invoker ($variant)', spec => {
     const setup = (kind: number, target: unknown, returnVoid = false, argumentCount = 2) => {
         const reads: number[] = [];
-        const returnType = {name: 'result', ee: returnVoid, Sc: vi.fn(function (this: unknown, destructors: unknown, value: unknown) {
-            expect(this).toBe(returnType);
-            return {value, destructors};
-        })};
-        const types = [returnType, ...[0, 1].slice(0, argumentCount).map(index => ({name: `arg${index}`, Rc(pointer: number) {
-            reads.push(pointer);
-            return pointer === 100 ? 7 : 9;
-        }}))];
-        const Kg = vi.fn((convert, reference, value) => convert(reference, value));
-        const context = sandbox({Jg: () => types, R: () => target, Mg: () => 'method', Kg, Ig: (fn: unknown) => fn});
-        const source = patched('onnx-asyncify');
-        const start = source.indexOf('function Pb('), end = source.indexOf('function Rb(', start);
-        runInContext(`${source.slice(start, end)};globalThis.fixture=Pb(3,0,${kind});`, context);
-        return {invoke: context.fixture, reads, Kg, returnType};
+        const returnType: Record<string, unknown> = {
+            name: 'result',
+            [spec.voidField]: returnVoid,
+            [spec.toWireField]: vi.fn(function (this: unknown, destructors: unknown, value: unknown) {
+                expect(this).toBe(returnType);
+                return {value, destructors};
+            }),
+        };
+        const types = [returnType, ...[0, 1].slice(0, argumentCount).map(index => ({
+            name: `arg${index}`,
+            [spec.fromWireField](pointer: number) {
+                reads.push(pointer);
+                return pointer === 100 ? 7 : 9;
+            },
+        }))];
+        const wrapResult = vi.fn((convert, reference, value) => convert(reference, value));
+        const context = sandbox({
+            [spec.lookupTypes]: () => types,
+            R: () => target,
+            [spec.lookupName]: () => 'method',
+            [spec.wrapResult]: wrapResult,
+            [spec.registerInvoker]: (fn: unknown) => fn,
+        });
+        const source = patched(spec.variant);
+        const start = source.indexOf(spec.startMarker), end = source.indexOf(spec.endMarker, start);
+        runInContext(`${source.slice(start, end)};globalThis.fixture=${spec.entry}(3,0,${kind});`, context);
+        return {invoke: context.fixture, reads, Kg: wrapResult, returnType};
     };
 
     it('普通函数保留参数偏移、原 JIT 的 this 和返回转换', () => {

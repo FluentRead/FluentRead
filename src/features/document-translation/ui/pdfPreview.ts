@@ -109,10 +109,12 @@ function browserPdfDocument(bytes: Uint8Array): BrowserPdfResource {
             disableFontFace: false,
             disableWorkerRendering: true,
             useWorkerFetch: false,
-            cMapPacked: true,
-            cMapUrl: `${pdfAssetRoot}/cmaps/`,
-            standardFontDataUrl: `${pdfAssetRoot}/standard_fonts/`,
-            wasmUrl: `${pdfAssetRoot}/wasm/`,
+            ...(pdfAssetRoot ? {
+                cMapPacked: true,
+                cMapUrl: `${pdfAssetRoot}/cmaps/`,
+                standardFontDataUrl: `${pdfAssetRoot}/standard_fonts/`,
+                wasmUrl: `${pdfAssetRoot}/wasm/`,
+            } : {}),
             ...binaryDataFactoryOptions,
         } as Parameters<typeof getDocument>[0]);
         return resource.task.promise;

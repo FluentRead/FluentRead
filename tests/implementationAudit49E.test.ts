@@ -165,6 +165,7 @@ describe('audit 49 E actual translation and cache entries', () => {
         expect(deleted.tasks.find(t => t.model === ids.opusZhEn)).toMatchObject({phase: 'idle', downloadedBytes: 0});
     });
     it('keeps a model paused when cancellation occurs during the final cached artifact lookup', async () => {
+        vi.stubGlobal('WebAssembly', {...WebAssembly, Suspending: function () {}, promising: function () {}});
         const terminal = deferred<void>(); let terminalWrites = 0;
         const manager = createLocalTranslationDownloadManager({onChange: async snapshot => {
             const phase = snapshot.tasks.find(t => t.model === ids.opusZhEn)?.phase;

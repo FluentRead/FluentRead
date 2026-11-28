@@ -6,12 +6,14 @@
  */
 import {DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID, getInformationHighlightModel, type InformationHighlightModelId} from '@/src/core/config/informationHighlightModel';
 import {withLocalInferenceBudget} from '@/src/shared/onnx/resources';
+import {ONNX_WASM_JSPI_UNSUPPORTED_CODE, supportsOnnxWasmRuntime} from '@/src/shared/onnx/wasmBinary';
 import {getInformationHighlightArtifacts, getInformationHighlightArtifactStore, informationHighlightArtifactStore, removeRetiredInformationHighlightArtifacts} from './artifacts';
 import type {InformationHighlightModelErrorCode, InformationHighlightModelStatus, InformationHighlightResult} from '../protocol';
 import type {InformationHighlightWorkerRequest, InformationHighlightWorkerResponse} from './worker';
 const RECOVERABLE_INPUT_ERRORS = new Set(['INFORMATION_HIGHLIGHT_TOKEN_LIMIT', 'INFORMATION_HIGHLIGHT_TEXT_LIMIT', 'INFORMATION_HIGHLIGHT_ALIGNMENT']);
 export interface InformationHighlightCapability {supported: boolean; reason?: string}
 export async function probeInformationHighlightWebGpu(): Promise<InformationHighlightCapability> {
+    if (!supportsOnnxWasmRuntime()) return {supported: false, reason: ONNX_WASM_JSPI_UNSUPPORTED_CODE};
     const gpu = (navigator as unknown as {gpu?: {requestAdapter(): Promise<{features: ReadonlySet<string>} | null>}}).gpu;
     if (!gpu) return {supported: false, reason: 'INFORMATION_HIGHLIGHT_WEBGPU_UNAVAILABLE'};
     try {

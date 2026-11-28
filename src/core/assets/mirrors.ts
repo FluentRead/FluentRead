@@ -6,8 +6,11 @@
  */
 
 const CHINA_LOCALE_PATTERN = /^zh(?:$|-CN|-Hans)/iu;
+const DEFAULT_DEMOTE_COOLDOWN_MS = 5 * 60_000;
+const MAX_TRACKED_ORIGINS = 16;
 
 const preferredOrigins: string[] = [];
+const demotedOrigins = new Map<string, number>();
 
 function normalizeRelativePath(value: string): string {
     return value.replace(/^\/+/u, '');
@@ -74,6 +77,7 @@ export function buildNpmAssetMirrorUrls(
 export function rememberPreferredMirrorOrigin(url: string): void {
     try {
         const origin = new URL(url).origin;
+        demotedOrigins.delete(origin);
         const existingIndex = preferredOrigins.indexOf(origin);
         if (existingIndex === 0) return;
         if (existingIndex > 0) preferredOrigins.splice(existingIndex, 1);
@@ -84,7 +88,24 @@ export function rememberPreferredMirrorOrigin(url: string): void {
     }
 }
 
-/** 按会话内最近成功的镜像源提前排序，同时保留全部候选源且不改变未命中项的原始顺序。 */
+/** 暂时降权近期连续失败或超时的镜像源，避免多文件下载反复在同一失效源上等待超时。 */
+export function demoteMirrorOrigin(url: string, cooldownMs = DEFAULT_DEMOTE_COOLDOWN_MS): void {
+    try {
+        const origin = new URL(url).origin;
+        const existingIndex = preferredOrigins.indexOf(origin);
+        if (existingIndex >= 0) preferredOrigins.splice(existingIndex, 1);
+        demotedOrigins.delete(origin);
+        demotedOrigins.set(origin, Date.now() + cooldownMs);
+        while (demotedOrigins.size > MAX_TRACKED_ORIGINS) {
+            const oldest = demotedOrigins.keys().next().value!;
+            demotedOrigins.delete(oldest);
+        }
+    } catch {
+        // 无效地址忽略，不污染降权表。
+    }
+}
+
+/** 按会话内最近成功的镜像源提前排序、近期失败源后置，同时保留全部候选源与同优先级原始顺序。 */
 export function orderMirrorUrls(urls: readonly string[]): string[] {
     const unique: string[] = [];
     const seen = new Set<string>();
@@ -94,11 +115,18 @@ export function orderMirrorUrls(urls: readonly string[]): string[] {
             unique.push(url);
         }
     }
-    if (preferredOrigins.length === 0 || unique.length <= 1) return unique;
+    if ((preferredOrigins.length === 0 && demotedOrigins.size === 0) || unique.length <= 1) return unique;
+    const now = Date.now();
+    for (const [origin, until] of demotedOrigins) {
+        if (until <= now) demotedOrigins.delete(origin);
+    }
     const rank = (url: string): number => {
         try {
-            const index = preferredOrigins.indexOf(new URL(url).origin);
-            return index >= 0 ? index : preferredOrigins.length;
+            const origin = new URL(url).origin;
+            const preferredIndex = preferredOrigins.indexOf(origin);
+            if (preferredIndex >= 0) return preferredIndex;
+            if (demotedOrigins.has(origin)) return preferredOrigins.length + 1;
+            return preferredOrigins.length;
         } catch {
             return preferredOrigins.length;
         }
@@ -109,7 +137,8 @@ export function orderMirrorUrls(urls: readonly string[]): string[] {
         .map(item => item.url);
 }
 
-/** 仅供测试重置会话级镜像优选状态。 */
+/** 仅供测试重置会话级镜像优选与降权状态。 */
 export function resetPreferredMirrorOrigins(): void {
     preferredOrigins.length = 0;
+    demotedOrigins.clear();
 }

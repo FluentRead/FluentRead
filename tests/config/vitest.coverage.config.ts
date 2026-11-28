@@ -382,6 +382,7 @@ export default defineConfig({
                 'src/core/i18n/numberFormat.ts',
                 'src/core/i18n/bundles.ts',
                 'src/platform/i18n/uiLanguageBundles.ts',
+                'src/app/background/handlers/uiLanguageBase.ts',
                 'src/ui/i18n/legacyDom.ts',
                 'src/core/config/localTts.ts',
                 'src/features/local-tts/protocol.ts',

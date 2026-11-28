@@ -344,7 +344,7 @@ describe('shared offscreen composition through actual message routing', () => {
             await translation.configureLocalTranslationDownloadNotifications.mock.calls[0][0](translationSnapshot());
             expect(sent).toContainEqual({type: 'fluentReadLocalTranslationDownloadProgress', snapshot: translationSnapshot()});
             expect(await send('LOCAL_TTS_SYNTHESIZE', {requestId: 'speech', text: 'Original', language: 'en', voice: 'fixture'})).toMatchObject({success: true, audioBase64: 'AQI='});
-            expect(speech.synthesizeLocalTts).toHaveBeenCalledWith('Original', 'en', 'fixture', expect.any(AbortSignal));
+            expect(speech.synthesizeLocalTts).toHaveBeenCalledWith('Original', 'en', 'fixture', expect.any(AbortSignal), undefined);
             for (const keepWarm of [true, false]) expect(await send('LOCAL_TTS_PREPARE', {keepWarm})).toMatchObject({success: true});
             for (const type of ['LOCAL_TTS_STATUS', 'LOCAL_TTS_REMOVE_MODEL']) expect(await send(type)).toMatchObject({success: true});
             expect(speech.prepareLocalTtsModel).toHaveBeenNthCalledWith(1, true, expect.any(Function)); expect(speech.prepareLocalTtsModel).toHaveBeenNthCalledWith(2, false, expect.any(Function));

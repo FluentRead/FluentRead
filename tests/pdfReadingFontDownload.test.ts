@@ -2,6 +2,7 @@ import {createHash, webcrypto} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {afterEach, describe, expect, it, vi} from 'vitest';
+import {resetPreferredMirrorOrigins} from '@/src/core/assets/mirrors';
 import {
     createPdfReadingFontLoader, getPdfReadingFontSources, loadPdfReadingFontBytes,
     PDF_READING_FONT_BYTES, PDF_READING_FONT_CACHE, PDF_READING_FONT_CACHE_KEY,
@@ -31,7 +32,7 @@ function harness(overrides: Partial<PdfReadingFontLoaderDependencies> = {}) {
     const deps = {fetch, digest, openCache, locale: () => 'en-US', timeoutMs: 5_000, ...overrides};
     return {entries, cache, fetch, digest, openCache, deps, load: createPdfReadingFontLoader(deps)};
 }
-afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals();});
+afterEach(() => {resetPreferredMirrorOrigins(); vi.useRealTimers(); vi.unstubAllGlobals();});
 
 describe('PDF reading font data download', () => {
     it('releases rejected source bodies before fallback and unlocks the verified font stream', async () => {

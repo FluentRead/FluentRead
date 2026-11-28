@@ -44,6 +44,7 @@ async function listBuildFiles(directory, current = directory) {
 
 export function verifyEdgeManifest(manifest, expectedVersion) {
   assert(manifest.manifest_version === 3, 'Edge 发布产物必须是 Manifest V3');
+  assert(manifest.minimum_chrome_version === '137', 'Edge MV3 必须声明 minimum_chrome_version 为 137 以匹配 ONNX JSPI 变体');
   assert(manifest.version === expectedVersion, 'Edge 清单版本必须与根 package.json 一致');
   assert(!Object.hasOwn(manifest, 'oauth2') && !Object.hasOwn(manifest, 'key'), 'Edge 清单不得包含 Chrome OAuth 或固定 key');
   assert(Array.isArray(manifest.permissions) && !manifest.permissions.includes('identity')

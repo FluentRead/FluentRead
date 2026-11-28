@@ -18,7 +18,7 @@ import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources'
 import {mangaInferenceClient, mangaExtensionUrl, type MangaInferenceProgress} from './mangaInferenceClient';
 import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 import {protectMangaSession} from './mangaSessionFallback';
-import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
+import {assertOnnxWasmRuntimeSupported, configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
 import {assertMangaOcrActive, loadMangaOcrAssets, removeMangaOcrAssets, withMangaModelAdmission, withMangaModelRemoval} from './mangaOcrAssets';
 import type {MangaOcrItem,MangaRegion} from './mangaRegions';
 import {findMangaBubbleLayout,assignMangaLayoutBubbles,collectMangaRegions,type MangaOcrPage} from './mangaBubbles';
@@ -206,6 +206,7 @@ export function createMangaOcrRuntime(create: (signal?: AbortSignal, progress?: 
 }
 
 export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Progress): Promise<MangaOcrPort> {
+    assertOnnxWasmRuntimeSupported();
     const model = await loadMangaOcrAssets(signal, percent => progress?.('preparing', percent));
     assertMangaOcrActive(signal); progress?.('initializing');
     // 两个包共享同一 ONNX 实例；在导入 SDK 前覆盖其 CDN 默认路径，符合扩展 CSP。

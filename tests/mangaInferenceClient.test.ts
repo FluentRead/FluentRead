@@ -159,6 +159,14 @@ describe('图片 CPU/WASM 偏好和诊断', () => {
         await expect(queued).resolves.toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
         await flush(); expect(workers).toHaveLength(1); expect(workers[0].terminate).not.toHaveBeenCalled();
     });
+
+    it('缺少 JSPI 运行时能力时立即返回错误，不重复重建 CPU Worker', async () => {
+        const {client, workers} = harness();
+        const request = client.request({type: 'recognize'}); await flush();
+        workers[0].fail('ONNX_WASM_JSPI_UNSUPPORTED: WebAssembly JSPI is required');
+        await expect(request).rejects.toThrow('ONNX_WASM_JSPI_UNSUPPORTED');
+        expect(workers).toHaveLength(1);
+    });
 });
 
 describe('漫画独立 Worker 客户端', () => {

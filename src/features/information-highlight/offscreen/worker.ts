@@ -7,7 +7,7 @@
 import {AutoConfig, AutoModelForCausalLM, AutoTokenizer, env, Tensor} from '@huggingface/transformers';
 import {getInformationHighlightModel, type InformationHighlightModelId} from '@/src/core/config/informationHighlightModel';
 import {localWasmThreads, paceLocalInference, paceLocalInitialization} from '@/src/shared/onnx/resources';
-import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
+import {configureOnnxWasmBackend, ONNX_WASM_JSPI_UNSUPPORTED_CODE, resolveOnnxWasmAssetPaths, supportsOnnxWasmRuntime} from '@/src/shared/onnx/wasmBinary';
 import {getInformationHighlightArtifactStore} from './artifacts';
 import {createSurprisalResultCache, scoreLocalSurprisal, type CausalScoringEngine, type ScoringPast, type ScoringTensor} from './scorer';
 import type {InformationHighlightResult} from '../protocol';
@@ -31,6 +31,7 @@ export function startInformationHighlightWorker(): void {
     const results = createSurprisalResultCache();
     let tail: Promise<void> = Promise.resolve();
     const getEngine = (modelId: InformationHighlightModelId): Promise<CausalScoringEngine> => {
+        if (!supportsOnnxWasmRuntime()) return Promise.reject(new Error(ONNX_WASM_JSPI_UNSUPPORTED_CODE));
         if (boundModel !== undefined && boundModel !== modelId) return Promise.reject(new Error('INFORMATION_HIGHLIGHT_INVALID_MODEL'));
         boundModel = modelId;
         return creating ??= paceLocalInitialization(async () => {

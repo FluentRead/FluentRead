@@ -38,14 +38,14 @@
           <span><Download aria-hidden="true" />{{ t('settings.localTranslation.downloadSize', {size: formatBytes(state(item.value).totalBytes)}) }}</span>
           <span><Cpu aria-hidden="true" />{{ t('settings.localTranslation.memory', {size: memoryRange(item)}) }}</span>
         </div>
-        <div v-if="showProgress(item.value) || state(item.value).error || item.engine === 'hunyuan' && !hunyuanSupported" class="local-model-progress">
+        <div v-if="showProgress(item.value) || state(item.value).error || supported && !modelSupported(item)" class="local-model-progress">
           <progress v-if="showProgress(item.value)" :value="state(item.value).downloadedBytes" :max="state(item.value).totalBytes || 1" :aria-label="modelName(item)" />
           <div v-if="showProgress(item.value)" class="local-model-progress-detail">
             <span>{{ percent(item.value) }}% · {{ formatBytes(state(item.value).downloadedBytes) }} / {{ formatBytes(state(item.value).totalBytes) }}</span>
             <span v-if="state(item.value).phase === 'downloading' && state(item.value).bytesPerSecond > 0">{{ formatBytes(state(item.value).bytesPerSecond) }}/s</span>
           </div>
           <p v-if="state(item.value).error" class="local-models-error" role="alert">{{ t(`settings.localTranslation.error.${state(item.value).error}`) }}</p>
-          <p v-if="item.engine === 'hunyuan' && !hunyuanSupported" class="local-models-error" role="status">{{ t('settings.localTranslation.error.browser') }}</p>
+          <p v-if="supported && !modelSupported(item)" class="local-models-error" role="status">{{ t('settings.localTranslation.error.browser') }}</p>
         </div>
         <footer class="local-model-actions">
           <span class="local-model-status" :class="{'is-ready': state(item.value).phase === 'ready'}" role="status" aria-live="polite"><Check v-if="state(item.value).phase === 'ready'" aria-hidden="true" />{{ loaded ? t(`settings.localTranslation.phase.${state(item.value).phase}`) : t('settings.localTranslation.statusReading') }}</span>
@@ -102,7 +102,7 @@ import {
   type LocalTranslationModel, type LocalTranslationModelId, type LocalTranslationDownloadState,
 } from '@/src/core/config/localTranslation'
 import {browserCapabilities} from '@/src/platform/browser/capabilities'
-import {supportsHunyuanTranslation} from '@/src/platform/browser/localTranslationSupport'
+import {supportsHunyuanTranslation, supportsOpusTranslation} from '@/src/platform/browser/localTranslationSupport'
 import {useUiI18n} from '@/src/ui/i18n'
 import FieldHelp from './components/FieldHelp.vue'
 import SegmentedControl from './components/SegmentedControl.vue'
@@ -112,7 +112,12 @@ const {t} = useUiI18n()
 const {active, capture, revision} = useSettingsActionContext(() => props.active, () => [props.config, props.context, props.service])
 const supported = browserCapabilities.extensionDom
 const hunyuanSupported = supportsHunyuanTranslation()
-function modelSupported(model: LocalTranslationModel): boolean { return supported && (model.engine !== 'hunyuan' || hunyuanSupported) }
+const opusSupported = supportsOpusTranslation()
+function modelSupported(model: LocalTranslationModel): boolean {
+  if (!supported) return false
+  if (model.engine === 'hunyuan') return hunyuanSupported
+  return model.engine !== 'opus' || opusSupported
+}
 const defaultModel = DEFAULT_LOCAL_TRANSLATION_MODEL
 const tasks = ref<LocalTranslationDownloadState[]>([])
 const loaded = ref(false)

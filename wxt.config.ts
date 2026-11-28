@@ -20,6 +20,7 @@ import {wllamaExtensionWorker} from './scripts/testing/wllama-extension-build';
 import {
     configureSafariBackgroundPage,
     configureStableContentUiResources,
+    createChromiumManifest,
     createExtensionWebAccessibleResources,
     createFirefoxManifest,
     createGoogleDriveManifest,
@@ -34,11 +35,13 @@ import {
     extendRemoteConfigBuildConfig,
     extendScopedChineseCatalogBuildConfig,
     extendSubframePageContextBuildConfig,
+    extendSubframeSiteCatalogBuildConfig,
     extendSubframeSiteRulesBuildConfig,
     groupModuleWorkers,
     pruneEntrypointVitePlugins,
     remoteConfigStorageBuildPlugin,
     subframePageContextBuildPlugin,
+    subframeSiteCatalogBuildPlugin,
     subframeSiteRulesBuildPlugin,
 } from './scripts/testing/wxt-vite-helpers';
 import {
@@ -58,6 +61,8 @@ export {
     extendRemoteConfigBuildConfig,
     subframePageContextBuildPlugin,
     extendSubframePageContextBuildConfig,
+    subframeSiteCatalogBuildPlugin,
+    extendSubframeSiteCatalogBuildConfig,
     subframeSiteRulesBuildPlugin,
     extendSubframeSiteRulesBuildConfig,
     extendScopedChineseCatalogBuildConfig,
@@ -101,6 +106,7 @@ export function createExtensionManifest(
         },
         host_permissions: [...EXTENSION_HOST_PERMISSIONS],
         web_accessible_resources: createExtensionWebAccessibleResources(env),
+        ...createChromiumManifest(env),
         ...createFirefoxManifest(env),
         ...createSafariManifest(env),
         ...createGoogleDriveManifest(env),
@@ -168,7 +174,7 @@ export default defineConfig({
     },
     vite: (env) => {
         const isProductionBuild = env.command === 'build' && env.mode === 'production';
-        const browserTargets: Readonly<Record<string, string>> = {chrome: 'chrome87', edge: 'edge88', firefox: 'firefox140', safari: 'safari26'};
+        const browserTargets: Readonly<Record<string, string>> = {chrome: 'chrome137', edge: 'edge137', firefox: 'firefox140', safari: 'safari26'};
         const staticSetup = getBuildStaticSetup();
         return {
             // 固定版本的本地分词算法通过缓存适配器读取纯数据，不采用供应商自带的网络加载器。
@@ -178,8 +184,8 @@ export default defineConfig({
             build: {
                 // WXT 不展示 Vite 的 gzip 统计；实际产物和安装包继续由独立体积门禁校验。
                 reportCompressedSize: false,
-                // Chromium 沿用 Vite 5 基线。Firefox 和 Safari 已在 manifest 明确最低版本。
-                target: browserTargets[env.browser] ?? ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
+                // 各目标浏览器已在 manifest 明确最低版本（Chrome/Edge 137、Firefox 140、Safari 26）。
+                target: browserTargets[env.browser] ?? ['es2020', 'edge137', 'firefox140', 'chrome137', 'safari26'],
                 // 源码层脱敏之外，生产构建也移除 console 和 debugger。
                 ...(isProductionBuild ? {rolldownOptions: {output: {minify: {mangle: true, compress: {dropConsole: true, dropDebugger: true}}}}} : {}),
                 ...(env.command === 'serve' ? {sourcemap: process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 'inline' as const : false} : {}),
@@ -228,6 +234,7 @@ export default defineConfig({
         'vite:build:extendConfig': (entrypoints, viteConfig) => {
             extendRemoteConfigBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
             extendSubframePageContextBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
+            extendSubframeSiteCatalogBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
             extendSubframeSiteRulesBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
             extendScopedChineseCatalogBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
             pruneEntrypointVitePlugins(entrypoints, viteConfig as {plugins?: unknown[]});

@@ -5,10 +5,14 @@ const fake = vi.hoisted(() => ({
   bytes: new Map<string, number>(), complete: new Set<string>(),
   gates: new Map<string, () => void>(), download: vi.fn(), remove: vi.fn(), invalidate: vi.fn(),
   supported: true,
+  opusSupported: true,
   legacyCached: false,
   check: vi.fn(),
 }));
-vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: () => fake.supported}));
+vi.mock('@/src/platform/browser/localTranslationSupport', () => ({
+  supportsHunyuanTranslation: () => fake.supported,
+  supportsOpusTranslation: () => fake.opusSupported,
+}));
 vi.mock('@/src/features/local-translation/offscreen/artifactStore', () => ({
   LOCAL_MODEL_CACHE: 'download-test-cache',
   getTranslationArtifacts: (model: string) => [ids.opusZhEn, ids.opusJaEn, ids.hunyuan].includes(model as any)
@@ -29,6 +33,7 @@ const entries = new Map<string, Response>();
 beforeEach(() => {
   fake.bytes.clear(); fake.complete.clear(); fake.gates.clear(); entries.clear();
   fake.supported = true;
+  fake.opusSupported = true;
   fake.legacyCached = false;
   fake.check.mockReset().mockImplementation(async (file: {repo: string}) => fake.complete.has(file.repo));
   vi.stubGlobal('navigator', {storage: {estimate: async () => ({quota: 10_000_000_000, usage: 0})}});
@@ -482,6 +487,12 @@ describe('page-independent local model jobs', () => {
     await vi.waitFor(() => expect(fake.download).toHaveBeenCalledTimes(2));
     fake.gates.get(ids.opusZhEn)!();
     await vi.waitFor(async () => expect(await phase(manager)).toBe('ready'));
+  });
+
+  it('refuses OPUS downloads when the browser lacks ONNX JSPI support', async () => {
+    fake.opusSupported = false;
+    const manager = createLocalTranslationDownloadManager();
+    await expect(manager.start(ids.opusZhEn)).rejects.toThrow('LOCAL_TRANSLATION_BROWSER_UNSUPPORTED');
   });
 
   it('reports insufficient disk space before opening a download', async () => {

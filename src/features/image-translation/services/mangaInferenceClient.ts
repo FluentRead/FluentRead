@@ -6,6 +6,7 @@
  * 模块边界：不处理图片像素、不下载模型、不操作宿主页；静态 Worker 只读取同源缓存和包内代码。
  */
 import {withLocalInferenceBudget} from '@/src/shared/onnx/resources';
+import {isOnnxJspiUnsupportedError} from '@/src/shared/onnx/wasmBinary';
 import {withMangaModelAdmission} from './mangaOcrAssets';
 import type {MangaOcrPage} from './mangaBubbles';
 import {isImageTextSegmentationSource,type ImageTextSegmentationSource} from './imageTextSegmentation';
@@ -164,7 +165,7 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
             const initial=input();
             try { return await attempt<T>(initial, signal, progress); }
             catch (error) {
-                if (owner !== generation || cpu || signal?.aborted || message.type.startsWith('dispose')||error instanceof MangaSegmentationProtocolError) throw error;
+                if (owner !== generation || cpu || signal?.aborted || message.type.startsWith('dispose')||error instanceof MangaSegmentationProtocolError||isOnnxJspiUnsupportedError(error)) throw error;
                 cpu = true; progress?.('initializing');
                 return await attempt<T>(input(), signal, progress);
             }

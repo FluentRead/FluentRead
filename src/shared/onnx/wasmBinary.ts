@@ -9,11 +9,41 @@ declare const __FLUENTREAD_ONNX_WASM_VARIANT__: 'jspi' | 'asyncify' | undefined;
 
 export type OnnxWasmVariant = 'jspi' | 'asyncify';
 
-/** 按构建目标返回打包的 ONNX WASM 变体：Chrome/Edge/Firefox 使用体积更小且无栈改写开销的 JSPI，Safari 保留 Asyncify。 */
+export const ONNX_WASM_JSPI_UNSUPPORTED_CODE = 'ONNX_WASM_JSPI_UNSUPPORTED';
+
+/** 按构建目标返回打包的 ONNX WASM 变体：Chrome/Edge 使用体积更小且无栈改写开销的 JSPI，Firefox/Thunderbird/Safari 保留 Asyncify。 */
 export function resolveOnnxWasmVariant(): OnnxWasmVariant {
     return typeof __FLUENTREAD_ONNX_WASM_VARIANT__ === 'string' && __FLUENTREAD_ONNX_WASM_VARIANT__ === 'asyncify'
         ? 'asyncify'
         : 'jspi';
+}
+
+/** 检测当前运行时是否具备 WebAssembly JSPI（Chrome/Edge 137+、Firefox 153+）。 */
+export function supportsOnnxJspi(): boolean {
+    try {
+        return typeof WebAssembly !== 'undefined'
+            && typeof (WebAssembly as unknown as {Suspending?: unknown}).Suspending === 'function'
+            && typeof (WebAssembly as unknown as {promising?: unknown}).promising === 'function';
+    } catch {
+        return false;
+    }
+}
+
+/** 校验当前浏览器运行时是否满足随扩展打包的 ONNX WASM 变体能力要求。 */
+export function supportsOnnxWasmRuntime(variant: OnnxWasmVariant = resolveOnnxWasmVariant()): boolean {
+    return variant === 'asyncify' || supportsOnnxJspi();
+}
+
+/** 判断异常是否源于当前浏览器缺少 JSPI 支持（不应触发无意义的 CPU/q8 重试或重复下载）。 */
+export function isOnnxJspiUnsupportedError(error: unknown): boolean {
+    return error instanceof Error && error.message.includes(ONNX_WASM_JSPI_UNSUPPORTED_CODE);
+}
+
+/** 在加载本地 ONNX 模型或实例化会话前快速拒绝不支持 JSPI 的旧版 Chromium 侧载环境。 */
+export function assertOnnxWasmRuntimeSupported(variant: OnnxWasmVariant = resolveOnnxWasmVariant()): void {
+    if (!supportsOnnxWasmRuntime(variant)) {
+        throw new Error(`${ONNX_WASM_JSPI_UNSUPPORTED_CODE}: WebAssembly JSPI is required by the packaged ONNX runtime (Chrome/Edge 137+)`);
+    }
 }
 
 export function resolveOnnxWasmAssetPaths(

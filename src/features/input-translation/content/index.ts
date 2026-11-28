@@ -4,6 +4,7 @@
  * 主要内容：相同译文保留原文且不重复展示；定义配置、依赖和 feature 契约，提供启用判断、配置键与替换/双语输出顺序写回，原生控件用原生 setter 与 input/change 事件写回，编辑宿主按光标文本度量推进三连序列并经 editableHost.ts 的原生编辑路径保留原文、清理触发符并写回；
  * 以请求 ID 复用共享 broker 取消，冻结实际服务的 AI 超时预算并给消息应答保留余量；提示与翻译并行启动，用 closed Shadow tooltip 提供取消、重试与恢复原文，首次同步定位、后续视口事件按帧合并并清理临时资源，防止失焦、编辑或配置变化后的迟到提交。
  * 模块边界：本文件拥有内容页事件与临时 UI，不直接调用 provider 或全局 browser API；sendMessage、Shadow UI、站点禁用和 generation 均由 composition root 注入，输入纯算法来自 inputBox.ts，编辑宿主度量与写回来自 editableHost.ts。
+ * 提示定位：安全区只在创建与尺寸变化时测量，滚动帧复用缓存内缩值。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {TRANSLATION_CANCEL_MESSAGE_TYPE} from '@/src/services/translation/types';
@@ -14,7 +15,7 @@ import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
 import {parseApiKeyRequirementKey} from '@/src/core/config/validation';
 import {getCompositeTranslationConfigFingerprint} from '@/src/core/config/compositeTranslation';
 import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
-import {clampToVisualViewport, getSafeVisualViewportRect} from '@/src/platform/dom/visualViewport';
+import {clampToVisualViewport, getSafeVisualViewportRect, getVisualViewportRect} from '@/src/platform/dom/visualViewport';
 import {
     matchesCustomInputBoxTranslationHotkey,
     normalizeCustomInputBoxTranslationHotkey,
@@ -544,10 +545,27 @@ export function createInputTranslationContentFeature(
         ui.mount();
 
         const tooltip = ui.mounted!;
+        // 安全区探针会改动 body 并强制样式计算：只在创建和尺寸变化时测量，滚动帧复用缓存的内缩值。
+        let remeasureSafeArea = true;
+        let safeInsets = {left: 0, top: 0, right: 0, bottom: 0};
+        const readViewport = (view: Window) => {
+            const raw = getVisualViewportRect(view);
+            if (remeasureSafeArea) {
+                remeasureSafeArea = false;
+                const safe = getSafeVisualViewportRect(view);
+                safeInsets = {left: safe.left - raw.left, top: safe.top - raw.top, right: raw.right - safe.right, bottom: raw.bottom - safe.bottom};
+                return safe;
+            }
+            const left = raw.left + safeInsets.left;
+            const top = raw.top + safeInsets.top;
+            const right = Math.max(left + 1, raw.right - safeInsets.right);
+            const bottom = Math.max(top + 1, raw.bottom - safeInsets.bottom);
+            return {left, top, right, bottom, width: right - left, height: bottom - top};
+        };
         const position = () => {
             const view = rootDocument.defaultView;
             const rect = element.getBoundingClientRect();
-            const viewport = view ? getSafeVisualViewportRect(view)
+            const viewport = view ? readViewport(view)
                 : {left: 0, top: 0, right: 1024, bottom: 768, width: 1024, height: 768};
             // 高度不足84时先回收留白；可用高度至少44时仍给完整44按钮留出内容空间。
             // 长状态文案与预览继续只滚动自己的提示，不推动宿主页或编辑器。
@@ -574,7 +592,8 @@ export function createInputTranslationContentFeature(
         const view = rootDocument.defaultView;
         let positionFrame: number | undefined;
         let positionActive = true;
-        const schedulePosition = () => {
+        const schedulePosition = (event?: Event) => {
+            if (event?.type === 'resize') remeasureSafeArea = true;
             if (!positionActive || positionFrame !== undefined) return;
             // 小型 DOM 适配器可不提供绘制时钟；真实页面把同帧多种视口事件合并成一次几何读取。
             if (typeof view?.requestAnimationFrame !== 'function') { position(); return; }
@@ -861,7 +880,11 @@ export function createInputTranslationContentFeature(
                 && internalWriteElement !== element
                 && activeInputTranslationElement === element) {
                 if (activeRequestController) invalidate();
-                else removeExistingTooltip();
+                else {
+                    removeExistingTooltip();
+                    // 已完成的翻译在用户继续编辑后不再需要跟踪；否则之后每次按键都会序列化整个富文本编辑器。
+                    activeInputTranslationElement = null;
+                }
             }
             if (!triggerSequence || triggerSequence.element !== element) return;
             if (!sequenceStillMatches(triggerSequence)) resetKeyPresses();

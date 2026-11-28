@@ -3,6 +3,7 @@
  * 文件职责：管理 SelectionTranslator Vue 覆盖层在内容脚本中的单例挂载、异步所有权校验与卸载，避免配置快速切换时旧 Promise 污染新实例。
  * 主要内容：缓存 ContentScriptContext，维护 mountRequestId、实例与 Shadow UI 句柄；普通翻译与学习卡片共用 closed Shadow Root，通过 modal host 控制器承接组件选区；观察自有 host 的祖先链，在页面重建时先由组件复核来源再有界恢复同一实例，并在关闭或卸载时停止恢复。
  * 模块边界：运行时只负责编排组件生命周期，不读取 Selection API、不调用翻译或 TTS；这些行为归 Vue 组件与控制器，Shadow DOM 创建由 platform/shadow-ui 提供。
+ * 来源复核：祖先节点发生移除（如替换 body）时即使 host 仍连接也复核来源。
  */
 import SelectionTranslator from '@/src/features/selection-translation/ui/SelectionTranslator.vue';
 import { config } from '@/src/services/config/store';
@@ -57,7 +58,12 @@ function watchSelectionHost(host: HTMLElement, requestId: number, context: Conte
     observed = ancestors;
     for (const node of ancestors) observer.observe(node, {childList: true});
   };
-  const observer = new MutationObserver(sync);
+  // host 挂在 html 下时替换 body 不会使其断开；祖先变化后仍复用来源校验收起已失效的卡片。
+  const observer = new MutationObserver((records) => {
+    // 仅新增节点（包括本模块重新接入 host）不会让来源失效，只有移除祖先子节点时才复核。
+    if (host.isConnected && records.some(record => record.removedNodes.length > 0)) selectionTranslatorInstance?.revalidateSource?.();
+    sync();
+  });
   sync();
   return {
     selectionChanged(next: Range | null) {

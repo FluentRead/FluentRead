@@ -3,6 +3,7 @@
  * 文件职责：封装翻译 broker 对单个 provider 的调度入场、超时取消、API Key 轮换、隐私与术语保护及观测采集。
  * 主要内容：实现 provider 适配器解析（含自定义 OpenAI 兼容回退）、多 Key 轮换与 B站/硅基流动 Hunyuan-MT-7B 字面 emoji 严格校验重试、调度租约持有（端侧翻译如浏览器内置翻译与本地模型翻译默认豁免全局 HTTP RPS/RPM 限流，仅显式配置对应服务或模型限流时计入速率）、紧凑 JSON 批次封装解析，以及成功/失败后的模型用量口径校准与持久化。
  * 模块边界：负责单次上游调用的传输生命周期，依赖 broker/protocol 与 broker/telemetry 及翻译调度器，不处理持久化翻译缓存、在途去重或语义级上下文泄漏重译。
+ * 用量写入：在调度任务内发起但不占用并发槽等待，调用方返回前仍等待写入结束。
  */
 
 import {
@@ -105,6 +106,8 @@ export function createBrokerProviderTransport(options: BrokerProviderTransportOp
             ...(deps.serviceTypes.isAI(execution.service) ? {quotaScope: quotaDigest(execution, model, true)} : {}),
         };
 
+        // 用量写入可能等待存储屏障：任务内立即发起但不占用并发槽等待，调用方返回前仍等写入结束。
+        let usageWrite: Promise<void> | undefined;
         try {
             return await requestScheduler.schedule(async (lease) => {
                 const controller = new AbortController();
@@ -174,7 +177,7 @@ export function createBrokerProviderTransport(options: BrokerProviderTransportOp
                         const result = await Promise.race([operation, timeout, externalAbort]);
                         clearTimeout(timer!);
                         telemetry.addUpstreamElapsed(execution.trace, startedAt);
-                        await telemetry.persistModelUsage(execution, message, observations, startedAt, 'success', usageGeneration);
+                        usageWrite = telemetry.persistModelUsage(execution, message, observations, startedAt, 'success', usageGeneration);
                         return result;
                     } catch (error) {
                         clearTimeout(timer!);
@@ -193,7 +196,7 @@ export function createBrokerProviderTransport(options: BrokerProviderTransportOp
                         ) {
                             lastObservation.outcome = 'timeout';
                         }
-                        await telemetry.persistModelUsage(execution, message, observations, startedAt, outcome, usageGeneration);
+                        usageWrite = telemetry.persistModelUsage(execution, message, observations, startedAt, outcome, usageGeneration);
                         throw error;
                     }
                 } finally {
@@ -211,6 +214,8 @@ export function createBrokerProviderTransport(options: BrokerProviderTransportOp
                 throw new TranslationProviderDeadlineError();
             }
             throw error;
+        } finally {
+            await usageWrite;
         }
     }
 

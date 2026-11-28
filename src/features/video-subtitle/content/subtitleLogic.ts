@@ -6,10 +6,12 @@
  */
 import {getCompositeTranslationConfigFingerprint} from '@/src/core/config/compositeTranslation';
 import {hasDistinctTranslation} from '@/src/core/translation/result';
-import {buildGlossaryRevision} from '@/src/core/glossary';
+import {createGlossaryRevisionMemoizer} from '@/src/core/glossary';
 import type {Config} from '@/src/core/config/model';
 import {resolveConfiguredModel, services} from '@/src/core/config/catalog';
 import type {VideoSubtitleCue} from './youtubeSubtitleData';
+
+const readGlossaryRevision = createGlossaryRevisionMemoizer();
 
 /** 同一同步更新轮次的选择证据；数组身份、原文和第二次时钟读取相同才可复用。 */
 export type YoutubeCueSelection = ReturnType<typeof selectYoutubeCaptionCue> & {cues: readonly VideoSubtitleCue[]; source: string; currentMs: number};
@@ -501,7 +503,7 @@ export function getVideoTranslationConfigFingerprint(value: Config): string {
     from: value.from,
     videoSourceLanguage: value.videoSourceLanguage,
     videoPreferHumanSubtitles: value.videoPreferHumanSubtitles,
-    glossaryRevision: buildGlossaryRevision(value.glossaryLibraries, value.glossaryEnabled),
+    glossaryRevision: readGlossaryRevision(value.glossaryLibraries, value.glossaryEnabled),
     videoGlossaryIds: value.videoGlossaryIds,
     to: value.to,
     model: resolveConfiguredModel(value.model[service], value.customModel[service]),

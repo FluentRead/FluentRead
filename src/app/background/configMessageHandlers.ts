@@ -28,8 +28,8 @@ import {createConfigStorageReadHandler, createPopupStartupHandler} from './handl
 import {createConfigCountIncrementHandler} from './handlers/configCount';
 import {createConfigHistoryHandler} from './handlers/configHistory';
 import {createOfficialSiteRuleHandlers} from './officialSiteRuleRuntime';
+import {backgroundConfigMutations} from './configMutationQueue';
 import {
-    createConfigMutationCoordinator,
     createConfigPersistenceBatchHandler,
     createConfigPersistenceHandler,
     type ConfigPersistenceContext,
@@ -39,7 +39,8 @@ import {
 export function createConfigBackgroundHandlers<TContext extends ConfigPersistenceContext>(
     registerContentReceiver?: (sender: ConfigPersistenceContext['sender']) => Promise<void>,
 ): Array<BackgroundMessageHandler<TContext>> {
-    const mutations = createConfigMutationCoordinator();
+    // 与右键菜单等后台内部写入共用同一条队列，防止并发保存相互覆盖。
+    const mutations = backgroundConfigMutations;
     const persistence = createConfigPersistenceHandler({
         ready: configReady,
         getCurrentConfig: () => config,

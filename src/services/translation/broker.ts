@@ -11,6 +11,7 @@
  * 文件职责：编排翻译请求的配置快照、语言解析、缓存、请求去重、超时与 provider 调用，是后台翻译用例的中心服务。
  * 主要内容：createTranslationBroker 同时支持单条、批量和页面摘要，验证 provider 返回数量、类型及明显的原文回显或错语种，图片文字的内部策略接受有效原样结果并隔离缓存，空来源在本地保留；普通数组无论是否缓存都先合并完全相同的原文，再按原位置回填，AI 多段保留独立槽位与邻段语义；仅在原生批次响应结构异常时以相同取消所有权和剩余 deadline 逐段恢复，整批完成前不发布缓存；对完整多段协议逐槽修复上下文回显并拒绝空译文，以包含 Chrome auto 检测样本的完整身份构建缓存键，并按实际消费的云地域和凭据摘要、匿名额度身份、等待策略、清理代次与剩余 deadline 隔离 pending 请求；入口在等待前复制消息，ready 采用有界水合等待，之后按最终服务解析 AI 配置预算并扣除已等待时间，取消检查后沿用可信配置快照，仅未附着的公开请求复制备用配置；批次摘要与分项缓存键只构建一次并复用，重复身份只读写一次；每次公开请求累计缓存复用、上游调用次数、耗时与免费链线路尝试，结束后向注入的统计端口交付只含规模数值、服务与线路标识的事件。 可核对的公开符号包括 createTranslationBroker、聚合导出。
  * 模块边界：本文件位于翻译 application service 层，负责高层用例编排与组合路由；具体协议校验、缓存与在途存储、上游传输调度、异常恢复管线和用量统计下沉到 ./broker/* 子模块，不初始化 DOM 候选或网站规则，不挂载页面 UI，也不把供应商 HTTP 细节扩散到 feature。
+ * 摘要共享：同一页面摘要跨取消归属共用一次调用，最后一个可取消等待者离开才中止；术语表修订号经 memoizer 复用。
  */
 
 import {
@@ -56,7 +57,7 @@ import {hasTranslationContent} from '@/src/core/translation/result';
 import {escapePageContextDelimiters} from '@/src/core/translation/prompts';
 import {SUBTITLE_CONTEXT_LIMIT} from '@/src/core/translation/subtitleContext';
 import {buildPageSummaryReference} from '@/src/core/translation/pageSummaryReference';
-import {buildGlossaryRevision, resolveGlossary} from '@/src/core/glossary';
+import {createGlossaryRevisionMemoizer, resolveGlossary} from '@/src/core/glossary';
 import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
 import {getCompositeTranslationProvider, isCompositeTranslationProviderId} from '@/src/core/config/compositeTranslation';
@@ -114,6 +115,7 @@ export {resolveTranslationRequestModel};
 
 export function createTranslationBroker(deps: TranslationBrokerDependencies): TranslationBroker {
     const now = deps.now ?? (() => Date.now());
+    const readGlossaryRevision = createGlossaryRevisionMemoizer();
     const compositeRouting = createCompositeTranslationRoutingState({now});
     const logger = deps.logger ?? console;
     const requestScheduler = deps.requestScheduler ?? createTranslationRequestScheduler(
@@ -158,6 +160,9 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         callProviderWithinDeadline: providerTransport.callProviderWithinDeadline,
     });
 
+    type SharedPageSummary = {controller: AbortController; waiters: number; release: () => void};
+    const sharedPageSummaryWaiters = new WeakMap<Promise<PageSummaryResult>, SharedPageSummary>();
+
     async function addPageSummary(
         execution: TranslationRequestExecution,
         pageContext: string,
@@ -179,10 +184,14 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         }
 
         const summaryTimeoutMs = normalizeDeadlineTimeoutMs(requestTimeoutMs as number);
-        const pendingKey = `${buildPendingRequestKey(key, summaryTimeoutMs, requestGeneration)}:cache:${useCache ? 'on' : 'off'}${cacheStore.pendingIdentitySuffix(execution, modelOverride)}`;
+        // 摘要跨取消归属共享：各请求只登记等待，最后一个可取消等待者离开时才中止共享调用。
+        const pendingKey = `${buildPendingRequestKey(key, summaryTimeoutMs, requestGeneration)}:cache:${useCache ? 'on' : 'off'}${cacheStore.pendingIdentitySuffix({...execution, ownershipKey: undefined}, modelOverride)}`;
         const existing = cacheStore.pendingPageSummaries.get(pendingKey);
-        if (existing) return runWithinDeadline(() => existing, requestDeadline, now, execution.abortSignal);
+        if (existing) return waitForSharedPageSummary(existing, sharedPageSummaryWaiters.get(existing)!, execution.abortSignal, requestDeadline);
 
+        const controller = new AbortController();
+        const abortSignal = execution.abortSignal;
+        execution = {...execution, ownershipKey: undefined, abortSignal: controller.signal};
         const request = (async () => {
             const fallback: PageSummaryResult = {context: pageContext, summarized: false};
             try {
@@ -243,7 +252,33 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             }
         })();
 
-        return cacheStore.trackPending(cacheStore.pendingPageSummaries, pendingKey, request);
+        // 共享调用被中止后立即让出 pending 位，后续请求重新发起摘要而不是加入已中止的调用。
+        const entry = {controller, waiters: 0, release: () => { cacheStore.pendingPageSummaries.delete(pendingKey); }};
+        sharedPageSummaryWaiters.set(request, entry);
+        return waitForSharedPageSummary(cacheStore.trackPending(cacheStore.pendingPageSummaries, pendingKey, request), entry, abortSignal, requestDeadline);
+    }
+
+    async function waitForSharedPageSummary(
+        request: Promise<PageSummaryResult>,
+        entry: SharedPageSummary,
+        signal: AbortSignal | undefined,
+        requestDeadline: number,
+    ): Promise<PageSummaryResult> {
+        // 不可取消的等待者永久计数，保证共享调用不会被其他请求的取消中止。
+        entry.waiters += 1;
+        if (!signal) return runWithinDeadline(() => request, requestDeadline, now);
+        const leave = () => {
+            entry.waiters -= 1;
+            if (entry.waiters > 0) return;
+            entry.release();
+            entry.controller.abort();
+        };
+        signal.addEventListener('abort', leave, {once: true});
+        try {
+            return await runWithinDeadline(() => request, requestDeadline, now, signal);
+        } finally {
+            signal.removeEventListener('abort', leave);
+        }
     }
 
     async function translateSingleWithCache(
@@ -637,7 +672,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             selectedService, getSelectedModel(current, selectedService, message.modelOverride), deps.serviceTypes,
         );
         if (supportsGlossary && message.glossaryRevision !== undefined
-            && message.glossaryRevision !== buildGlossaryRevision(current.glossaryLibraries, current.glossaryEnabled)) {
+            && message.glossaryRevision !== readGlossaryRevision(current.glossaryLibraries, current.glossaryEnabled)) {
             throw new GlossaryRevisionChangedError();
         }
         const glossarySource = getTranslationGlossaryContext(message);

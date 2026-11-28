@@ -4,6 +4,7 @@
  * 文件职责：实现扩展自有的翻译结果缓存，统一键规范化、确定超限写入的早拒绝、TTL、可配置双容量限制、内存热层和 Dexie 持久层。
  * 主要内容：定义缓存 identity/record、canonicalize 与 buildTranslationCacheKey，维护 FluentReadCacheDatabase 与事务内增量用量汇总，并通过 translationCache 提供读取、写入、按短窗口合批写回的持久化 LRU、过期清理、阈值设置和用量统计；缓存读写故障降级，管理故障向 UI 如实报告。 可核对的公开符号包括 TRANSLATION_CACHE_VERSION、TRANSLATION_CACHE_TTL_MS、TRANSLATION_CACHE_MAX_ENTRY_BYTES、TRANSLATION_CACHE_MEMORY_ENTRIES、TranslationCacheIdentity、TranslationCacheRecord。
  * 模块边界：本文件位于翻译 application service 层，负责用例编排和端口契约；不挂载页面 UI，且不应把某家供应商的网络细节扩散到 feature，具体 HTTP 协议由 providers/platform 实现。
+ * 读一致性：冷读与其他写入并发时仍返回已提交快照，仅跳过热层回填与访问时间写回。
  */
 
 import {sha256Hex} from '@/src/shared/function/sha256';
@@ -267,12 +268,13 @@ class TranslationCache {
 
     try {
       const record = await translationCacheDb.entries.get(key);
-      if (epoch !== this.clearEpoch || revision !== this.contentRevision || !record) return null;
+      if (epoch !== this.clearEpoch || !record) return null;
       if (isExpired(record, now)) {
         await this.removeExpired(key, now, epoch);
         return null;
       }
-      this.touch(record, now);
+      // 读事务返回已提交快照；期间有其他写入时照常返回，只是不回填热层或写回访问时间，避免复活已淘汰记录。
+      if (revision === this.contentRevision) this.touch(record, now);
       return record.translation;
     } catch (error) {
       console.warn('[FluentRead] translation cache read failed:', error);
@@ -378,7 +380,8 @@ class TranslationCache {
     try {
       const missedKeys = [...missedByKey.keys()];
       const records = await translationCacheDb.entries.bulkGet(missedKeys);
-      if (epoch !== this.clearEpoch || revision !== this.contentRevision) return results;
+      if (epoch !== this.clearEpoch) return results;
+      const stale = revision !== this.contentRevision;
       const expiredDbKeys: string[] = [];
       for (let index = 0; index < missedKeys.length; index += 1) {
         const record = records[index];
@@ -387,7 +390,7 @@ class TranslationCache {
           expiredDbKeys.push(record.key);
           continue;
         }
-        this.touch(record, now);
+        if (!stale) this.touch(record, now);
         for (const slot of missedByKey.get(missedKeys[index]!)!) {
           results[slot] = record.translation;
         }

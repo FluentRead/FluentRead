@@ -4411,6 +4411,45 @@ describe('translation broker', () => {
         }));
     });
 
+    it('shares one AI summary across cancellable owners and aborts it only after the last waiter leaves', async () => {
+        mocks.config.service = 'ai';
+        mocks.config.enableAIContext = true;
+        const summaries: {resolve: (value: string) => void; signal: AbortSignal}[] = [];
+        mocks.service.mockImplementation((message: {summaryPrompt?: string; origin: string; abortSignal: AbortSignal}) => {
+            if (!message.summaryPrompt) return Promise.resolve(`${message.origin}-译文`);
+            return new Promise<string>(resolve => summaries.push({resolve, signal: message.abortSignal}));
+        });
+        const controlled = (origin: string, owner: string, controller: AbortController) => translateWithCache(
+            attachTranslationRequestControl({origin, pageContext: summaryContext('Owner context')}, {signal: controller.signal, ownershipKey: owner}),
+        );
+        const firstController = new AbortController(), secondController = new AbortController();
+        const first = controlled('A', 'summary-owner-a', firstController).catch(error => error);
+        const second = controlled('B', 'summary-owner-b', secondController);
+        await flushMicrotasks();
+        expect(summaries).toHaveLength(1);
+        firstController.abort();
+        expect(await first).toMatchObject({name: 'AbortError'});
+        expect(summaries[0]!.signal.aborted).toBe(false);
+        summaries[0]!.resolve('Owner summary');
+        await expect(second).resolves.toBe('B-译文');
+
+        const lastController = new AbortController();
+        const lastContext = summaryContext('Last waiter context');
+        mocks.service.mockClear();
+        const lone = translateWithCache(attachTranslationRequestControl({origin: 'D', pageContext: lastContext}, {
+            signal: lastController.signal, ownershipKey: 'summary-owner-d'}),
+        ).catch(error => error);
+        await flushMicrotasks();
+        lastController.abort();
+        expect(await lone).toMatchObject({name: 'AbortError'});
+        expect(summaries.at(-1)!.signal.aborted).toBe(true);
+        const retry = translateWithCache({origin: 'E', pageContext: lastContext});
+        await flushMicrotasks();
+        summaries.at(-1)!.resolve('Fresh summary');
+        await expect(retry).resolves.toBe('E-译文');
+        expect(mocks.service.mock.calls.filter(([message]) => message.summaryPrompt)).toHaveLength(2);
+    });
+
     it('falls back to raw page context when summary budget expires and reports total budget exhaustion', async () => {
         mocks.config.service = 'ai';
         mocks.config.enableAIContext = true;

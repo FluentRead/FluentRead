@@ -2,7 +2,7 @@
  * @file src/app/background/handlers/configStorage.ts
  *
  * 文件职责：在后台唯一配置数据库边界为 popup、options、document 与 content 提供受 sender 授权的只读配置记录快照。
- * 主要内容：校验 configStorageRead 消息键、等待配置仓库初始化、限制记录读取权限，在网页快照读取前登记实际通知接收者；为 Popup 提供只包含引导状态的启动提示。
+ * 主要内容：校验 configStorageRead 消息键、等待配置仓库初始化、限制记录读取权限，在网页快照读取前登记实际通知接收者；网页快照去除凭据与仅供后台使用的计数幂等日志；为 Popup 提供只包含引导状态的启动提示。
  * 模块边界：本文件不直接打开 IndexedDB、不解密记录、不修改配置或广播变化；具体读取端口和扩展 URL 判断由 background composition root 注入。
  */
 
@@ -66,10 +66,20 @@ export function createConfigStorageReadHandler(
             const value = await dependencies.read(key);
             return {
                 success: true,
-                value: trustedExtensionPage ? value : sanitizeConfigCredentials(value),
+                value: trustedExtensionPage ? value : omitCountOperationLog(sanitizeConfigCredentials(value)),
             };
         },
     };
+}
+
+/**
+ * 计数幂等日志只供后台去重重试，最多上千条；网页 frame 每次配置广播都会重读配置，
+ * 携带它只会放大跨进程复制与解析开销（归一化时也会被丢弃）。
+ */
+function omitCountOperationLog(value: unknown): unknown {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || !('__fluentCountOperations' in value)) return value;
+    const {__fluentCountOperations: _omitted, ...rest} = value as Record<string, unknown>;
+    return rest;
 }
 
 /** 启动提示只供模块预取；Popup 仍通过配置 store 新读快照后决定实际页面。 */

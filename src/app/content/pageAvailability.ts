@@ -3,6 +3,7 @@
  * 文件职责：统一协调 content 总开关、站点禁用、YouTube SPA 路由与页面功能的 activate/dispose 边界。
  * 主要内容：幂等启停 MAIN-world bridge 和页面 feature，合并同步与在途协调请求，限制失效挂载重试次数，维护视频字幕路由挂载；按排除普通锚点的页面身份记录自动翻译意图，使新 SPA 页面可重新启动、手动恢复后的同页保持原文，并让自动翻译不受非必要 UI 的异步挂载阻塞。
  * 模块边界：本模块通过 composition root 注入当前路由、可用性、挂载器和全文状态，不读取全局配置、不操作具体功能 DOM；具体 feature 保留自己的清理实现。
+ * 路由基线：路由处理器提供 resync，运行时重新启用时以当前地址为基线。
  */
 import {getPageTranslationMaterialIdentity} from '@/src/services/translation/context/policy';
 
@@ -167,9 +168,11 @@ export function createContentRouteChangeHandler(dependencies: {
     applySiteDisabledState(disabled: boolean): Promise<void>;
     pageAvailability: ContentPageAvailabilityRuntime;
     reconcileFeatures(): void;
-}): () => void {
+}): (() => void) & {resync(): void} {
     let currentHref = dependencies.getHref();
-    return () => {
+    // 运行时关闭期间页面桥不会派发路由事件；重新启用时以当前地址为基线，避免回到旧地址被误判为未变化。
+    const resync = () => { currentHref = dependencies.getHref(); };
+    return Object.assign(() => {
         const href = dependencies.getHref();
         if (currentHref === href) return;
         const previousIdentity = getAutoTranslationPageIdentity(currentHref);
@@ -190,5 +193,5 @@ export function createContentRouteChangeHandler(dependencies: {
         availability.syncVideoSubtitlePage();
         dependencies.reconcileFeatures();
         availability.refreshAutoTranslation();
-    };
+    }, {resync});
 }

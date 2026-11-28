@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/titleTranslation.ts
  * 文件职责：在全文翻译会话期间翻译页面标题，并在恢复时把标题交还给页面。
- * 主要内容：精确相同译文和有同目标语言证据的排版回显保留原文且不重复展示；以 <title> 当前文本为源、复用会话冻结的配置快照发起翻译；观察 head 子树及根节点的直接子级以跟随 SPA 替换 head/html 或改写标题；用「上次写入值」区分自身写入与页面写入来阻断自激循环；源标题变化时取消旧请求，并用 generation 与写前快照丢弃迟到结果；恢复时仅在译文仍然在位时写回原标题。
+ * 主要内容：精确相同译文和有同目标语言证据的排版回显保留原文且不重复展示；以 <title> 当前文本为源、复用会话冻结的配置快照发起翻译；观察 head 子树及根节点的直接子级以跟随 SPA 替换 head/html 或改写标题；用「上次写入值」区分自身写入与页面写入来阻断自激循环；源标题变化时取消旧请求，并用 generation 与写前快照丢弃迟到结果；恢复时仅在译文仍然在位时写回原标题；会话期间向 pageTitleSource 登记原始标题读取器，使正文请求不把标题译文当作上下文。
  * 模块边界：本文件只读写 document.title；根节点仅观察结构更换，正文子树不进入标题观察，不参与正文候选遍历、不渲染双语 DOM、不读取配置存储；翻译经 translateText 发出，配置由调用方传入的快照提供。
  *
  * 背景：正文候选遍历把整个 <head> 列为硬裁剪标签（core/translation/dom.ts），标题因此
@@ -12,6 +12,7 @@ import {hasDistinctTargetTranslation as hasDistinctTranslation} from '@/src/core
 import {translateText} from '@/src/services/translation/client';
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {createSnapshotTranslateOptions, type FullPageTranslationConfigSnapshot} from './translationRequest';
+import {registerPageTitleTranslationView} from './pageTitleSource';
 
 /** SPA 的一次路由切换常连续改写标题；合并抖动，只翻译稳定下来的那一次。 */
 const TITLE_SETTLE_DELAY_MS = 150;
@@ -29,6 +30,8 @@ interface TitleTranslationState {
     appliedTitle: string | null;
     /** 源标题每变化一次自增，用于丢弃迟到的旧请求结果。 */
     generation: number;
+    /** 注销正文请求使用的原始标题读取器。 */
+    unregisterTitleView: () => void;
 }
 
 let state: TitleTranslationState | null = null;
@@ -116,6 +119,8 @@ export function startFullPageTitleTranslation(snapshot: FullPageTranslationConfi
         originalTitle: document.title,
         appliedTitle: null,
         generation: 0,
+        // 正文请求以页面原始标题为上下文，标题被替换成译文后也不能把译文喂回 provider 或缓存键。
+        unregisterTitleView: registerPageTitleTranslationView(() => active),
     };
     state = active;
     observeTitleRoots(active);
@@ -129,6 +134,7 @@ export function stopFullPageTitleTranslation(): void {
     const active = state;
     if (!active) return;
     state = null;
+    active.unregisterTitleView();
 
     if (active.settleTimer !== null) window.clearTimeout(active.settleTimer);
     active.observer.disconnect();

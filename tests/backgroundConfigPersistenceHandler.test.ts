@@ -2,6 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 
 import {
     CONFIG_PERSIST_BATCH_MESSAGE_TYPE,
+    CONFIG_PERSIST_CLIENT_SEQUENCE_LIMIT,
     CONFIG_PERSIST_MESSAGE_TYPE,
     createConfigMutationCoordinator,
     createConfigPersistenceBatchHandler,
@@ -41,6 +42,32 @@ function createDependencies(overrides: Partial<ConfigPersistenceDependencies<Tes
 }
 
 describe('background config persistence handler', () => {
+    it('只保留最近客户端的序号基线，且不淘汰仍有在途保存的客户端', async () => {
+        let releasePinned!: () => void;
+        const pinnedGate = new Promise<void>(resolve => { releasePinned = resolve; });
+        const dependencies = createDependencies({
+            saveConfig: vi.fn(async (config: TestConfig) => { if (config.marker === 'pinned') await pinnedGate; }),
+        });
+        const router = createBackgroundMessageRouter([createConfigPersistenceHandler(dependencies)]);
+        const sender = {sender: {url: 'chrome-extension://extension-id/options.html'}};
+        const save = (clientId: string, marker = clientId) => router.dispatch({
+            type: CONFIG_PERSIST_MESSAGE_TYPE, config: {marker}, clientId, sequence: 1,
+        }, sender);
+        const pinned = save('pinned');
+        await Promise.resolve();
+        const clients = Array.from({length: CONFIG_PERSIST_CLIENT_SEQUENCE_LIMIT + 4}, (_, index) => `client-${index}`);
+        const others = clients.map(clientId => save(clientId));
+        releasePinned();
+        await Promise.all([pinned, ...others]);
+        expect(dependencies.saveConfig).toHaveBeenCalledWith(expect.objectContaining({marker: 'pinned'}), {recordHistory: true});
+        expect(dependencies.saveConfig).toHaveBeenCalledTimes(clients.length + 1);
+
+        await save(clients.at(-1)!);
+        expect(dependencies.saveConfig).toHaveBeenCalledTimes(clients.length + 1);
+        await save('client-0');
+        expect(dependencies.saveConfig).toHaveBeenCalledTimes(clients.length + 2);
+    });
+
     it('按扩展 sender 权限保存配置，并记录历史', async () => {
         const dependencies = createDependencies();
         const router = createBackgroundMessageRouter([

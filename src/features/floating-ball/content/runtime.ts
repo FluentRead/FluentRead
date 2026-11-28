@@ -3,6 +3,7 @@
  * 文件职责：协调悬浮球组件在网页中的创建、恢复位置、显隐、全屏避让、高级外观同步、权威翻译状态同步和卸载，并向组件注入全文翻译、漫画连续翻译切换与打开扩展快捷面板的动作。
  * 主要内容：维护单例 Shadow UI 与迟到挂载 requestId；本次隐藏只作用于当前文档，网站和全局隐藏复用现有配置；拖动坐标作为同一补丁保存，卸载释放订阅但不恢复全文会话。
  * 模块边界：运行时只拥有挂载和桥接职责，不实现拖拽视觉、外观归一化或全文翻译算法；FloatingBall.vue 负责交互，core/config 负责字段归一化，full-page feature 提供翻译动作，配置持久化通过 services/config 完成。
+ * 限流挂载：超出并发创建上限时返回等待重试结果的 Promise，不再以 null 让 registry 误报失败。
  */
 import FloatingBall from '@/src/features/floating-ball/ui/FloatingBall.vue';
 import type {FloatingBallHideScope, FloatingBallPresentation} from '@/src/features/floating-ball/types';
@@ -42,6 +43,8 @@ let hiddenForDocument = false;
 let mountingPromise: Promise<FloatingBallExposed | null> | null = null;
 let mountRequestId = 0;
 let unfinishedMounts = 0;
+/** 被限流的挂载等待下一次重试结果，避免 registry 把有意延后的挂载误报为失败。 */
+let deferredMount: {promise: Promise<FloatingBallExposed | null>; resolve(value: Promise<FloatingBallExposed | null> | null): void} | null = null;
 let retryMountWhenAvailable = false;
 let contentScriptContext: ContentScriptContext | null = null;
 let unsubscribeFullPageTranslationProgress: (() => void) | null = null;
@@ -85,10 +88,14 @@ function announceMountWait(): void {
 
 function finishMountAttempt(): void {
     unfinishedMounts -= 1;
+    const waiting = deferredMount;
+    deferredMount = null;
+    let retry: Promise<FloatingBallExposed | null> | null | undefined = null;
     if (retryMountWhenAvailable && unfinishedMounts < 2 && config.on !== false) {
       retryMountWhenAvailable = false;
-      void mountFloatingBall();
+      retry = mountFloatingBall();
     }
+    waiting?.resolve(retry ?? null);
 }
 
 /** 把实时配置折叠为组件需要的展示契约；字段语义与归一化都由 core/config 保证。 */
@@ -202,7 +209,12 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
     if (shouldNotify) {
       try {announceMountWait();} catch (error) {console.error('[FluentRead] 悬浮球恢复提示失败', error);}
     }
-    return null;
+    if (!deferredMount) {
+      let resolve!: (value: Promise<FloatingBallExposed | null> | null) => void;
+      const promise = new Promise<FloatingBallExposed | null>(settle => { resolve = settle; });
+      deferredMount = {promise, resolve};
+    }
+    return deferredMount.promise;
   }
   retryMountWhenAvailable = false;
 
@@ -353,6 +365,8 @@ export function unmountFloatingBall() {
   mountRequestId++;
   mountingPromise = null;
   retryMountWhenAvailable = false;
+  deferredMount?.resolve(null);
+  deferredMount = null;
   clearMountWaitNotice();
   if (import.meta.env.BROWSER !== 'userscript') {
     anchoredPopup?.close();

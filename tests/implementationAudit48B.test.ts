@@ -162,10 +162,11 @@ describe('implementation audit 48 B: controlled public storage and backup flows'
         const history = vi.fn();
         port.watch('local:configHistory', history);
         await expect(port.setItems!(new Map<string, unknown>([['local:config', {version: 2}], ['local:configHistory', {version: 2}]]))).resolves.toBeUndefined();
-        expect(next).toHaveBeenLastCalledWith({version: 2}, {version: 1});
-        expect(history).toHaveBeenCalledWith({version: 2}, null);
+        // 非凭据键不再为订阅者额外解密旧值。
+        expect(next).toHaveBeenLastCalledWith({version: 2}, undefined);
+        expect(history).toHaveBeenCalledWith({version: 2}, undefined);
         await expect(port.removeItem('local:config')).resolves.toBeUndefined();
-        expect(next).toHaveBeenLastCalledWith(null, {version: 2});
+        expect(next).toHaveBeenLastCalledWith(null, undefined);
         stop();
         await port.setItem('local:config', {version: 3});
         expect(next).toHaveBeenCalledTimes(2);

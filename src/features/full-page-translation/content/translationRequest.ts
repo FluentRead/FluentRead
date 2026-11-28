@@ -40,6 +40,7 @@ import {
     type TranslationQueueSession,
 } from '@/src/services/translation/queue';
 
+import {getPageSourceTitle} from './pageTitleSource';
 import {copyFullPageTranslationConfigSnapshot, type FullPageTranslationConfigSnapshot, type PageTranslationConfigOverrides} from './translationConfigSnapshot';
 
 const FULL_PAGE_TRANSLATION_CACHE_LIMIT = 512;
@@ -353,7 +354,7 @@ async function translateSlotsIndividually(
     snapshot: FullPageTranslationConfigSnapshot,
     signal?: AbortSignal,
     queueSession?: TranslationQueueSession,
-    context = document.title,
+    context = getPageSourceTitle(),
     discourseContext?: string,
 ): Promise<string[]> {
     throwIfAborted(signal);
@@ -369,7 +370,7 @@ async function translateSlotsIndividually(
         && (snapshot.service === services.localTranslation || snapshot.service === services.chromeTranslator)
         ? origins.join('\n') : undefined;
     const slotIdentifications = joinedDetectionText !== undefined && origins.length > 1
-        ? origins.map(origin => identifyTextLanguage(origin ?? '')) : undefined;
+        ? origins.map(origin => identifyTextLanguage(origin)) : undefined;
     const hasConflictingSlotLanguages = new Set(
         slotIdentifications?.flatMap(item => item.status === 'identified' && item.languages.length === 1 ? item.languages : []) ?? [],
     ).size > 1;
@@ -462,7 +463,7 @@ function createRequestCacheKey(
         enableAIMultiSegment: snapshot.enableAIMultiSegment,
         aiMultiSegmentLimits: getAIMultiSegmentLimits(snapshot),
         enableNativeBatch: snapshot.enableNativeBatch !== false,
-        context: document.title,
+        context: getPageSourceTitle(),
         pageUrl: document.location?.href ?? document.URL ?? '',
         pageContextGeneration,
         aiBatchOwnerIdentity,
@@ -685,13 +686,13 @@ function createTranslationBatchSnapshotKey(snapshot: FullPageTranslationConfigSn
 }
 
 function createBatchScopeKey(snapshot: FullPageTranslationConfigSnapshot, session: FullPageTranslationSessionCache): string {
-    return JSON.stringify([createTranslationBatchSnapshotKey(snapshot), document.title,
+    return JSON.stringify([createTranslationBatchSnapshotKey(snapshot), getPageSourceTitle(),
         document.location?.href ?? document.URL ?? '', session.pageContextGeneration ?? 0]);
 }
 
 function createAIBatchCircuitKey(snapshot: FullPageTranslationConfigSnapshot): string {
     // 正文变动需要隔离分组和缓存，却不能让同会话、同配置重新试用已经失败的协议。
-    return JSON.stringify([createTranslationBatchSnapshotKey(snapshot), document.title,
+    return JSON.stringify([createTranslationBatchSnapshotKey(snapshot), getPageSourceTitle(),
         document.location?.href ?? document.URL ?? '']);
 }
 
@@ -893,14 +894,14 @@ function enqueueTranslationBatchTask(
 
     // 同配置的协议已熔断时无需再凑批；逐槽请求仍使用本次快照与取消作用域。
     if (!native && queue.disabledAIKeys.has(createAIBatchCircuitKey(snapshot))) {
-        return translateSlotsIndividually(origins, snapshot, signal, queueSession, document.title, discourseContext);
+        return translateSlotsIndividually(origins, snapshot, signal, queueSession, getPageSourceTitle(), discourseContext);
     }
 
     return new Promise<string[]>((resolve, reject) => {
         const task: TranslationBatchTask = {
             batchKey: JSON.stringify([createBatchScopeKey(snapshot, session), discourseScope(discourseContext)]),
             aiCircuitKey: createAIBatchCircuitKey(snapshot),
-            context: document.title,
+            context: getPageSourceTitle(),
             discourseContext,
             owner,
             origins,
@@ -946,7 +947,7 @@ async function translateArrayWithValidation(
     origins: readonly string[],
     snapshot: FullPageTranslationConfigSnapshot,
     options: SnapshotTranslateExecutionOptions,
-    context = document.title,
+    context = getPageSourceTitle(),
     discourseContext?: string,
 ): Promise<string[]> {
     const translations = await translateTextBatch([...origins], context,
@@ -964,7 +965,7 @@ async function translateTextSlotsDirectly(
     queueSession?: TranslationQueueSession,
     fullPageSession?: FullPageTranslationSessionCache,
     onSlotProtocolInvalid?: () => void,
-    context = document.title,
+    context = getPageSourceTitle(),
     discourseContext?: string,
 ): Promise<string[]> {
     throwIfAborted(signal);
@@ -1069,7 +1070,7 @@ async function translateTextSlotsInternal(
     // 缓存身份、微任务合批、协议回退与跳过槽回填都必须使用同一次调用的值。
     origins = Array.from(origins);
     snapshot = copyFullPageTranslationConfigSnapshot(snapshot);
-    const requestContext = document.title;
+    const requestContext = getPageSourceTitle();
     // Codeforces 在 MathJax 排版前使用 $$$...$$$。公式源码留在本地，
     // 只把两侧正文交给现有槽请求；回填不依赖模型保留占位符，也不改宿主 DOM。
     // 仅处理完整的三美元定界符，不把普通价格或未闭合片段猜成公式。

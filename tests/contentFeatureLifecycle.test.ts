@@ -567,6 +567,12 @@ describe('content 路由协调边界', () => {
         expect(dependencies.applySiteDisabledState).toHaveBeenCalledWith(true);
         expect(dependencies.reconcileFeatures).toHaveBeenCalledOnce();
         expect(dependencies.pageAvailability.refreshAutoTranslation).toHaveBeenCalledOnce();
+
+        // 运行时关闭期间离开再回到旧地址：重新启用时同步基线后，回到旧地址仍是一次路由变化。
+        href = 'https://example.com/elsewhere';
+        changed.resync();
+        href = 'https://example.com/private'; changed();
+        expect(dependencies.applySiteDisabledState).toHaveBeenCalledTimes(2);
     });
 });
 

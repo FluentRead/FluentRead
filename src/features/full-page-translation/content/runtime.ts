@@ -1859,6 +1859,7 @@ function processFullPageMutations(session: FullPageSession, mutations: readonly 
     };
     const siteChildListAdapters = core.adapters.filter(adapter => adapter.childListRescanRoot);
     const siteChildListRoots = siteChildListAdapters.length ? new WeakSet<Element>() : null;
+    const adapterScopeRoots = new Set<Element>();
     for (const mutation of mutations) {
         if (isOwnMutation(mutation, loadingSyntheticChecks)) continue;
         const mutationElement = mutationTargetElement(mutation.target);
@@ -1898,8 +1899,7 @@ function processFullPageMutations(session: FullPageSession, mutations: readonly 
                 }
             }
             if (core.adapters.length && mutationElement) {
-                const affectedRoot = siteAttributes === null ? document.documentElement : getComposedParent(mutationElement) ?? mutationElement;
-                for (const target of resolveStatefulMutationTargets(session, affectedRoot)) restoreStatefulTargetOutsideScope(session, target, reads);
+                adapterScopeRoots.add(siteAttributes === null ? document.documentElement : getComposedParent(mutationElement) ?? mutationElement); // 循环后每根只扫一次，避免 O(记录数 × 条目数)
             }
             const changedTarget = mutationElement ? resolveStatefulMutationTarget(mutationElement) : false;
             const changedState = changedTarget ? getTranslationState(changedTarget) : undefined;
@@ -1978,6 +1978,9 @@ function processFullPageMutations(session: FullPageSession, mutations: readonly 
                 : mutationElement;
             attributeBatch.process(affectedRoot, mutationElement, mutation.target, mutation.attributeName, siteAttributeMutation);
         }
+    }
+    for (const root of adapterScopeRoots.has(document.documentElement) ? [document.documentElement] : adapterScopeRoots) {
+        for (const target of resolveStatefulMutationTargets(session, root)) restoreStatefulTargetOutsideScope(session, target, reads);
     }
     refreshFullPageModal(session);
     attributeBatch.flush();

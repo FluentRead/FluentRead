@@ -4,12 +4,14 @@ const state = vi.hoisted(() => ({
     config: {} as Record<string, unknown>,
     capability: {browser: 'chrome', imageTranslation: true, areaTranslation: true},
     openPdfSelection: vi.fn(),
+    saveConfig: vi.fn(async (value: Record<string, unknown>) => {Object.assign(state.config, value);}),
 }));
 const subscriptions: Array<(config: unknown) => void> = [];
 
 vi.mock('@/src/services/config/store', () => ({
     config: state.config,
     configReady: Promise.resolve(),
+    saveConfig: state.saveConfig,
     subscribeConfig: (listener: (config: unknown) => void) => {
         subscriptions.push(listener);
         return () => {};
@@ -437,15 +439,33 @@ describe('右键菜单动作执行', () => {
         expect(await runContextMenuAction('translatePage', 4, {}, {id: 4}, false)).toEqual({handled: false});
     });
 
-    it('网站开关按基础域切换名单，并回传切换之后的状态', async () => {
-        expect(toggleSiteExtensionDisabled({}, {})).toEqual({handled: false});
-        expect(toggleSiteExtensionDisabled({pageUrl: 'chrome://extensions'}, {})).toEqual({handled: false});
+    it('网站开关按基础域切换名单，经 saveConfig 持久化并回传切换之后的状态', async () => {
+        state.saveConfig.mockClear();
+        expect(await toggleSiteExtensionDisabled({}, {})).toEqual({handled: false});
+        expect(await toggleSiteExtensionDisabled({pageUrl: 'chrome://extensions'}, {})).toEqual({handled: false});
+        expect(state.saveConfig).not.toHaveBeenCalled();
         expect(await runContextMenuAction('toggleSite', 1, {pageUrl: 'https://news.example.com/a'}, {id: 1}, false))
             .toEqual({handled: true, isSiteDisabled: true, isTranslated: false});
+        expect(state.saveConfig).toHaveBeenLastCalledWith(
+            expect.objectContaining({disabledExtensionDomains: ['example.com']}),
+            {recordHistory: true},
+        );
         expect(state.config.disabledExtensionDomains).toEqual(['example.com']);
-        expect(toggleSiteExtensionDisabled({}, {url: 'https://www.example.com/b'}))
+        expect(await toggleSiteExtensionDisabled({}, {url: 'https://www.example.com/b'}))
             .toEqual({handled: true, isSiteDisabled: false, isTranslated: undefined});
         expect(state.config.disabledExtensionDomains).toEqual([]);
+        expect(state.saveConfig).toHaveBeenCalledTimes(2);
+    });
+
+    it('网站开关并发点击在配置队列内串行读取最新名单', async () => {
+        state.config.disabledExtensionDomains = [];
+        const [first, second] = await Promise.all([
+            toggleSiteExtensionDisabled({pageUrl: 'https://a.example.com/'}, {}),
+            toggleSiteExtensionDisabled({pageUrl: 'https://other.test/'}, {}),
+        ]);
+        expect(first).toMatchObject({isSiteDisabled: true});
+        expect(second).toMatchObject({isSiteDisabled: true});
+        expect(state.config.disabledExtensionDomains).toEqual(['example.com', 'other.test']);
     });
 });
 

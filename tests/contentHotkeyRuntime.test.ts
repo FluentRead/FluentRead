@@ -322,6 +322,45 @@ describe('全文快捷键与录制器使用同一逻辑按键', () => {
         expect(toggleFullPage).toHaveBeenCalledTimes(2);
     });
 
+    it('输入框内无 Control/Alt/Meta 的全文快捷键让行给字符输入，输入框外照常触发', async () => {
+        Object.assign(mocks.config, {floatingBallHotkey: 'custom', customFloatingBallHotkey: 'Shift+1'});
+        const {toggleFullPage, keydown, keyup} = await installFullPageHotkey();
+        const textarea = {tagName: 'TEXTAREA', getAttribute: () => null};
+        const typed = keyboardEvent({key: '!', code: 'Digit1', shiftKey: true, altKey: false, composedPath: () => [textarea]});
+        keydown(keyboardEvent({key: 'Shift', code: 'ShiftLeft', shiftKey: true, altKey: false, composedPath: () => [textarea]}));
+        keydown(typed);
+        expect(toggleFullPage).not.toHaveBeenCalled();
+        expect(typed.preventDefault).not.toHaveBeenCalled();
+        keyup(keyboardEvent({key: '1', code: 'Digit1', shiftKey: false, altKey: false}));
+        keyup(keyboardEvent({key: 'Shift', code: 'ShiftLeft', shiftKey: false, altKey: false}));
+
+        keydown(keyboardEvent({key: 'Shift', code: 'ShiftLeft', shiftKey: true, altKey: false, composedPath: () => []}));
+        keydown(keyboardEvent({key: '!', code: 'Digit1', shiftKey: true, altKey: false, composedPath: () => []}));
+        expect(toggleFullPage).toHaveBeenCalledOnce();
+    });
+
+    it('isTypingKeystroke 只把输入法组合与输入场景内无 Control/Alt/Meta 的按键视为字符输入', async () => {
+        const {isTypingKeystroke} = await import('@/src/shared/dom/editingTarget');
+        const input = {tagName: 'INPUT', getAttribute: () => null};
+        const key = (overrides: Record<string, unknown>) => keyboardEvent({altKey: false, composedPath: () => [input], ...overrides}) as unknown as KeyboardEvent;
+        expect(isTypingKeystroke(key({keyCode: 229, composedPath: () => []}), document)).toBe(true);
+        expect(isTypingKeystroke(key({}), document)).toBe(true);
+        for (const modifier of ['ctrlKey', 'altKey', 'metaKey']) expect(isTypingKeystroke(key({[modifier]: true}), document)).toBe(false);
+    });
+
+    it('输入框内带 Alt 的全文快捷键仍然生效，输入法组合期间不触发', async () => {
+        const {toggleFullPage, keydown, keyup} = await installFullPageHotkey();
+        const input = {tagName: 'INPUT', getAttribute: () => null};
+        keydown(keyboardEvent({key: 'Alt', code: 'AltLeft', composedPath: () => [input], isComposing: true}));
+        keydown(keyboardEvent({composedPath: () => [input], isComposing: true}));
+        expect(toggleFullPage).not.toHaveBeenCalled();
+        keyup(keyboardEvent({altKey: false}));
+        keyup(keyboardEvent({key: 'Alt', code: 'AltLeft', altKey: false}));
+        keydown(keyboardEvent({key: 'Alt', code: 'AltLeft', composedPath: () => [input]}));
+        keydown(keyboardEvent({composedPath: () => [input]}));
+        expect(toggleFullPage).toHaveBeenCalledOnce();
+    });
+
     it('macOS Option 字形回退到物理键，非 QWERTY 布局按实际字符而非物理位置匹配', async () => {
         Object.assign(mocks.config, {floatingBallHotkey: 'custom', customFloatingBallHotkey: 'Alt+/'});
         const optionGlyph = await installFullPageHotkey();

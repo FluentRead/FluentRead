@@ -129,8 +129,10 @@ export async function startContentApp(ctx: ContentScriptContext,
         pageAvailability?.disposeVideoSubtitlePage(); removePageStyles?.(); removePageStyles = null;
         syncBilingualSentenceHighlight(document, false);
     };
+    let routeChangeHandler: ReturnType<typeof createContentRouteChangeHandler> | undefined;
     const activatePageFeatures = async (): Promise<void> => {
         if (!isPageRuntimeEnabled() || featureController) return;
+        routeChangeHandler?.resync();
         removePageStyles = installPageStyles(ctx);
         pageTranslationFont?.set(config.browserDefaultTranslationFont === true);
         syncBilingualSentenceHighlight(document, config.bilingualSentenceHighlightEnabled === true, config.bilingualSentenceHighlightStyle, config.bilingualSentenceHighlightAppearance);
@@ -211,7 +213,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         void reportSiteDisabledState();
         await pageAvailability!.reconcile();
     };
-    document.addEventListener('fluentread-route-change', createContentRouteChangeHandler({
+    document.addEventListener('fluentread-route-change', routeChangeHandler = createContentRouteChangeHandler({
         getHref: () => window.location.href,
         routeChanged: href => { informationHighlight?.routeChanged(); siteAdaptation.routeChanged(new URL(href)); },
         resetTranslationRoute: () => { resetPageTranslationContextCache(); resetFullPageTranslationRouteState(); },

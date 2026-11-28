@@ -109,6 +109,32 @@ describe('划词翻译挂载生命周期', () => {
         }
     });
 
+    it('host 挂在 html 下时替换 body 也会复核来源，仅新增节点不复核', async () => {
+        const {document, window} = parseHTML('<html><body><p>Original article</p></body></html>');
+        const host = document.createElement('fluent-read-selection-translator-ui');
+        document.documentElement.appendChild(host);
+        vi.stubGlobal('MutationObserver', window.MutationObserver);
+        const revalidateSource = vi.fn();
+        const instance = {revalidateSource, translateExplicitRange: vi.fn(() => true)};
+        mocks.createVueShadowUi.mockResolvedValueOnce({...ui(instance), shadowHost: host});
+        mocks.createModalDialogHostController.mockReturnValue({placeForRange: vi.fn(), dispose: vi.fn()});
+        const runtime = await import('@/src/features/selection-translation/content/runtime');
+        try {
+            expect(await runtime.mountSelectionTranslator({} as never)).toBe(instance);
+            expect(runtime.translateSelectionFromRange({} as Range)).toBe(true);
+            document.documentElement.appendChild(document.createElement('div'));
+            await new Promise(resolve => setTimeout(resolve, 0));
+            expect(revalidateSource).not.toHaveBeenCalled();
+            const replacement = document.createElement('body');
+            document.body.replaceWith(replacement);
+            await vi.waitFor(() => expect(revalidateSource).toHaveBeenCalledOnce());
+            expect(host.parentNode).toBe(document.documentElement);
+        } finally {
+            runtime.unmountSelectionTranslator();
+            vi.unstubAllGlobals();
+        }
+    });
+
     it('持续删除只自动恢复两次，新选区允许恢复，禁用或上下文失效后停止恢复', async () => {
         const {document, window} = parseHTML('<html><body><p>Selected text</p></body></html>');
         const host = document.createElement('fluent-read-selection-translator-ui');

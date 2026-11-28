@@ -81,7 +81,7 @@ function scan() {
   if (!pageAllowed()) { close(false); snapshot.value = undefined; if (!saving.value) { closeMenu(false); clearEntries(); } return; }
   if (!allowed()) {
     closeMenu(false); clearEntries();
-    if (opened.value && (!snapshot.value?.element.isConnected || !isWritingEditor(snapshot.value.element, snapshot.value.site))) close(false);
+    if (opened.value && (!snapshot.value?.element.isConnected || !isWritingEditor(snapshot.value.element, snapshot.value.site) || !visible(snapshot.value.element))) close(false);
     return;
   }
   // allowed 已验证一等写作网站路由；同步扫描期间站点身份不会改变。
@@ -91,7 +91,7 @@ function scan() {
     return visible(element) && rect.width >= 120 && rect.height >= 20 && Boolean(findReplyActionAnchor(element, site));
   });
   for (const [editor, entry] of entries) if (!editors.includes(editor) || !entry.host.isConnected) { entry.abort.abort(); entry.host.remove(); entries.delete(editor); }
-  if (opened.value && (!snapshot.value?.element.isConnected || (!entries.has(snapshot.value.element) && anchor.value !== snapshot.value.element))) close(false);
+  if (opened.value && (!snapshot.value?.element.isConnected || !isWritingEditor(snapshot.value.element, snapshot.value.site) || !visible(snapshot.value.element) || (!entries.has(snapshot.value.element) && anchor.value !== snapshot.value.element))) close(false);
   if (menuOpened.value && ![...entries.values()].some(entry => entry.host === menuAnchor.value)) closeMenu(false);
   for (const editor of editors) {
     const action = findReplyActionAnchor(editor, site)!;

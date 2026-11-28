@@ -22,7 +22,10 @@ import {isModelThinkingEnabled} from '@/src/core/config/modelThinking';
 import {sha256Hex} from '@/src/shared/function/sha256';
 
 function resolveWritingSenderUrl(sender: WritingSender): string {
-    if (sender.frameId !== 0) return sender.url || '';
+    if (sender.frameId !== 0) {
+        if (sender.tab?.url && !isWritingEligibleUrl(sender.tab.url)) return '';
+        return sender.url || '';
+    }
     try {
         // MessageSender.url 可能仍是内容脚本初次注入时的地址，标签地址才反映 GitHub 页内导航后的当前路由。
         const page = new URL(sender.tab?.url || '');

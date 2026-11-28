@@ -4,7 +4,7 @@
  * 主要内容：复用站点配置支持 Gmail、GitHub、Outlook、X、Reddit、LinkedIn、Slack、Discord、Notion 及通用网页编辑框；解析穿透 Shadow DOM 的当前焦点编辑目标，按剩余字符预算读取主题、原帖、最近讨论或周边段落而不克隆长子树，检测富媒体与框架托管富文本编辑器并提供复制回退。
  * 模块边界：只处理显式传入的 DOM，不监听页面、不联网、不发送表单；复杂富文本和 Slate/ProseMirror/Lexical 编辑器统一回退复制粘贴。
  */
-import {isWritingEligibleUrl, type WritingIntent} from '@/src/core/config/writing';
+import {isWritingEligibleUrl, isWritingPage, type WritingIntent} from '@/src/core/config/writing';
 import {getWritingSiteProfile, matchFirstClassWritingSite, type WritingSite, type WritingSiteProfile} from './siteProfiles';
 
 export type {WritingSite} from './siteProfiles';
@@ -22,9 +22,10 @@ export function writingSite(url: string): WritingSite {
     return matchFirstClassWritingSite(url);
 }
 
-/** 优先匹配一等支持网站；其余常规 HTTP/HTTPS 页面回落为通用编辑模式。 */
+/** 仅对真正的一等写作页面路由返回对应平台；其余常规 HTTP/HTTPS 页面回落为通用编辑模式。 */
 export function resolveWritingSite(url: string): WritingSite {
-    return matchFirstClassWritingSite(url) ?? (isWritingEligibleUrl(url) ? 'generic' : null);
+    if (isWritingPage(url)) return matchFirstClassWritingSite(url);
+    return isWritingEligibleUrl(url) ? 'generic' : null;
 }
 
 export function isWritingEditor(element: Element | null, site: WritingSite): element is HTMLElement {
@@ -33,29 +34,37 @@ export function isWritingEditor(element: Element | null, site: WritingSite): ele
         const input = element as HTMLInputElement;
         return !input.disabled && !input.readOnly;
     }
-    if (element.getAttribute('contenteditable') === 'plaintext-only') return true;
-    if (site === 'generic') return element.getAttribute('contenteditable') === 'true';
+    if (element.getAttribute('aria-disabled') === 'true' || element.getAttribute('aria-readonly') === 'true') return false;
+    const editable = element.getAttribute('contenteditable')?.toLowerCase();
+    if (editable === 'plaintext-only') return true;
+    if (site === 'generic') return editable === 'true' || editable === '';
     const profile = getWritingSiteProfile(site);
     if (!profile || !profile.richEditorSelector) return false;
-    return (element.getAttribute('contenteditable') === 'true' || element.matches('[role="textbox"][data-slate-editor="true"]'))
+    return (editable === 'true' || editable === '' || element.matches('[role="textbox"][data-slate-editor="true"]'))
         && element.matches(profile.richEditorSelector);
 }
 
-/** 从焦点节点向上解析实际可编辑宿主，兼容富文本内部子节点与开放 Shadow DOM。 */
+/** 从焦点节点向上解析实际可编辑宿主，兼容富文本内部子节点、排除扩展 UI 与防止 Shadow DOM 环路。 */
 export function deepActiveElement(doc: Document): Element | null {
     let active: Element | null = doc.activeElement;
-    while (active?.shadowRoot?.activeElement) {
-        if (active.matches(excludedUi)) return null;
-        active = active.shadowRoot.activeElement;
+    const visited = new Set<Element>();
+    for (let depth = 0; active && depth < 16; depth++) {
+        if (active.closest(excludedUi)) return null;
+        visited.add(active);
+        const next = active.shadowRoot?.activeElement;
+        if (!next || visited.has(next)) return active;
+        active = next;
     }
-    return active;
+    return null;
 }
 
 export function resolveEditableTarget(element: Element | null, site: WritingSite): HTMLElement | null {
     if (!element) return null;
     if (isWritingEditor(element, site)) return element;
-    const host = element.closest('[contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"][data-slate-editor="true"]');
-    return host && isWritingEditor(host, site) ? host : null;
+    if (element.matches('input, textarea, select, button, [role="button"]')) return null;
+    const nearest = element.closest('[contenteditable], [role="textbox"][data-slate-editor="true"]');
+    if (!nearest || nearest.getAttribute('contenteditable')?.toLowerCase() === 'false') return null;
+    return isWritingEditor(nearest, site) ? nearest : null;
 }
 
 export function hasManagedRichEditor(element: HTMLElement): boolean {

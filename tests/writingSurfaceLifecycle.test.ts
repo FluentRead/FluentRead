@@ -310,13 +310,19 @@ describe('写作入口真实组件生命周期', () => {
         expect(state.canInsert).toBe(true);
         expect(state.fillDraft('Updated generic draft')).toBeUndefined();
         expect(editor.value).toBe('Updated generic draft');
-        // Connected editor that becomes disabled closes generic session on scan.
+        // Connected editor that becomes disabled or hidden closes generic session on scan.
         requestOpenWritingForEditor(editor); await settle();
         expect(state.opened).toBe(true);
         editor.disabled = true;
         state.scan(); await settle();
         expect(state.opened).toBe(false);
         editor.disabled = false;
+        requestOpenWritingForEditor(editor); await settle();
+        expect(state.opened).toBe(true);
+        editor.getClientRects = () => [] as any;
+        state.scan(); await settle();
+        expect(state.opened).toBe(false);
+        editor.getClientRects = () => [{x: 0, y: 0, width: 400, height: 100, left: 0, top: 0, right: 400, bottom: 100, toJSON: () => ({})}] as any;
         // Managed rich editor (Slate) opens cleanly with copy fallback.
         const slate = dom.document.createElement('div');
         slate.setAttribute('contenteditable', 'true');
@@ -352,6 +358,15 @@ describe('写作入口真实组件生命周期', () => {
         expect(state.anchor).toBe(standalone);
         state.scan(); await settle();
         expect(state.opened).toBe(true);
+        standalone.disabled = true;
+        state.scan(); await settle();
+        expect(state.opened).toBe(false);
+        standalone.disabled = false;
+        requestOpenWritingForEditor(standalone); await settle();
+        expect(state.opened).toBe(true);
+        standalone.getClientRects = () => [] as any;
+        state.scan(); await settle();
+        expect(state.opened).toBe(false);
     });
 
     it('dismisses writing for this visit without a config write, including after remount', async () => {

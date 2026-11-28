@@ -113,7 +113,13 @@ describe('First-class writing site expansion (7 new platforms)', () => {
             expect(isPlainTextWritingSite(expected), url).toBe(plain);
         }
         expect(writingSite('https://example.com/post')).toBeNull();
+        expect(writingSite('ftp://x.com/foo')).toBeNull();
+        expect(writingSite('ws://github.com/a/b')).toBeNull();
+        expect(writingSite('http://outlook.office.com/mail/')).toBeNull();
         expect(resolveWritingSite('https://example.com/post')).toBe('generic');
+        expect(resolveWritingSite('https://github.com/settings/profile')).toBe('generic');
+        expect(resolveWritingSite('https://mail.google.com/settings')).toBe('generic');
+        expect(resolveWritingSite('ftp://x.com/foo')).toBeNull();
         expect(resolveWritingSite('chrome://settings')).toBeNull();
         expect(getWritingSiteProfile('generic')).toBeNull();
         expect(getWritingSiteProfile(null)).toBeNull();
@@ -270,7 +276,18 @@ describe('Universal generic editor mode & rich framework copy fallback', () => {
             <input id="text" type="text">
             <input id="plain">
             <input id="pw" type="password">
-            <div id="ce" contenteditable="true"><p id="child">Inner text</p></div>
+            <div id="ce" contenteditable="true">
+                <p id="child">Inner text</p>
+                <span contenteditable="false"><em id="island">Read-only chip</em></span>
+                <input id="nested-pw" type="password">
+                <textarea id="nested-disabled" disabled></textarea>
+                <select id="nested-select"><option>A</option></select>
+                <button id="nested-btn" type="button">Act</button>
+                <span id="nested-role-btn" role="button">Role act</span>
+            </div>
+            <div id="bare-ce" contenteditable=""></div>
+            <div id="aria-disabled-ce" contenteditable="true" aria-disabled="true"></div>
+            <div id="aria-readonly-ce" contenteditable="true" aria-readonly="true"></div>
             <div id="pt" contenteditable="plaintext-only"></div>
             <div id="div">Not editable</div>
             <div data-fluent-read-ui="writing"><textarea id="own"></textarea></div>
@@ -280,28 +297,63 @@ describe('Universal generic editor mode & rich framework copy fallback', () => {
         expect(isWritingEditor(doc.querySelector('#plain'), 'generic')).toBe(true);
         expect(isWritingEditor(doc.querySelector('#pw'), 'generic')).toBe(false);
         expect(isWritingEditor(doc.querySelector('#ce'), 'generic')).toBe(true);
+        expect(isWritingEditor(doc.querySelector('#bare-ce'), 'generic')).toBe(true);
+        expect(isWritingEditor(doc.querySelector('#aria-disabled-ce'), 'generic')).toBe(false);
+        expect(isWritingEditor(doc.querySelector('#aria-readonly-ce'), 'generic')).toBe(false);
         expect(isWritingEditor(doc.querySelector('#pt'), 'generic')).toBe(true);
         expect(isWritingEditor(doc.querySelector('#div'), 'generic')).toBe(false);
         expect(isWritingEditor(doc.querySelector('#own'), 'generic')).toBe(false);
 
         expect(resolveEditableTarget(null, 'generic')).toBeNull();
         expect(resolveEditableTarget(doc.querySelector('#child'), 'generic')).toBe(doc.querySelector('#ce'));
+        // contenteditable="false" island and nested non-editable/password controls must NOT escape to ancestor editor.
+        expect(resolveEditableTarget(doc.querySelector('#island'), 'generic')).toBeNull();
+        expect(resolveEditableTarget(doc.querySelector('#nested-pw'), 'generic')).toBeNull();
+        expect(resolveEditableTarget(doc.querySelector('#nested-disabled'), 'generic')).toBeNull();
+        expect(resolveEditableTarget(doc.querySelector('#nested-select'), 'generic')).toBeNull();
+        expect(resolveEditableTarget(doc.querySelector('#nested-btn'), 'generic')).toBeNull();
+        expect(resolveEditableTarget(doc.querySelector('#nested-role-btn'), 'generic')).toBeNull();
+        // Child inside contenteditable on a site that does not accept contenteditable (github) returns null.
+        expect(resolveEditableTarget(doc.querySelector('#child'), 'github')).toBeNull();
         expect(resolveEditableTarget(doc.querySelector('#div'), 'generic')).toBeNull();
         expect(findReplyEditors(doc, 'generic')).toEqual([]);
         expect(findReplyActionAnchor(doc.querySelector<HTMLElement>('#ta')!, 'generic')).toBeNull();
     });
 
-    it('pierces open Shadow DOM for deepActiveElement and ignores FluentRead UI shadow hosts', () => {
-        const {doc} = page('<div id="host"></div><div id="own" data-fluent-read-ui="writing"></div>');
+    it('pierces open Shadow DOM for deepActiveElement, guards cycles/depth, and ignores FluentRead UI descendants', () => {
+        const {doc} = page('<div id="host"></div><div id="own" data-fluent-read-ui="writing"><div id="own-child"></div></div>');
         const host = doc.querySelector<HTMLElement>('#host')!;
         const inner = doc.createElement('textarea');
         Object.defineProperty(host, 'shadowRoot', {value: {activeElement: inner}});
         Object.defineProperty(doc, 'activeElement', {configurable: true, value: host});
         expect(deepActiveElement(doc)).toBe(inner);
 
-        const own = doc.querySelector<HTMLElement>('#own')!;
-        Object.defineProperty(own, 'shadowRoot', {value: {activeElement: doc.createElement('textarea')}});
-        Object.defineProperty(doc, 'activeElement', {configurable: true, value: own});
+        // Descendant inside FluentRead UI returns null via closest(excludedUi).
+        const ownChild = doc.querySelector<HTMLElement>('#own-child')!;
+        Object.defineProperty(doc, 'activeElement', {configurable: true, value: ownChild});
+        expect(deepActiveElement(doc)).toBeNull();
+
+        // Cycle in shadowRoot.activeElement terminates safely.
+        const cycleA = doc.createElement('div');
+        const cycleB = doc.createElement('div');
+        Object.defineProperty(cycleA, 'shadowRoot', {value: {activeElement: cycleB}});
+        Object.defineProperty(cycleB, 'shadowRoot', {value: {activeElement: cycleA}});
+        Object.defineProperty(doc, 'activeElement', {configurable: true, value: cycleA});
+        expect(deepActiveElement(doc)).toBe(cycleB);
+
+        // Pathological >16-level nesting returns null safely.
+        let root = doc.createElement('div');
+        let current = root;
+        for (let i = 0; i < 18; i++) {
+            const next = doc.createElement('div');
+            Object.defineProperty(current, 'shadowRoot', {value: {activeElement: next}});
+            current = next;
+        }
+        Object.defineProperty(doc, 'activeElement', {configurable: true, value: root});
+        expect(deepActiveElement(doc)).toBeNull();
+
+        // Null activeElement returns null cleanly.
+        Object.defineProperty(doc, 'activeElement', {configurable: true, value: null});
         expect(deepActiveElement(doc)).toBeNull();
     });
 
@@ -404,9 +456,11 @@ describe('Universal writing shortcut runtime', () => {
             isMounted: () => shortcutMocks.writingMounted,
         });
 
-        // Untrusted, repeat, global disabled, writing disabled, site disabled, ineligible URL, writing disabledDomains, non-matching key, non-editable focus.
+        // Untrusted, repeat, IME composing, keyCode 229, global disabled, writing disabled, site disabled, ineligible URL, writing disabledDomains, non-matching key, non-editable focus.
         doc.dispatchEvent(keyEvent(win, {isTrusted: false}));
         doc.dispatchEvent(keyEvent(win, {repeat: true}));
+        doc.dispatchEvent(keyEvent(win, {isComposing: true}));
+        doc.dispatchEvent(keyEvent(win, {keyCode: 229}));
         shortcutMocks.config.on = false; doc.dispatchEvent(keyEvent(win)); shortcutMocks.config.on = true;
         shortcutMocks.config.writing.enabled = false; doc.dispatchEvent(keyEvent(win)); shortcutMocks.config.writing.enabled = true;
         siteDisabled = true; doc.dispatchEvent(keyEvent(win)); siteDisabled = false;
@@ -424,6 +478,7 @@ describe('Universal writing shortcut runtime', () => {
         const received = vi.fn();
         registerWritingOpenHandler(received);
         expect(received).toHaveBeenCalledWith(editor);
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
 
         // When already mounted: delivers directly without re-mounting.
         shortcutMocks.writingMounted = true;
@@ -436,7 +491,7 @@ describe('Universal writing shortcut runtime', () => {
         shortcutMocks.writingMounted = false;
         shortcutMocks.mountWriting.mockRejectedValueOnce(new Error('mount failed'));
         doc.dispatchEvent(keyEvent(win));
-        await Promise.resolve(); await Promise.resolve();
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
         const lateHandler = vi.fn();
         registerWritingOpenHandler(lateHandler);
         expect(lateHandler).not.toHaveBeenCalled();
@@ -455,6 +510,61 @@ describe('Universal writing shortcut runtime', () => {
         });
         second.abort();
         expect(shortcutMocks.unmountWriting).toHaveBeenCalledOnce();
+    });
+
+    it('coalesces rapid double-presses while mount is in-flight and cancels in-flight mount cleanly on abort', async () => {
+        const {doc, win} = page('<textarea id="first"></textarea><textarea id="second"></textarea>');
+        const first = doc.querySelector<HTMLElement>('#first')!;
+        const second = doc.querySelector<HTMLElement>('#second')!;
+        let active: Element | null = first;
+        Object.defineProperty(doc, 'activeElement', {configurable: true, get: () => active});
+
+        let resolveMount!: () => void;
+        const mount = vi.fn(() => new Promise<void>(resolve => { resolveMount = resolve; }));
+        const unmount = vi.fn();
+        const controller = new AbortController();
+        mountWritingShortcut(controller.signal, {
+            document: doc, getHref: () => 'https://example.com', isSiteDisabled: () => false,
+            mount, unmount, isMounted: () => false,
+        });
+
+        // Press 1 starts mount; press 2 on second editor while mounting reuses in-flight mount and updates target.
+        doc.dispatchEvent(keyEvent(win));
+        active = second;
+        doc.dispatchEvent(keyEvent(win));
+        expect(mount).toHaveBeenCalledOnce();
+        resolveMount();
+        await Promise.resolve(); await Promise.resolve();
+        const handler = vi.fn();
+        registerWritingOpenHandler(handler);
+        expect(handler).toHaveBeenCalledOnce();
+        expect(handler).toHaveBeenCalledWith(second);
+        registerWritingOpenHandler(null);
+
+        // Abort during an in-flight mount calls unmount even while isMounted() is false,
+        // and a stale rejection after abort must not wipe a subsequent session's pending target.
+        let rejectInFlight!: (error: Error) => void;
+        mount.mockImplementationOnce(() => new Promise<void>((_res, rej) => { rejectInFlight = rej; }));
+        doc.dispatchEvent(keyEvent(win));
+        expect(mount).toHaveBeenCalledTimes(2);
+        controller.abort();
+        expect(unmount).toHaveBeenCalledOnce();
+
+        // Start a fresh session and queue a new target before the old mount rejects.
+        const fresh = new AbortController();
+        mountWritingShortcut(fresh.signal, {
+            document: doc, getHref: () => 'https://example.com', isSiteDisabled: () => false,
+            mount: vi.fn(() => new Promise<void>(() => {})), unmount: vi.fn(), isMounted: () => false,
+        });
+        active = first;
+        doc.dispatchEvent(keyEvent(win));
+        rejectInFlight(new Error('stale failure'));
+        await Promise.resolve(); await Promise.resolve();
+        const freshHandler = vi.fn();
+        registerWritingOpenHandler(freshHandler);
+        expect(freshHandler).toHaveBeenCalledWith(first);
+        registerWritingOpenHandler(null);
+        fresh.abort();
     });
 
     it('uses global document and window.location defaults when omitted', () => {

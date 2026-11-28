@@ -46,9 +46,11 @@ export function mountWritingShortcut(
     if (signal.aborted) return;
     const doc = deps.document ?? document;
     const getHref = deps.getHref ?? (() => window.location.href);
+    let mounting: Promise<void> | null = null;
+    let mountToken = 0;
 
     const onKeydown = (event: KeyboardEvent) => {
-        if (!event.isTrusted || event.repeat) return;
+        if (!event.isTrusted || event.repeat || event.isComposing || event.keyCode === 229) return;
         if (!config.on || !config.writing.enabled || deps.isSiteDisabled()) return;
         const href = getHref();
         if (!isWritingEligibleUrl(href)) return;
@@ -62,14 +64,23 @@ export function mountWritingShortcut(
         event.preventDefault();
         event.stopPropagation();
         requestOpenWritingForEditor(editor);
-        if (!deps.isMounted()) {
-            void deps.mount().catch(() => { clearPendingWritingOpenTarget(); });
+        if (!deps.isMounted() && !mounting) {
+            const token = ++mountToken;
+            const pending = Promise.resolve(deps.mount()).catch(() => {
+                if (mountToken === token) clearPendingWritingOpenTarget();
+            }).finally(() => {
+                if (mounting === pending) mounting = null;
+            });
+            mounting = pending;
         }
     };
 
     doc.addEventListener('keydown', onKeydown, {capture: true, signal});
     signal.addEventListener('abort', () => {
+        mountToken++;
+        const shouldUnmount = deps.isMounted() || mounting !== null;
+        mounting = null;
         clearPendingWritingOpenTarget();
-        if (deps.isMounted()) deps.unmount();
+        if (shouldUnmount) deps.unmount();
     }, {once: true});
 }

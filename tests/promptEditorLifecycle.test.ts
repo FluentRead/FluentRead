@@ -162,6 +162,13 @@ describe('写作和阅读偏好的真实模板工作流', () => {
     expect(config.writing.writingHotkey).toBe('Alt+Shift+W');
     state.handleWritingHotkeyConfirm('none');await settle();
     expect(config.writing.writingHotkey).toBe('');
+    // 禁用后另一功能占用原快捷键，重新启用写作助手时警告并清空冲突快捷键，避免双功能争抢。
+    config.writing.enabled = false;config.writing.writingHotkey = 'Alt+T';await settle();
+    message.warning.mockClear();
+    enable.checked = true;enable.dispatchEvent(new win.Event('change'));await settle();
+    expect(message.warning).toHaveBeenCalledOnce();
+    expect(config.writing.enabled).toBe(true);
+    expect(config.writing.writingHotkey).toBe('');
   });
 
   it('阅读预览、默认偏好、上下文范围和学习中心入口通过实际控件更新', async () => {

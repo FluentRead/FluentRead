@@ -179,7 +179,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         const resetFullPageKeyboardGesture = hotkeys.installFloatingBallHotkey(activationController.signal);
         mountConfiguredQuickTranslation(config, hotkeys, () => currentPageSiteDisabled, activationController.signal,
             () => { resetHoverKeyboardGesture(); resetFullPageKeyboardGesture(); }, mailFullPageToggle);
-        if (import.meta.env.BROWSER !== 'userscript') mountWritingShortcut(activationController.signal, {isSiteDisabled: () => currentPageSiteDisabled, mount: () => mountWritingAssistant(ctx), unmount: unmountWritingAssistant, isMounted: isWritingAssistantMounted});
+        if (import.meta.env.BROWSER !== 'userscript' && capabilities.browser !== 'userscript') mountWritingShortcut(activationController.signal, {isSiteDisabled: () => currentPageSiteDisabled, mount: () => mountWritingAssistant(ctx), unmount: unmountWritingAssistant, isMounted: isWritingAssistantMounted});
         activePageFeatureRegistry = createContentFeatureRegistry([
             ...createLearningContentFeatures(ctx, config, capabilities),
             ...createReaderContentFeatures(ctx, config),

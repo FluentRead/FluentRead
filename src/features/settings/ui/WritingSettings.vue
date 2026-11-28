@@ -7,7 +7,7 @@
 <template>
   <div class="writing-settings">
     <div ref="modelOptionsHost" data-i18n-ignore />
-    <FeatureEnableCard v-model="config.writing.enabled" title="启用写作助手" :description="t('writing.experience.enableDescription')" />
+    <FeatureEnableCard :model-value="config.writing.enabled" title="启用写作助手" :description="t('writing.experience.enableDescription')" @update:model-value="handleWritingEnabledChange" />
     <p v-if="!config.writing.enabled" class="writing-description" role="status">{{ t('writing.experience.disabled') }}</p>
     <p v-else-if="!config.on" class="writing-description" role="status">{{ t('writing.experience.paused') }}</p>
     <SettingsGroup v-if="config.writing.disabledDomains.length" :title="t('writing.entry.disabledSites')">
@@ -197,6 +197,16 @@ function findWritingHotkeyConflict(hotkey: string): string {
   const profile = findEnabledQuickTranslationHotkeyConflict(config.value.quickTranslationProfiles ?? [], resolved);
   if (!profile) return '';
   return t('quickTranslation.conflictProfile', {group: t(`quickTranslation.heading.${quickTranslationActionKey(profile.action)}`)});
+}
+function handleWritingEnabledChange(enabled: boolean) {
+  if (enabled && config.value.writing.writingHotkey) {
+    const conflict = findWritingHotkeyConflict(config.value.writing.writingHotkey);
+    if (conflict) {
+      ElMessage.warning(conflict);
+      config.value.writing.writingHotkey = '';
+    }
+  }
+  config.value.writing.enabled = enabled;
 }
 function handleWritingHotkeyConfirm(hotkey: string) {
   const conflict = findWritingHotkeyConflict(hotkey);

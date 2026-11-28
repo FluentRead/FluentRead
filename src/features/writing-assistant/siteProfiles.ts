@@ -206,8 +206,9 @@ export const WRITING_SITE_PROFILES: Readonly<Record<FirstClassWritingSite, Writi
 
 export function matchFirstClassWritingSite(url: string): FirstClassWritingSite | null {
     try {
-        const host = new URL(url).hostname;
-        return Object.hasOwn(HOST_TO_SITE, host) ? HOST_TO_SITE[host] : null;
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:') return null;
+        return Object.hasOwn(HOST_TO_SITE, parsed.hostname) ? HOST_TO_SITE[parsed.hostname] : null;
     } catch { return null; }
 }
 

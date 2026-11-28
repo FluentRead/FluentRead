@@ -73,6 +73,8 @@ describe('Writing mounting and background composition', () => {
     for (const frameId of [1, undefined]) {
       expect(eligibility({frameId, url: 'file:///tmp/frame.html', tab: {url}})).toContain('仅支持');
       expect(eligibility({frameId, url: 'chrome-extension://ext/frame.html', tab: {url}})).toContain('仅支持');
+      expect(eligibility({frameId, url, tab: {url: 'file:///tmp/parent.html'}})).toContain('仅支持');
+      expect(eligibility({frameId, url, tab: {url: 'chrome://settings'}})).toContain('仅支持');
       expect(eligibility({frameId, url: 'https://example.com/', tab: {url}})).toBeUndefined();
       expect(eligibility({frameId, url, tab: {url: 'https://example.com/'}})).toBeUndefined();
     }

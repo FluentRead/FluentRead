@@ -2,8 +2,8 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {huggingFaceDownloadOrigins} from '@/src/platform/http/modelDownloads';
 import {sha256} from '@noble/hashes/sha256';
 import {createModelArtifactStore, MODEL_ARTIFACT_CHUNK_BYTES, type ModelArtifact} from '@/src/platform/storage/modelArtifacts';
-import {DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID, getInformationHighlightModel, INFORMATION_HIGHLIGHT_MODELS, INFORMATION_HIGHLIGHT_MODEL_FILES, INFORMATION_HIGHLIGHT_MODEL_REVISION, INFORMATION_HIGHLIGHT_MODEL_BYTES} from '@/src/core/config/informationHighlightModel';
-import {getInformationHighlightArtifacts, getInformationHighlightArtifactStore, informationHighlightArtifacts, informationHighlightArtifactStore, INFORMATION_HIGHLIGHT_CACHE, removeRetiredInformationHighlightArtifacts} from '@/src/features/information-highlight/offscreen/artifacts';
+import {DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID, getInformationHighlightModel, INFORMATION_HIGHLIGHT_MODELS} from '@/src/core/config/informationHighlightModel';
+import {getInformationHighlightArtifacts, getInformationHighlightArtifactStore, informationHighlightArtifactStore, INFORMATION_HIGHLIGHT_CACHE, removeRetiredInformationHighlightArtifacts} from '@/src/features/information-highlight/offscreen/artifacts';
 
 describe('fixed model artifacts integrity and bounded resumable cache', () => {
     let entries: Map<string, Response>, cache: {match: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn>};
@@ -14,9 +14,10 @@ describe('fixed model artifacts integrity and bounded resumable cache', () => {
     afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals();});
     const fileFor = (body: Uint8Array, path = 'model.onnx'): ModelArtifact => ({url: `https://huggingface.co/org/model/resolve/pinned/${path}`, size: body.length, sha256: Array.from(sha256(body), value => value.toString(16).padStart(2,'0')).join('')});
     it('pins six verified files with actual size and content SHA-256, not a parameter-count estimate', () => {
-        expect(INFORMATION_HIGHLIGHT_MODEL_REVISION).toMatch(/^[a-f0-9]{40}$/u); expect(INFORMATION_HIGHLIGHT_MODEL_BYTES).toBe(490043908);
-        expect(INFORMATION_HIGHLIGHT_MODEL_FILES).toHaveLength(6); expect(INFORMATION_HIGHLIGHT_MODEL_FILES.every(file => /^[a-f0-9]{64}$/u.test(file.sha256))).toBe(true);
-        expect(INFORMATION_HIGHLIGHT_MODEL_FILES.at(-1)).toMatchObject({size: 483003582, sha256: '30a39f89fab8f30d0f99aa1e28d3e3be6fca66a3fab915f77584ac52a8361d25'});
+        const defaultModel = getInformationHighlightModel(DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID);
+        expect(defaultModel.revision).toMatch(/^[a-f0-9]{40}$/u); expect(defaultModel.bytes).toBe(490043908);
+        expect(defaultModel.files).toHaveLength(6); expect(defaultModel.files.every(file => /^[a-f0-9]{64}$/u.test(file.sha256))).toBe(true);
+        expect(defaultModel.files.at(-1)).toMatchObject({size: 483003582, sha256: '30a39f89fab8f30d0f99aa1e28d3e3be6fca66a3fab915f77584ac52a8361d25'});
     });
     it('offers only a pretrained Base model and resolves retired persisted choices to it', () => {
         expect(DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID).toBe('qwen2.5-0.5b');
@@ -29,13 +30,14 @@ describe('fixed model artifacts integrity and bounded resumable cache', () => {
             expect(getInformationHighlightModel(model.id)).toBe(model);
         }
         for (const value of [undefined, null, 'qwen3-0.6b', 'unsupported-model', {}, 1]) expect(getInformationHighlightModel(value)).toBe(INFORMATION_HIGHLIGHT_MODELS[0]);
-        expect(getInformationHighlightModel(DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID)).toMatchObject({name: 'Qwen2.5 0.5B Base', repository: 'onnx-community/Qwen2.5-0.5B', bytes: INFORMATION_HIGHLIGHT_MODEL_BYTES, kvCacheDtype: 'float32'});
+        expect(getInformationHighlightModel(DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID)).toMatchObject({name: 'Qwen2.5 0.5B Base', repository: 'onnx-community/Qwen2.5-0.5B', bytes: INFORMATION_HIGHLIGHT_MODELS[0].bytes, kvCacheDtype: 'float32'});
     });
     it('keeps verified Base v1 files readable and never serves retired chat-model cache entries', async () => {
-        const file = informationHighlightArtifacts[0];
+        const defaultModel = getInformationHighlightModel(DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID);
+        const file = getInformationHighlightArtifacts()[0];
         const retiredUrl = 'https://huggingface.co/onnx-community/Qwen3-0.6B-ONNX/resolve/1e0a4a196ecabdf9a879664110574563d3f372d3/config.json';
-        expect(file.url).toBe(`https://huggingface.co/onnx-community/Qwen2.5-0.5B/resolve/${INFORMATION_HIGHLIGHT_MODEL_REVISION}/config.json`);
-        expect(getInformationHighlightArtifacts()).toEqual(informationHighlightArtifacts);
+        expect(file.url).toBe(`https://huggingface.co/onnx-community/Qwen2.5-0.5B/resolve/${defaultModel.revision}/config.json`);
+        expect(getInformationHighlightArtifacts()).toHaveLength(defaultModel.files.length);
         expect(getInformationHighlightArtifactStore()).toBe(informationHighlightArtifactStore);
         entries.set(`${file.url}?fluent-read-verified=${file.sha256}`, new Response(JSON.stringify({size: file.size, sha256: file.sha256})));
         entries.set(`${file.url}?fluent-read-part=0`, new Response(new Uint8Array(file.size), {headers: {'Content-Length': String(file.size)}}));

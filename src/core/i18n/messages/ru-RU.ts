@@ -170,8 +170,6 @@ export const ruRUMessages = {
     "sentenceHighlight.title": "Стиль подсветки предложений",
     "sentenceHighlight.description": "Выберите стиль выделения соответствующих предложений оригинала и перевода.",
     "sentenceHighlight.tryHint": "Наведите указатель на предложение, чтобы подсветить оригинал и перевод вместе.",
-    "sentenceHighlight.offHint": "Включите двуязычную подсветку, чтобы попробовать сопоставление здесь.",
-    "sentenceHighlight.openStyles": "Выбрать стиль подсветки",
     "sentenceHighlight.enableHint": "Выберите стиль, чтобы включить подсветку. Выберите «Нет», чтобы отключить её и сохранить прежние настройки оформления.",
     "sentenceHighlight.noneDescription": "Отключает подсветку предложений, сохраняя текущий стиль и пользовательское оформление.",
     "sentenceHighlight.sample": "Читайте в своём темпе",

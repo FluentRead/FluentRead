@@ -49,8 +49,7 @@ import {
     isUnchangedTranslationResultAllowed,
     isImageTextBatch,
 } from '@/src/services/translation/requestSnapshot';
-import type {TranslationProviderRequest} from '@/src/services/translation/types';
-import type {TranslationProviderConfigSnapshot} from '@/src/services/translation/types';
+import type {TranslationProviderConfigSnapshot, TranslationProviderRequest} from '@/src/services/translation/types';
 import {documentFreeAttemptCharacters, runDocumentFreeNativeCandidate, serializeDocumentFreeFirstSlot, translateDocumentFreeGroups} from './documentFreeBatch';
 
 type FreeTranslationRequest = Omit<TranslationProviderRequest<string>, 'origin'>;

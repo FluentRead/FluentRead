@@ -170,8 +170,6 @@ export const esESMessages = {
     "sentenceHighlight.title": "Estilo de resaltado por oración",
     "sentenceHighlight.description": "Elige el estilo para resaltar las oraciones correspondientes del original y la traducción.",
     "sentenceHighlight.tryHint": "Pasa el cursor sobre una oración para resaltar su original y traducción juntos.",
-    "sentenceHighlight.offHint": "Activa el resaltado bilingüe por oración para probar la correspondencia aquí.",
-    "sentenceHighlight.openStyles": "Elegir estilo de resaltado",
     "sentenceHighlight.enableHint": "Elige un estilo para activar el resaltado. Elige «Ninguno» para desactivarlo y conservar tus ajustes de apariencia anteriores.",
     "sentenceHighlight.noneDescription": "Desactiva el resaltado por frases y conserva el estilo actual y la apariencia personalizada.",
     "sentenceHighlight.sample": "Lee a tu ritmo",

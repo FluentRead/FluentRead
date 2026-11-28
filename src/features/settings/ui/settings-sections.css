@@ -86,69 +86,11 @@
 .fluentread-service-option > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .fluentread-service-option :deep(.service-brand-icon) { flex: none; box-shadow: none; }
 
-.settings-subgroup-heading {
-  padding: 16px 16px 10px;
-  border-top: 1px solid var(--line);
-  background: var(--surface);
-}
-
-.settings-subgroup-heading h3 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.settings-subgroup-heading p {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: 10.5px;
-  line-height: 1.55;
-}
-
-:deep(.settings-navigation-link),
-.settings-inline-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 0;
-  color: var(--brand-strong);
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-:deep(.settings-navigation-link) { padding: 6px 0; }
-:deep(.settings-heading-link) { margin-left: auto; min-height: 32px; flex-shrink: 0; }
-:deep(.settings-navigation-link:hover),
-.settings-inline-link:hover { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
-:deep(.settings-navigation-link:focus-visible),
-.settings-inline-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
-:deep(.settings-navigation-link .el-icon) { font-size: 14px; }
-.settings-inline-link { padding: 0; font-size: inherit; font-weight: 700; }
-
 @media (max-width: 480px) {
   .general-settings-section :deep(.settings-item:has(.general-service-control)) { grid-template-columns: minmax(0, 1fr); }
   .general-settings-section .general-service-control,
   .service-default-control { max-width: none; }
 }
-
-.capability-warning { margin: 6px 0 0; color: var(--fr-warning); font-size: 11px; line-height: 1.5; }
-.settings-switch { --el-switch-on-color: #ef4776; --el-switch-off-color: #cfd5df; }
-
-.feature-help {
-  width: min(100%, 1080px);
-  margin: -6px auto 22px;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  color: var(--muted);
-  background: var(--surface-soft);
-  font-size: 10.5px;
-}
-.feature-help summary { padding: 11px 0; color: var(--ink); cursor: pointer; font-weight: 700; }
-.feature-help p { margin: 0; padding: 0 0 12px; line-height: 1.6; }
 
 .disabled-section {
   margin: 18px 12px 8px;

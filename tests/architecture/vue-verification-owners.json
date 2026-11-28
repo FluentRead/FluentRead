@@ -149,12 +149,6 @@
       ],
       "scenario": "实际划词面板、选择变化与迟到结果"
     },
-    "src/features/settings/ui/AlwaysTranslateSites.vue": {
-      "kind": "frozen-debt",
-      "sourceSha256": "bd3bee9987da6060eb2c34e87608801156211012bc5d8d38581ce5be725fd1c8",
-      "reason": "实现“始终翻译”、“禁用扩展”与“不显示悬浮球”三类网站名单编辑器，接收域名数组并通过 v-model 更新规范化后的规则集合。 当前尚未登记可确认的自动组件行为消费者；不把父组件mock或源码契约算作该组件行为证明。",
-      "exitCriteria": "修改此文件前，以真实SFC执行对应事件/异步/取消场景并登记消费者，或纳入正式逐文件严格覆盖；不得刷新冻结hash延续豁免。"
-    },
     "src/features/settings/ui/AreaTranslationSettings.vue": {
       "kind": "behavior",
       "tests": [

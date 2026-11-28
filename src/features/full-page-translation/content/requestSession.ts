@@ -12,21 +12,14 @@ import {
 } from '@/src/services/translation/queue';
 import {
     clearFullPageTranslationRequestCache,
+    createAbortError,
     type FullPageTranslationCacheEntry,
     type FullPageTranslationConfigSnapshot,
     type FullPageTranslationRequestCacheEntry,
     type FullPageTranslationSessionCache,
 } from '@/src/features/full-page-translation/content/translationRequest';
 
-export function createAbortError(): Error {
-    try {
-        return new DOMException('翻译已取消', 'AbortError');
-    } catch {
-        const error = new Error('翻译已取消');
-        error.name = 'AbortError';
-        return error;
-    }
-}
+export {createAbortError};
 
 export interface FullPageRequestSessionState {
     translationRequestCache: Map<string, FullPageTranslationRequestCacheEntry>;

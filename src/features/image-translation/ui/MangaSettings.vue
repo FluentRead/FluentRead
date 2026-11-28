@@ -95,7 +95,7 @@ import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import MangaModelSettings from './MangaModelSettings.vue';
 import {getImageOcrEngine, getMangaOcrEngine} from '../ocrLanguages';
 
-const props = defineProps<{settings: Config; imageEnabled: boolean; available: boolean; serviceOptions: {label: string; value: string; disabled?: boolean}[]}>();
+const props = defineProps<{settings: Config; imageEnabled: boolean; available: boolean}>();
 const emit = defineEmits<{'update:imageEnabled': [enabled: boolean]}>();
 const {t: message, translateLegacy} = useUiI18n();
 const t = (source: string) => /^(image|area)\./.test(source) ? message(source) : translateLegacy(source);

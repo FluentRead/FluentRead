@@ -5,6 +5,7 @@
  * 模块边界：不存储 URL、正文或凭据，不按顶层网址或 TTL 丢弃接收者，不建立端口或定时器；真实浏览器事件和会话存储由 composition root 注入。
  */
 import {CONFIG_STORAGE_CHANGED_MESSAGE} from '@/src/platform/storage/configStorage';
+import {isBrowserTabId as isTabId} from '@/src/platform/browser/ids';
 import {TRANSLATION_CACHE_CLEARED_MESSAGE} from './handlers/translationCache';
 import {VOCABULARY_BOOK_CHANGED_MESSAGE, type VocabularyBookChangedMessage} from '@/src/features/vocabulary/protocol';
 import {PERSONAL_CORRECTIONS_CHANGED} from '@/src/services/personal-corrections/protocol';
@@ -44,9 +45,6 @@ function invalidationIntent(message: unknown): Invalidation {
         }
     }
     throw new TypeError('不支持的网页失效通知');
-}
-function isTabId(value: unknown): value is number {
-    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
 /** 会话存储跨非持久后台唤醒保留，但随浏览器会话清空，避免跨会话复用标签 ID。 */

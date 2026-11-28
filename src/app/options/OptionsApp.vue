@@ -190,19 +190,25 @@
 import '@/src/features/settings/ui/components/settings-navigation.css'
 import UiIcon from '@/src/ui/components/UiIcon.vue'
 import {getSupportImageUrl, getContactImageUrl} from './aboutImages'
-import {SETTINGS_TABBED_SECTION_IDS, settingsPagePanels, resolveSettingsPanel, filterNavigationItems, filterSettingsSearchTargets, isUiLanguageSearch, settingsSearchTargets} from '@/src/features/settings/model/navigation';
+import {
+  SETTINGS_TABBED_SECTION_IDS,
+  settingsPagePanels,
+  resolveSettingsPanel,
+  filterNavigationItems,
+  filterSettingsSearchTargets,
+  isUiLanguageSearch,
+  settingsSearchTargets,
+  navigationGroups,
+  navigationItems,
+  resolveNavigationItem,
+  resolveRequestedSection,
+} from '@/src/features/settings/model/navigation';
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SettingsNavigationIcon from '@/src/features/settings/ui/SettingsNavigationIcon.vue'
 import SettingsSectionNavigation from '@/src/features/settings/ui/components/SettingsSectionNavigation.vue'
 const SettingsSections = defineAsyncComponent(() => import('@/src/features/settings/ui/SettingsSections.vue'))
 const LearningCenter = defineAsyncComponent(() => import('@/src/features/settings/ui/LearningCenter.vue'))
 import {useUiI18n} from '@/src/ui/i18n'
-import {
-  navigationGroups,
-  navigationItems,
-  resolveNavigationItem,
-  resolveRequestedSection,
-} from '@/src/features/settings/model/navigation'
 import {
   config as runtimeConfig,
   configReady,

@@ -81,7 +81,7 @@ function configureSectionPorts(data: Record<string, any>, {template = false, req
         '@/src/features/settings/ui/SectionTranslationSettings.vue', '@/src/features/settings/ui/ParagraphHandlingSettings.vue',
         '@/src/features/settings/ui/TranslationCacheSettings.vue', '@/src/features/settings/ui/ExcludedLanguageSettings.vue',
         '@/src/features/settings/ui/ExcludedTagSettings.vue',
-        '@/src/features/settings/ui/ReadingAssistanceSettings.vue', '@/src/features/settings/ui/ConfigManagement.vue',
+        '@/src/features/settings/ui/ConfigManagement.vue',
         '@/src/features/settings/ui/QuickTranslationProfiles.vue', '@/src/features/settings/ui/ContextMenuSettings.vue',
         '@/src/features/settings/ui/components/FieldHelp.vue',
     ]) componentPort(path);

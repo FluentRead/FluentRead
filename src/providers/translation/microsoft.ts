@@ -6,11 +6,10 @@
  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
  */
 
-import {getTranslationProviderLanguages} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderLanguages, getTranslationRequestScheduler, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import type {TranslationLanguageOverride} from '@/src/core/translation/languages';
 import {runtimeFetch} from '@/src/platform/http/runtime';
 import {translateMicrosoftTextsWithTransport, type MicrosoftTranslationLease} from './microsoftTransport';
-import {requireTranslationProviderConfig, getTranslationRequestScheduler} from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderRequest} from '@/src/services/translation/types';
 import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 

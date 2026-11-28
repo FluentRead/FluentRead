@@ -6,7 +6,6 @@
  */
 import {isFreeTranslationProviderId, type FreeTranslationProviderId} from '@/src/core/config/freeTranslation';
 import {FREE_PROVIDER_ORIGINS} from '@/src/core/config/freeProviderOrigins';
-export {FREE_PROVIDER_ORIGINS} from '@/src/core/config/freeProviderOrigins';
 
 export const FREE_PROVIDER_PERMISSION_QUERY_TIMEOUT_MS = 2_000;
 

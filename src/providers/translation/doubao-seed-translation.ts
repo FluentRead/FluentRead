@@ -11,14 +11,12 @@ import {mergeCustomBody} from '@/src/core/config/customBody';
 import {services} from '@/src/core/config/catalog';
 import {resolveDoubaoSeedTranslationLanguage} from '@/src/core/config/doubaoSeedTranslation';
 import {currentConfiguredModel} from '@/src/services/translation/templates';
-import {getTranslationProviderLanguages} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderLanguages, requireTranslationProviderConfig, reportTranslationModelUsage, reportTranslationModelUsageFailure} from '@/src/services/translation/requestSnapshot';
 import {createHttpStatusError, readJsonResponse} from '@/src/platform/http/errors';
 import {abortErrorFromSignal, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
 import {appendOptionalBearer} from './auth';
 import {buildOpenAIApiEndpoint, readResponsesApiText} from './responses-api';
-import {requireTranslationProviderConfig, reportTranslationModelUsage, reportTranslationModelUsageFailure} from '@/src/services/translation/requestSnapshot';
-import type {TranslationProviderRequest} from '@/src/services/translation/types';
-import type {TranslationProviderConfigSnapshot} from '@/src/services/translation/types';
+import type {TranslationProviderConfigSnapshot, TranslationProviderRequest} from '@/src/services/translation/types';
 import {normalizeDeepSeekResponsesUsage as normalizeResponsesApiUsage} from './usage';
 
 /**

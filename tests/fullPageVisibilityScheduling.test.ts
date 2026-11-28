@@ -288,7 +288,6 @@ vi.mock("@/src/core/translation/public", async (importOriginal) => {
             snapshot.slots.length > 1
                 ? snapshot.slots.map(({source}) => source).join("").replace(/\s+/gu, " ").trim()
                 : null,
-        evaluateHardGuard: (element: Element) => ({prune: isProtected(element)}),
         getComposedParent: (element: Element) => element.parentElement ??
             ((element.getRootNode?.() as {host?: Element})?.host ?? null),
         isProtectedDescendantElement: (element: Element) => element.matches(protectedSelector),

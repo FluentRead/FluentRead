@@ -223,7 +223,7 @@ export function createSnapshotTranslateOptions(
     };
 }
 
-function createAbortError(): Error {
+export function createAbortError(): Error {
     try {
         return new DOMException('翻译已取消', 'AbortError');
     } catch {

@@ -170,8 +170,6 @@ export const jaJPMessages = {
     "sentenceHighlight.title": "文のハイライトスタイル",
     "sentenceHighlight.description": "原文と訳文の対応する文に使うハイライトのスタイルを選びます。",
     "sentenceHighlight.tryHint": "文にカーソルを合わせると、原文と訳文が同時に強調されます。",
-    "sentenceHighlight.offHint": "二言語の文をハイライトをオンにすると、ここで対応を体験できます。",
-    "sentenceHighlight.openStyles": "文のハイライトスタイルを調整",
     "sentenceHighlight.enableHint": "スタイルを選ぶとハイライトがオンになります。「なし」を選ぶとオフになり、前回の外観設定は保持されます。",
     "sentenceHighlight.noneDescription": "文ごとのハイライトをオフにし、現在のスタイルとカスタム外観を保持します。",
     "sentenceHighlight.sample": "自分のペースで読む",

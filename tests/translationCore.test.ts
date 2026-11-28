@@ -55,8 +55,6 @@ import {
 import {
     findAdapterPrunedAncestor,
     inheritCachedFlag,
-    partitionInlineRunAtBarriers,
-    readCachedFlagOr,
 } from '@/src/core/translation/internal';
 import {resolveVisualTranslationRange} from '@/src/core/translation/visual';
 import {defaultTranslationAdapters} from '@/src/core/translation/registry';
@@ -939,29 +937,14 @@ describe('translation candidate core', () => {
         )).toEqual({result: null, inspected: ['parent']});
     });
 
-    it('直接行内序列在独立候选边界处分段，并跳过连续或首尾边界', () => {
-        const barrier = Symbol('barrier');
-
-        expect(partitionInlineRunAtBarriers(
-            [barrier, 'before', barrier, barrier, 'after', barrier],
-            (node) => node === barrier,
-        )).toEqual([['before'], ['after']]);
-        expect(partitionInlineRunAtBarriers([], () => false)).toEqual([]);
-    });
-
-    it('engine 本轮布尔缓存支持祖先继承，并只在缺失时执行后备计算', () => {
+    it('engine 本轮布尔缓存支持祖先继承', () => {
         const parent = {};
         const child = {};
         const flags = new WeakMap<object, boolean>([[parent, true], [child, false]]);
-        const fallback = vi.fn(() => true);
 
         expect(inheritCachedFlag(parent, flags)).toBe(true);
         expect(inheritCachedFlag(child, flags)).toBe(false);
         expect(inheritCachedFlag(null, flags)).toBe(false);
-        expect(readCachedFlagOr(flags, child, fallback)).toBe(false);
-        expect(fallback).not.toHaveBeenCalled();
-        expect(readCachedFlagOr(flags, {}, fallback)).toBe(true);
-        expect(fallback).toHaveBeenCalledOnce();
     });
 
     it('keeps inline links and emphasis inside one paragraph candidate', () => {

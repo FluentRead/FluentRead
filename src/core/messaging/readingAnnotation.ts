@@ -7,7 +7,7 @@
 import {inferenceResponse, type InferenceResponse} from './inference';
 import {isMessageRecord, isNonEmptyString, isPositiveSafeInteger, parseMessage, shape, type Validator} from './validation';
 
-export const READING_ANNOTATION_LANGUAGES = ['ja', 'ko', 'zh', 'ru', 'el', 'ar', 'hi', 'th'] as const;
+const READING_ANNOTATION_LANGUAGES = ['ja', 'ko', 'zh', 'ru', 'el', 'ar', 'hi', 'th'] as const;
 export interface VideoReadingAnnotation {text: string; language: string; scheme: string}
 export interface ReadingAnnotationInput {text: string; language: string}
 export interface ReadingAnnotationRequest extends ReadingAnnotationInput {requestId: string}
@@ -21,7 +21,7 @@ const text: Validator<string> = (value): value is string => isNonEmptyString(val
 const resultText: Validator<string> = (value): value is string => isNonEmptyString(value) && value.length <= 12_000;
 const scheme: Validator<string> = (value): value is string => isNonEmptyString(value) && value.length <= 64;
 const requestId: Validator<string> = (value): value is string => typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/u.test(value);
-export const isVideoReadingAnnotation = shape<VideoReadingAnnotation>({text: resultText, language, scheme});
+const isVideoReadingAnnotation = shape<VideoReadingAnnotation>({text: resultText, language, scheme});
 export const isReadingAnnotationResult: Validator<VideoReadingAnnotation | null> = (value): value is VideoReadingAnnotation | null => value === null || isVideoReadingAnnotation(value);
 export const isReadingAnnotationRequest = shape<ReadingAnnotationRequest>({text, language, requestId});
 export const isReadingAnnotationCancellation = shape<ReadingAnnotationCancellation>({requestId});

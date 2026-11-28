@@ -171,8 +171,6 @@ export const enUSMessages = {
     "sentenceHighlight.title": "Sentence highlight style",
     "sentenceHighlight.description": "Choose how matching source and translated sentences are highlighted.",
     "sentenceHighlight.tryHint": "Move over a sentence to highlight its source and translation together.",
-    "sentenceHighlight.offHint": "Turn on bilingual sentence highlighting to try matching sentences here.",
-    "sentenceHighlight.openStyles": "Choose sentence highlight style",
     "sentenceHighlight.enableHint": "Choose a style to enable highlighting. Choose “None” to turn it off and keep your previous appearance settings.",
     "sentenceHighlight.noneDescription": "Turn off sentence highlighting while keeping the current style and custom appearance.",
     "sentenceHighlight.sample": "Read at your own pace",

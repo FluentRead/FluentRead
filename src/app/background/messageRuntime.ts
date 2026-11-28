@@ -12,7 +12,6 @@ import {lookupSelectionDictionary, createDictionaryRuntimeHandler} from './dicti
 import {createSelectionPageZoomBrowserPort, createSelectionPageZoomHandler} from '@/src/features/selection-translation/background/pageZoomHandler';
 import {createSelectionTtsRuntimeHandlers} from './selectionTtsRuntime';
 import {vocabularyBook} from '@/src/features/vocabulary/repository';
-import {createBrowserMaterialHandler} from './handlers/vocabulary';
 import {clearTranslationCache, getTranslationCacheStats, translateWithCache} from '@/src/app/translation/runtime';
 import {serializeTranslationError} from '@/src/services/translation/errors';
 import {createBackgroundMessageRouter, createBackgroundRuntimeMessageListener, type BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
@@ -33,7 +32,7 @@ import {createUiLanguageBaseHandler} from './handlers/uiLanguageBase';
 import {createTranslationCancelHandler, createTranslationRequestFallback, createTranslationRequestRegistry} from './handlers/translation';
 import {createSelectionWordLookupHandler} from './handlers/selectionWordLookup';
 import {isBrowserTabId} from './tabTranslationState';
-import {createBrowserVocabularyBookChangedBroadcaster, createBrowserVocabularyUndoOptions, createVocabularyBackgroundHandlers} from './handlers/vocabulary';
+import {createBrowserMaterialHandler, createBrowserVocabularyBookChangedBroadcaster, createBrowserVocabularyUndoOptions, createVocabularyBackgroundHandlers} from './handlers/vocabulary';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {installExtensionPageMessageListener, type ExtensionPageMessageTarget} from '@/src/platform/offscreen/extensionPageMessaging';
 import {createCapabilityGatedBackgroundHandlers} from './capabilityRegistry';

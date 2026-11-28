@@ -166,8 +166,6 @@ export const zhCNMessages = {
     "sentenceHighlight.title": "逐句高亮样式",
     "sentenceHighlight.description": "选择原文与译文对应句子的高亮样式，便于对照阅读",
     "sentenceHighlight.tryHint": "移到一句话上，原文与译文会同步高亮",
-    "sentenceHighlight.offHint": "开启双语逐句高亮，即可在这里体验句子对应",
-    "sentenceHighlight.openStyles": "调整逐句高亮样式",
     "sentenceHighlight.enableHint": "选择样式即可开启；选择“无”关闭高亮，并保留上次的外观设置",
     "sentenceHighlight.noneDescription": "关闭逐句高亮，保留当前样式与自定义外观",
     "sentenceHighlight.sample": "让阅读轻松自然",

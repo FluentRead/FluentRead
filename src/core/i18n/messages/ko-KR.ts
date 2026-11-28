@@ -170,8 +170,6 @@ export const koKRMessages = {
     "sentenceHighlight.title": "문장 강조 스타일",
     "sentenceHighlight.description": "원문과 번역문의 대응하는 문장을 강조할 스타일을 선택합니다.",
     "sentenceHighlight.tryHint": "문장 위로 마우스를 옮기면 원문과 번역문이 함께 강조됩니다.",
-    "sentenceHighlight.offHint": "이중 언어 문장 강조를 켜면 여기에서 문장 대응을 체험할 수 있습니다.",
-    "sentenceHighlight.openStyles": "문장 강조 스타일 조정",
     "sentenceHighlight.enableHint": "스타일을 선택하면 강조가 켜집니다. ‘없음’을 선택하면 강조가 꺼지고 이전 모양 설정은 유지됩니다.",
     "sentenceHighlight.noneDescription": "문장별 강조를 끄고 현재 스타일과 사용자 지정 모양을 유지합니다.",
     "sentenceHighlight.sample": "편안하게 읽기",

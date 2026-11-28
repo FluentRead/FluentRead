@@ -9,7 +9,7 @@ import {isVideoTranscriptionInput, isVideoPreparationResult, isVideoTranscriptio
 import {isReadingAnnotationRequest, isReadingAnnotationCancellation, isReadingAnnotationResponse, type ReadingAnnotationRequest, type ReadingAnnotationCancellation, type ReadingAnnotationResponse} from './readingAnnotation';
 export type {InferenceBackend, InferenceFailure, InferenceSuccess, InferenceResponse} from './inference';
 export type {VideoTranscriptionModel, VideoTranscriptionCancelReason, VideoRecognitionMetadata, VideoTranscriptionSegment, VideoTranscriptionResult, VideoPreparationResult, VideoTranscriptionInput, VideoPrepareInput, VideoBackgroundInput, VideoBackgroundRequestMap, VideoBackgroundResponseMap, VideoBackgroundRequestType, VideoBackgroundRequest} from './video';
-export {isVideoPreparationResult, isVideoTranscriptionResult, isVideoBackgroundInput, parseVideoBackgroundResponse} from './video';
+export {isVideoPreparationResult, isVideoTranscriptionResult} from './video';
 import {isLocalTranslationModel, normalizeLocalTranslationDownloadSnapshot, type LocalTranslationModelId, type LocalTranslationDownloadSnapshot, type LocalTranslationDownloadState} from '@/src/core/config/localTranslation';
 import {parseSpeechCues, type SpeechCue} from '@/src/core/tts/speechProgress';
 import {arrayOf, isBoolean, isFiniteNumber, isMessageRecord, isNonEmptyString, isString, oneOf, optional, parseMessage, shape, type Validator} from './validation';

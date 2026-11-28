@@ -170,8 +170,6 @@ export const frFRMessages = {
     "sentenceHighlight.title": "Style du surlignage par phrase",
     "sentenceHighlight.description": "Choisissez le style de mise en évidence des phrases correspondantes du texte original et traduit.",
     "sentenceHighlight.tryHint": "Survolez une phrase pour souligner ensemble sa source et sa traduction.",
-    "sentenceHighlight.offHint": "Activez le surlignage bilingue par phrase pour essayer la correspondance ici.",
-    "sentenceHighlight.openStyles": "Choisir le style de surlignage",
     "sentenceHighlight.enableHint": "Choisissez un style pour activer le surlignage. Choisissez « Aucun » pour le désactiver et conserver vos réglages d’apparence précédents.",
     "sentenceHighlight.noneDescription": "Désactive le surlignage phrase par phrase et conserve le style actuel et l’apparence personnalisée.",
     "sentenceHighlight.sample": "Lire à votre rythme",

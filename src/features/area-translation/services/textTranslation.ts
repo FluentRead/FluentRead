@@ -16,8 +16,7 @@ import {
     markTranslationRemainingBudget,
     attachTranslationImageInput,
 } from '@/src/services/translation/requestSnapshot';
-import type {TrustedTranslationGlossaryContext} from '@/src/services/translation/types';
-import type {TranslationConfigSource, TranslationRequestMessage} from '@/src/services/translation/types';
+import type {TranslationConfigSource, TranslationRequestMessage, TrustedTranslationGlossaryContext} from '@/src/services/translation/types';
 import type {ImageOperationOptions} from '@/src/features/image-translation/protocol';
 import type {AreaRecognitionResult, AreaTranslationMode, AreaTranslationResult, AreaTranslationSelection} from '../protocol';
 import {DEFAULT_AREA_VISION_PROMPT} from '@/src/core/config/vision';

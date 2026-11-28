@@ -677,7 +677,7 @@
       "tests": [
         "tests/interfaceSettingsLifecycle.test.ts"
       ],
-      "scenario": "保留原始官方品牌图标不变，为 11 套工艺 Popup 皮肤叠加专属外缘趣味装饰并隔离渐变 ID"
+      "scenario": "保留原始官方品牌图标不变，为 15 套工艺 Popup 皮肤叠加专属外缘趣味装饰并隔离渐变 ID"
     }
   }
 }

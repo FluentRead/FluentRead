@@ -27,7 +27,7 @@ import {mountImageTranslator, unmountImageTranslator, toggleContextMenuImage, to
 import type {MangaTranslationStatus} from '@/src/features/image-translation/content/mangaSession';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 import * as controlsModule from '@/src/features/image-translation/content/controls';
-import {registerMangaReadingOpener} from '@/src/features/image-translation/content/runtime';
+import {getImageData, registerMangaReadingOpener, retryFailedMangaTranslation} from '@/src/features/image-translation/content/runtime';
 import {importMangaModel,MANGA_OCR_CACHE,MANGA_TEXT_SEGMENTATION_ASSET} from '@/src/features/image-translation/services/mangaOcrAssets';
 import {createVirtualModelResponsePort,virtualModelBuffer} from './helpers/virtualModelResponse';
 
@@ -3620,4 +3620,158 @@ it('大量文本节点的批量更新采用有界保守检查', async () => {
     const target = document.createElement('p'); document.body.append(target);
     env.observers[0].callback([{type: 'childList', target, addedNodes: Array.from({length: 9}, () => document.createTextNode('x')), removedNodes: []} as unknown as MutationRecord], {} as MutationObserver);
     expect(env.bitmap()).toBeNull();
+});
+
+it('getImageData 对无需缩放的 data:/blob: 光栅图片走零 Canvas 直通路径，异常或需缩放时安全回退 Canvas', async () => {
+    const env = setup();
+    const img = document.createElement('img') as HTMLImageElement;
+    Object.defineProperties(img, {
+        naturalWidth: {configurable: true, value: 800, writable: true},
+        naturalHeight: {configurable: true, value: 1200, writable: true},
+        currentSrc: {configurable: true, get: () => img.src},
+    });
+
+    // 1. Direct raster data: URL returns immediately without touching canvas
+    const jpegData = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+    img.src = jpegData;
+    const prevCanvasCount = env.canvases.length;
+    expect(await getImageData(img)).toBe(jpegData);
+    expect(env.canvases.length).toBe(prevCanvasCount);
+
+    // 2. Non-raster data: URL (SVG) falls back to Canvas
+    img.src = 'data:image/svg+xml;base64,PHN2Zy8+';
+    expect(await getImageData(img)).toBe('data:image/png;base64,source');
+    expect(env.canvases.length).toBe(prevCanvasCount + 1);
+
+    // 3. Empty src falls back to Canvas
+    img.src = '';
+    expect(await getImageData(img)).toBe('data:image/png;base64,source');
+
+    // 4. Direct blob: JPEG uses fetch + FileReader without creating a Canvas
+    img.src = 'blob:https://mangaplus.shueisha.co.jp/page-1';
+    const fetchMock = vi.fn<(...args: any[]) => Promise<any>>(async () => ({
+        ok: true,
+        blob: async () => new Blob(['jpeg-bytes'], {type: 'image/jpeg'}),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const canvasBeforeBlob = env.canvases.length;
+    expect(await getImageData(img)).toBe('data:image/png;base64,source');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(env.canvases.length).toBe(canvasBeforeBlob);
+
+    // 5. Non-ok response, SVG blob, empty blob, oversize blob, and fetch error all fall back cleanly to Canvas
+    for (const impl of [
+        async () => ({ok: false, blob: async () => new Blob(['x'], {type: 'image/jpeg'})}),
+        async () => ({ok: true, blob: async () => new Blob(['<svg/>'], {type: 'image/svg+xml'})}),
+        async () => ({ok: true, blob: async () => new Blob([], {type: 'image/jpeg'})}),
+        async () => ({ok: true, blob: async () => ({type: 'image/jpeg', size: 20 * 1024 * 1024})}),
+        async () => { throw new TypeError('revoked blob'); },
+    ]) {
+        fetchMock.mockImplementationOnce(impl as never);
+        const before = env.canvases.length;
+        expect(await getImageData(img)).toBe('data:image/png;base64,source');
+        expect(env.canvases.length).toBe(before + 1);
+    }
+
+    // 6. Scale < 1 (exceeds MAX_IMAGE_READ_EDGE) skips direct fast path and downscales via Canvas
+    img.src = jpegData;
+    Object.defineProperty(img, 'naturalWidth', {configurable: true, value: 9000, writable: true});
+    const beforeScale = env.canvases.length;
+    expect(await getImageData(img)).toBe('data:image/png;base64,source');
+    expect(env.canvases.length).toBe(beforeScale + 1);
+
+    // 7. Abort and timeout propagation on blob: fast path
+    Object.defineProperty(img, 'naturalWidth', {configurable: true, value: 800, writable: true});
+    img.src = 'blob:https://mangaplus.shueisha.co.jp/page-abort';
+    const controller = new AbortController();
+    fetchMock.mockImplementationOnce((_url: string, init?: {signal?: AbortSignal}) => new Promise((_res, rej) => {
+        init?.signal?.addEventListener('abort', () => rej(Object.assign(new Error('aborted'), {name: 'AbortError'})));
+    }) as never);
+    const pendingAbort = getImageData(img, {signal: controller.signal});
+    controller.abort();
+    await expect(pendingAbort).rejects.toMatchObject({name: 'AbortError'});
+
+    // Timeout during fetch
+    vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    try {
+        fetchMock.mockImplementationOnce((_url: string, init?: {signal?: AbortSignal}) => new Promise((_res, rej) => {
+            init?.signal?.addEventListener('abort', () => rej(new Error('fetch timed out')));
+        }) as never);
+        const pendingTimeout = getImageData(img, {timeoutMs: 10});
+        vi.advanceTimersByTime(15);
+        await expect(pendingTimeout).rejects.toThrow('图片读取超时');
+    } finally {
+        vi.useRealTimers();
+    }
+
+    // FileReader error and non-string result fall back cleanly to Canvas
+    const OrigReader = globalThis.FileReader;
+    class ErrorReader {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        readyState = 0;
+        result: unknown = null;
+        abort = vi.fn();
+        readAsDataURL = () => { void Promise.resolve().then(() => this.onerror?.()); };
+    }
+    vi.stubGlobal('FileReader', ErrorReader);
+    fetchMock.mockImplementationOnce(async () => ({ok: true, blob: async () => new Blob(['x'], {type: 'image/webp'})}));
+    await expect(getImageData(img)).rejects.toThrow('图片数据读取失败');
+
+    class NonStringReader {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        readyState = 0;
+        result: unknown = new ArrayBuffer(4);
+        abort = vi.fn();
+        readAsDataURL = () => { void Promise.resolve().then(() => this.onload?.()); };
+    }
+    vi.stubGlobal('FileReader', NonStringReader);
+    fetchMock.mockImplementationOnce(async () => ({ok: true, blob: async () => new Blob(['x'], {type: 'image/png'})}));
+    await expect(getImageData(img)).rejects.toThrow('图片数据读取失败');
+    // Abort while FileReader is actively reading a blob cancels reader cleanly
+    class SlowReader {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        readyState = 0;
+        result: unknown = null;
+        abort = vi.fn(() => { this.readyState = 2; });
+        readAsDataURL = () => { this.readyState = 1; };
+    }
+    vi.stubGlobal('FileReader', SlowReader);
+    const abortDuringRead = new AbortController();
+    fetchMock.mockImplementationOnce(async () => ({ok: true, blob: async () => new Blob(['x'], {type: 'image/jpeg'})}));
+    const pendingReaderAbort = getImageData(img, {signal: abortDuringRead.signal});
+    await flush();
+    abortDuringRead.abort();
+    await expect(pendingReaderAbort).rejects.toMatchObject({name: 'AbortError'});
+    vi.stubGlobal('FileReader', OrigReader);
+
+    // 8. preferOpaqueJpeg encodes opaque manga canvas as JPEG 0.92 and keeps PNG when alpha < 255
+    img.src = 'https://example.test/manga-opaque.jpg';
+    const beforeOpaque = env.canvases.length;
+    await getImageData(img, {preferOpaqueJpeg: true});
+    expect(env.canvases[beforeOpaque].toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.92);
+    expect(env.canvases.every(c => c.width === 0 && c.height === 0)).toBe(true);
+
+    // Transparent canvas falls back to lossless PNG
+    const origImpl = vi.mocked(document.createElement).getMockImplementation()!;
+    vi.mocked(document.createElement).mockImplementation(((tag: string) => {
+        const el = origImpl(tag);
+        if (tag === 'canvas' && env.canvases.length === beforeOpaque + 4) {
+            (el as HTMLCanvasElement).getContext = vi.fn(() => ({
+                drawImage: vi.fn(),
+                getImageData: vi.fn(() => ({data: new Uint8ClampedArray([255, 255, 255, 128])})),
+            })) as never;
+        }
+        return el;
+    }) as never);
+    await getImageData(img, {preferOpaqueJpeg: true});
+    expect(env.canvases[beforeOpaque + 2].toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png');
+    vi.mocked(document.createElement).mockImplementation(origImpl);
+
+    // 9. retryFailedMangaTranslation returns 0 when mounted without failures and 0 when unmounted
+    expect(retryFailedMangaTranslation()).toBe(0);
+    unmountImageTranslator();
+    expect(retryFailedMangaTranslation()).toBe(0);
 });

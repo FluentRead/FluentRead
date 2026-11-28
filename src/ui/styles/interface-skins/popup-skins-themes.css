@@ -1,6 +1,6 @@
 /**
  * @file src/ui/styles/interface-skins/popup-skins-themes.css
- * 文件职责：定义 11 套风格迥异的 Popup 专属工艺皮肤（液态玻璃、极光幻彩、拟物硬件、新粗野波普、赛博霓虹、经典复古桌面、极客终端、典藏画报、樱雾物语、宇治手账、黑金典藏）的令牌与材质特化规则。
+ * 文件职责：定义 15 套风格迥异的 Popup 专属工艺皮肤（液态玻璃、极光幻彩、拟物硬件、新粗野波普、赛博霓虹、经典复古桌面、极客终端、典藏画报、樱雾物语、宇治手账、黑金典藏、素净极简、落日熔金、建筑蓝图、星穹漫游）的令牌与材质特化规则。
  * 主要内容：每套皮肤拥有独立的画布氛围、几何圆角、边框/投影物理、字体气质与浅深色板，所有基础语义色保持纯 hex 以保证 WCAG AA 可读性校验，光学纹理与渐变通过独立图层令牌叠加。
  * 模块边界：所有选择器严格限定在 :root[data-popup-root] 与 .popup-skin-scope 内，绝不影响 Options 设置页、内容脚本及网页翻译；绝不对品牌图标施加滤镜。
  */
@@ -865,3 +865,308 @@
   --skin-switch-on-bg: #d6b15c;
   --skin-switch-knob: #140f05;
 }
+
+/* ==========================================================================
+   12. 素净极简 (swiss-minimal) — 瑞士无框去噪 + 轻量紧凑节奏 + 黑白反差主按钮
+   ========================================================================== */
+:root[data-popup-root]:not(.dark)[data-interface-skin="swiss-minimal"],
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="swiss-minimal"] {
+  --skin-page: #ffffff;
+  --skin-surface: #ffffff;
+  --skin-surface-soft: #f3f4f6;
+  --skin-surface-hover: #e8eaee;
+  --skin-ink: #0f1115;
+  --skin-muted: #525866;
+  --skin-line: #e4e7ec;
+  --skin-line-strong: #c5cbd6;
+  --skin-brand: #111318;
+  --skin-brand-strong: #0f1115;
+  --skin-brand-soft: #eceef2;
+  --skin-action-bg: #111318;
+  --skin-action-hover: #272b34;
+  --skin-action-text: #ffffff;
+  --skin-shell-padding: 10px 12px 8px;
+  --skin-header-gap: 8px;
+  --skin-section-gap: 8px;
+  --skin-feature-gap: 6px;
+  --skin-action-height: 38px;
+  --skin-feature-height: 44px;
+  --skin-feature-padding: 6px 8px;
+  --skin-icon-size: 24px;
+  --skin-panel-radius: 0px;
+  --skin-preview-radius: 10px;
+  --skin-control-radius: 6px;
+  --skin-action-radius: 6px;
+  --skin-feature-radius: 7px;
+  --skin-icon-radius: 5px;
+  --skin-control-border: 1px solid #e4e7ec;
+  --skin-input-border: 1px solid #e8ebf0;
+  --skin-feature-border: 1px solid transparent;
+  --skin-feature-bg: #f6f7f9;
+  --skin-icon-bg: #ffffff;
+  --skin-icon-border: 1px solid #e0e4ec;
+  --skin-icon-fg: #0f1115;
+  --skin-status-active: #10b981;
+  --skin-switch-on-bg: #111318;
+  --skin-switch-knob: #ffffff;
+}
+
+:root[data-popup-root][data-interface-skin="swiss-minimal"] .hero-card,
+.popup-skin-scope[data-interface-skin="swiss-minimal"] .preview-hero {
+  padding: 2px 0 10px;
+  border: 0;
+  border-bottom: 1px solid var(--skin-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-popup-root][data-interface-skin="swiss-minimal"] .popup-header,
+.popup-skin-scope[data-interface-skin="swiss-minimal"] .preview-header {
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--skin-line);
+}
+
+:root[data-popup-root][data-interface-skin="swiss-minimal"] .feature-card,
+.popup-skin-scope[data-interface-skin="swiss-minimal"] .preview-feature {
+  grid-template-columns: 24px minmax(0, 1fr) 6px;
+  gap: 7px;
+}
+
+:root.dark[data-popup-root][data-interface-skin="swiss-minimal"],
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="swiss-minimal"] {
+  --skin-page: #0b0c0f;
+  --skin-surface: #111318;
+  --skin-surface-soft: #181b22;
+  --skin-surface-hover: #222630;
+  --skin-ink: #f4f5f7;
+  --skin-muted: #9ca3b2;
+  --skin-line: #232732;
+  --skin-line-strong: #3b4152;
+  --skin-brand: #e4e7ee;
+  --skin-brand-strong: #f4f5f7;
+  --skin-brand-soft: #1d212b;
+  --skin-action-bg: #f4f5f7;
+  --skin-action-hover: #dfe3eb;
+  --skin-action-text: #0b0c0f;
+  --skin-shell-padding: 10px 12px 8px;
+  --skin-header-gap: 8px;
+  --skin-section-gap: 8px;
+  --skin-feature-gap: 6px;
+  --skin-action-height: 38px;
+  --skin-feature-height: 44px;
+  --skin-feature-padding: 6px 8px;
+  --skin-icon-size: 24px;
+  --skin-panel-radius: 0px;
+  --skin-preview-radius: 10px;
+  --skin-control-radius: 6px;
+  --skin-action-radius: 6px;
+  --skin-feature-radius: 7px;
+  --skin-icon-radius: 5px;
+  --skin-control-border: 1px solid #232732;
+  --skin-input-border: 1px solid #232732;
+  --skin-feature-border: 1px solid transparent;
+  --skin-feature-bg: #14171e;
+  --skin-icon-bg: #0b0c0f;
+  --skin-icon-border: 1px solid #2c3140;
+  --skin-icon-fg: #f4f5f7;
+  --skin-status-active: #34d399;
+  --skin-switch-on-bg: #f4f5f7;
+  --skin-switch-knob: #0b0c0f;
+}
+
+/* ==========================================================================
+   13. 落日熔金 (golden-hour) — 暖杏霞光画布 + 象牙丝绒浮卡 + 熔金绯红渐变按钮
+   ========================================================================== */
+:root[data-popup-root]:not(.dark)[data-interface-skin="golden-hour"],
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="golden-hour"] {
+  --skin-page: #fff2e6;
+  --skin-page-bg:
+    radial-gradient(circle at 86% 6%, #fcd39d 0%, transparent 48%),
+    radial-gradient(circle at 12% 18%, #fecdd3 0%, transparent 46%),
+    radial-gradient(circle at 52% 96%, #fde68a 0%, transparent 52%),
+    #fff2e6;
+  --skin-surface: #fffbf5;
+  --skin-panel-bg: rgba(255, 251, 245, 0.86);
+  --skin-control-bg: rgba(255, 251, 245, 0.88);
+  --skin-input-bg: rgba(252, 238, 224, 0.72);
+  --skin-surface-soft: #fceee0;
+  --skin-surface-hover: #f7e2ce;
+  --skin-ink: #261309;
+  --skin-muted: #6b4532;
+  --skin-line: #f0d3bc;
+  --skin-line-strong: #dca782;
+  --skin-brand: #c84312;
+  --skin-brand-strong: #9f300a;
+  --skin-brand-soft: #fde9db;
+  --skin-action-bg: linear-gradient(125deg, #cf400e 0%, #be2454 100%);
+  --skin-action-hover: linear-gradient(125deg, #b83609 0%, #a51c47 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 16px;
+  --skin-preview-radius: 16px;
+  --skin-control-radius: 10px;
+  --skin-action-radius: 12px;
+  --skin-feature-radius: 13px;
+  --skin-icon-radius: 50%;
+  --skin-panel-backdrop: blur(10px);
+  --skin-panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 8px 22px rgba(180, 68, 22, 0.10);
+  --skin-feature-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 3px 10px rgba(180, 68, 22, 0.06);
+  --skin-action-shadow: 0 6px 16px rgba(190, 36, 84, 0.30), inset 0 1px 0 rgba(255, 236, 209, 0.42);
+  --skin-icon-bg: #fde8d7;
+  --skin-icon-fg: #9f300a;
+  --skin-switch-on-bg: #c84312;
+  --skin-switch-knob: #ffffff;
+}
+
+:root[data-popup-root]:not(.dark)[data-interface-skin="golden-hour"] .feature-card:nth-child(4n + 1) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="golden-hour"] .preview-feature:nth-child(4n + 1) .preview-feature-icon { background: #ffedd5; color: #b43c0e; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="golden-hour"] .feature-card:nth-child(4n + 2) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="golden-hour"] .preview-feature:nth-child(4n + 2) .preview-feature-icon { background: #ffe4e6; color: #be123c; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="golden-hour"] .feature-card:nth-child(4n + 3) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="golden-hour"] .preview-feature:nth-child(4n + 3) .preview-feature-icon { background: #fef3c7; color: #a16207; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="golden-hour"] .feature-card:nth-child(4n + 4) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="golden-hour"] .preview-feature:nth-child(4n + 4) .preview-feature-icon { background: #fce7f3; color: #9d174d; }
+
+:root.dark[data-popup-root][data-interface-skin="golden-hour"],
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="golden-hour"] {
+  --skin-page: #140d11;
+  --skin-page-bg:
+    radial-gradient(90% 45% at 80% 0%, rgba(249, 115, 22, 0.26) 0%, transparent 62%),
+    radial-gradient(circle at 14% 92%, rgba(225, 29, 72, 0.22) 0%, transparent 54%),
+    #140d11;
+  --skin-surface: #1d1419;
+  --skin-panel-bg: rgba(29, 20, 25, 0.88);
+  --skin-surface-soft: #281c22;
+  --skin-surface-hover: #35252d;
+  --skin-ink: #fdf3eb;
+  --skin-muted: #cca999;
+  --skin-line: #422c33;
+  --skin-line-strong: #78493c;
+  --skin-brand: #fb923c;
+  --skin-brand-strong: #fdba74;
+  --skin-brand-soft: #382018;
+  --skin-action-bg: linear-gradient(125deg, #c93e0e 0%, #b52052 100%);
+  --skin-action-hover: linear-gradient(125deg, #b5350a 0%, #9e1945 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 16px;
+  --skin-preview-radius: 16px;
+  --skin-control-radius: 10px;
+  --skin-action-radius: 12px;
+  --skin-feature-radius: 13px;
+  --skin-icon-radius: 50%;
+  --skin-panel-shadow: inset 0 1px 0 rgba(253, 186, 116, 0.14), 0 10px 26px rgba(0, 0, 0, 0.48);
+  --skin-action-shadow: 0 6px 18px rgba(201, 62, 14, 0.36);
+  --skin-icon-bg: #362018;
+  --skin-icon-border: 1px solid #633b28;
+  --skin-icon-fg: #fdba74;
+  --skin-switch-on-bg: #c93e0e;
+  --skin-switch-knob: #ffffff;
+}
+
+/* ==========================================================================
+   14. 建筑蓝图 (blueprint) — 常暗普鲁士蓝晒 + 双级制图网格 + 冰白印签主按钮
+   ========================================================================== */
+:root[data-popup-root][data-interface-skin="blueprint"],
+.popup-skin-scope[data-interface-skin="blueprint"] {
+  --skin-page: #061a38;
+  --skin-page-bg:
+    linear-gradient(rgba(186, 230, 253, 0.16) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, rgba(186, 230, 253, 0.16) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(rgba(147, 197, 253, 0.08) 1px, transparent 1px) 0 0 / 16px 16px,
+    linear-gradient(90deg, rgba(147, 197, 253, 0.08) 1px, transparent 1px) 0 0 / 16px 16px,
+    #061a38;
+  --skin-surface: #092247;
+  --skin-panel-bg: rgba(9, 34, 71, 0.86);
+  --skin-surface-soft: #0e2c59;
+  --skin-surface-hover: #14366b;
+  --skin-ink: #f2f9ff;
+  --skin-muted: #9bc5ec;
+  --skin-line: #25538f;
+  --skin-line-strong: #7dd3fc;
+  --skin-brand: #7dd3fc;
+  --skin-brand-strong: #bae6fd;
+  --skin-brand-soft: #103466;
+  --skin-action-bg: linear-gradient(180deg, #e6f6ff 0%, #c4e8ff 100%);
+  --skin-action-hover: linear-gradient(180deg, #ffffff 0%, #d9f1ff 100%);
+  --skin-action-text: #061a38;
+  --skin-action-tracking: 0.03em;
+  --skin-heading-font: ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", sans-serif;
+  --skin-panel-radius: 2px;
+  --skin-preview-radius: 2px;
+  --skin-control-radius: 2px;
+  --skin-feature-radius: 2px;
+  --skin-icon-radius: 2px;
+  --skin-pill-radius: 2px;
+  --skin-tag-radius: 2px;
+  --skin-panel-border: 1px solid rgba(186, 230, 253, 0.56);
+  --skin-feature-border: 1px dashed rgba(147, 197, 253, 0.44);
+  --skin-panel-shadow: inset 0 0 0 1px rgba(186, 230, 253, 0.14), 0 8px 20px rgba(2, 10, 24, 0.42);
+  --skin-action-shadow: 0 0 14px rgba(125, 211, 252, 0.28);
+  --skin-icon-bg: rgba(125, 211, 252, 0.12);
+  --skin-icon-border: 1px solid rgba(186, 230, 253, 0.45);
+  --skin-icon-fg: #d9f3ff;
+  --skin-status-active: #7dd3fc;
+  --skin-status-ring: 0 0 7px rgba(125, 211, 252, 0.85);
+  --skin-switch-on-bg: #7dd3fc;
+  --skin-switch-knob: #061a38;
+}
+
+/* ==========================================================================
+   15. 星穹漫游 (starlight) — 常暗深空星点穹顶 + 幽蓝星云 + 璨紫星轨胶囊钮
+   ========================================================================== */
+:root[data-popup-root][data-interface-skin="starlight"],
+.popup-skin-scope[data-interface-skin="starlight"] {
+  --skin-page: #070918;
+  --skin-page-bg:
+    radial-gradient(1.2px 1.2px at 18% 14%, rgba(255, 255, 255, 0.85) 50%, transparent 100%),
+    radial-gradient(1px 1px at 78% 12%, rgba(196, 181, 253, 0.85) 50%, transparent 100%),
+    radial-gradient(1.4px 1.4px at 88% 42%, rgba(186, 230, 253, 0.80) 50%, transparent 100%),
+    radial-gradient(1px 1px at 12% 68%, rgba(255, 255, 255, 0.72) 50%, transparent 100%),
+    radial-gradient(1.2px 1.2px at 62% 86%, rgba(253, 230, 138, 0.82) 50%, transparent 100%),
+    radial-gradient(circle at 22% 8%, rgba(99, 102, 241, 0.34) 0%, transparent 48%),
+    radial-gradient(circle at 84% 88%, rgba(139, 92, 246, 0.28) 0%, transparent 50%),
+    #070918;
+  --skin-surface: #10132b;
+  --skin-panel-bg: rgba(16, 19, 43, 0.78);
+  --skin-control-bg: rgba(20, 25, 56, 0.82);
+  --skin-input-bg: rgba(23, 28, 61, 0.76);
+  --skin-surface-soft: #171c3d;
+  --skin-surface-hover: #202752;
+  --skin-ink: #f3f4ff;
+  --skin-muted: #a4addb;
+  --skin-line: #2d3566;
+  --skin-line-strong: #6366f1;
+  --skin-brand: #93a4ff;
+  --skin-brand-strong: #c4ceff;
+  --skin-brand-soft: #1d224f;
+  --skin-action-bg: linear-gradient(125deg, #3b4fd4 0%, #6d38cf 100%);
+  --skin-action-hover: linear-gradient(125deg, #3244bf 0%, #5e2eb8 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 15px;
+  --skin-preview-radius: 15px;
+  --skin-control-radius: 10px;
+  --skin-action-radius: 999px;
+  --skin-feature-radius: 12px;
+  --skin-icon-radius: 50%;
+  --skin-panel-backdrop: blur(10px);
+  --skin-panel-border: 1px solid rgba(165, 180, 252, 0.26);
+  --skin-feature-border: 1px solid rgba(165, 180, 252, 0.20);
+  --skin-panel-shadow: inset 0 1px 0 rgba(224, 231, 255, 0.16), 0 10px 28px rgba(3, 5, 18, 0.56);
+  --skin-action-shadow: 0 6px 20px rgba(99, 102, 241, 0.44), inset 0 1px 0 rgba(224, 231, 255, 0.34);
+  --skin-icon-bg: rgba(147, 164, 255, 0.14);
+  --skin-icon-border: 1px solid rgba(196, 206, 255, 0.30);
+  --skin-icon-fg: #e0e7ff;
+  --skin-status-active: #a5b4fc;
+  --skin-status-ring: 0 0 8px rgba(165, 180, 252, 0.85);
+  --skin-switch-on-bg: #4f5fe0;
+  --skin-switch-knob: #ffffff;
+}
+
+:root[data-popup-root][data-interface-skin="starlight"] .feature-card:nth-child(4n + 1) .feature-icon,
+.popup-skin-scope[data-interface-skin="starlight"] .preview-feature:nth-child(4n + 1) .preview-feature-icon { background: rgba(99, 102, 241, 0.22); border-color: rgba(165, 180, 252, 0.42); color: #c7d2fe; }
+:root[data-popup-root][data-interface-skin="starlight"] .feature-card:nth-child(4n + 2) .feature-icon,
+.popup-skin-scope[data-interface-skin="starlight"] .preview-feature:nth-child(4n + 2) .preview-feature-icon { background: rgba(168, 85, 247, 0.22); border-color: rgba(216, 180, 254, 0.42); color: #e9d5ff; }
+:root[data-popup-root][data-interface-skin="starlight"] .feature-card:nth-child(4n + 3) .feature-icon,
+.popup-skin-scope[data-interface-skin="starlight"] .preview-feature:nth-child(4n + 3) .preview-feature-icon { background: rgba(250, 204, 21, 0.16); border-color: rgba(253, 230, 138, 0.42); color: #fef08a; }
+:root[data-popup-root][data-interface-skin="starlight"] .feature-card:nth-child(4n + 4) .feature-icon,
+.popup-skin-scope[data-interface-skin="starlight"] .preview-feature:nth-child(4n + 4) .preview-feature-icon { background: rgba(56, 189, 248, 0.18); border-color: rgba(125, 211, 252, 0.42); color: #bae6fd; }

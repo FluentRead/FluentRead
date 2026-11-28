@@ -331,6 +331,48 @@ function handleThemeKeydown(event: KeyboardEvent): void {
   background: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.18), transparent 65%), #070609;
 }
 
+.skin-stage-canvas[data-stage-style="swiss-minimal"] {
+  background-color: #f4f5f7;
+  background-image: none;
+}
+
+.skin-stage-canvas[data-stage-style="swiss-minimal"][data-stage-polarity="dark"] {
+  background-color: #08090c;
+  background-image: none;
+}
+
+.skin-stage-canvas[data-stage-style="golden-hour"] {
+  background:
+    radial-gradient(circle at 84% 12%, rgba(251, 146, 60, 0.34), transparent 50%),
+    radial-gradient(circle at 16% 86%, rgba(244, 63, 94, 0.24), transparent 52%),
+    #fce9d8;
+}
+
+.skin-stage-canvas[data-stage-style="golden-hour"][data-stage-polarity="dark"] {
+  background:
+    radial-gradient(circle at 84% 10%, rgba(249, 115, 22, 0.24), transparent 52%),
+    radial-gradient(circle at 16% 88%, rgba(225, 29, 72, 0.20), transparent 52%),
+    #0f090c;
+}
+
+.skin-stage-canvas[data-stage-style="blueprint"] {
+  background-color: #04142b;
+  background-image:
+    linear-gradient(rgba(186, 230, 253, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(186, 230, 253, 0.12) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.skin-stage-canvas[data-stage-style="starlight"] {
+  background:
+    radial-gradient(1.5px 1.5px at 20% 22%, rgba(255, 255, 255, 0.72) 50%, transparent 100%),
+    radial-gradient(1.2px 1.2px at 80% 18%, rgba(196, 181, 253, 0.75) 50%, transparent 100%),
+    radial-gradient(1.4px 1.4px at 74% 82%, rgba(253, 230, 138, 0.72) 50%, transparent 100%),
+    radial-gradient(circle at 24% 12%, rgba(99, 102, 241, 0.26), transparent 52%),
+    radial-gradient(circle at 82% 88%, rgba(139, 92, 246, 0.22), transparent 52%),
+    #050714;
+}
+
 /* 与真实菜单栏同宽：窄版跟随皮肤登记的宽度，拉丁字母与西里尔字母语言沿用菜单栏的加宽规则。 */
 .interface-skin-live-preview {
   --preview-popup-width: var(--interface-popup-width, 320px);

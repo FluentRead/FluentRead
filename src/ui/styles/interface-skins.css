@@ -1,7 +1,7 @@
 /**
  * @file src/ui/styles/interface-skins.css
  * 文件职责：集中装配 FluentRead 的 Popup 专属可插拔皮肤样式与界面字体规则，供 Popup 页面以及 Options 内的局部 `.popup-skin-scope` 预览容器共享同一份样式源。
- * 主要内容：引入界面字体规则、Popup 皮肤共享适配层与 `.popup-skin-scope` 主题隔离防火墙（popup-skins-base.css）以及 11 套全新 craft 皮肤变量定义（popup-skins-themes.css）；默认经典皮肤不覆盖任何皮肤变量，直接沿用 tokens.css 与 popup.css 原生视觉。
+ * 主要内容：引入界面字体规则、Popup 皮肤共享适配层与 `.popup-skin-scope` 主题隔离防火墙（popup-skins-base.css）以及 15 套全新 craft 皮肤变量定义（popup-skins-themes.css）；默认经典皮肤不覆盖任何皮肤变量，直接沿用 tokens.css 与 popup.css 原生视觉。
  * 模块边界：所有皮肤选择器均严格限定在 Popup 根节点（:root[data-popup-root]）与局部预览容器（.popup-skin-scope）内，绝不修改 Options 页面自身样式。
  */
 

@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaSession.ts
  * 文件职责：管理当前漫画章节的连续翻译会话，保证一次开启、受控并发调度、原文暂停与异步任务所有权。
- * 主要内容：接收可见页和有界提前翻译窗口，当前页优先并支持可选 maxConcurrent 上限（默认 1 保持严格串行，开启并发时允许可见页与预译页重叠流水）；同优先级按最新有效页序选取，缺失、重复或非法序号稳定保留进入顺序；阅读器移动期间暂停新识别但立即复用已完成结果，短暂离屏不取消在途推理，停稳后未译当前页可取消远处旧任务，最近页面仅保留不抢占队列；隐藏时停止新任务，换图、换章和关闭取消旧任务；显式单页重试进入同一队列并清除旧错误，不循环请求或并发绕过会话；未启动的延后任务重新排队，卸载后不再发送迟到通知。
+ * 主要内容：接收可见页和有界提前翻译窗口，当前页优先并支持可选 maxConcurrent 上限（默认 1 保持严格串行，开启并发时允许可见页与预译页重叠流水）；同优先级按最新有效页序选取，缺失、重复或非法序号稳定保留进入顺序；阅读器移动期间暂停新识别但立即复用已完成结果，短暂离屏不取消在途推理，停稳后未译当前页可取消远处旧任务，最近页面仅保留不抢占队列；隐藏时停止新任务，换图、换章和关闭取消旧任务；显式单页重试与批量重试失败页进入同一队列并清除旧错误，不循环请求或并发绕过会话；状态快照单遍汇总零临时数组分配；未启动的延后任务重新排队，卸载后不再发送迟到通知。
  * 模块边界：只依赖注入的页面翻译与恢复端口，图片和可读画布共用一个队列；不查询 DOM、保存配置或实现 OCR；位图缓存、宿主样式与语言包由图片运行时管理。
  */
 import type {ImageTranslationStage} from '../progress';
@@ -60,13 +60,23 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
     const isRunning = (image: T) => { for (const task of running) if (task.image === image) return true; return false; };
     const isRunningPage = (image: T, page: Page) => { for (const task of running) if (task.image === image && task.page === page) return true; return false; };
 
-    const status = (): MangaTranslationStatus => ({
-        available, active, pending: active && running.size > 0,
-        errors: Array.from(pages.values()).filter(page => page.failed).length,
-        completed: Array.from(pages.values()).filter(page => page.completed && !page.failed).length,
-        prefetching: active && running.size > 0 && Array.from(running).every(task => !task.page.visible),
-        ahead: Array.from(pages.values()).filter(page => page.retained && page.ahead && !page.visible && page.completed && !page.failed).length,
-    });
+    const status = (): MangaTranslationStatus => {
+        let errors = 0, completed = 0, ahead = 0;
+        for (const page of pages.values()) {
+            if (page.failed) errors++;
+            else if (page.completed) {
+                completed++;
+                if (page.retained && page.ahead && !page.visible) ahead++;
+            }
+        }
+        let prefetching = active && running.size > 0;
+        if (prefetching) {
+            for (const task of running) {
+                if (task.page.visible) {prefetching = false; break;}
+            }
+        }
+        return {available, active, pending: active && running.size > 0, errors, completed, prefetching, ahead};
+    };
     const notify = (final = false) => {if (!disposed || final) ports.changed(status());};
 
     function reset() {
@@ -219,6 +229,19 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
             schedulingDeferred = false;
             page.attempted = false;page.failed = false;page.completed = false;
             notify();pump();return true;
+        },
+        retryFailed(onRetried?: (image: T) => void): number {
+            if (disposed || !active || suspended) return 0;
+            let retried = 0;
+            for (const [image, page] of pages) {
+                if (!page.failed || !page.retained || !page.scheduled || isRunning(image)) continue;
+                page.attempted = false;page.failed = false;page.completed = false;
+                onRetried?.(image);
+                retried++;
+            }
+            if (!retried) return 0;
+            schedulingDeferred = false;
+            notify();pump();return retried;
         },
         dispose() { if (disposed) return; reset(); disposed = true; available = false; notify(true); },
     };

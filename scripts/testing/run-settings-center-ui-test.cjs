@@ -1970,6 +1970,10 @@ async function main() {
       {value: 'sakura', label: '樱雾物语', kind: 'craft', contentHeight: true, popupWidth: 322, brand: '#d4356f', surface: '#ffffff', darkSurface: '#231720'},
       {value: 'matcha', label: '宇治手账', kind: 'craft', contentHeight: true, popupWidth: 322, brand: '#2b6946', surface: '#fbf8f0', darkSurface: '#18241c'},
       {value: 'midnight-gold', label: '黑金典藏', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#dfc076', surface: '#131218', darkSurface: '#131218'},
+      {value: 'swiss-minimal', label: '素净极简', kind: 'craft', contentHeight: true, popupWidth: 312, brand: '#111318', surface: '#ffffff', darkSurface: '#111318'},
+      {value: 'golden-hour', label: '落日熔金', kind: 'craft', contentHeight: true, popupWidth: 322, brand: '#c84312', surface: '#fffbf5', darkSurface: '#1d1419'},
+      {value: 'blueprint', label: '建筑蓝图', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#7dd3fc', surface: '#092247', darkSurface: '#092247'},
+      {value: 'starlight', label: '星穹漫游', kind: 'craft', contentHeight: true, popupWidth: 326, brand: '#93a4ff', surface: '#10132b', darkSurface: '#10132b'},
     ];
     const skinCards = interfaceSettingsGroup.locator('.interface-skin-option');
     if (await skinCards.count() !== expectedInterfaceSkins.length) {

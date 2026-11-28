@@ -27,7 +27,7 @@ import { Config, normalizeConfig } from '@/src/core/config/model'
 import { popupQuickFeatureIconPaths, popupQuickFeatureIconTones } from '@/src/ui/popupQuickFeatureIcons'
 
 describe('Popup 皮肤与栏目配置', () => {
-  it('默认保留当前界面并注册 3 大系列 12 套全新 Popup 皮肤', () => {
+  it('默认保留当前界面并注册 4 大系列 16 套全新 Popup 皮肤', () => {
     const config = new Config()
 
     expect(config.interfaceSkin).toBe('default')
@@ -49,6 +49,10 @@ describe('Popup 皮肤与栏目配置', () => {
       'sakura',
       'matcha',
       'midnight-gold',
+      'swiss-minimal',
+      'golden-hour',
+      'blueprint',
+      'starlight',
     ]
     expect(interfaceSkinOptions.map((item) => item.value)).toEqual(expectedSkins)
     expect(interfaceSkinOptions.map((item) => item.label)).toEqual([
@@ -64,13 +68,17 @@ describe('Popup 皮肤与栏目配置', () => {
       '樱雾物语',
       '宇治手账',
       '黑金典藏',
+      '素净极简',
+      '落日熔金',
+      '建筑蓝图',
+      '星穹漫游',
     ])
-    expect(interfaceSkinGroups.map((item) => item.value)).toEqual(['atmosphere', 'expressive', 'editorial'])
-    expect(interfaceSkinGroups.map((item) => item.label)).toEqual(['光影与材质', '潮流与个性', '东方与人文'])
+    expect(interfaceSkinGroups.map((item) => item.value)).toEqual(['atmosphere', 'expressive', 'editorial', 'horizon'])
+    expect(interfaceSkinGroups.map((item) => item.label)).toEqual(['光影与材质', '潮流与个性', '东方与人文', '极简与视界'])
     for (const group of interfaceSkinGroups) {
       expect(interfaceSkinOptions.filter((item) => item.group === group.value)).toHaveLength(4)
     }
-    expect(new Set(interfaceSkinOptions.map((item) => JSON.stringify(item.preview))).size).toBe(12)
+    expect(new Set(interfaceSkinOptions.map((item) => JSON.stringify(item.preview))).size).toBe(16)
 
     const hex = /^#[0-9a-f]{6}$/
     const fill = /^(#[0-9a-f]{6}|linear-gradient\(\d+deg(, #[0-9a-f]{6}( \d+%)?){2,3}\))$/
@@ -116,9 +124,15 @@ describe('Popup 皮肤与栏目配置', () => {
     expect(getInterfaceSkinOption('liquid-glass').popupWidth).toBe(324)
     expect(getInterfaceSkinOption('aurora').popupWidth).toBe(322)
     expect(getInterfaceSkinOption('retro-os').popupWidth).toBe(320)
+    expect(getInterfaceSkinOption('swiss-minimal').popupWidth).toBe(312)
+    expect(getInterfaceSkinOption('golden-hour').popupWidth).toBe(322)
+    expect(getInterfaceSkinOption('blueprint').popupWidth).toBe(324)
+    expect(getInterfaceSkinOption('starlight').popupWidth).toBe(326)
     expect(getInterfaceSkinOption('cyber').toneMode).toBe('dark')
     expect(getInterfaceSkinOption('terminal').toneMode).toBe('dark')
     expect(getInterfaceSkinOption('midnight-gold').toneMode).toBe('dark')
+    expect(getInterfaceSkinOption('blueprint').toneMode).toBe('dark')
+    expect(getInterfaceSkinOption('starlight').toneMode).toBe('dark')
     expect(interfaceVisibilityOptions.map((item) => item.key)).toEqual([
       'popupQuickFeatures',
       'popupSiteRule',

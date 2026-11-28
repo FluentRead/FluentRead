@@ -1,8 +1,8 @@
 /**
  * @file src/ui/styles/interface-skins/popup-skins-base.css
  * 文件职责：定义 Popup 专属皮肤系统的三层隔离基础样式，确保皮肤与明暗极性只作用于真实 Popup（:root[data-popup-root]）及设置页局部预览容器（.popup-skin-scope），绝不污染 Options 设置页。
- * 主要内容：1) .popup-skin-scope[data-popup-theme="light"|"dark"] 完整令牌重绑以隔绝 Options 明暗串色；2) 常暗皮肤（cyber/terminal/midnight-gold）的明暗反馈令牌锁暗；3) craft 皮肤语义桥接与共享结构样式（含 --skin-page-bg 氛围画布、--skin-panel-bg/--skin-panel-backdrop 玻璃材质、字体族、物理按压反馈与减弱动态兜底）。
- * 模块边界：不编写任何 Options 页面布局或设置卡片选择器；具体 11 套 craft 皮肤的色值、材质纹理与特化样式在 popup-skins-themes.css 定义。
+ * 主要内容：1) .popup-skin-scope[data-popup-theme="light"|"dark"] 完整令牌重绑以隔绝 Options 明暗串色；2) 常暗皮肤（cyber/terminal/midnight-gold/blueprint/starlight）的明暗反馈令牌锁暗；3) craft 皮肤语义桥接与共享结构样式（含 --skin-page-bg 氛围画布、--skin-panel-bg/--skin-panel-backdrop 玻璃材质、字体族、物理按压反馈与减弱动态兜底）。
+ * 模块边界：不编写任何 Options 页面布局或设置卡片选择器；具体 15 套 craft 皮肤的色值、材质纹理与特化样式在 popup-skins-themes.css 定义。
  */
 
 /* ==========================================================================
@@ -100,14 +100,18 @@
 }
 
 /* ==========================================================================
-   Layer 2: 常暗专属皮肤（cyber / terminal / midnight-gold）反馈色与色制兜底
+   Layer 2: 常暗专属皮肤（cyber / terminal / midnight-gold / blueprint / starlight）反馈色与色制兜底
    ========================================================================== */
 :root[data-popup-root][data-interface-skin="cyber"],
 :root[data-popup-root][data-interface-skin="terminal"],
 :root[data-popup-root][data-interface-skin="midnight-gold"],
+:root[data-popup-root][data-interface-skin="blueprint"],
+:root[data-popup-root][data-interface-skin="starlight"],
 .popup-skin-scope[data-interface-skin="cyber"],
 .popup-skin-scope[data-interface-skin="terminal"],
-.popup-skin-scope[data-interface-skin="midnight-gold"] {
+.popup-skin-scope[data-interface-skin="midnight-gold"],
+.popup-skin-scope[data-interface-skin="blueprint"],
+.popup-skin-scope[data-interface-skin="starlight"] {
   color-scheme: dark;
   --fr-color-danger: #ff7b93;
   --fr-color-danger-soft: rgba(255, 123, 147, 0.16);
@@ -122,7 +126,7 @@
 }
 
 /* ==========================================================================
-   Layer 3: Craft 皮肤共享语义桥接（11 套工艺皮肤统一复用）
+   Layer 3: Craft 皮肤共享语义桥接（15 套工艺皮肤统一复用）
    ========================================================================== */
 :root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin],
 .popup-skin-scope[data-interface-skin-kind="craft"][data-interface-skin] {

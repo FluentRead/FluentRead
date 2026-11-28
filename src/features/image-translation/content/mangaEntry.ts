@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaEntry.ts
  * 文件职责：将安静的独立漫画按钮、按住对照原图桥接和按需资源确认挂载到隔离 Shadow UI，并桥接真实会话、资源检查与持久偏好。
- * 主要内容：用地址识别阅读页，在已有 Shadow UI 中持有唯一按需文字面板并同步独立悬浮坞左右/垂直停靠位置；主入口和悬浮球共享打开状态与可信触发目标，不自动读取；暴露可选 onPeekOriginal 端口并在暂停、禁用或卸载时安全复位对照态；注册实际宿主并按实例释放，订阅会话和配置，卸载即时退订，挂载所有权防止迟到实例影响新入口。
+ * 主要内容：用地址识别阅读页，在已有 Shadow UI 中持有唯一按需文字面板并同步独立悬浮坞左右/垂直停靠位置；主入口和悬浮球共享打开状态与可信触发目标，不自动读取；暴露可选 onPeekOriginal 端口并在暂停、禁用或卸载时安全复位对照态，并桥接一键重试失败页端口 retryFailed；注册实际宿主并按实例释放，订阅会话和配置，卸载即时退订，挂载所有权防止迟到实例影响新入口。
  * 模块边界：仅编排 feature 内部 UI 与公共配置、浏览器消息端口，不下载模型、不实现翻译，宿主脚本不能通过合成 DOM 事件发起动作。
  */
 import {reactive} from 'vue';
@@ -14,7 +14,7 @@ import {config, requestConfigPatch, subscribeConfig} from '@/src/services/config
 import {isFloatingBallDisabledOnSite} from '@/src/core/site-rules/domain';
 import {resolveMangaSite, resolveMangaSourceLanguage} from '@/src/core/config/manga';
 import MangaEntry from '../ui/MangaEntry.vue';
-import {subscribeMangaTranslation, toggleMangaTranslation, getMangaReadingCandidates, readMangaReadingCandidate, observeMangaReadingCandidate, registerMangaReadingOverlayHost, registerMangaReadingOpener} from './runtime';
+import {subscribeMangaTranslation, toggleMangaTranslation, retryFailedMangaTranslation, getMangaReadingCandidates, readMangaReadingCandidate, observeMangaReadingCandidate, registerMangaReadingOverlayHost, registerMangaReadingOpener} from './runtime';
 import type {MangaTranslationStatus} from './mangaSession';
 import {getMangaOcrEngine, getRequiredImageOcrLanguages, normalizeImageOcrLanguageCodes, type ImageOcrStatusResponse} from '../ocrLanguages';
 
@@ -95,6 +95,7 @@ export function mountMangaEntry(ctx: ContentScriptContext, ports: MangaEntryPort
             startAreaTranslation: async () => config.on && config.imageTranslationMangaEnabled && status.available && status.areaFallback === true
                 && await (ports.startAreaTranslation?.() ?? false),
             toggle: () => {if (config.on && config.imageTranslationMangaEnabled) toggleMangaTranslation();},
+            retryFailed: () => (config.on && config.imageTranslationMangaEnabled ? retryFailedMangaTranslation() : 0),
             inspectResources: async () => {
                 const sourceLanguage = resolveMangaSourceLanguage(location.href, config.from, config.imageTranslationMangaSites);
                 const result = await browser.runtime.sendMessage({type: 'fluentReadMangaModelStatus'}) as {success?: boolean; ready?: boolean; inpaintingReady?: boolean; error?: string};

@@ -862,6 +862,46 @@ describe('shared UI actual client SFC lifecycle', () => {
     const mounted = await mount(InterfaceSkinPreview, {skin: skin(), previewLabel: 'Preview'});
     for (const chosen of interfaceSkinOptions) {mounted.props.skin = chosen;mounted.props.previewLabel = chosen.label;await settle();const section = mounted.root.querySelector('section')!;expect(section.getAttribute('data-preview-skin')).toBe(chosen.value);expect(section.getAttribute('aria-label')).toBe(chosen.label);expect(section.style.getPropertyValue('--interface-popup-width')).toBe(`${chosen.popupWidth}px`);expect(section.querySelector('.preview-popup')!.getAttribute('data-preview-skin')).toBe(chosen.value);expect(section.querySelectorAll('button,input')).toHaveLength(0);expect(mounted.root.querySelectorAll('.skin-stage-theme-switch button[data-preview-theme-btn]')).toHaveLength(3);}
   });
+  it('handles preview status, theme switching clicks, keyboard navigation, and dark-only skin locking', async () => {
+    const updates: string[] = [];
+    const mounted = await mount(InterfaceSkinPreview, {skin: skin('swiss-minimal'), previewLabel: 'Preview', themeMode: 'auto', appDark: false, previewing: false}, {
+      listeners: {'onUpdate:themeMode': (mode: string) => {updates.push(mode); mounted.props.themeMode = mode;}},
+    });
+    const status = () => mounted.root.querySelector('.skin-stage-status')!;
+    const section = () => mounted.root.querySelector('section')!;
+    const switcher = () => mounted.root.querySelector('.skin-stage-theme-switch')!;
+    const btn = (mode: string) => mounted.root.querySelector<HTMLButtonElement>(`[data-preview-theme-btn="${mode}"]`)!;
+    expect(status().textContent).toContain('settings.interface.skinStudio.applied');
+    expect(section().getAttribute('data-popup-theme')).toBe('light');
+
+    mounted.props.previewing = true; mounted.props.appDark = true; await settle();
+    expect(status().textContent).toContain('settings.interface.skinStudio.previewing');
+    expect(section().getAttribute('data-popup-theme')).toBe('dark');
+
+    event(btn('light'), 'click'); await settle();
+    expect(section().getAttribute('data-popup-theme')).toBe('light');
+    event(btn('dark'), 'click'); await settle();
+    expect(section().getAttribute('data-popup-theme')).toBe('dark');
+    event(btn('auto'), 'click'); await settle();
+    expect(updates).toEqual(['light', 'dark', 'auto']);
+
+    for (const [k, expected] of [['ArrowRight', 'light'], ['ArrowDown', 'dark'], ['ArrowLeft', 'light'], ['ArrowUp', 'auto'], ['End', 'dark'], ['Home', 'auto']] as const) {
+      const pressed = key(switcher(), k); await settle();
+      expect(pressed.defaultPrevented).toBe(true);
+      expect(mounted.props.themeMode).toBe(expected);
+      expect(dom.document.activeElement).toBe(btn(expected));
+    }
+    const ignored = key(switcher(), 'Tab'); expect(ignored.defaultPrevented).toBe(false);
+
+    updates.length = 0;
+    mounted.props.skin = skin('blueprint'); await settle();
+    expect(section().getAttribute('data-popup-theme')).toBe('dark');
+    expect(btn('auto').disabled).toBe(true);
+    expect(btn('light').disabled).toBe(true);
+    for (const mode of ['auto', 'light', 'dark']) {event(btn(mode), 'click');}
+    expect(key(switcher(), 'ArrowRight').defaultPrevented).toBe(false);
+    expect(updates).toEqual([]);
+  });
   it('previews the compact coffee and sidebar icons in their real order when the browser supports a sidebar', async () => {
     sidebarPreview.available = true;
     const supported = await mount(InterfaceSkinPreview, {skin: skin(), previewLabel: 'Preview'});

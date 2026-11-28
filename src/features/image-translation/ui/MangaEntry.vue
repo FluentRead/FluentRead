@@ -1,7 +1,7 @@
 <!--
  * @file src/features/image-translation/ui/MangaEntry.vue
- * 文件职责：提供安静的漫画入口、实时进度遥测、按住对照原图按钮以及按需资源首次下载说明。
- * 主要内容：普通悬浮球不可见时在视口左右侧停靠可按住拖动并贴边持久化的连贯悬浮操作坞，内置主入口（含进度计数徽标与上下文提示）、按住对照原图按钮及次级文字面板入口，活跃/处理期间保持按钮可见；唯一文字面板与入口共享打开状态与主题；弹窗配有柔和遮罩层并遵循显式深浅主题，按源语言说明资源，圈选页使用区域入口，路由、语言、服务或会话变化关闭旧阅读内容并释放对照原图态。
+ * 文件职责：提供安静的漫画入口、实时进度遥测、一键重试失败页、按住对照原图按钮以及按需资源首次下载说明。
+ * 主要内容：普通悬浮球不可见时在视口左右侧停靠可按住拖动并贴边持久化的连贯悬浮操作坞，内置主入口（含进度计数徽标、准备阶段下载百分比、底部进度细条与上下文提示）、失败页一键重试按钮、按住对照原图按钮及次级文字面板入口，活跃/处理期间保持按钮可见；页面完成或结束等待时自动刷新已打开且处于等待中的文字面板；唯一文字面板与入口共享打开状态与主题；弹窗配有柔和遮罩层并遵循显式深浅主题，按源语言说明资源，圈选页使用区域入口，路由、语言、服务或会话变化关闭旧阅读内容并释放对照原图态。
  * 模块边界：不自动展开阅读面板，不下载资源、不扫描图片；单页进度属于图片运行时，所有动作通过注入端口和可信事件执行，界面只属于 closed Shadow UI。
  -->
 <template>
@@ -12,6 +12,10 @@
       <span v-if="busy || status.pending" class="fr-manga-spinner" aria-hidden="true" />
       <span v-else-if="status.errors" class="fr-manga-badge fr-manga-error-badge" aria-hidden="true">{{ errorBadge }}</span>
       <span v-else-if="status.active && completedCount > 0" class="fr-manga-badge" aria-hidden="true">✓</span>
+      <span v-if="progressPercent !== null" class="fr-manga-dock-progress" aria-hidden="true"><span class="fr-manga-dock-progress-fill" :style="{width: `${progressPercent}%`}" /></span>
+    </button>
+    <button v-if="status.active && !status.areaFallback && !status.pending && status.errors > 0 && retryFailed" ref="retryLauncher" class="fr-manga-retry-launcher is-expanded" :class="{'is-touch': touchCapable}" type="button" :aria-label="retryLabel" :title="retryLabel" @mouseenter="reveal" @pointerdown="noteTouch" @mouseleave="retract" @focusin="reveal" @focusout="retract" @keydown.esc.stop="collapseLauncher" @click.stop="triggerRetry($event)">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5M20 4v4.5h-4.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" /></svg>
     </button>
     <button v-if="status.active && !status.areaFallback && completedCount > 0 && onPeekOriginal" ref="peekLauncher" class="fr-manga-peek-launcher is-expanded" :class="{'is-peeking': peeking, 'is-touch': touchCapable}" type="button" :aria-label="t('按住对照原图')" :aria-pressed="peeking" :title="t('按住对照原图')" @mouseenter="reveal" @pointerdown.stop="startPeek($event)" @pointerup.stop="stopPeek" @pointercancel.stop="stopPeek" @pointerleave="stopPeek" @blur="stopPeek" @mouseleave="retract" @focusin="reveal" @focusout="retract" @contextmenu.prevent @keydown="onPeekKeydown($event)" @keyup="onPeekKeyup($event)">
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" /><circle cx="12" cy="12" r="2.75" stroke="currentColor" stroke-width="1.7" /></svg>
@@ -48,7 +52,7 @@ const props = defineProps<{
   status: MangaTranslationStatus; page: {site: string; route: string};
   settings: {sourceLanguage?: string; to?:string; service?:string; promptEnabled: boolean; floatingBallVisible: boolean; downloadConfirmed: boolean; animations: boolean; toolsDisplay?: string};
   dockPosition?: {side: 'left' | 'right'; verticalPosition: number | null};
-  toggle: () => void; inspectResources: () => Promise<boolean>; persist: (patch: Record<string, unknown>) => Promise<unknown>; openSettings: () => void;
+  toggle: () => void; retryFailed?: () => number; inspectResources: () => Promise<boolean>; persist: (patch: Record<string, unknown>) => Promise<unknown>; openSettings: () => void;
   startAreaTranslation: () => Promise<boolean>;
   onPeekOriginal?: (peeking: boolean) => void;
   readManga?: (event: MouseEvent) => void;
@@ -66,11 +70,32 @@ const visible = computed(() => props.status.available && (consent.value || !!err
 const completedCount = computed(() => props.status.completed ?? 0);
 const pageCount = computed(() => props.status.pageCount ?? 0);
 const errorBadge = computed(() => props.status.errors > 1 ? `!${props.status.errors}` : '!');
+const retryLabel = computed(() => props.status.errors > 1 ? `${t('重试')} (${props.status.errors})` : t('重试'));
+const preparingPercent = computed<number | null>(() => {
+  if (!props.status.active || props.status.areaFallback || !props.status.pending || props.status.stage !== 'preparing') return null;
+  if (typeof props.status.progress !== 'number' || !Number.isFinite(props.status.progress)) return null;
+  return clamp(Math.round(props.status.progress), 0, 100);
+});
+const progressPercent = computed<number | null>(() => {
+  if (!props.status.active || props.status.areaFallback) return null;
+  if (preparingPercent.value !== null) return preparingPercent.value;
+  if (pageCount.value > 0 && (completedCount.value > 0 || props.status.pending)) {
+    return clamp(Math.round((completedCount.value / pageCount.value) * 100), 0, 100);
+  }
+  if (props.status.pending && typeof props.status.progress === 'number' && Number.isFinite(props.status.progress)) {
+    return clamp(Math.round(props.status.progress), 0, 100);
+  }
+  return null;
+});
 const progressPill = computed(() => {
   if (!props.status.active || props.status.areaFallback) return '';
-  if (pageCount.value > 0) return `${completedCount.value}/${pageCount.value}`;
+  if (pageCount.value > 0) {
+    return preparingPercent.value !== null
+      ? `${completedCount.value}/${pageCount.value} · ${preparingPercent.value}%`
+      : `${completedCount.value}/${pageCount.value}`;
+  }
   if (props.status.pending && typeof props.status.progress === 'number' && Number.isFinite(props.status.progress)) {
-    return `${Math.max(0, Math.min(100, Math.round(props.status.progress)))}%`;
+    return `${clamp(Math.round(props.status.progress), 0, 100)}%`;
   }
   return '';
 });
@@ -99,7 +124,7 @@ const buttonTitle = computed(() => {
 });
 let disposed = false, request = 0;
 const DRAG_THRESHOLD = 6;
-const dock = ref<HTMLElement | null>(null), dialog = ref<HTMLElement | null>(null), launcher = ref<HTMLButtonElement | null>(null), peekLauncher = ref<HTMLButtonElement | null>(null), readingLauncher = ref<HTMLButtonElement | null>(null), expanded = ref(false);
+const dock = ref<HTMLElement | null>(null), dialog = ref<HTMLElement | null>(null), launcher = ref<HTMLButtonElement | null>(null), retryLauncher = ref<HTMLButtonElement | null>(null), peekLauncher = ref<HTMLButtonElement | null>(null), readingLauncher = ref<HTMLButtonElement | null>(null), expanded = ref(false);
 const dockSide = ref<'left' | 'right'>(props.dockPosition?.side === 'left' ? 'left' : 'right');
 const dockVertical = ref<number | null>(typeof props.dockPosition?.verticalPosition === 'number' ? props.dockPosition.verticalPosition : null);
 const isDragging = ref(false), dragX = ref(0), dragY = ref(0);
@@ -113,7 +138,7 @@ const dockStyle = computed(() => {
 });
 const touchCapable = ref((typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0)
   || (typeof window !== 'undefined' && window.matchMedia?.('(any-pointer: coarse)').matches === true));
-const reader = ref<{open:(event:Event,from?:HTMLElement|null)=>Promise<boolean>;close:()=>void}|null>(null);
+const reader = ref<{open:(event:Event,from?:HTMLElement|null)=>Promise<boolean>;close:()=>void;refreshPending?:()=>void}|null>(null);
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 interface DragGesture {id: number; startX: number; startY: number; offsetX: number; offsetY: number; width: number; height: number; moved: boolean}
 let dragGesture: DragGesture | undefined;
@@ -184,7 +209,7 @@ function startDrag(event: PointerEvent) {
   window.addEventListener('pointercancel', cancelDrag, true);
   window.addEventListener('blur', cancelActiveDrag);
 }
-function hasVisibleFocus() {return [launcher.value, peekLauncher.value, readingLauncher.value].some(el => !!el?.matches(':focus-visible'));}
+function hasVisibleFocus() {return [launcher.value, retryLauncher.value, peekLauncher.value, readingLauncher.value].some(el => !!el?.matches(':focus-visible'));}
 function clearIdle() {if (idleTimer !== null) clearTimeout(idleTimer);idleTimer = null;}
 function reveal() {
   expanded.value = true;clearIdle();
@@ -195,7 +220,7 @@ function reveal() {
 function pointerReveal(event: PointerEvent) {if (event.pointerType === 'mouse') reveal();}
 function noteTouch(event: PointerEvent) {if (event.pointerType === 'touch') touchCapable.value = true;}
 function retract(event?: MouseEvent | FocusEvent) {
-  if (event?.relatedTarget && [dock.value, launcher.value, peekLauncher.value, readingLauncher.value].includes(event.relatedTarget as never)) return;
+  if (event?.relatedTarget && [dock.value, launcher.value, retryLauncher.value, peekLauncher.value, readingLauncher.value].includes(event.relatedTarget as never)) return;
   clearIdle();if (!hasVisibleFocus()) expanded.value = false;
 }
 function beginPeek() {
@@ -223,7 +248,12 @@ function stopPeek() {
   peeking.value = false;
   props.onPeekOriginal?.(false);
 }
-function collapseLauncher() {stopPeek();launcher.value?.blur();peekLauncher.value?.blur();readingLauncher.value?.blur();clearIdle();expanded.value = false;}
+function collapseLauncher() {stopPeek();launcher.value?.blur();retryLauncher.value?.blur();peekLauncher.value?.blur();readingLauncher.value?.blur();clearIdle();expanded.value = false;}
+function triggerRetry(event: MouseEvent) {
+  props.retryFailed?.();
+  if (event.detail > 0) retryLauncher.value?.blur();
+  reveal();
+}
 function activate(event: MouseEvent) {
   if (suppressDragClick) {suppressDragClick = false; return;}
   void start();if (event.detail > 0) launcher.value?.blur();reveal();
@@ -265,6 +295,9 @@ watch(() => [props.settings.to,props.settings.service], closeReading);
 watch(() => props.status.active, active => {close();if (!active) {stopPeek();closeReading();}}, {flush:'sync'});
 watch(() => props.status.areaFallback, () => {stopPeek();close();closeReading();}, {flush:'sync'});
 watch(() => props.status.available, available => {if (!available) {stopPeek();close();closeReading();}}, {flush:'sync'});
+watch(() => [props.status.completed ?? 0, props.status.pending] as const, ([completed, pending], [prevCompleted, prevPending]) => {
+  if (completed > prevCompleted || (prevPending && !pending)) reader.value?.refreshPending?.();
+});
 watch(() => props.dockPosition?.side, side => {if (side === 'left' || side === 'right') {releaseDrag(); dockSide.value = side;}});
 watch(() => props.dockPosition?.verticalPosition, vertical => {if (vertical === null || typeof vertical === 'number') {releaseDrag(); dockVertical.value = vertical;}});
 watch(standalone, () => {releaseDrag();stopPeek();clearIdle();expanded.value = false;});

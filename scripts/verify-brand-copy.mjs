@@ -10,10 +10,11 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const taglines = JSON.parse(read('src/core/i18n/messages/brand-taglines.json'));
 const descriptions = JSON.parse(read('src/core/i18n/messages/product-descriptions.json'));
 
-assert.equal(Object.keys(taglines).length, 7, 'Seven interface languages need brand copy');
+assert.equal(Object.keys(taglines).length, 8, 'Eight interface languages need brand copy');
 assert.equal(taglines['en-US'], 'Closer languages. A bigger world.');
 assert.equal(taglines['zh-CN'], '让语言更近，让世界更大。');
-assert.deepEqual(Object.keys(descriptions).sort(), Object.keys(taglines).sort(), 'Product descriptions cover the same seven languages');
+assert.equal(taglines['zh-TW'], '讓語言更近，讓世界更大。');
+assert.deepEqual(Object.keys(descriptions).sort(), Object.keys(taglines).sort(), 'Product descriptions cover the same eight languages');
 assert.equal(JSON.parse(read('package.json')).description, descriptions['en-US'], 'Package product description');
 for (const [language, tagline] of Object.entries(taglines)) {
     assert.ok(typeof tagline === 'string' && tagline.trim(), `${language}: empty tagline`);

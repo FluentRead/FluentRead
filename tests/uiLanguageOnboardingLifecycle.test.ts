@@ -70,24 +70,24 @@ describe('UiLanguageOnboarding 实际保存与生命周期', () => {
   it('首屏直接提供七语原生名称与品牌，切换只预览且不自动保存', async () => {
     await mount({initialLanguage: 'zh-CN'})
     expect(document.querySelector('[data-testid="onboarding-welcome"]')).toBeNull()
-    const names = ['简体中文', 'English', '日本語', '한국어', 'Français', 'Русский', 'Español']
+    const names = ['简体中文', '繁體中文', 'English', '日本語', '한국어', 'Français', 'Русский', 'Español']
     for (const [index, {value}] of languageRules.UI_LANGUAGE_OPTIONS.entries()) {
       expect(button(`[data-language="${value}"]`).textContent).toContain(names[index])
       expect(button(`[data-language="${value}"]`).getAttribute('lang')).toBe(value)
       choose(value)();await settle()
-      expect(button('.onboarding-brand strong').textContent).toBe(value === 'zh-CN' ? '流畅阅读' : 'FluentRead')
+      expect(button('.onboarding-brand strong').textContent).toBe(value === 'zh-CN' ? '流畅阅读' : value === 'zh-TW' ? '流暢閱讀' : 'FluentRead')
       expect(state.selectedLanguage).toBe(value)
     }
     expect(setLanguage).not.toHaveBeenCalled();expect(saved).not.toHaveBeenCalled();expect(confirmed).not.toHaveBeenCalled()
   })
-  it('七种语言任一被选中时，单选组均只保留该卡片一个 Tab 入口', async () => {
+  it('八种语言任一被选中时，单选组均只保留该卡片一个 Tab 入口', async () => {
     await mount({initialLanguage: 'ja-JP'});await languageStep()
     for (const {value} of languageRules.UI_LANGUAGE_OPTIONS) {
       choose(value)();await settle()
       const radios = [...document.querySelectorAll('[role="radio"]')]
-      expect(radios).toHaveLength(7)
+      expect(radios).toHaveLength(8)
       expect(radios.filter(element => element.getAttribute('tabindex') === '0')).toEqual([button(`[data-language="${value}"]`)])
-      expect(radios.filter(element => element.getAttribute('tabindex') === '-1')).toHaveLength(6)
+      expect(radios.filter(element => element.getAttribute('tabindex') === '-1')).toHaveLength(7)
       expect(button(`[data-language="${value}"]`).getAttribute('aria-checked')).toBe('true')
     }
     expect(setLanguage).not.toHaveBeenCalled()
@@ -220,7 +220,7 @@ describe('UiLanguageOnboarding 实际保存与生命周期', () => {
   it('首屏直接聚焦浏览器默认语言一次，无下一步或返回按钮', async () => {
     await mount({initialLanguage: 'ja-JP'});expect(focus).toHaveBeenCalledOnce()
     expect(focused).toBe(button('[data-language="ja-JP"]'));expect(focus.mock.calls[0][1]).toEqual({preventScroll: true})
-    expect(document.querySelectorAll('[role="radio"]')).toHaveLength(7)
+    expect(document.querySelectorAll('[role="radio"]')).toHaveLength(8)
     expect(document.querySelector('.onboarding-back')).toBeNull()
   })
   it('保存期间冻结全部选择，提交值、存储及 saved/confirmed 一致且立即交接', async () => {
@@ -279,5 +279,58 @@ describe('UiLanguageOnboarding 实际保存与生命周期', () => {
     const error = button('[role="alert"]');expect(error.getAttribute('lang')).toBe(value)
     expect(error.textContent).not.toMatch(/private-token|secret.invalid|设置页|Reopen settings/u)
     expect(error.textContent!.length).toBeGreaterThan(10);expect(button('.onboarding-confirm').hasAttribute('disabled')).toBe(false)
+  })
+  it('启用场景步骤时：语言确认进入第二步，支持多选应用与跳过直接开始', async () => {
+    const {Config} = await import('@/src/core/config/model')
+    const currentConfig = new Config();currentConfig.display = 0;currentConfig.glossaryEnabled = false
+    const applyScenarioPatch = vi.fn(async (patch: Record<string, unknown>) => {Object.assign(currentConfig, patch)})
+    await mount({initialLanguage: 'zh-TW', enableScenarioStep: true, currentConfig, applyScenarioPatch})
+    const pending = confirmAction()();requests[0].gate.resolve();await pending;await settle()
+    expect(saved).toHaveBeenCalledWith('zh-TW');expect(confirmed).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-testid="onboarding-scenario-step"]')).not.toBeNull()
+
+    const academic = button('[data-scenario="academic"]'), developer = button('[data-scenario="developer"]')
+    callback(academic)();callback(developer)();await settle()
+    expect(academic.getAttribute('aria-pressed')).toBe('true');expect(developer.getAttribute('aria-pressed')).toBe('true')
+    callback(developer)();await settle()
+    expect(developer.getAttribute('aria-pressed')).toBe('false')
+
+    await callback(button('[data-testid="onboarding-scenario-apply"]'))();await settle()
+    expect(applyScenarioPatch).toHaveBeenCalledOnce()
+    expect(currentConfig.display).toBe(1);expect(currentConfig.glossaryEnabled).toBe(true)
+    expect(confirmed).toHaveBeenCalledOnce();expect(confirmed).toHaveBeenCalledWith('zh-TW')
+
+    // 当所选场景配置已完全满足时，不重复调用 applyScenarioPatch 但仍正常完成交接
+    app?.unmount();app = undefined;await settle();saved.mockClear();confirmed.mockClear();applyScenarioPatch.mockClear()
+    await mount({initialLanguage: 'zh-TW', enableScenarioStep: true, currentConfig, applyScenarioPatch})
+    const pending2 = confirmAction()();requests[1].gate.resolve();await pending2;await settle()
+    callback(button('[data-scenario="academic"]'))();await settle()
+    await callback(button('[data-testid="onboarding-scenario-apply"]'))();await settle()
+    expect(applyScenarioPatch).not.toHaveBeenCalled()
+    expect(confirmed).toHaveBeenCalledOnce()
+  })
+  it('启用场景步骤时可跳过不写入场景补丁，并保护非活跃或异步卸载边界', async () => {
+    const {Config} = await import('@/src/core/config/model')
+    const currentConfig = new Config()
+    let releasePatch!: () => void
+    const applyScenarioPatch = vi.fn(() => new Promise<void>(resolve => {releasePatch = resolve}))
+    await mount({initialLanguage: 'en-US', enableScenarioStep: true, currentConfig, applyScenarioPatch})
+    const pending = confirmAction()();requests[0].gate.resolve();await pending;await settle()
+    await callback(button('[data-testid="onboarding-scenario-skip"]'))();await settle()
+    expect(applyScenarioPatch).not.toHaveBeenCalled();expect(confirmed).toHaveBeenCalledOnce();expect(confirmed).toHaveBeenCalledWith('en-US')
+
+    // 二次触发在 committed 后被忽略
+    await state.finishScenario(true);state.toggleScenario('academic')
+    expect(applyScenarioPatch).not.toHaveBeenCalled()
+
+    // 异步应用补丁期间卸载，不触发 confirmed
+    app?.unmount();app = undefined;await settle();saved.mockClear();confirmed.mockClear()
+    const freshConfig = new Config();freshConfig.display = 0
+    await mount({initialLanguage: 'en-US', enableScenarioStep: true, currentConfig: freshConfig, applyScenarioPatch})
+    const langPending = confirmAction()();requests[1].gate.resolve();await langPending;await settle()
+    callback(button('[data-scenario="academic"]'))();await settle()
+    const applyPending = callback(button('[data-testid="onboarding-scenario-apply"]'))()
+    invalidate('unmount');releasePatch();await applyPending;await settle()
+    expect(confirmed).not.toHaveBeenCalled()
   })
 })

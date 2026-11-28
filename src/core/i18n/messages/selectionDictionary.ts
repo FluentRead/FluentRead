@@ -15,6 +15,12 @@ export const selectionDictionaryChineseMessages = {
 
 export const selectionDictionaryMessages: Readonly<Record<UiLanguage, Readonly<Record<string, string>>>> = {
     'zh-CN': selectionDictionaryChineseMessages,
+    'zh-TW': {
+        'selection.dictionary.source': '詞典來源',
+        'selection.dictionary.auto': '預設（自動選擇）',
+        'selection.dictionary.local': 'ECDICT 本機詞庫',
+        'selection.dictionary.help': '預設優先使用本機詞庫，未命中時自動查詢線上詞典；指定後只查詢所選詞典。',
+    },
     'en-US': {
         'selection.dictionary.source': 'Dictionary source',
         'selection.dictionary.auto': 'Default (automatic)',

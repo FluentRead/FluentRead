@@ -110,6 +110,7 @@ interface CompiledLegacyPatternSet {
 
 const LEGACY_CLAUSE_SEPARATORS: Readonly<Record<UiLanguage, string>> = {
     'zh-CN': '；',
+    'zh-TW': '；',
     'ja-JP': '；',
     'en-US': '; ',
     'ko-KR': '; ',

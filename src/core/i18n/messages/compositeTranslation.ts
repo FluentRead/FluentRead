@@ -46,6 +46,45 @@ export const compositeTranslationChineseMessages = {
 
 export const compositeTranslationMessages = {
   "zh-CN": compositeTranslationChineseMessages,
+  "zh-TW": {
+  "settings.services.composite.add": "新增組合",
+  "settings.services.composite.badge": "組合",
+  "settings.services.composite.title": "新增組合翻譯",
+  "settings.services.composite.name": "名稱",
+  "settings.services.composite.namePlaceholder": "例如：日常翻譯",
+  "settings.services.composite.nameRequired": "請輸入服務名稱",
+  "settings.services.composite.nameTooLong": "名稱最多 80 個字元",
+  "settings.services.composite.members": "成員",
+  "settings.services.composite.membersHelp": "選擇至少兩項已有服務，選擇後直接加入。可以排序或移除，不能加入其他組合。",
+  "settings.services.composite.addMember": "新增成員",
+  "settings.services.composite.selectMember": "選擇成員服務",
+  "settings.services.composite.empty": "還沒有成員服務，新增後才能檢查連接或翻譯。",
+  "settings.services.composite.membersRequired": "至少選擇兩個成員服務",
+  "settings.services.composite.moveUp": "上移 {service}",
+  "settings.services.composite.moveDown": "下移 {service}",
+  "settings.services.composite.removeMember": "移除 {service}",
+  "settings.services.composite.strategy": "調用方式",
+  "settings.services.composite.random": "隨機",
+  "settings.services.composite.randomHelp": "每次隨機排列成員，失敗後嘗試下一項。",
+  "settings.services.composite.sequential": "輪流",
+  "settings.services.composite.sequentialHelp": "按 A→B→C→A 輪流首選，失敗後嘗試剩餘成員。",
+  "settings.services.composite.smart": "智能",
+  "settings.services.composite.smartHelp": "優先使用近期成功率高、響應快的成員，失敗後切換。",
+  "settings.services.composite.timeout": "等待時間",
+  "settings.services.composite.timeoutBehavior": "單個成員逾時後，會自動嘗試其他成員。",
+  "settings.services.composite.timeoutHelp": "預設 12 秒，可設定 1–45 秒；整輪仍受翻譯請求的總等待時間限制。",
+  "settings.services.composite.timeoutInvalid": "請輸入 1–45 秒的整數",
+  "settings.services.composite.sharedConfig": "沿用成員各自的模型、金鑰及其他設定。",
+  "settings.services.composite.delete": "刪除",
+  "settings.services.composite.deleteTitle": "刪除組合翻譯",
+  "settings.services.composite.deleteConfirm": "確定刪除“{name}”嗎？只刪除組合，保留成員服務及其設定。",
+  "settings.services.composite.save": "儲存組合",
+  "settings.services.composite.sequentialDetails": "每次請求按 A→B→C→A 輪流首選；失敗或逾時後嘗試其餘成員，每個成員最多一次。背景重啟或成員清單、順序變化時從第一項重新輪流。",
+  "settings.services.composite.customTitle": "新增自訂服務",
+  "settings.services.composite.serviceType": "服務類型",
+  "settings.services.composite.interfaceType": "相容接口",
+  "settings.services.composite.compositeType": "組合翻譯",
+},
   "en-US": {
     "settings.services.composite.add": "Add combination",
     "settings.services.composite.badge": "Combined",
@@ -283,6 +322,13 @@ export const compositeTranslationMessages = {
 } as const;
 
 export const compositeTranslationLegacyText = {
+  "zh-TW": {
+    "组合翻译已添加": "組合翻譯已新增",
+    "组合翻译已删除": "組合翻譯已刪除",
+    "未命名组合": "未命名組合",
+    "组合翻译服务": "組合翻譯服務",
+    "同步配置引用了不存在的组合翻译服务，请重新预览配置。": "同步設定參照了不存在的組合翻譯服務，請重新預覽設定。"
+  },
   "en-US": {
     "组合翻译已添加": "Combined translation added",
     "组合翻译已删除": "Combined translation deleted",

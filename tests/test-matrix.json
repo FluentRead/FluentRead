@@ -973,7 +973,9 @@
       "tests/dictionaryRuntime.test.ts",
       "tests/dictionaryUi.test.ts",
       "tests/dictionaryAdapters.test.ts",
-      "tests/dictionaryScriptInitialization.test.ts"
+      "tests/dictionaryScriptInitialization.test.ts",
+      "tests/scenarioPresets.test.ts",
+      "tests/commandPalette.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

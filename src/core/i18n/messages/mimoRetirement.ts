@@ -9,6 +9,7 @@ import type {RegisteredUiLanguage} from '../types';
 export const mimoRetirementSource = "MiMo 旧编号将于北京时间 2026-10-21 10:00 失效。直连官方 API 时，自定义模型及请求体中的 mimo-v2.5 / mimo-v2.5-pro 会分别按 mimo-v2.6-flash / mimo-v2.6-pro 请求并按新模型计费；第三方网关请手动确认型号。";
 
 export const mimoRetirementLegacyText: Readonly<Record<RegisteredUiLanguage, Readonly<Record<string, string>>>> = {
+    'zh-TW': {[mimoRetirementSource]: "MiMo 舊編號將於北京時間 2026-10-21 10:00 失效。直連官方 API 時，自訂模型及要求本文中的 mimo-v2.5 / mimo-v2.5-pro 會分別按 mimo-v2.6-flash / mimo-v2.6-pro 要求並按新模型計費；第三方閘道請手動確認型號。"},
     'en-US': {[mimoRetirementSource]: "MiMo legacy IDs expire at 10:00 Beijing time on 2026-10-21. For direct official API requests, custom model and request-body IDs mimo-v2.5 / mimo-v2.5-pro are sent as mimo-v2.6-flash / mimo-v2.6-pro and billed at the new rates. Check model IDs with your third-party gateway."},
     'ja-JP': {[mimoRetirementSource]: "MiMo の旧 ID は北京時間 2026-10-21 10:00 に無効になります。公式 API への直接リクエストでは、カスタムモデルとリクエスト本文の mimo-v2.5 / mimo-v2.5-pro をそれぞれ mimo-v2.6-flash / mimo-v2.6-pro に置換し、新モデルの料金が適用されます。外部ゲートウェイのモデル ID は手動で確認してください。"},
     'ko-KR': {[mimoRetirementSource]: "MiMo의 기존 ID는 베이징 시간 2026-10-21 10:00에 만료됩니다. 공식 API에 직접 요청할 때 사용자 지정 모델 및 요청 본문의 mimo-v2.5 / mimo-v2.5-pro는 각각 mimo-v2.6-flash / mimo-v2.6-pro로 전송되며 새 모델 요금이 적용됩니다. 타사 게이트웨이의 모델 ID는 직접 확인하세요."},

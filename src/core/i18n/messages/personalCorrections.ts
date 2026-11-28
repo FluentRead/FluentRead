@@ -16,6 +16,13 @@ export const personalCorrectionChineseMessages = {
 
 export const personalCorrectionMessages = {
     'zh-CN': personalCorrectionChineseMessages,
+    'zh-TW': {
+        'personalCorrections.projectName': '專案：{name}',
+        'personalCorrections.pageName': '網頁：{name}',
+        'personalCorrections.noChapter': '此處沒有章節標題',
+        'personalCorrections.currentPage': '僅目前網頁',
+        'personalCorrections.project': '專案',
+    },
     'en-US': {
         'personalCorrections.projectName': 'Project: {name}',
         'personalCorrections.pageName': 'Page: {name}',

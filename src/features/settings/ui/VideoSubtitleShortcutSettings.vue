@@ -97,6 +97,7 @@ import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation';
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
 import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy';
 import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation';
+import {resolveCommandPaletteHotkey} from '@/src/core/config/commandPalette';
 import {canonicalizeHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
 import {
     findEnabledQuickTranslationHotkeyConflict,
@@ -152,6 +153,12 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
                 ? resolveSectionTranslationHotkey(props.config.sectionTranslationHotkey, props.config.customSectionTranslationHotkey)
                 : '',
             feature: t('sectionTranslation.settings.title'),
+        },
+        {
+            hotkey: props.config.commandPaletteEnabled
+                ? resolveCommandPaletteHotkey(props.config.commandPaletteHotkey, props.config.customCommandPaletteHotkey)
+                : '',
+            feature: t('commandPalette.title'),
         },
         {
             hotkey: props.config.informationHighlight?.hotkeyEnabled === true

@@ -88,6 +88,32 @@ describe('后台 feature handlers', () => {
                 await options.handle({type: 'openOptionsPage', section: 'settings-interface', target: 'video-sentence-learning-appearance'});
                 expect(create).toHaveBeenLastCalledWith({url: 'chrome-extension://fixture/options.html?target=video-sentence-learning-appearance#settings-interface'});
             }
+            const handlers = createPopupNavigationHandlers();
+            const openDocument = handlers[3];
+            const openSidepanel = handlers[4];
+            await expect(openDocument.handle({type: 'openDocumentWorkspace'}, {sender: {id: 'fixture', tab: {windowId: 9}}})).resolves.toEqual({success: true});
+            expect(create).toHaveBeenLastCalledWith({url: 'chrome-extension://fixture/document.html', windowId: 9});
+            await expect(openDocument.handle({type: 'openDocumentWorkspace'}, {sender: {id: 'fixture'}})).resolves.toEqual({success: true});
+            expect(create).toHaveBeenLastCalledWith({url: 'chrome-extension://fixture/document.html'});
+
+            const chromeOpen = vi.fn(async () => undefined);
+            vi.stubGlobal('chrome', {sidePanel: {open: chromeOpen}});
+            await expect(openSidepanel.handle({type: 'openTranslationSidepanel'}, {sender: {id: 'fixture', tab: {id: 3, windowId: 9}}})).resolves.toEqual({success: true});
+            expect(chromeOpen).toHaveBeenLastCalledWith({tabId: 3});
+            await expect(openSidepanel.handle({type: 'openTranslationSidepanel'}, {sender: {id: 'fixture', tab: {windowId: 9}}})).resolves.toEqual({success: true});
+            expect(chromeOpen).toHaveBeenLastCalledWith({windowId: 9});
+            await expect(openSidepanel.handle({type: 'openTranslationSidepanel'}, {sender: {id: 'fixture'}})).resolves.toEqual({success: true});
+            vi.stubGlobal('chrome', undefined);
+
+            const sidebarOpen = vi.fn(async () => undefined);
+            (globalThis as any).browser.sidebarAction = {open: sidebarOpen};
+            await expect(openSidepanel.handle({type: 'openTranslationSidepanel'}, {sender: {id: 'fixture'}})).resolves.toEqual({success: true});
+            expect(sidebarOpen).toHaveBeenCalledOnce();
+
+            delete (globalThis as any).browser.sidebarAction;
+            await expect(openSidepanel.handle({type: 'openTranslationSidepanel'}, {sender: {id: 'fixture'}})).resolves.toEqual({success: true});
+            expect(create).toHaveBeenLastCalledWith({url: 'chrome-extension://fixture/options.html#settings-translation-center'});
+
             expect(openOptionsPage).toHaveBeenCalledTimes(2);
             getManifest.mockReturnValueOnce({} as never);
             expect(() => createPopupNavigationHandlers()).toThrow('未配置扩展快捷面板');

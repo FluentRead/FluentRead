@@ -13,6 +13,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
     ...learningMaterialPatterns,
     // 两点选取将起点、终点或拒绝原因与取消提示组成一个文本节点，捕获前缀继续按当前语言翻译。
     {pattern: "^(.+) · Esc 取消$", localizedCaptures: [1], messages: {
+        'zh-TW': "{1} · Esc 取消",
         'en-US': "{1} · Esc to cancel",
         'ja-JP': "{1} · Esc でキャンセル",
         'ko-KR': "{1} · Esc로 취소",
@@ -22,6 +23,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
     }},
     // 两点选取会嵌入当前占用快捷键的功能名；保留整句边界，并让捕获继续使用现有功能名称译文。
     {pattern: '^快捷键已用于(.+)，请点击快捷键更换后使用$', localizedCaptures: [1], messages: {
+        'zh-TW': "快速鍵已用於{1}，請點擊快速鍵更換後使用",
         'en-US': 'This shortcut is used for {1}. Click the shortcut to change it before use.',
         'ja-JP': 'このショートカットは「{1}」で使用されています。クリックして変更してから使用してください。',
         'ko-KR': '이 단축키는 {1}에 사용 중입니다. 단축키를 클릭해 변경한 후 사용하세요.',
@@ -30,6 +32,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': 'Este atajo se usa para {1}. Haz clic en él y cámbialo antes de usarlo.',
     }},
     {pattern: '^此快捷键已用于(.+)，请更换组合键$', localizedCaptures: [1], messages: {
+        'zh-TW': "此快速鍵已用於{1}，請更換組合鍵",
         'en-US': 'This shortcut is already used for {1}. Choose another combination.',
         'ja-JP': 'このショートカットは「{1}」で使用されています。別のキーの組み合わせを選んでください。',
         'ko-KR': '이 단축키는 {1}에 이미 사용 중입니다. 다른 키 조합을 선택하세요.',
@@ -38,6 +41,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': 'Este atajo ya se usa para {1}. Elige otra combinación.',
     }},
     {pattern: "^当前网页有 (\\d+) 处相同原句。出现不同的已保存译法时，不会自动采用。$", localizedCaptures: [], messages: {
+        'zh-TW': "當前網頁有 {1} 處相同原句。出現不同的已儲存譯法時，不會自動採用。",
         'en-US': "This page contains {1} instances of the same source sentence. Conflicting saved translations are not applied automatically.",
         'ja-JP': "現在のページには同じ原文が {1} か所あります。異なる訳文が保存されている場合は、自動で採用しません。",
         'ko-KR': "현재 페이지에 같은 원문이 {1}곳 있습니다. 서로 다른 번역문이 저장되어 있으면 자동으로 적용하지 않습니다.",
@@ -46,6 +50,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Esta página contiene {1} apariciones de la misma frase original. Las traducciones guardadas en conflicto no se aplican automáticamente.",
     }},
     {pattern: "^未能保存 (.+) 的网站设置，请重试$", localizedCaptures: [], messages: {
+        'zh-TW': "未能儲存 {1} 的網站設定，請重試",
         'en-US': "Could not save site settings for {1}. Try again.",
         'ja-JP': "{1} のサイト設定を保存できませんでした。再試行してください。",
         'ko-KR': "{1}의 사이트 설정을 저장하지 못했습니다. 다시 시도하세요.",
@@ -54,6 +59,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "No se pudieron guardar los ajustes de {1}. Reinténtalo.",
     }},
     {pattern: "^已保存 (.+)，恢复扩展后生效$", localizedCaptures: [], messages: {
+        'zh-TW': "已儲存 {1}，還原擴充功能後生效",
         'en-US': "Saved {1}; restore the extension for it to take effect.",
         'ja-JP': "{1} を保存しました。拡張機能を有効に戻すと適用されます。",
         'ko-KR': "{1} 저장됨. 확장 프로그램을 다시 사용하면 적용됩니다.",
@@ -61,11 +67,15 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'ru-RU': "{1} сохранено; включите расширение для применения.",
         'es-ES': "{1} guardado; activa la extensión para aplicarlo.",
     }},
-    {pattern: "^翻译连接：(.+)；自定义服务：(\\d+)；凭据和地址已隐藏$", localizedCaptures: [], messages: {"en-US": "Connection: {1}; custom services: {2}; credentials and addresses hidden", "ja-JP": "接続：{1}；カスタムサービス：{2}；認証情報とアドレスは非表示", "ko-KR": "연결: {1}; 사용자 지정 서비스: {2}; 인증 정보와 주소 숨김", "fr-FR": "Connexion : {1} ; services personnalisés : {2} ; identifiants et adresses masqués", "ru-RU": "Подключение: {1}; своих сервисов: {2}; учётные данные и адреса скрыты", "es-ES": "Conexión: {1}; servicios personalizados: {2}; credenciales y direcciones ocultas"}},
-    {pattern: "^Google Drive 请求失败（HTTP (\\d+)），请重试。$", localizedCaptures: [], messages: {"en-US": "Google Drive request failed (HTTP {1}). Try again.", "ja-JP": "Google Drive リクエスト失敗（HTTP {1}）。再試行してください。", "ko-KR": "Google Drive 요청 실패 (HTTP {1}). 다시 시도하세요.", "fr-FR": "Échec Google Drive (HTTP {1}). Réessayez.", "ru-RU": "Ошибка запроса Google Drive (HTTP {1}). Повторите попытку.", "es-ES": "Falló Google Drive (HTTP {1}). Reinténtalo."}},
-    {pattern: "^读取 Google 账号失败（HTTP (\\d+)）。$", localizedCaptures: [], messages: {"en-US": "Unable to read Google account (HTTP {1}).", "ja-JP": "Google アカウント読み取り失敗（HTTP {1}）。", "ko-KR": "Google 계정 읽기 실패 (HTTP {1}).", "fr-FR": "Lecture du compte Google impossible (HTTP {1}).", "ru-RU": "Ошибка чтения аккаунта Google (HTTP {1}).", "es-ES": "No se pudo leer la cuenta Google (HTTP {1})."}},
+    {pattern: "^翻译连接：(.+)；自定义服务：(\\d+)；凭据和地址已隐藏$", localizedCaptures: [], messages: {
+        'zh-TW': "翻譯連接：{1}；自訂服務：{2}；憑證和位址已隱藏","en-US": "Connection: {1}; custom services: {2}; credentials and addresses hidden", "ja-JP": "接続：{1}；カスタムサービス：{2}；認証情報とアドレスは非表示", "ko-KR": "연결: {1}; 사용자 지정 서비스: {2}; 인증 정보와 주소 숨김", "fr-FR": "Connexion : {1} ; services personnalisés : {2} ; identifiants et adresses masqués", "ru-RU": "Подключение: {1}; своих сервисов: {2}; учётные данные и адреса скрыты", "es-ES": "Conexión: {1}; servicios personalizados: {2}; credenciales y direcciones ocultas"}},
+    {pattern: "^Google Drive 请求失败（HTTP (\\d+)），请重试。$", localizedCaptures: [], messages: {
+        'zh-TW': "Google Drive 請求失敗（HTTP {1}），請重試。","en-US": "Google Drive request failed (HTTP {1}). Try again.", "ja-JP": "Google Drive リクエスト失敗（HTTP {1}）。再試行してください。", "ko-KR": "Google Drive 요청 실패 (HTTP {1}). 다시 시도하세요.", "fr-FR": "Échec Google Drive (HTTP {1}). Réessayez.", "ru-RU": "Ошибка запроса Google Drive (HTTP {1}). Повторите попытку.", "es-ES": "Falló Google Drive (HTTP {1}). Reinténtalo."}},
+    {pattern: "^读取 Google 账号失败（HTTP (\\d+)）。$", localizedCaptures: [], messages: {
+        'zh-TW': "讀取 Google 帳號失敗（HTTP {1}）。","en-US": "Unable to read Google account (HTTP {1}).", "ja-JP": "Google アカウント読み取り失敗（HTTP {1}）。", "ko-KR": "Google 계정 읽기 실패 (HTTP {1}).", "fr-FR": "Lecture du compte Google impossible (HTTP {1}).", "ru-RU": "Ошибка чтения аккаунта Google (HTTP {1}).", "es-ES": "No se pudo leer la cuenta Google (HTTP {1})."}},
 
     {pattern: "^图片翻译失败：(.+)$", localizedCaptures: [1], messages: {
+        'zh-TW': "圖片翻譯失敗：{1}",
         'en-US': "Image translation failed: {1}",
         'ja-JP': "画像翻訳に失敗しました：{1}",
         'ko-KR': "이미지 번역 실패: {1}",
@@ -74,6 +84,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "No se pudo traducir la imagen: {1}",
     }},
     {pattern: "^已完成 (\\d+) 个词条$", localizedCaptures: [], messages: {
+        'zh-TW': "已完成 {1} 個詞條",
         'ja-JP': "{1} 件の単語",
         'ko-KR': "단어 {1}개",
         'fr-FR': "{1} entrées de vocabulaire",
@@ -81,6 +92,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} entradas de vocabulario",
     }},
     {pattern: "^(\\d+) 个模型，点击切换$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 個模型，點擊切換",
         'ja-JP': "{1} モデル · クリックで切替",
         'ko-KR': "모델 {1}개 · 클릭하여 전환",
         'fr-FR': "{1} modèles · cliquer pour changer",
@@ -88,6 +100,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} modelos · pulsa para cambiar",
     }},
     {pattern: "^已达到 (\\d+) 个模型上限$", localizedCaptures: [], messages: {
+        'zh-TW': "已達到 {1} 個模型上限",
         'ja-JP': "モデル数の上限 {1} 件に達しました",
         'ko-KR': "모델 한도 {1}개에 도달했습니다",
         'fr-FR': "Limite de {1} modèles atteinte",
@@ -95,6 +108,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Se alcanzó el límite de {1} modelos",
     }},
     {pattern: "^最多只能保存 (\\d+) 个自定义服务$", localizedCaptures: [], messages: {
+        'zh-TW': "最多只能儲存 {1} 個自訂服務",
         'ja-JP': "カスタムサービスは最大 {1} 件です",
         'ko-KR': "사용자 지정 서비스는 최대 {1}개입니다",
         'fr-FR': "Jusqu’à {1} services personnalisés",
@@ -102,6 +116,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Puedes guardar hasta {1} servicios personalizados",
     }},
     {pattern: "^自定义服务已达到 (\\d+) 个上限$", localizedCaptures: [], messages: {
+        'zh-TW': "自訂服務已達到 {1} 個上限",
         'ja-JP': "カスタムサービスの上限 {1} 件に達しました",
         'ko-KR': "사용자 지정 서비스 한도 {1}개에 도달했습니다",
         'fr-FR': "Limite de {1} services personnalisés atteinte",
@@ -109,6 +124,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Se alcanzó el límite de {1} servicios personalizados",
     }},
     {pattern: "^已保存 (.+)，启动插件后生效$", localizedCaptures: [], messages: {
+        'zh-TW': "已儲存 {1}，啟動外掛後生效",
         'ja-JP': "{1} を保存しました。拡張を有効にすると適用されます",
         'ko-KR': "{1} 저장됨. 확장을 켜면 적용됩니다",
         'fr-FR': "{1} enregistré ; activez l’extension pour appliquer",
@@ -116,6 +132,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} guardado; activa la extensión para aplicarlo",
     }},
     {pattern: "^已保存 (.+)，当前网页请刷新后重试$", localizedCaptures: [], messages: {
+        'zh-TW': "已儲存 {1}，當前網頁請重新整理後重試",
         'ja-JP': "{1} を保存しました。ページを更新して再試行してください",
         'ko-KR': "{1} 저장됨. 페이지를 새로고침하고 다시 시도하세요",
         'fr-FR': "{1} enregistré ; actualisez la page et réessayez",
@@ -123,6 +140,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} guardado; recarga la página y reintenta",
     }},
     {pattern: "^已保存 (.+)；(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "已儲存 {1}；{2}",
         'ja-JP': "{1} を保存しました；{2}",
         'ko-KR': "{1} 저장됨; {2}",
         'fr-FR': "{1} enregistré ; {2}",
@@ -130,6 +148,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} guardado; {2}",
     }},
     {pattern: "^已关闭 (.+) 的始终翻译，当前网页保持不变$", localizedCaptures: [], messages: {
+        'zh-TW': "已關閉 {1} 的始終翻譯，當前網頁保持不變",
         'ja-JP': "{1} の常時翻訳を無効にしました。現在のページは変わりません",
         'ko-KR': "{1} 항상 번역을 껐습니다. 현재 페이지는 유지됩니다",
         'fr-FR': "Traduction systématique désactivée pour {1} ; page inchangée",
@@ -137,6 +156,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Traducción permanente desactivada en {1}; la página no cambia",
     }},
     {pattern: "^已开启 (.+) 的始终翻译$", localizedCaptures: [], messages: {
+        'zh-TW': "已開啟 {1} 的始終翻譯",
         'ja-JP': "{1} の常時翻訳を有効にしました",
         'ko-KR': "{1} 항상 번역을 켰습니다",
         'fr-FR': "Traduction systématique activée pour {1}",
@@ -144,6 +164,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Traducción permanente activada en {1}",
     }},
     {pattern: "^已在 (.+) 禁用扩展$", localizedCaptures: [], messages: {
+        'zh-TW': "已在 {1} 停用擴充功能",
         'ja-JP': "{1} で拡張を無効にしました",
         'ko-KR': "{1}에서 확장을 껐습니다",
         'fr-FR': "Extension désactivée sur {1}",
@@ -151,6 +172,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Extensión desactivada en {1}",
     }},
     {pattern: "^已恢复 (.+) 的扩展$", localizedCaptures: [], messages: {
+        'zh-TW': "已還原 {1} 的擴充功能",
         'ja-JP': "{1} で拡張を再開しました",
         'ko-KR': "{1}에서 확장을 다시 켰습니다",
         'fr-FR': "Extension réactivée sur {1}",
@@ -158,6 +180,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Extensión reactivada en {1}",
     }},
     {pattern: "^当前已在 (.+) 禁用扩展，请先恢复扩展$", localizedCaptures: [], messages: {
+        'zh-TW': "當前已在 {1} 停用擴充功能，請先還原擴充功能",
         'ja-JP': "{1} で拡張が無効です。先に再開してください",
         'ko-KR': "{1}에서 확장이 꺼져 있습니다. 먼저 켜세요",
         'fr-FR': "Extension désactivée sur {1} ; réactivez-la d’abord",
@@ -165,6 +188,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Extensión desactivada en {1}; actívala primero",
     }},
     {pattern: "^恢复 (.+) 的扩展$", localizedCaptures: [], messages: {
+        'zh-TW': "還原 {1} 的擴充功能",
         'ja-JP': "{1} で拡張を再開",
         'ko-KR': "{1}에서 확장 다시 켜기",
         'fr-FR': "Réactiver l’extension sur {1}",
@@ -172,6 +196,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Reactivar extensión en {1}",
     }},
     {pattern: "^始终翻译 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "始終翻譯 {1}",
         'ja-JP': "{1} を常に翻訳",
         'ko-KR': "{1} 항상 번역",
         'fr-FR': "Toujours traduire {1}",
@@ -179,6 +204,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Traducir siempre {1}",
     }},
     {pattern: "^在 (.+) 禁用扩展$", localizedCaptures: [], messages: {
+        'zh-TW': "在 {1} 停用擴充功能",
         'ja-JP': "{1} で拡張を無効化",
         'ko-KR': "{1}에서 확장 끄기",
         'fr-FR': "Désactiver l’extension sur {1}",
@@ -186,6 +212,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Desactivar extensión en {1}",
     }},
     {pattern: "^所有网站自动翻译已开启，(.+) 会自动翻译$", localizedCaptures: [], messages: {
+        'zh-TW': "所有網站自動翻譯已開啟，{1} 會自動翻譯",
         'ja-JP': "全サイトの自動翻訳が有効なため、{1} も自動翻訳します",
         'ko-KR': "모든 사이트 자동 번역이 켜져 있어 {1}도 자동 번역합니다",
         'fr-FR': "Traduction automatique globale activée ; {1} sera traduit",
@@ -193,6 +220,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Traducción automática global activa; se traducirá {1}",
     }},
     {pattern: "^当前浏览器暂不支持(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "當前瀏覽器暫不支援{1}",
         'ja-JP': "このブラウザーは現在 {1} に対応していません",
         'ko-KR': "이 브라우저는 현재 {1}을 지원하지 않습니다",
         'fr-FR': "Ce navigateur ne prend pas encore en charge {1}",
@@ -200,6 +228,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Este navegador aún no admite {1}",
     }},
     {pattern: "^快捷键已设置为: (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "快速鍵已設定為: {1}",
         'ja-JP': "ショートカットを {1} に設定しました",
         'ko-KR': "단축키를 {1}로 설정했습니다",
         'fr-FR': "Raccourci défini sur {1}",
@@ -207,6 +236,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Atajo establecido: {1}",
     }},
     {pattern: "^划词翻译快捷键已设置为: (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "劃詞翻譯快速鍵已設定為: {1}",
         'ja-JP': "選択翻訳のキーを {1} に設定しました",
         'ko-KR': "선택 번역 단축키를 {1}로 설정했습니다",
         'fr-FR': "Raccourci de sélection défini sur {1}",
@@ -214,6 +244,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Atajo de selección establecido: {1}",
     }},
     {pattern: "^并发数量已更新为 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "並行數量已更新為 {1}",
         'ja-JP': "同時実行数を {1} に更新しました",
         'ko-KR': "동시 실행 수를 {1}로 변경했습니다",
         'fr-FR': "Concurrence définie sur {1}",
@@ -221,6 +252,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Concurrencia actualizada a {1}",
     }},
     {pattern: "^已完成真实翻译请求（(.+) ms）。$", localizedCaptures: [], messages: {
+        'zh-TW': "已完成真實翻譯請求（{1} ms）。",
         'ja-JP': "実際の翻訳リクエストが完了しました（{1} ms）。",
         'ko-KR': "실제 번역 요청을 완료했습니다({1} ms).",
         'fr-FR': "Requête réelle de traduction terminée ({1} ms).",
@@ -228,6 +260,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Solicitud real de traducción completada ({1} ms).",
     }},
     {pattern: "^你的请求频率过高，被【(.+)】拒绝了，请稍后再试吧~$", localizedCaptures: [], messages: {
+        'zh-TW': "你的請求頻率過高，被【{1}】拒絕了，請稍後再試吧~",
         'ja-JP': "{1} のリクエスト制限に達しました。後で再試行してください。",
         'ko-KR': "{1} 요청 한도에 도달했습니다. 나중에 다시 시도하세요.",
         'fr-FR': "Limite de requêtes de {1} atteinte. Réessayez plus tard.",
@@ -235,6 +268,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Se alcanzó el límite de solicitudes de {1}. Reintenta más tarde.",
     }},
     {pattern: "^网络连接失败：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "網路連線失敗：{1}",
         'ja-JP': "ネットワーク接続に失敗：{1}",
         'ko-KR': "네트워크 연결 실패: {1}",
         'fr-FR': "Échec de connexion réseau : {1}",
@@ -242,6 +276,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Error de conexión de red: {1}",
     }},
     {pattern: "^已选 (\\d+) 个服务 · 右侧卡片可拖动排序$", localizedCaptures: [], messages: {
+        'zh-TW': "已選 {1} 個服務 · 右側卡片可拖曳排序",
         'en-US': "{1} services selected · drag the cards on the right to reorder",
         'ja-JP': "{1} サービスを選択 · 右のカードをドラッグして並べ替え",
         'ko-KR': "서비스 {1}개 선택 · 오른쪽 카드를 드래그해 정렬",
@@ -250,6 +285,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} servicios seleccionados · arrastra las tarjetas para ordenar",
     }},
     {pattern: "^(\\d+) 个翻译服务$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 個翻譯服務",
         'ja-JP': "{1} 翻訳サービス",
         'ko-KR': "번역 서비스 {1}개",
         'fr-FR': "{1} services de traduction",
@@ -257,6 +293,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} servicios de traducción",
     }},
     {pattern: "^分 (\\d+) 秒$", localizedCaptures: [], messages: {
+        'zh-TW': "分 {1} 秒",
         'ja-JP': "分 {1} 秒",
         'ko-KR': "분 {1}초",
         'fr-FR': "min {1} s",
@@ -264,6 +301,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "min {1} s",
     }},
     {pattern: "^第 (\\d+)–(\\d+) 条，共 (\\d+) 条$", localizedCaptures: [], messages: {
+        'zh-TW': "第 {1}–{2} 條，共 {3} 條",
         'ja-JP': "{3} 件中 {1}–{2} 件",
         'ko-KR': "총 {3}개 중 {1}–{2}",
         'fr-FR': "{1}–{2} sur {3}",
@@ -271,6 +309,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1}–{2} de {3}",
     }},
     {pattern: "^查看全部 (\\d+) 项$", localizedCaptures: [], messages: {
+        'zh-TW': "檢視全部 {1} 項",
         'ja-JP': "全 {1} 件を表示",
         'ko-KR': "전체 {1}개 보기",
         'fr-FR': "Voir les {1} éléments",
@@ -278,6 +317,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Ver los {1} elementos",
     }},
     {pattern: "^开始复习 (\\d+) 个$", localizedCaptures: [], messages: {
+        'zh-TW': "開始復習 {1} 個",
         'ja-JP': "{1} 件を復習",
         'ko-KR': "{1}개 복습 시작",
         'fr-FR': "Réviser {1} éléments",
@@ -285,6 +325,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Repasar {1} elementos",
     }},
     {pattern: "^复习 (\\d+) 个 · 记得 (\\d+) 个 · 忘了 (\\d+) 个$", localizedCaptures: [], messages: {
+        'zh-TW': "復習 {1} 個 · 記得 {2} 個 · 忘了 {3} 個",
         'en-US': "Reviewed {1} · remembered {2} · forgot {3}",
         'ja-JP': "復習 {1} 件 · 覚えていた {2} 件 · 忘れた {3} 件",
         'ko-KR': "복습 {1}개 · 기억 {2}개 · 잊음 {3}개",
@@ -293,6 +334,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Repasados: {1} · recordados: {2} · olvidados: {3}",
     }},
     {pattern: "^(\\d+) 次收藏记录$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 次收藏紀錄",
         'ja-JP': "{1} 件の保存履歴",
         'ko-KR': "저장 기록 {1}회",
         'fr-FR': "{1} enregistrements",
@@ -300,6 +342,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} registros guardados",
     }},
     {pattern: "^(\\d+) 分钟后$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 分鐘後",
         'ja-JP': "{1} 分後",
         'ko-KR': "{1}분 후",
         'fr-FR': "Dans {1} minutes",
@@ -307,6 +350,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "En {1} minutos",
     }},
     {pattern: "^(\\d+) 小时后$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 小時後",
         'ja-JP': "{1} 時間後",
         'ko-KR': "{1}시간 후",
         'fr-FR': "Dans {1} heures",
@@ -314,6 +358,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "En {1} horas",
     }},
     {pattern: "^第 (\\d+) / (\\d+) 页 · 共 (\\d+) 个$", localizedCaptures: [], messages: {
+        'zh-TW': "第 {1} / {2} 頁 · 共 {3} 個",
         'en-US': "Page {1} / {2} · {3} total",
         'ja-JP': "{1} / {2} ページ · 合計 {3} 件",
         'ko-KR': "{1} / {2}페이지 · 총 {3}개",
@@ -322,6 +367,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Página {1} / {2} · {3} en total",
     }},
     {pattern: "^(.+) 已标记为掌握$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 已標記為掌握",
         'ja-JP': "{1} を習得済みにしました",
         'ko-KR': "{1} 습득 완료로 표시",
         'fr-FR': "{1} marqué comme maîtrisé",
@@ -329,6 +375,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} marcado como dominado",
     }},
     {pattern: "^(.+) 已回到学习队列$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 已回到學習佇列",
         'ja-JP': "{1} を学習キューに戻しました",
         'ko-KR': "{1} 학습 대기열로 복귀",
         'fr-FR': "{1} remis dans la file d’étude",
@@ -336,6 +383,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} vuelve a la cola de estudio",
     }},
     {pattern: "^已删除 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "已刪除 {1}",
         'ja-JP': "{1} を削除しました",
         'ko-KR': "{1} 삭제됨",
         'fr-FR': "{1} supprimé",
@@ -343,6 +391,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} eliminado",
     }},
     {pattern: "^确认删除“(.+)”及其复习记录吗？$", localizedCaptures: [], messages: {
+        'zh-TW': "確認刪除“{1}”及其復習紀錄嗎？",
         'ja-JP': "「{1}」と復習履歴を削除しますか？",
         'ko-KR': "“{1}” 및 복습 기록을 삭제할까요?",
         'fr-FR': "Supprimer « {1} » et ses révisions ?",
@@ -350,6 +399,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "¿Eliminar «{1}» y sus repasos?",
     }},
     {pattern: "^已导出 (\\d+) 个 Anki 词条$", localizedCaptures: [], messages: {
+        'zh-TW': "已匯出 {1} 個 Anki 詞條",
         'ja-JP': "Anki に {1} 件をエクスポートしました",
         'ko-KR': "Anki 항목 {1}개 내보냄",
         'fr-FR': "{1} entrées Anki exportées",
@@ -357,6 +407,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} entradas Anki exportadas",
     }},
     {pattern: "^开始记录于 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "開始紀錄於 {1}",
         'ja-JP': "記録開始：{1}",
         'ko-KR': "기록 시작: {1}",
         'fr-FR': "Début de l’enregistrement : {1}",
@@ -364,6 +415,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Inicio del registro: {1}",
     }},
     {pattern: "^更新于 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "更新於 {1}",
         'ja-JP': "更新：{1}",
         'ko-KR': "업데이트: {1}",
         'fr-FR': "Mis à jour : {1}",
@@ -371,6 +423,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Actualizado: {1}",
     }},
     {pattern: "^用量趋势，共 (.+) Token$", localizedCaptures: [], messages: {
+        'zh-TW': "用量趨勢，共 {1} Token",
         'ja-JP': "使用量の推移、合計 {1} トークン",
         'ko-KR': "사용량 추이, 총 {1} 토큰",
         'fr-FR': "Tendance d’utilisation, {1} tokens au total",
@@ -378,6 +431,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Tendencia de uso, {1} tokens en total",
     }},
     {pattern: "^完整数值：(.+) Token$", localizedCaptures: [], messages: {
+        'zh-TW': "完整數值：{1} Token",
         'ja-JP': "正確な値：{1} トークン",
         'ko-KR': "정확한 값: {1} 토큰",
         'fr-FR': "Valeur exacte : {1} tokens",
@@ -385,6 +439,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Valor exacto: {1} tokens",
     }},
     {pattern: "^第 (\\d+) 页$", localizedCaptures: [], messages: {
+        'zh-TW': "第 {1} 頁",
         'ja-JP': "{1} ページ",
         'ko-KR': "{1}페이지",
         'fr-FR': "Page {1}",
@@ -392,6 +447,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Página {1}",
     }},
     {pattern: "^(.+) 个可翻译片段$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 個可翻譯片段",
         'ja-JP': "翻訳可能な部分 {1} 件",
         'ko-KR': "번역 가능한 구간 {1}개",
         'fr-FR': "{1} segments traduisibles",
@@ -399,6 +455,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} segmentos traducibles",
     }},
     {pattern: "^(.+) 个片段$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 個片段",
         'ja-JP': "{1} 件の部分",
         'ko-KR': "구간 {1}개",
         'fr-FR': "{1} segments",
@@ -406,6 +463,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} segmentos",
     }},
     {pattern: "^(.+) 个文本片段$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 個文本片段",
         'ja-JP': "{1} 件のテキスト部分",
         'ko-KR': "텍스트 구간 {1}개",
         'fr-FR': "{1} segments de texte",
@@ -413,6 +471,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} segmentos de texto",
     }},
     {pattern: "^当前展示前 (\\d+) 个片段，下载时会包含完整文件。$", localizedCaptures: [], messages: {
+        'zh-TW': "當前展示前 {1} 個片段，下載時會包含完整檔案。",
         'ja-JP': "先頭 {1} 件を表示しています。ダウンロードには全体が含まれます。",
         'ko-KR': "처음 {1}개 구간을 표시하며 다운로드에는 전체 파일이 포함됩니다.",
         'fr-FR': "Affichage des {1} premiers segments ; le téléchargement inclut le fichier complet.",
@@ -420,6 +479,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Se muestran los primeros {1} segmentos; la descarga incluye el archivo completo.",
     }},
     {pattern: "^文件大小超过 (.+)，请先拆分文件后再翻译。$", localizedCaptures: [], messages: {
+        'zh-TW': "檔案大小超過 {1}，請先拆分檔案後再翻譯。",
         'ja-JP': "ファイルが {1} を超えています。分割してから翻訳してください。",
         'ko-KR': "파일이 {1}를 초과합니다. 나누어 번역하세요.",
         'fr-FR': "Le fichier dépasse {1}. Divisez-le avant de traduire.",
@@ -427,6 +487,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "El archivo supera {1}. Divídelo antes de traducir.",
     }},
     {pattern: "^第 (\\d+) 页第 (\\d+) 个文本块译文$", localizedCaptures: [], messages: {
+        'zh-TW': "第 {1} 頁第 {2} 個文本塊譯文",
         'ja-JP': "{1} ページの第 {2} テキストブロックの訳文",
         'ko-KR': "{1}페이지 {2}번째 텍스트 블록 번역",
         'fr-FR': "Traduction du bloc {2}, page {1}",
@@ -434,6 +495,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Traducción del bloque {2} de la página {1}",
     }},
     {pattern: "^第 (\\d+) 个文本片段译文$", localizedCaptures: [], messages: {
+        'zh-TW': "第 {1} 個文本片段譯文",
         'ja-JP': "第 {1} テキスト部分の訳文",
         'ko-KR': "{1}번째 텍스트 구간 번역",
         'fr-FR': "Traduction du segment de texte {1}",
@@ -441,6 +503,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Traducción del segmento de texto {1}",
     }},
     {pattern: "^第 (\\d+) 段译文$", localizedCaptures: [], messages: {
+        'zh-TW': "第 {1} 段譯文",
         'ja-JP': "第 {1} 段落の訳文",
         'ko-KR': "{1}번째 문단 번역",
         'fr-FR': "Traduction du paragraphe {1}",
@@ -448,6 +511,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Traducción del párrafo {1}",
     }},
     {pattern: "^全文翻译已开启，(.+) 项将在滚动到附近时翻译$", localizedCaptures: [], messages: {
+        'zh-TW': "全文翻譯已開啟，{1} 項將在捲動到附近時翻譯",
         'en-US': "Full-page translation is on; {1} items translate when you scroll nearby",
         'ja-JP': "全文翻訳は有効です。{1} 件は近くにスクロールすると翻訳します",
         'ko-KR': "전체 번역이 켜져 있으며 {1}개 항목은 근처로 스크롤하면 번역합니다",
@@ -456,6 +520,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Traducción de página activa; {1} elementos se traducirán al acercarte",
     }},
     {pattern: "^(.+) 项将在滚动到附近时翻译$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 項將在捲動到附近時翻譯",
         'ja-JP': "{1} 件は近くまでスクロールすると翻訳します",
         'ko-KR': "{1}개 항목은 근처로 스크롤하면 번역됩니다",
         'fr-FR': "{1} éléments seront traduits en défilant à proximité",
@@ -463,6 +528,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} elementos se traducirán al desplazarte cerca",
     }},
     {pattern: "^常用服务优先，更多服务(.+)$", localizedCaptures: [1], messages: {
+        'zh-TW': "常用服務優先，更多服務{1}",
         'en-US': "Common services first; more services {1}",
         'ja-JP': "よく使うサービスを優先。その他 {1}",
         'ko-KR': "자주 쓰는 서비스 우선; 더 많은 서비스 {1}",
@@ -471,6 +537,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Servicios habituales primero; más servicios {1}",
     }},
     {pattern: "^(.+) 已禁用扩展，无法开启始终翻译$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 已停用擴充功能，無法開啟始終翻譯",
         'en-US': "The extension is disabled on {1}; always-translate is unavailable",
         'ja-JP': "{1} で拡張が無効のため、常時翻訳は使えません",
         'ko-KR': "{1}에서 확장이 꺼져 있어 항상 번역을 켤 수 없습니다",
@@ -479,6 +546,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Extensión desactivada en {1}; traducción permanente no disponible",
     }},
     {pattern: "^，其中 (.+) 个任务将在滚动到附近时翻译$", localizedCaptures: [], messages: {
+        'zh-TW': "，其中 {1} 個任務將在捲動到附近時翻譯",
         'en-US': ", including {1} tasks waiting for nearby scrolling",
         'ja-JP': "、うち {1} 件は近くにスクロールすると翻訳します",
         'ko-KR': ", 그중 {1}개 작업은 근처로 스크롤하면 번역합니다",
@@ -487,6 +555,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': ", incluidas {1} tareas que esperan al desplazamiento",
     }},
     {pattern: "^翻译进度：正在进行 (\\d+) 个任务，剩余 (\\d+) 个任务(.*)$", localizedCaptures: [3], messages: {
+        'zh-TW': "翻譯進度：正在進行 {1} 個任務，剩餘 {2} 個任務{3}",
         'en-US': "Translation progress: {1} active, {2} remaining{3}",
         'ja-JP': "翻訳進捗：実行中 {1} 件、残り {2} 件{3}",
         'ko-KR': "번역 진행: 진행 중 {1}개, 남음 {2}개{3}",
@@ -495,6 +564,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Progreso: {1} activas, {2} restantes{3}",
     }},
     {pattern: "^(.+)。请检查网络后重试。$", localizedCaptures: [], messages: {
+        'zh-TW': "{1}。請檢查網路後重試。",
         'en-US': "{1}. Check your connection and retry.",
         'ja-JP': "{1}。ネット接続を確認して再試行してください。",
         'ko-KR': "{1}. 네트워크를 확인하고 다시 시도하세요.",
@@ -503,6 +573,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1}. Revisa la conexión y reintenta.",
     }},
     {pattern: "^(.+)用量趋势，(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "{1}用量趨勢，{2}",
         'en-US': "{1} usage trend, {2}",
         'ja-JP': "{1} の使用量推移、{2}",
         'ko-KR': "{1} 사용량 추이, {2}",
@@ -511,6 +582,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Tendencia de uso de {1}, {2}",
     }},
     {pattern: "^(.+)，输入 (.+) Token，输出 (.+) Token，共 (.+) Token，(.+) 次请求，(.+) 次未上报$", localizedCaptures: [], messages: {
+        'zh-TW': "{1}，輸入 {2} Token，輸出 {3} Token，共 {4} Token，{5} 次請求，{6} 次未上報",
         'en-US': "{1}: input {2}, output {3}, total {4} tokens; {5} requests, {6} unreported",
         'ja-JP': "{1}：入力 {2}、出力 {3}、合計 {4} トークン、{5} リクエスト、未報告 {6}",
         'ko-KR': "{1}: 입력 {2}, 출력 {3}, 총 {4} 토큰; 요청 {5}회, 미보고 {6}회",
@@ -519,6 +591,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1}: entrada {2}, salida {3}, total {4} tokens; {5} solicitudes, {6} sin informar",
     }},
     {pattern: "^最早保留记录 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "最早保留紀錄 {1}",
         'en-US': "Oldest retained record: {1}",
         'ja-JP': "最古の保存記録：{1}",
         'ko-KR': "가장 오래된 기록: {1}",
@@ -527,6 +600,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Registro más antiguo: {1}",
     }},
     {pattern: "^(.+) 分 (.+) 秒$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 分 {2} 秒",
         'en-US': "{1} min {2} sec",
         'ja-JP': "{1} 分 {2} 秒",
         'ko-KR': "{1}분 {2}초",
@@ -535,6 +609,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} min {2} s",
     }},
     {pattern: "^输入命中率 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "輸入命中率 {1}",
         'en-US': "Input hit rate {1}",
         'ja-JP': "入力ヒット率 {1}",
         'ko-KR': "입력 적중률 {1}",
@@ -543,6 +618,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Tasa de aciertos de entrada {1}",
     }},
     {pattern: "^(.+)；输入 Token 命中率 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "{1}；輸入 Token 命中率 {2}",
         'en-US': "{1}; input token hit rate {2}",
         'ja-JP': "{1}；入力トークンのヒット率 {2}",
         'ko-KR': "{1}; 입력 토큰 적중률 {2}",
@@ -551,6 +627,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1}; tasa de aciertos de tokens de entrada {2}",
     }},
     {pattern: "^(.+)；Token 命中率 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "{1}；Token 命中率 {2}",
         'en-US': "{1}; token hit rate {2}",
         'ja-JP': "{1}；トークンのヒット率 {2}",
         'ko-KR': "{1}; 토큰 적중률 {2}",
@@ -559,6 +636,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1}; tasa de aciertos de tokens {2}",
     }},
     {pattern: "^按(.+)排序$", localizedCaptures: [1], messages: {
+        'zh-TW': "按{1}排序",
         'en-US': "Sort by {1}",
         'ja-JP': "{1}で並べ替え",
         'ko-KR': "{1} 기준 정렬",
@@ -567,6 +645,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Ordenar por {1}",
     }},
     {pattern: "^(.+)，输入 (.+) Token，其中缓存读取 (.+) Token，缓存 Token 命中率 (.+)，输出 (.+) Token，共 (.+) Token，(.+) 次请求，点击筛选$", localizedCaptures: [], messages: {
+        'zh-TW': "{1}，輸入 {2} Token，其中快取讀取 {3} Token，快取 Token 命中率 {4}，輸出 {5} Token，共 {6} Token，{7} 次請求，點擊篩選",
         'en-US': "{1}: input {2}, cached {3} tokens, cache hit rate {4}, output {5}, total {6} tokens, {7} requests; click to filter",
         'ja-JP': "{1}：入力 {2}、キャッシュ読込 {3} トークン、ヒット率 {4}、出力 {5}、合計 {6} トークン、{7} リクエスト。クリックで絞込",
         'ko-KR': "{1}: 입력 {2}, 캐시 {3} 토큰, 적중률 {4}, 출력 {5}, 총 {6} 토큰, 요청 {7}회; 클릭하여 필터",
@@ -575,6 +654,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1}: entrada {2}, caché {3} tokens, aciertos {4}, salida {5}, total {6} tokens, {7} solicitudes; pulsa para filtrar",
     }},
     {pattern: "^保存失败：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "儲存失敗：{1}",
         'en-US': "Save failed: {1}",
         'ja-JP': "保存失敗：{1}",
         'ko-KR': "저장 실패: {1}",
@@ -583,6 +663,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Error al guardar: {1}",
     }},
     {pattern: "^(.+) 已在禁用扩展名单中。$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 已在停用副檔名單中。",
         'en-US': "{1} is already in the disabled-sites list.",
         'ja-JP': "{1} は既に無効サイト一覧にあります。",
         'ko-KR': "{1}은 이미 비활성 사이트 목록에 있습니다.",
@@ -591,6 +672,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} ya está en la lista de sitios desactivados.",
     }},
     {pattern: "^(.+) 已在始终翻译名单中。$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 已在始終翻譯名單中。",
         'en-US': "{1} is already in the always-translate list.",
         'ja-JP': "{1} は既に常時翻訳一覧にあります。",
         'ko-KR': "{1}은 이미 항상 번역 목록에 있습니다.",
@@ -599,6 +681,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} ya está en la lista de traducción permanente.",
     }},
     {pattern: "^已添加 (.+)。$", localizedCaptures: [], messages: {
+        'zh-TW': "已新增 {1}。",
         'en-US': "Added {1}.",
         'ja-JP': "{1} を追加しました。",
         'ko-KR': "{1} 추가됨.",
@@ -607,6 +690,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} añadido.",
     }},
     {pattern: "^删除 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "刪除 {1}",
         'en-US': "Delete {1}",
         'ja-JP': "{1} を削除",
         'ko-KR': "{1} 삭제",
@@ -615,6 +699,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Eliminar {1}",
     }},
     {pattern: "^最近修改 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "最近修改 {1}",
         'en-US': "Recent change {1}",
         'ja-JP': "最近の変更 {1}",
         'ko-KR': "최근 변경 {1}",
@@ -623,6 +708,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Cambio reciente {1}",
     }},
     {pattern: "^自动设置快照 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "自動設定快照 {1}",
         'en-US': "Automatic settings snapshot {1}",
         'ja-JP': "自動設定スナップショット {1}",
         'ko-KR': "자동 설정 스냅샷 {1}",
@@ -631,6 +717,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Instantánea automática de ajustes {1}",
     }},
     {pattern: "^将恢复 (.+)，并生成一份新的最近修改记录。是否继续？$", localizedCaptures: [1], messages: {
+        'zh-TW': "將還原 {1}，並生成一份新的最近修改紀錄。是否繼續？",
         'en-US': "Restore {1} and create a new recent change record? Continue?",
         'ja-JP': "{1} を復元し、新しい変更履歴を作成します。続行しますか？",
         'ko-KR': "{1}을 복원하고 새 변경 기록을 만듭니다. 계속할까요?",
@@ -639,6 +726,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "¿Restaurar {1} y crear un nuevo registro de cambios? ¿Continuar?",
     }},
     {pattern: "^恢复失败：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "還原失敗：{1}",
         'en-US': "Restore failed: {1}",
         'ja-JP': "復元失敗：{1}",
         'ko-KR': "복원 실패: {1}",
@@ -647,6 +735,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Error al restaurar: {1}",
     }},
     {pattern: "^查看最近修改 v(.+)，(.+)，(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "檢視最近修改 v{1}，{2}，{3}",
         'en-US': "View recent change v{1}, {2}, {3}",
         'ja-JP': "最近の変更 v{1} を表示、{2}、{3}",
         'ko-KR': "최근 변경 v{1} 보기, {2}, {3}",
@@ -655,6 +744,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Ver cambio v{1}, {2}, {3}",
     }},
     {pattern: "^查看自动设置快照 b(.+)，(.+)，(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "檢視自動設定快照 b{1}，{2}，{3}",
         'en-US': "View automatic snapshot b{1}, {2}, {3}",
         'ja-JP': "自動スナップショット b{1} を表示、{2}、{3}",
         'ko-KR': "자동 스냅샷 b{1} 보기, {2}, {3}",
@@ -663,6 +753,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Ver instantánea automática b{1}, {2}, {3}",
     }},
     {pattern: "^(.+) 项不同$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 項不同",
         'en-US': "{1} differences",
         'ja-JP': "{1} 件の相違",
         'ko-KR': "차이 {1}개",
@@ -671,6 +762,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} diferencias",
     }},
     {pattern: "^备份已导出：(.+) 个词条，(.+) 条用量记录$", localizedCaptures: [], messages: {
+        'zh-TW': "備份已匯出：{1} 個詞條，{2} 條用量紀錄",
         'en-US': "Backup exported: {1} entries, {2} usage records",
         'ja-JP': "バックアップを出力：{1} 単語、{2} 使用量記録",
         'ko-KR': "백업 내보냄: 항목 {1}개, 사용량 기록 {2}개",
@@ -679,6 +771,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Copia exportada: {1} entradas, {2} registros de uso",
     }},
     {pattern: "^导出失败：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "匯出失敗：{1}",
         'en-US': "Export failed: {1}",
         'ja-JP': "エクスポート失敗：{1}",
         'ko-KR': "내보내기 실패: {1}",
@@ -687,6 +780,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Error al exportar: {1}",
     }},
     {pattern: "^文件约 (.+) MB，读取和校验可能需要较长时间。是否继续？$", localizedCaptures: [], messages: {
+        'zh-TW': "檔案約 {1} MB，讀取和驗證可能需要較長時間。是否繼續？",
         'en-US': "File is about {1} MB; reading and validation may take a while. Continue?",
         'ja-JP': "約 {1} MB のため、読込と検証に時間がかかる場合があります。続行しますか？",
         'ko-KR': "파일이 약 {1} MB로 읽기와 검증에 시간이 걸릴 수 있습니다. 계속할까요?",
@@ -695,6 +789,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Archivo de unos {1} MB; leer y validar puede tardar. ¿Continuar?",
     }},
     {pattern: "^无法读取备份：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "無法讀取備份：{1}",
         'en-US': "Cannot read backup: {1}",
         'ja-JP': "バックアップを読めません：{1}",
         'ko-KR': "백업을 읽을 수 없음: {1}",
@@ -703,6 +798,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "No se puede leer la copia: {1}",
     }},
     {pattern: "^无法读取 JSON：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "無法讀取 JSON：{1}",
         'en-US': "Cannot read JSON: {1}",
         'ja-JP': "JSON を読めません：{1}",
         'ko-KR': "JSON을 읽을 수 없음: {1}",
@@ -711,6 +807,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "No se puede leer JSON: {1}",
     }},
     {pattern: "^模型用量新增 (.+)、跳过 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "模型用量新增 {1}、略過 {2}",
         'en-US': "Model usage: {1} added, {2} skipped",
         'ja-JP': "モデル使用量：追加 {1}、スキップ {2}",
         'ko-KR': "모델 사용량: 추가 {1}, 건너뜀 {2}",
@@ -719,6 +816,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Uso de modelos: {1} añadidos, {2} omitidos",
     }},
     {pattern: "^单词本新增 (.+)、更新 (.+)、跳过 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "單字本新增 {1}、更新 {2}、略過 {3}",
         'en-US': "Wordbook: {1} added, {2} updated, {3} skipped",
         'ja-JP': "単語帳：追加 {1}、更新 {2}、スキップ {3}",
         'ko-KR': "단어장: 추가 {1}, 업데이트 {2}, 건너뜀 {3}",
@@ -727,6 +825,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Vocabulario: {1} añadidos, {2} actualizados, {3} omitidos",
     }},
     {pattern: "^设置已应用（(.+) 项需确认）$", localizedCaptures: [], messages: {
+        'zh-TW': "設定已應用（{1} 項需確認）",
         'en-US': "Settings applied ({1} items need review)",
         'ja-JP': "設定を適用しました（{1} 件は要確認）",
         'ko-KR': "설정 적용됨({1}개 확인 필요)",
@@ -735,6 +834,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Ajustes aplicados ({1} elementos por revisar)",
     }},
     {pattern: "^导入完成但有失败项：(.+)。已成功：(.+)$", localizedCaptures: [1,2], messages: {
+        'zh-TW': "匯入完成但有失敗項：{1}。已成功：{2}",
         'en-US': "Import completed with failures: {1}. Succeeded: {2}",
         'ja-JP': "一部失敗してインポート完了：{1}。成功：{2}",
         'ko-KR': "일부 실패로 가져오기 완료: {1}. 성공: {2}",
@@ -743,6 +843,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Importación completada con fallos: {1}. Correctos: {2}",
     }},
     {pattern: "^导入完成：(.+)$", localizedCaptures: [1], messages: {
+        'zh-TW': "匯入完成：{1}",
         'en-US': "Import completed: {1}",
         'ja-JP': "インポート完了：{1}",
         'ko-KR': "가져오기 완료: {1}",
@@ -751,6 +852,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Importación completada: {1}",
     }},
     {pattern: "^(.+) 项设置或凭据变化$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 項設定或憑證變化",
         'en-US': "{1} setting or credential changes",
         'ja-JP': "{1} 件の設定・認証情報の変更",
         'ko-KR': "설정 또는 자격 증명 변경 {1}개",
@@ -759,6 +861,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} cambios de ajustes o credenciales",
     }},
     {pattern: "^“(.+)”是界面保留名称，请换一个模型标识$", localizedCaptures: [], messages: {
+        'zh-TW': "“{1}”是介面保留名稱，請換一個模型標識",
         'en-US': "“{1}” is a reserved interface name. Choose another model ID.",
         'ja-JP': "「{1}」は予約済みの表示名です。別のモデル ID を使用してください。",
         'ko-KR': "“{1}”은 예약된 인터페이스 이름입니다. 다른 모델 ID를 사용하세요.",
@@ -767,6 +870,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "«{1}» es un nombre reservado. Elige otro identificador de modelo.",
     }},
     {pattern: "^选择模型，当前模型：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "選擇模型，當前模型：{1}",
         'en-US': "Choose model; current: {1}",
         'ja-JP': "モデルを選択、現在：{1}",
         'ko-KR': "모델 선택, 현재: {1}",
@@ -775,6 +879,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Elegir modelo, actual: {1}",
     }},
     {pattern: "^删除模型 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "刪除模型 {1}",
         'en-US': "Delete model {1}",
         'ja-JP': "モデル {1} を削除",
         'ko-KR': "모델 {1} 삭제",
@@ -783,6 +888,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Eliminar modelo {1}",
     }},
     {pattern: "^(.+) 提示词$", localizedCaptures: [1], messages: {
+        'zh-TW': "{1} 提示詞",
         'en-US': "{1} prompt",
         'ja-JP': "{1} プロンプト",
         'ko-KR': "{1} 프롬프트",
@@ -791,6 +897,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Instrucción {1}",
     }},
     {pattern: "^插入 (.+)（(.+)）$", localizedCaptures: [2], messages: {
+        'zh-TW': "插入 {1}（{2}）",
         'en-US': "Insert {1} ({2})",
         'ja-JP': "{1}（{2}）を挿入",
         'ko-KR': "{1} 삽입({2})",
@@ -799,6 +906,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Insertar {1} ({2})",
     }},
     {pattern: "^已完成真实翻译请求(.*)。$", localizedCaptures: [1], messages: {
+        'zh-TW': "已完成真實翻譯請求{1}。",
         'en-US': "Real translation request completed{1}.",
         'ja-JP': "実際の翻訳リクエストが完了しました{1}。",
         'ko-KR': "실제 번역 요청 완료{1}.",
@@ -807,6 +915,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Solicitud real de traducción completada{1}.",
     }},
     {pattern: "^确定要删除“(.+)”吗？相关模型和连接配置也会一并清理。$", localizedCaptures: [], messages: {
+        'zh-TW': "確定要刪除“{1}”嗎？相關模型和連接設定也會一並清理。",
         'en-US': "Delete “{1}”? Its models and connection settings will also be removed.",
         'ja-JP': "「{1}」を削除しますか？関連モデルと接続設定も削除します。",
         'ko-KR': "“{1}”을 삭제할까요? 관련 모델과 연결 설정도 삭제됩니다.",
@@ -815,6 +924,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "¿Eliminar «{1}»? También se eliminarán sus modelos y ajustes de conexión.",
     }},
     {pattern: "^拖动(.+)调整顺序$", localizedCaptures: [], messages: {
+        'zh-TW': "拖曳{1}調整順序",
         'en-US': "Drag {1} to reorder",
         'ja-JP': "{1} をドラッグして並べ替え",
         'ko-KR': "{1} 드래그하여 정렬",
@@ -823,6 +933,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Arrastra {1} para ordenar",
     }},
     {pattern: "^移除(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "移除{1}",
         'en-US': "Remove {1}",
         'ja-JP': "{1} を除く",
         'ko-KR': "{1} 제거",
@@ -831,6 +942,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Quitar {1}",
     }},
     {pattern: "^(.+) 秒$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 秒",
         'en-US': "{1} seconds",
         'ja-JP': "{1} 秒",
         'ko-KR': "{1}초",
@@ -839,6 +951,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} segundos",
     }},
     {pattern: "^已复制(.+)$", localizedCaptures: [1], messages: {
+        'zh-TW': "已複製{1}",
         'en-US': "Copied {1}",
         'ja-JP': "{1} をコピーしました",
         'ko-KR': "{1} 복사됨",
@@ -847,6 +960,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} copiado",
     }},
     {pattern: "^复制(.+)$", localizedCaptures: [1], messages: {
+        'zh-TW': "複製{1}",
         'en-US': "Copy {1}",
         'ja-JP': "{1} をコピー",
         'ko-KR': "{1} 복사",
@@ -855,6 +969,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Copiar {1}",
     }},
     {pattern: "^停止播放(.+)$", localizedCaptures: [1], messages: {
+        'zh-TW': "停止播放{1}",
         'en-US': "Stop playing {1}",
         'ja-JP': "{1} の再生を停止",
         'ko-KR': "{1} 재생 중지",
@@ -863,6 +978,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Detener {1}",
     }},
     {pattern: "^播放(.+)$", localizedCaptures: [1], messages: {
+        'zh-TW': "播放{1}",
         'en-US': "Play {1}",
         'ja-JP': "{1} を再生",
         'ko-KR': "{1} 재생",
@@ -871,6 +987,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Reproducir {1}",
     }},
     {pattern: "^(.+)选中文本$", localizedCaptures: [1], messages: {
+        'zh-TW': "{1}選取文本",
         'en-US': "{1} selected text",
         'ja-JP': "選択テキストを{1}",
         'ko-KR': "선택한 텍스트 {1}",
@@ -880,6 +997,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
     }},
     // Vue 把静态文本与插值编译成同一个文本节点，这些整句模板覆盖运行时拼接后的界面文案。
     {pattern: "^([\\d,.]+) 字符$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 字元",
         'en-US': "{1} characters",
         'ja-JP': "{1} 文字",
         'ko-KR': "{1}자",
@@ -888,6 +1006,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} caracteres",
     }},
     {pattern: "^([\\d,.]+\\s?[A-Za-z]*) 次$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 次",
         'en-US': "{1} requests",
         'ja-JP': "{1} 回",
         'ko-KR': "{1}회",
@@ -896,6 +1015,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} solicitudes",
     }},
     {pattern: "^([\\d,.]+)\\/([\\d,.]+) 次可计算请求命中$", localizedCaptures: [], messages: {
+        'zh-TW': "{1}/{2} 次可計算請求命中",
         'en-US': "{1}/{2} measurable requests hit the cache",
         'ja-JP': "計測できたリクエストのうち {1}/{2} 回がキャッシュにヒット",
         'ko-KR': "측정 가능한 요청 중 {1}/{2}회 캐시 적중",
@@ -904,6 +1024,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1}/{2} solicitudes medibles acertaron en la caché",
     }},
     {pattern: "^([\\d,.]+)\\/([\\d,.]+) 次请求命中$", localizedCaptures: [], messages: {
+        'zh-TW': "{1}/{2} 次請求命中",
         'en-US': "{1}/{2} requests hit the cache",
         'ja-JP': "{1}/{2} 回のリクエストがキャッシュにヒット",
         'ko-KR': "요청 {1}/{2}회 캐시 적중",
@@ -912,6 +1033,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1}/{2} solicitudes acertaron en la caché",
     }},
     {pattern: "^配置模型：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "設定模型：{1}",
         'en-US': "Configured model: {1}",
         'ja-JP': "設定したモデル：{1}",
         'ko-KR': "설정한 모델: {1}",
@@ -920,6 +1042,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Modelo configurado: {1}",
     }},
     {pattern: "^缓存创建（服务商上报）(.+) Token$", localizedCaptures: [], messages: {
+        'zh-TW': "快取建立（服務商上報）{1} Token",
         'en-US': "Cache writes (reported by provider): {1} tokens",
         'ja-JP': "キャッシュ作成（サービス報告値）：{1} トークン",
         'ko-KR': "캐시 생성(서비스 보고값): {1} 토큰",
@@ -928,6 +1051,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Escrituras en caché (según el proveedor): {1} tokens",
     }},
     {pattern: "^推理 (.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "推理 {1}",
         'en-US': "Reasoning {1}",
         'ja-JP': "推論 {1}",
         'ko-KR': "추론 {1}",
@@ -936,6 +1060,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Razonamiento {1}",
     }},
     {pattern: "^([\\d,.]+) 次问答$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 次問答",
         'en-US': "{1} questions",
         'ja-JP': "{1} 回の質問",
         'ko-KR': "질문 {1}회",
@@ -944,6 +1069,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} preguntas",
     }},
     {pattern: "^([\\d,.]+) 条记录$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 條紀錄",
         'en-US': "{1} records",
         'ja-JP': "{1} 件の記録",
         'ko-KR': "기록 {1}개",
@@ -952,6 +1078,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} registros",
     }},
     {pattern: "^([\\d,.]+) 轮$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 輪",
         'en-US': "{1} turns",
         'ja-JP': "{1} 往復",
         'ko-KR': "{1}회 대화",
@@ -960,6 +1087,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} turnos",
     }},
     {pattern: "^词典词形：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "詞典詞形：{1}",
         'en-US': "Dictionary form: {1}",
         'ja-JP': "辞書形：{1}",
         'ko-KR': "사전형: {1}",
@@ -968,6 +1096,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Forma de diccionario: {1}",
     }},
     {pattern: "^例句：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "例句：{1}",
         'en-US': "Example: {1}",
         'ja-JP': "例文：{1}",
         'ko-KR': "예문: {1}",
@@ -976,6 +1105,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Ejemplo: {1}",
     }},
     {pattern: "^译：(.+)$", localizedCaptures: [], messages: {
+        'zh-TW': "譯：{1}",
         'en-US': "Translation: {1}",
         'ja-JP': "訳：{1}",
         'ko-KR': "번역: {1}",
@@ -984,6 +1114,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "Traducción: {1}",
     }},
     {pattern: "^(.+)，已保留普通翻译。$", localizedCaptures: [1], messages: {
+        'zh-TW': "{1}，已保留普通翻譯。",
         'en-US': "{1}. The standard translation is kept.",
         'ja-JP': "{1}。通常の翻訳はそのまま表示しています。",
         'ko-KR': "{1}. 일반 번역은 그대로 유지했습니다.",
@@ -992,6 +1123,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1}. Se mantiene la traducción estándar.",
     }},
     {pattern: "^([\\d,.]+) 个词条$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 個詞條",
         'en-US': "{1} entries",
         'ja-JP': "{1} 件の単語",
         'ko-KR': "단어 {1}개",
@@ -1000,6 +1132,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} entradas",
     }},
     {pattern: "^([\\d,.]+) 条复习日志$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 條復習日誌",
         'en-US': "{1} review logs",
         'ja-JP': "{1} 件の復習記録",
         'ko-KR': "복습 기록 {1}개",
@@ -1008,6 +1141,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} registros de repaso",
     }},
     {pattern: "^([\\d,.]+) 项需确认$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 項需確認",
         'en-US': "{1} to review",
         'ja-JP': "{1} 件の確認が必要",
         'ko-KR': "확인 필요 {1}개",
@@ -1016,6 +1150,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} por revisar",
     }},
     {pattern: "^(.+)请在上方选择可用服务。$", localizedCaptures: [1], messages: {
+        'zh-TW': "{1}請在上方選擇可用服務。",
         'en-US': "{1} Choose an available service above.",
         'ja-JP': "{1}上で利用できるサービスを選択してください。",
         'ko-KR': "{1} 위에서 사용 가능한 서비스를 선택하세요.",
@@ -1024,6 +1159,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} Elige un servicio disponible arriba.",
     }},
     {pattern: "^([\\d,.]+) 个可用模型$", localizedCaptures: [], messages: {
+        'zh-TW': "{1} 個可用模型",
         'en-US': "{1} available models",
         'ja-JP': "利用できるモデル {1} 件",
         'ko-KR': "사용 가능한 모델 {1}개",
@@ -1032,6 +1168,7 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
         'es-ES': "{1} modelos disponibles",
     }},
     {pattern: "^第 (\\d+) 次$", localizedCaptures: [], messages: {
+        'zh-TW': "第 {1} 次",
         'en-US': "Run {1}",
         'ja-JP': "{1} 回目",
         'ko-KR': "{1}번째",
@@ -1043,6 +1180,100 @@ export const localizedLegacyPatterns: readonly LocalizedLegacyPattern[] = [
 
 /** 复合状态拆分之后才尝试的旧模板，按数组顺序匹配，因此具体模板必须位于宽泛模板之前。 */
 const fallbackLegacyPatterns: Readonly<Record<RegisteredUiLanguage, readonly LegacyPatternEntry[]>> = {
+    'zh-TW': [
+        ["^最多 (\\d+) 字符$", "最多 {1} 字元"],
+        ["^没有找到“(.+)”相关设置$", "沒有找到“{1}”相關設定"],
+        ["^没有找到包含“(.+)”的服务或模型$", "沒有找到包含“{1}”的服務或模型"],
+        ["^已完成 (\\d+) 次翻译$", "已完成 {1} 次翻譯"],
+        ["^已完成 (\\d+) 个词条$", "已完成 {1} 個詞條"],
+        ["^(\\d+) 项$", "{1} 項"],
+        ["^(\\d+) 个模型，点击切换$", "{1} 個模型，點擊切換"],
+        ["^已达到 (\\d+) 个模型上限$", "已達到 {1} 個模型上限"],
+        ["^最多只能保存 (\\d+) 个自定义服务$", "最多只能儲存 {1} 個自訂服務"],
+        ["^自定义服务已达到 (\\d+) 个上限$", "自訂服務已達到 {1} 個上限"],
+        ["^当前：(.+)$", "當前：{1}"],
+        ["^已保存 (.+)，启动插件后生效$", "已儲存 {1}，啟動外掛後生效"],
+        ["^已保存 (.+)，当前网页请刷新后重试$", "已儲存 {1}，當前網頁請重新整理後重試"],
+        ["^已保存 (.+)；(.+)$", "已儲存 {1}；{2}"],
+        ["^已关闭 (.+) 的始终翻译，当前网页保持不变$", "已關閉 {1} 的始終翻譯，當前網頁保持不變"],
+        ["^已开启 (.+) 的始终翻译$", "已開啟 {1} 的始終翻譯"],
+        ["^已在 (.+) 禁用扩展$", "已在 {1} 停用擴充功能"],
+        ["^已恢复 (.+) 的扩展$", "已還原 {1} 的擴充功能"],
+        ["^当前已在 (.+) 禁用扩展，请先恢复扩展$", "當前已在 {1} 停用擴充功能，請先還原擴充功能"],
+        ["^恢复 (.+) 的扩展$", "還原 {1} 的擴充功能"],
+        ["^始终翻译 (.+)$", "始終翻譯 {1}"],
+        ["^在 (.+) 禁用扩展$", "在 {1} 停用擴充功能"],
+        ["^所有网站自动翻译已开启，(.+) 会自动翻译$", "所有網站自動翻譯已開啟，{1} 會自動翻譯"],
+        ["^所有网站自动翻译已开启，请在完整设置中关闭全局开关$", "所有網站自動翻譯已開啟，請在完整設定中關閉全局開關"],
+        ["^当前浏览器暂不支持(.+)$", "當前瀏覽器暫不支援{1}"],
+        ["^点击开启 · YouTube$", "點擊開啟 · YouTube"],
+        ["^(.+) · YouTube$", "{1} · YouTube"],
+        ["^(.+) \\+ 鼠标悬停$", "{1}  滑鼠懸停"],
+        ["^翻译服务：(.+)，当前模型：(.+)$", "翻譯服務：{1}，當前模型：{2}"],
+        ["^翻译服务：(.+)$", "翻譯服務：{1}"],
+        ["^不支持的按键:\\s*(.*)$", "不支援的按鍵: {1}"],
+        ["^不支持的修饰键:\\s*(.*)$", "不支援的修飾鍵: {1}"],
+        ["^与系统快捷键冲突:\\s*(.+)$", "與系統快速鍵衝突: {1}", [1]],
+        ["^当前快捷键为 (.+)$", "當前快速鍵為 {1}"],
+        ["^(.+) 需要 API Key（访问令牌），当前尚未配置；请先在设置中填写，再开始翻译。$", "{1} 需要 API Key（訪問權杖），當前尚未設定；請先在設定中填寫，再開始翻譯。", [1]],
+        ["^(.+) 需要 App Key 和 App Secret，当前尚未完整配置；请先在设置中填写，再开始翻译。$", "{1} 需要 App Key 和 App Secret，當前尚未完整設定；請先在設定中填寫，再開始翻譯。", [1]],
+        ["^(.+) 需要 SecretId 和 SecretKey，当前尚未完整配置；请先在设置中填写，再开始翻译。$", "{1} 需要 SecretId 和 SecretKey，當前尚未完整設定；請先在設定中填寫，再開始翻譯。", [1]],
+        ["^(.+) 需要 (.+) 和 (.+)，当前尚未完整配置；请先在设置中填写，再开始翻译。$", "{1} 需要 {2} 和 {3}，當前尚未完整設定；請先在設定中填寫，再開始翻譯。", [1, 2, 3]],
+        ["^(.+) 需要 (.+)，当前尚未配置；请先在设置中填写，再开始翻译。$", "{1} 需要 {2}，當前尚未設定；請先在設定中填寫，再開始翻譯。", [1, 2]],
+        ["^输入 (.+)；留空表示尚未配置$", "輸入 {1}；留空表示尚未設定", [1]],
+        ["^正在播放原文$", "正在播放原文"],
+        ["^正在播放单词$", "正在播放單字"],
+        ["^正在播放译文$", "正在播放譯文"],
+        ["^快捷键已设置为: (.+)$", "快速鍵已設定為: {1}"],
+        ["^划词翻译快捷键已设置为: (.+)$", "劃詞翻譯快速鍵已設定為: {1}"],
+        ["^并发数量已更新为 (.+)$", "並行數量已更新為 {1}"],
+        ["^已完成真实翻译请求（(.+) ms）。$", "已完成真實翻譯請求（{1} ms）。"],
+        ["^你的请求频率过高，被【(.+)】拒绝了，请稍后再试吧~$", "你的請求頻率過高，被【{1}】拒絕了，請稍後再試吧~"],
+        ["^网络连接失败：(.+)$", "網路連線失敗：{1}"],
+        ["^第 (\\d+) 条字幕译文$", "第 {1} 條字幕譯文"],
+        ["^(\\d+) 条网站规则$", "{1} 條網站規則"],
+        ["^已选 (\\d+) 个服务 · 右侧卡片可拖动排序$", "已選 {1} 個服務 · 右側卡片可拖曳排序"],
+        ["^(\\d+) 个翻译服务$", "{1} 個翻譯服務"],
+        ["^已翻译 (\\d+) 次$", "已翻譯 {1} 次"],
+        ["^正在请求 (.+)…$", "正在請求 {1}…"],
+        ["^分 (\\d+) 秒$", "分 {1} 秒"],
+        ["^第 (\\d+) \\/ (\\d+) 页$", "第 {1} / {2} 頁"],
+        ["^第 (\\d+)–(\\d+) 条，共 (\\d+) 条$", "第 {1}–{2} 條，共 {3} 條"],
+        ["^查看全部 (\\d+) 项$", "檢視全部 {1} 項"],
+        ["^开始复习 (\\d+) 个$", "開始復習 {1} 個"],
+        ["^复习 (\\d+) 个 · 记得 (\\d+) 个 · 忘了 (\\d+) 个$", "復習 {1} 個 · 記得 {2} 個 · 忘了 {3} 個"],
+        ["^(\\d+) 次收藏记录$", "{1} 次收藏紀錄"],
+        ["^(\\d+) 分钟后$", "{1} 分鐘後"],
+        ["^(\\d+) 小时后$", "{1} 小時後"],
+        ["^第 (\\d+) \\/ (\\d+) 页 · 共 (\\d+) 个$", "第 {1} / {2} 頁 · 共 {3} 個"],
+        ["^(.+) 已标记为掌握$", "{1} 已標記為掌握"],
+        ["^(.+) 已回到学习队列$", "{1} 已回到學習佇列"],
+        ["^已删除 (.+)$", "已刪除 {1}"],
+        ["^确认删除“(.+)”及其复习记录吗？$", "確認刪除“{1}”及其復習紀錄嗎？"],
+        ["^已导出 (\\d+) 个 Anki 词条$", "已匯出 {1} 個 Anki 詞條"],
+        ["^已恢复刚才删除的词条$", "已還原剛才刪除的詞條"],
+        ["^开始记录于 (.+)$", "開始紀錄於 {1}"],
+        ["^更新于 (.+)$", "更新於 {1}"],
+        ["^用量趋势，共 (.+) Token$", "用量趨勢，共 {1} Token"],
+        ["^完整数值：(.+) Token$", "完整數值：{1} Token"],
+        ["^双语 · (.+)$", "雙語 · {1}"],
+        ["^第 (\\d+) 页$", "第 {1} 頁"],
+        ["^(.+) 个可翻译片段$", "{1} 個可翻譯片段"],
+        ["^(.+) 个片段$", "{1} 個片段"],
+        ["^(.+) 个文本片段$", "{1} 個文本片段"],
+        ["^当前展示前 (\\d+) 个片段，下载时会包含完整文件。$", "當前展示前 {1} 個片段，下載時會包含完整檔案。"],
+        ["^文件大小超过 (.+)，请先拆分文件后再翻译。$", "檔案大小超過 {1}，請先拆分檔案後再翻譯。"],
+        ["^下载双语文件$", "下載雙語檔案"],
+        ["^下载译文文件$", "下載譯文檔案"],
+        ["^第 (\\d+) 页第 (\\d+) 个文本块译文$", "第 {1} 頁第 {2} 個文本塊譯文"],
+        ["^第 (\\d+) 个文本片段译文$", "第 {1} 個文本片段譯文"],
+        ["^第 (\\d+) 段译文$", "第 {1} 段譯文"],
+        ["^(.+) 项将在滚动到附近时翻译$", "{1} 項將在捲動到附近時翻譯"],
+        ["^最多同时处理 (\\d+) 个翻译任务，(.+)；失败后最多重试 (\\d+) 次，退避从 (.+) 逐步增加到最多 (.+)。$", "最多同時處理 {1} 個翻譯任務，{2}；失敗後最多重試 {3} 次，退避從 {4} 逐步增加到最多 {5}。"],
+        ["^(.+)不限速$", "{1}不限速"],
+        ["^(.+)最多 (\\d+) 次$", "{1}最多 {2} 次"],
+        ["^(.+)（当前浏览器不可用）$", "{1}（當前瀏覽器不可用）"],
+    ],
     'en-US': [
         ["^最多 (\\d+) 字符$", "Up to {1} characters"],
         ["^没有找到“(.+)”相关设置$", "No settings found for “{1}”"],

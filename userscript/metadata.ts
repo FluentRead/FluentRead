@@ -28,6 +28,7 @@ export function createUserscriptMetadata({version, iconDataUrl, requires = []}: 
         // Keep the original name/namespace identity for existing manager installations.
         '// @name         FluentRead-流畅阅读',
         '// @name:zh-CN   流畅阅读',
+        '// @name:zh-TW   流暢閱讀',
         '// @name:zh      流畅阅读',
         '// @name:en      FluentRead',
         '// @name:ja      FluentRead',
@@ -40,7 +41,7 @@ export function createUserscriptMetadata({version, iconDataUrl, requires = []}: 
         `// @description  ${productDescriptions['en-US']}`,
         `// @description:zh ${productDescriptions['zh-CN']}`,
         ...Object.entries(productDescriptions).map(([language, description]) =>
-            `// @description:${language === 'zh-CN' ? language : language.split('-')[0]} ${description}`),
+            `// @description:${language === 'zh-CN' || language === 'zh-TW' ? language : language.split('-')[0]} ${description}`),
         '// @author       ThinkStu',
         '// @license      GPL-3.0-only',
         '// @homepageURL  https://github.com/FluentRead/FluentRead',

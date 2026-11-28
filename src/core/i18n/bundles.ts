@@ -11,6 +11,7 @@
 import {getUiLanguageBundlePath, translate} from './index';
 import {createLegacyPatternSet} from './messages/legacy-patterns';
 import {createExtensionSiteActionText} from './messages/siteRules';
+import {zhTWLegacyText, zhTWMessages} from './messages/zh-TW';
 import {enUSLegacyText, enUSMessages} from './messages/en-US';
 import {esESLegacyText, esESMessages} from './messages/es-ES';
 import {frFRLegacyText, frFRMessages} from './messages/fr-FR';
@@ -23,6 +24,7 @@ import {UI_LANGUAGE_OPTIONS} from './language';
 import type {RegisteredUiLanguage, UiLanguageBundle} from './types';
 
 export const UI_LANGUAGE_BUNDLES: Readonly<Record<RegisteredUiLanguage, UiLanguageBundle>> = {
+    'zh-TW': {messages: zhTWMessages, legacyText: zhTWLegacyText, legacyPatterns: createLegacyPatternSet('zh-TW')},
     'en-US': {messages: enUSMessages, legacyText: enUSLegacyText, legacyPatterns: createLegacyPatternSet('en-US')},
     'ja-JP': {messages: jaJPMessages, legacyText: jaJPLegacyText, legacyPatterns: createLegacyPatternSet('ja-JP')},
     'ko-KR': {messages: koKRMessages, legacyText: koKRLegacyText, legacyPatterns: createLegacyPatternSet('ko-KR')},
@@ -47,7 +49,7 @@ export function createExtensionMetadataLocaleFiles(): Array<{relativeDest: strin
     return UI_LANGUAGE_OPTIONS.map(({value: language}) => {
         const name = language === 'zh-CN' ? translate('common.brand', language) : UI_LANGUAGE_BUNDLES[language].messages['common.brand'];
         return {
-            relativeDest: `_locales/${language === 'zh-CN' ? 'zh_CN' : language.split('-')[0]}/messages.json`,
+            relativeDest: `_locales/${language === 'zh-CN' ? 'zh_CN' : language === 'zh-TW' ? 'zh_TW' : language.split('-')[0]}/messages.json`,
             contents: JSON.stringify({
                 extensionName: {message: name},
                 extensionDescription: {message: productDescriptions[language]},

@@ -29,6 +29,7 @@ import {jaJPLegacyText, jaJPMessages} from '@/src/core/i18n/messages/ja-JP';
 import {koKRLegacyText, koKRMessages} from '@/src/core/i18n/messages/ko-KR';
 import {ruRULegacyText, ruRUMessages} from '@/src/core/i18n/messages/ru-RU';
 import {zhCNMessages} from '@/src/core/i18n/messages/zh-CN';
+import {zhTWLegacyText, zhTWMessages} from '@/src/core/i18n/messages/zh-TW';
 import {Config, normalizeConfig} from '@/src/core/config/model';
 import {translationLoadingStyleOptions} from '@/src/core/config/translationLoadingStyle';
 import {TRANSLATION_STYLE_PRESETS} from '@/src/core/config/translationAppearance';
@@ -119,6 +120,7 @@ describe('界面 i18n 契约', () => {
   });
 
   const translatedCatalogs: ReadonlyArray<Readonly<Record<string, string>>> = [
+    zhTWMessages,
     enUSMessages,
     jaJPMessages,
     koKRMessages,
@@ -128,6 +130,7 @@ describe('界面 i18n 契约', () => {
   ];
 
   const translatedLegacyCatalogs = [
+    zhTWLegacyText,
     jaJPLegacyText,
     koKRLegacyText,
     frFRLegacyText,
@@ -141,9 +144,10 @@ describe('界面 i18n 契约', () => {
 
   it('完整本地化写作连接、配置与生成失败状态', () => {
     const errors = ["请先启用写作助手", "请在写作助手设置中选择一个 AI 服务", "请先选择写作模型", "请先在翻译服务中配置这个服务的 API Key", "请先输入草稿", "请先写下要求或提供参考内容", "已停止生成", "写作助手连接中断，请重试", "写作助手仅支持 Gmail 和 GitHub 的 Issue、Pull Request 回复页面", "写作助手已停用", "当前网站已禁用写作助手", "无效的写作请求", "正在处理其他写作请求，请稍后重试", "生成超时，请重试", "生成未完成，请重试", "模型没有返回正文，请重试", "对照译文未完整生成，请重试"];
-    for (const {value: language} of UI_LANGUAGE_OPTIONS.filter(item => item.value !== 'zh-CN')) {
+    for (const {value: language} of UI_LANGUAGE_OPTIONS.filter(item => item.value !== 'zh-CN' && item.value !== 'zh-TW')) {
       for (const error of errors) expect(translateLegacyText(error, language)).not.toBe(error);
     }
+    expect(translateLegacyText('请先启用写作助手', 'zh-TW')).toBe('請先啟用寫作助手');
   });
 
   it('Google Drive 同步完整翻译账号状态、差异数量与隐藏凭据预览', () => {
@@ -189,6 +193,7 @@ describe('界面 i18n 契约', () => {
   it('保留中文默认值，并只接受受支持的界面语言', () => {
     expect(DEFAULT_UI_LANGUAGE).toBe('zh-CN');
     expect(new Config().uiLanguage).toBe('zh-CN');
+    expect(normalizeUiLanguage('zh-TW')).toBe('zh-TW');
     expect(normalizeUiLanguage('en-US')).toBe('en-US');
     expect(normalizeUiLanguage('ja-JP')).toBe('ja-JP');
     expect(normalizeUiLanguage('ko-KR')).toBe('ko-KR');
@@ -236,7 +241,13 @@ describe('界面 i18n 契约', () => {
     expect(resolveUiLanguageFromLocale('fr-FR')).toBe('fr-FR');
     expect(resolveUiLanguageFromLocale('ru-RU')).toBe('ru-RU');
     expect(resolveUiLanguageFromLocale('zh-CN')).toBe('zh-CN');
-    expect(resolveUiLanguageFromLocale('zh-TW')).toBe('zh-CN');
+    expect(resolveUiLanguageFromLocale('zh-SG')).toBe('zh-CN');
+    expect(resolveUiLanguageFromLocale('zh-Hans')).toBe('zh-CN');
+    expect(resolveUiLanguageFromLocale('zh')).toBe('zh-CN');
+    expect(resolveUiLanguageFromLocale('zh-TW')).toBe('zh-TW');
+    expect(resolveUiLanguageFromLocale('zh-HK')).toBe('zh-TW');
+    expect(resolveUiLanguageFromLocale('zh-MO')).toBe('zh-TW');
+    expect(resolveUiLanguageFromLocale('zh-Hant')).toBe('zh-TW');
     expect(resolveUiLanguageFromLocale('es-ES')).toBe('es-ES');
     expect(resolveUiLanguageFromLocale(null)).toBe('zh-CN');
     expect(resolveUiLanguageFromLocale('ar-EG')).toBe('zh-CN');
@@ -272,6 +283,7 @@ describe('界面 i18n 契约', () => {
   it('所有界面语言均独立显示中文简繁译文名称，并识别历史别名', () => {
     const expectedChineseLabels = {
       'zh-CN': ['简体中文 / Simplified Chinese', '繁體中文 / Traditional Chinese'],
+      'zh-TW': ['簡體中文 / Simplified Chinese', '繁體中文 / Traditional Chinese'],
       'en-US': ['Simplified Chinese', 'Traditional Chinese'],
       'ja-JP': ['中国語（簡体字） / Simplified Chinese / 简体中文', '中国語（繁体字） / Traditional Chinese / 繁體中文'],
       'ko-KR': ['중국어 간체 / Simplified Chinese / 简体中文', '중국어 번체 / Traditional Chinese / 繁體中文'],
@@ -375,10 +387,11 @@ describe('界面 i18n 契约', () => {
 
   it('提供可继续扩展的语言选择器和参数插值', () => {
     expect(UI_LANGUAGE_OPTIONS.map((item) => item.value)).toEqual([
-      'zh-CN', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES',
+      'zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES',
     ]);
     expect(UI_LANGUAGE_OPTIONS.map((item) => getUiLanguageDisplayLabel(item.value, 'zh-CN'))).toEqual([
-      '中文 / Chinese',
+      '简体中文 / Simplified Chinese',
+      '繁體中文 / Traditional Chinese',
       'English / 英语',
       '日本語 / Japanese / 日语',
       '한국어 / Korean / 韩语',
@@ -387,7 +400,8 @@ describe('界面 i18n 契约', () => {
       'Español / Spanish / 西班牙语',
     ]);
     expect(UI_LANGUAGE_OPTIONS.map((item) => getUiLanguageDisplayLabel(item.value, 'en-US'))).toEqual([
-      'Chinese / 中文',
+      'Simplified Chinese / 简体中文',
+      'Traditional Chinese / 繁體中文',
       'English / 英语',
       'Japanese / 日本語',
       'Korean / 한국어',
@@ -427,9 +441,16 @@ describe('界面 i18n 契约', () => {
     )).toBe('Turn back on for this site');
     expect(Object.keys(enUSMessages).sort()).toEqual(Object.keys(zhCNMessages).sort());
     expect(Object.keys(esESMessages).sort()).toEqual(Object.keys(enUSMessages).sort());
-    for (const catalog of [jaJPMessages, koKRMessages, frFRMessages, ruRUMessages]) {
+    for (const catalog of [zhTWMessages, jaJPMessages, koKRMessages, frFRMessages, ruRUMessages]) {
       expect(Object.keys(catalog).sort()).toEqual(Object.keys(enUSMessages).sort());
     }
+    expect(translate('common.brand', 'zh-TW')).toBe('流暢閱讀');
+    expect(translate('popup.current', 'zh-TW', {value: 'Ctrl'})).toBe('目前：Ctrl');
+    expect(translate('settings.general.defaultTargetLanguage', 'zh-TW')).toBe('翻譯語言');
+    expect(translate('commandPalette.title', 'zh-TW')).toBe('全域命令面板');
+    expect(translate('scenarioPresets.settings.title', 'zh-TW')).toBe('情境預設');
+    const differingKeys = Object.keys(zhCNMessages).filter(key => zhTWMessages[key as keyof typeof zhTWMessages] !== zhCNMessages[key as keyof typeof zhCNMessages]);
+    expect(differingKeys.length).toBeGreaterThan(1500);
   });
 
   it('每种正式语言目录都完整，并保留相同的插值参数', () => {
@@ -1231,8 +1252,8 @@ describe('旧界面译文人工校正', () => {
   const availableServiceOptions = options.services.filter((option) => !option.disabled);
   const unavailableServiceKey = 'quickTranslation.serviceUnavailable';
 
-  it('不可用服务提示由七语键和完整服务目录生成，并保留本地化服务名称', () => {
-    const catalogs = { 'zh-CN': zhCNMessages, 'en-US': enUSMessages, 'ja-JP': jaJPMessages,
+  it('不可用服务提示由八语键和完整服务目录生成，并保留本地化服务名称', () => {
+    const catalogs = { 'zh-CN': zhCNMessages, 'zh-TW': zhTWMessages, 'en-US': enUSMessages, 'ja-JP': jaJPMessages,
       'ko-KR': koKRMessages, 'fr-FR': frFRMessages, 'ru-RU': ruRUMessages, 'es-ES': esESMessages };
     for (const {value: locale} of UI_LANGUAGE_OPTIONS) {
       const template = catalogs[locale][unavailableServiceKey];
@@ -1244,7 +1265,7 @@ describe('旧界面译文人工校正', () => {
         expect(message, `${locale} ${option.value}`).toContain(label);
         expect(message, `${locale} ${option.value}`).not.toContain('{service}');
         expect(message, `${locale} ${option.value}`).not.toBe(label);
-        if (locale !== 'zh-CN' && locale !== 'ja-JP') expect(message, `${locale} ${option.value}`).not.toMatch(/[\u3400-\u9fff]/u);
+        if (locale !== 'zh-CN' && locale !== 'zh-TW' && locale !== 'ja-JP') expect(message, `${locale} ${option.value}`).not.toMatch(/[\u3400-\u9fff]/u);
       }
     }
   });
@@ -1311,7 +1332,7 @@ it('中文展示使用流畅阅读，首启七语品牌与正式目录一致并�
     expect(translate('settings.cloud.deleteManualWebDav', 'zh-CN')).toBe('请在已配置的 WebDAV 备份目录中只删除 fluentread-config.encrypted.json。');
     for (const {value} of UI_LANGUAGE_OPTIONS) {
         expect(onboardingMessages.onboardingProductNames[value], value).toBe(translate('common.brand', value));
-        expect(translate('common.brand', value)).toBe(value === 'zh-CN' ? '流畅阅读' : 'FluentRead');
+        expect(translate('common.brand', value)).toBe(value === 'zh-CN' ? '流畅阅读' : value === 'zh-TW' ? '流暢閱讀' : 'FluentRead');
         expect(translateLegacyText(translate('video.panelAriaLabel', 'zh-CN'), value), value).toBe(translate('video.panelAriaLabel', value));
     }
     expect(translateLegacyText('用户输入 FluentRead', 'zh-CN')).toBe('用户输入 FluentRead');
@@ -1320,9 +1341,9 @@ it('中文展示使用流畅阅读，首启七语品牌与正式目录一致并�
 
 // 保留上方全部 i18n owner；仅补充源码审计对显式只读 locale 字面量表的边界。
 describe('源码审计的只读本地语言表', () => {
-  const locales = ['zh-CN', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'];
+  const locales = ['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'];
   const importType = "import type {UiLanguage} from '@/src/core/i18n/language';";
-  const entries = "'zh-CN': '清空', 'en-US': 'Clear', 'ja-JP': 'クリア', 'ko-KR': '초기화', 'fr-FR': 'Effacer', 'ru-RU': 'Очистить', 'es-ES': 'Despejar'";
+  const entries = "'zh-CN': '清空', 'zh-TW': '清空', 'en-US': 'Clear', 'ja-JP': 'クリア', 'ko-KR': '초기화', 'fr-FR': 'Effacer', 'ru-RU': 'Очистить', 'es-ES': 'Despejar'";
   const table = `{${entries}}`;
   const readonlyType = 'Readonly<Record<UiLanguage, string>>';
   const standard = `const labels = ${table} as const satisfies ${readonlyType};`;

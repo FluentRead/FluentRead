@@ -32,6 +32,7 @@ import {translationStatsKoreanMessages} from './translationStats';
 import {localTranslationKoreanMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
+import {task7Messages, task7LegacyText} from './task7Features';
 
 import countForms from './count-forms.json';
 
@@ -46,6 +47,7 @@ export const koKRMessages = {
     "feedback.retryHint": "잠시 후 다시 시도하세요. 원문과 현재 선택 영역은 유지됩니다.",
     ...countForms['ko-KR'],
     ...personalCorrectionMessages['ko-KR'],
+    ...task7Messages['ko-KR'],
     "document.config.loadFailed": "설정을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.",
     "popup.compact.translate": "번역",
     "popup.compact.restore": "복원",
@@ -2568,6 +2570,7 @@ const koKRLegacyTextBase: Readonly<Record<string, string>> = {
     'FluentRead 备份': '플루언트리드 백업',
     'FluentRead 翻译中心': '플루언트리드 번역 센터',
     ...mimoRetirementLegacyText['ko-KR'],
+    ...task7LegacyText['ko-KR'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'MiMo의 페이 페이 유 키는 보통 sk-로 시작합니다; 키가 API 키 페이지에서 가져오는지 꼭 확인해 주세요.',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'OCR 서비스 초기화가 실패했습니다. 설정 페이지를 다시 열고 다시 시도해 주세요.',
     'Offscreen 文档': '오프스크린 문서',

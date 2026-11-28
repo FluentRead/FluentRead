@@ -33,6 +33,7 @@ import {translationStatsEnglishMessages} from './translationStats';
 import {localTranslationEnglishMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
+import {task7Messages, task7LegacyText} from './task7Features';
 
 import countForms from './count-forms.json';
 
@@ -47,6 +48,7 @@ export const enUSMessages = {
     "feedback.retryHint": "Try again shortly. Your source text and selection will stay available.",
     ...countForms['en-US'],
     ...personalCorrectionMessages['en-US'],
+    ...task7Messages['en-US'],
     "document.config.loadFailed": "Could not load settings. Reload and try again.",
     "popup.compact.translate": "Translate",
     "popup.compact.restore": "Restore",
@@ -2557,6 +2559,7 @@ const enUSLegacyTextBase: Readonly<Record<string, string>> = {
     'FluentRead 备份': 'FluentRead backup',
     'FluentRead 翻译中心': 'FluentRead Translation Center',
     ...mimoRetirementLegacyText['en-US'],
+    ...task7LegacyText['en-US'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'MiMo pay-as-you-go keys usually start with sk-; Please make sure the Key comes from the API Keys page.',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'OCR service initialization failed. Please reopen the settings page and try again.',
     'Offscreen 文档': 'Offscreen document',

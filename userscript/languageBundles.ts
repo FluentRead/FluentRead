@@ -19,6 +19,8 @@ export function userscriptMessages<T extends Record<string, string>>(messages: T
     return Object.fromEntries(Object.entries(messages).filter(([key]) => !['learning.collection.undoExtensionNotice', 'popup.donationDescription'].includes(key)
         && !key.startsWith('informationHighlight.')
         && !key.startsWith('dictionary.')
+        && !key.startsWith('scenarioPresets.')
+        && !key.startsWith('commandPalette.')
         && (!key.startsWith('learning.collection.speech') || key === 'learning.collection.speechFailed')
         && !key.startsWith('contextMenu.notice.') && !key.startsWith('video.learning.') && !key.startsWith('video.learningAppearance.')
         && !key.startsWith('video.readingAnnotation.')

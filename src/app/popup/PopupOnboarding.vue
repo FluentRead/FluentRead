@@ -11,6 +11,9 @@
       v-if="!handoffRequested"
       :key="onboardingContext.revision.value"
       :initial-language="initialLanguage"
+      :enable-scenario-step="true"
+      :current-config="config"
+      :apply-scenario-patch="applyScenarioPatch"
       :onSaved="onboardingActions.saved"
       :onConfirmed="onboardingActions.confirmed"
     />
@@ -25,7 +28,8 @@
 <script setup lang="ts">
 import {computed, onBeforeUnmount, ref, shallowRef, watch, type Component} from 'vue';
 import browser from 'webextension-polyfill';
-import {config, subscribeConfig} from '@/src/services/config/store';
+import {config, requestConfigPatch, subscribeConfig} from '@/src/services/config/store';
+import type {Config} from '@/src/core/config/model';
 import {resolveUiLanguageFromLocale} from '@/src/core/i18n/language';
 import {onboardingChineseMessages, onboardingEnglishMessages, onboardingLoadError} from '@/src/core/i18n/messages/onboarding';
 import {applyInterfaceSkin, applyInterfaceFont, applyInterfaceTheme} from '@/src/ui/interfaceAppearance';
@@ -73,6 +77,11 @@ watch(onboardingContext.active, active => {
   };
 }, {immediate: true, flush: 'sync'});
 
+async function applyScenarioPatch(patch: Partial<Config>): Promise<void> {
+  if (!onboardingContext.active.value || Object.keys(patch).length === 0) return;
+  Object.assign(config, patch);
+  await requestConfigPatch(patch).catch(() => undefined);
+}
 function loadMain(): Promise<Component> {
   return pendingMain ??= import('./PopupApp.vue').then(module => module.default).catch(error => {
     pendingMain = undefined;

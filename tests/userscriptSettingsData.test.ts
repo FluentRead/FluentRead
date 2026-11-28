@@ -148,7 +148,7 @@ describe('standalone static settings data representation', () => {
         const path = resolve(root, tables[0][0]);
         const generated = transform(readFileSync(path, 'utf8'), path)!.code;
         const decoded = value(initializer(generated, tables[0][1])) as Record<string, Record<string, string>>;
-        expect(Object.keys(decoded)).toEqual(['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES']);
+        expect(Object.keys(decoded)).toEqual(['zh-TW', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES']);
         for (const prompts of Object.values(decoded)) {
             expect(Object.keys(prompts)).toEqual(['system', 'meaning', 'grammar', 'usage', 'practice']);
             expect(prompts.system).toContain('{{to}}');

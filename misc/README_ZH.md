@@ -12,7 +12,7 @@
 
 </div>
 
-流畅阅读支持在原网页中对照阅读原文与译文，并提供划词翻译、AI 阅读辅助、图片翻译、文档翻译和视频双语字幕。翻译卡片支持结合上下文解释选中文字并连续追问。
+流畅阅读是一款开源、注重隐私的全场景浏览器阅读、翻译与语言学习工作台。除在原网页中对照阅读原文与译文外，还完整覆盖本地离线 AI 模型、PaddleOCR + LaMa 漫画与图片翻译、17 种格式文档翻译（含扫描版 PDF OCR）、视频与会议双语字幕（支持本地 Whisper / Qwen3-ASR 离线转写）、离线词典与 AnkiConnect / 「再次遇见」复习闭环、写作助手、端到端加密云同步以及全局命令面板。
 
 我们从 2024 年 1 月开始开发流畅阅读。从那时起，流畅阅读始终保持开源，并免费向用户提供。
 
@@ -34,23 +34,25 @@
 
 | 功能 | 说明 |
 | --- | --- |
-| 网页翻译 | 全文双语对照、悬浮翻译与划词翻译，支持恢复原文和网站自动翻译规则。 |
-| AI 翻译卡片 | 解释含义、分析句子、说明用法与生成练习，支持上下文参考和连续追问。 |
-| 学习中心 | 收藏单词、短语和句子，保留原文语境，支持学习与复习。 |
-| 图片与圈选翻译 | 识别网页图片或选定区域中的文字，并显示可复制的译文。 |
-| 文档翻译 | 支持 PDF、ePub、DOCX 等格式，提供双语阅读、译文校订与文件导出。 |
-| 视频字幕 | 支持 YouTube 和 X 双语字幕，可切换仅原文或仅译文；部分 X 视频可通过本地模型生成 AI 字幕。 |
-| 翻译服务与设置 | 支持免费翻译服务、DeepL、AI 服务和本地 Ollama，可配置术语库、译文样式、快捷键及菜单栏布局。 |
+| 网页翻译与智能高亮 | 全文双语对照与仅译文模式、悬浮/划词/局部区域翻译、原文恢复、网站专属适配规则，以及基于信息意外度的智能高亮。 |
+| 全局命令面板与场景引导 | 在任意网页按 `Alt+K`（可自定义）打开命令面板，支持中文、英文与拼音模糊检索；内置 5 大使用场景预设（学术科研、程序员/技术文档、语言学习、追剧与漫画、跨境办公）一键无损配置。 |
+| 本地离线 AI 与丰富引擎 | 支持免费引擎、DeepL、OpenAI / Claude / Gemini / DeepSeek、本地 Ollama / LM Studio 与浏览器端离线模型；提供术语库、自定义提示词、译文样式与 8 种界面语言（简体中文、繁體中文、English、日本語、한국어、Français、Русский、Español）。 |
+| 漫画、图片与圈选翻译 | 集成 PaddleOCR 文字检测与 LaMa 背景修复，支持漫画连续翻译、网页图片翻译以及屏幕区域圈选识别与复制。 |
+| 17 种格式文档翻译 | 支持 PDF（含扫描版 PDF OCR 识别）、ePub、DOCX、PPTX、Markdown、HTML、TXT、SRT/VTT/ASS 字幕等 17 种格式，支持双语对照阅读、逐段校订与多格式导出。 |
+| 视频与会议字幕 + 本地 ASR | 支持 YouTube、X、B 站及在线会议双语字幕；无原生字幕时可调用本地 Whisper 或 Qwen3-ASR 模型离线生成 AI 字幕。 |
+| AI 阅读卡片与学习闭环 | 结合段落语境解释含义、拆解句式并连续追问；内置离线词典、单词本、AnkiConnect 同步与「再次遇见」网页重现复习机制。 |
+| 写作助手与隐私脱敏 | 在网页输入框内直接翻译、润色与改写，并在发送云端翻译前自动识别与脱敏敏感隐私内容。 |
+| 端到端加密云同步与多端生态 | 支持 Google Drive 与 WebDAV 端到端加密配置备份；覆盖 Chrome、Edge、Firefox、Safari、油猴脚本，并提供 Obsidian、Zotero、Thunderbird [第三方集成](../integrations/)。 |
 
 各功能的使用方法与支持范围见[使用指南](https://read.thinkstu.com/guide/)。AI 讲解需要配置可用的 AI 服务；第三方服务的费用与可用性由服务商决定。
 
 ## 安装
 
-[Chrome](https://chromewebstore.google.com/detail/djnlaiohfaaifbibleebjggkghlmcpcj) · [Edge](https://microsoftedge.microsoft.com/addons/detail/kakgmllfpjldjhcnkghpplmlbnmcoflp) · [Firefox](https://addons.mozilla.org/zh-CN/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/) · [油猴脚本](https://greasyfork.org/zh-CN/scripts/482986)
+[Chrome](https://chromewebstore.google.com/detail/djnlaiohfaaifbibleebjggkghlmcpcj) · [Edge](https://microsoftedge.microsoft.com/addons/detail/kakgmllfpjldjhcnkghpplmlbnmcoflp) · [Firefox](https://addons.mozilla.org/zh-CN/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/) · [Safari](../docs/maintainers/releases.md#本地打包) · [油猴脚本](https://greasyfork.org/zh-CN/scripts/482986) · [第三方集成（Obsidian / Zotero / Thunderbird）](../integrations/)
 
 1. 安装扩展并刷新需要翻译的网页。
-2. 打开流畅阅读，选择目标语言。源语言默认为自动检测，也可手动指定。
-3. 点击“翻译页面”。划词翻译及其他功能可在设置中开启。
+2. 打开流畅阅读，选择界面语言（支持含简繁中文在内的 8 种语言），可按需一键应用使用场景预设（学术科研、程序员、语言学习、追剧与漫画、跨境办公）。
+3. 点击“翻译页面”，或随时按 `Alt+K` 呼出全局命令面板快速操作。
 
 各浏览器商店的版本更新可能存在时间差。油猴脚本提供核心网页翻译能力；完整支持范围见[安装指南](https://read.thinkstu.com/guide/getting-started)。
 

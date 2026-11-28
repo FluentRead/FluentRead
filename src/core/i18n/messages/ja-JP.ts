@@ -32,6 +32,7 @@ import {translationStatsJapaneseMessages} from './translationStats';
 import {localTranslationJapaneseMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
+import {task7Messages, task7LegacyText} from './task7Features';
 
 import countForms from './count-forms.json';
 
@@ -46,6 +47,7 @@ export const jaJPMessages = {
     "feedback.retryHint": "少し待って再試行してください。原文と現在の選択範囲は保持されます。",
     ...countForms['ja-JP'],
     ...personalCorrectionMessages['ja-JP'],
+    ...task7Messages['ja-JP'],
     "document.config.loadFailed": "設定を読み込めませんでした。再読み込みしてもう一度お試しください。",
     "popup.compact.translate": "翻訳",
     "popup.compact.restore": "戻す",
@@ -2568,6 +2570,7 @@ const jaJPLegacyTextBase: Readonly<Record<string, string>> = {
     'FluentRead 备份': 'FluentRead バックアップ',
     'FluentRead 翻译中心': 'FluentRead 翻訳センター',
     ...mimoRetirementLegacyText['ja-JP'],
+    ...task7LegacyText['ja-JP'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'MiMoの従量分支払キーは通常sk-で始まります;キーがAPIキーのページから取得されていることを確認してください。',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'OCRサービスの初期化に失敗しました。設定ページを再度開いて、もう一度お試しください。',
     'Offscreen 文档': 'オフスクリーン文書',

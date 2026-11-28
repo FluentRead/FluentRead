@@ -54,7 +54,7 @@ describe('localized installation and publication descriptions', () => {
         expect(metadata).toContain(`// @description  ${productDescriptions['en-US']}\n`);
         expect(metadata).toContain(`// @description:zh ${productDescriptions['zh-CN']}\n`);
         for (const [language, description] of Object.entries(productDescriptions)) {
-            const locale = language === 'zh-CN' ? language : language.split('-')[0];
+            const locale = language === 'zh-CN' || language === 'zh-TW' ? language : language.split('-')[0];
             expect(metadata).toContain(`// @description:${locale} ${description}\n`);
         }
         const directives = metadata.match(/^\/\/ @description(?::[^ ]+)? /gmu);
@@ -77,7 +77,7 @@ describe('localized installation and publication descriptions', () => {
         const directory = createMetadataFixture();
         try {
             const {verifyLocalizedExtensionMetadata} = await metadataVerifier();
-            const expectedLocales = ['en', 'es', 'fr', 'ja', 'ko', 'ru', 'zh_CN'];
+            const expectedLocales = ['en', 'es', 'fr', 'ja', 'ko', 'ru', 'zh_CN', 'zh_TW'];
             const {action, ...metadataFields} = metadataManifest;
             expect(await verifyLocalizedExtensionMetadata(directory, metadataManifest)).toEqual(expectedLocales);
             expect(await verifyLocalizedExtensionMetadata(directory, {...metadataFields, manifest_version: 2, browser_action: action})).toEqual(expectedLocales);

@@ -12,7 +12,7 @@ An open-source browser extension for bilingual translation.
 
 </div>
 
-FluentRead displays translations alongside the original webpage and provides selection translation, AI reading assistance, image and document translation, and bilingual video subtitles. Its reading card provides contextual explanations and follow-up questions.
+FluentRead is an open-source, privacy-first reading, translation, and language-learning workspace for the web. It displays translations alongside original webpages and brings together local offline AI models, PaddleOCR + LaMa manga & image translation, 17-format document translation with scanned PDF OCR, video & meeting subtitles with local Whisper/Qwen3 ASR, offline dictionaries with AnkiConnect & re-encounter review, a writing assistant, and a keyboard-first global command palette.
 
 We began developing FluentRead in January 2024. Since then, FluentRead has remained open source and free to use.
 
@@ -34,23 +34,25 @@ For a closer look, [watch the full official introduction (4+ minutes, in Chinese
 
 | Feature | Description |
 | --- | --- |
-| Webpage translation | Bilingual page translation, hover and selection translation, original-text restoration, and automatic translation rules. |
-| AI reading card | Meaning, sentence analysis, usage explanations, and practice, with paragraph context and follow-up questions. |
-| Learning center | Save words, phrases, and sentences with their original context for study and review. |
-| Image and area translation | Recognize text in webpage images or selected screen areas and display translations that can be copied. |
-| Document translation | Read PDF, ePub, DOCX, and other supported formats in two languages, edit translations, and export files. |
-| Video subtitles | Bilingual subtitles on YouTube and X, with original-only and translation-only display modes; supported X videos can also use local AI transcription. |
-| Services and settings | Free translation services, DeepL, AI providers, and local Ollama models, with glossaries, translation styles, shortcuts, and menu layout settings. |
+| Webpage translation & Smart Highlighting | Full-page bilingual or translation-only reading, hover/selection/section translation, original-text restoration, per-site rules, and surprisal-based smart highlighting. |
+| Global Command Palette & Scenario Onboarding | Press `Alt+K` (customizable) from any page to search and run actions with Chinese/English/Pinyin matching, or jump-start with 5 scenario presets (Academic, Developer, Language Learning, Media & Manga, Cross-border Work). |
+| Local offline AI & translation engines | Free engines, DeepL, OpenAI/Claude/Gemini/DeepSeek, local Ollama / LM Studio, and on-device browser translation, with glossaries, custom prompts, translation styles, and 8 UI languages (`简体中文`, `繁體中文`, English, 日本語, 한국어, Français, Русский, Español). |
+| Manga, image & area translation | PaddleOCR text detection and LaMa background inpainting for seamless continuous manga reading, webpage image translation, and area screenshot translation. |
+| 17-format document translation | Translate PDF (including scanned PDF OCR), ePub, DOCX, PPTX, Markdown, HTML, TXT, SRT/VTT/ASS subtitles, and more — with side-by-side bilingual reading, inline revision editing, and export. |
+| Video & meeting subtitles + local ASR | Bilingual subtitles for YouTube, X, Bilibili, and online meetings, with local Whisper and Qwen3-ASR offline transcription when native captions are unavailable. |
+| AI reading card & learning loop | Contextual meaning, sentence analysis, and follow-up Q&A; built-in offline dictionaries, vocabulary book, AnkiConnect sync, and "Re-encounter" passive review when saved words reappear on the web. |
+| Writing assistant & privacy protection | Input-box translation and polishing directly inside web editors, paired with automatic redaction of sensitive data before cloud translation requests. |
+| E2EE cloud sync & ecosystem | End-to-end encrypted configuration backup via Google Drive and WebDAV; available across Chrome, Edge, Firefox, Safari, Userscript, and companion [integrations](./integrations/) for Obsidian, Zotero, and Thunderbird. |
 
 See the [user guide](https://read.thinkstu.com/en/guide/) for instructions and supported formats. AI explanations require a configured AI service. Third-party pricing and availability depend on the provider.
 
 ## Installation
 
-[Chrome](https://chromewebstore.google.com/detail/djnlaiohfaaifbibleebjggkghlmcpcj) · [Edge](https://microsoftedge.microsoft.com/addons/detail/kakgmllfpjldjhcnkghpplmlbnmcoflp) · [Firefox](https://addons.mozilla.org/en-US/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/) · [Userscript](https://greasyfork.org/en/scripts/482986)
+[Chrome](https://chromewebstore.google.com/detail/djnlaiohfaaifbibleebjggkghlmcpcj) · [Edge](https://microsoftedge.microsoft.com/addons/detail/kakgmllfpjldjhcnkghpplmlbnmcoflp) · [Firefox](https://addons.mozilla.org/en-US/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/) · [Safari](./docs/maintainers/releases.md#本地打包) · [Userscript](https://greasyfork.org/en/scripts/482986) · [Integrations (Obsidian / Zotero / Thunderbird)](./integrations/)
 
 1. Install the extension and refresh the webpage.
-2. Open FluentRead and select a target language. The source language defaults to automatic detection and can also be selected manually.
-3. Choose “Translate page.” Enable selection translation and other tools in settings as needed.
+2. Open FluentRead, pick your interface language (8 languages including Simplified & Traditional Chinese), and optionally apply a scenario preset (Academic, Developer, Language Learning, Media & Manga, or Cross-border Work).
+3. Click “Translate page” or press `Alt+K` anytime to open the Global Command Palette.
 
 Store updates may arrive at different times. The userscript provides core webpage translation features. See the [installation guide](https://read.thinkstu.com/en/guide/getting-started) for browser and feature availability.
 

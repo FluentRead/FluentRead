@@ -71,6 +71,8 @@
       <p>{{ selectedTextServiceUnavailableMessage }}请在上方选择可用服务。</p>
     </div>
     <FeatureServiceSettings id="feature-services" data-settings-anchor="services" :data-settings-anchor-label="t('featureServices.assignments')" :active="viewActive && props.activeSection === 'settings-general'" :config="config" :service-options="availableServiceOptions" @configure-service="openInputServiceSettings" />
+    <ScenarioPresetsSettings v-if="ScenarioPresetsSettings" :config="config" :active="viewActive && props.activeSection === 'settings-general'" />
+    <CommandPaletteSettings v-if="CommandPaletteSettings" :config="config" :active="viewActive && props.activeSection === 'settings-general'" />
   </section>
   <section v-if="hasVisitedSection('settings-sites')" v-show="props.activeSection === 'settings-sites'" id="settings-sites" class="settings-section site-settings-section">
     <SettingsPanel name="rules">
@@ -717,6 +719,8 @@ const ImageOcrSettings = import.meta.env.BROWSER === 'userscript' ? null : defin
 const MangaSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/image-translation/ui/public').then(module => module.MangaSettings));
 const VideoLocalModelSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoLocalModelSettings.vue'));
 const VideoSubtitleShortcutSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSubtitleShortcutSettings.vue'));
+const ScenarioPresetsSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./ScenarioPresetsSettings.vue'));
+const CommandPaletteSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./CommandPaletteSettings.vue'));
 const LocalTtsSettings = defineAsyncComponent(() => import('./LocalTtsSettings.vue'));
 const VideoSubtitleAppearanceSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSubtitleAppearanceSettings.vue'));
 const ModelUsageDashboard = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/model-usage/public').then(module => module.ModelUsageDashboard));

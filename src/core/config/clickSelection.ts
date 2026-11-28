@@ -9,6 +9,7 @@ import {resolveAreaTranslationHotkey} from './areaTranslation';
 import {resolveParagraphCopyHotkey} from './paragraphCopy';
 import {resolveSectionTranslationHotkey} from './sectionTranslation';
 import {resolveVideoSubtitleModeHotkey} from './videoSubtitleShortcut';
+import {resolveCommandPaletteHotkey} from './commandPalette';
 import {findEnabledQuickTranslationHotkeyConflict, inputBoxTranslationTriggerHotkey, type QuickTranslationProfile} from './quickTranslation';
 
 export const DEFAULT_CLICK_SELECTION_HOTKEY = 'Alt+Shift+S';
@@ -37,6 +38,9 @@ interface ClickSelectionConfig {
     videoSubtitleModeHotkeyEnabled?: boolean;
     videoSubtitleModeHotkey?: string;
     customVideoSubtitleModeHotkey?: string;
+    commandPaletteEnabled?: boolean;
+    commandPaletteHotkey?: string;
+    customCommandPaletteHotkey?: string;
     inputBoxTranslationTrigger?: string;
     customInputBoxTranslationHotkey?: string;
     quickTranslationProfiles?: readonly QuickTranslationProfile[];
@@ -74,6 +78,7 @@ export function findClickSelectionHotkeyConflict(config: ClickSelectionConfig, h
         {hotkey: config.paragraphCopyEnabled ? resolveParagraphCopyHotkey(config.paragraphCopyHotkey, config.customParagraphCopyHotkey) : '', feature: '段落复制'},
         {hotkey: config.sectionTranslationHotkeyEnabled ? resolveSectionTranslationHotkey(config.sectionTranslationHotkey, config.customSectionTranslationHotkey) : '', feature: '局部翻译'},
         {hotkey: config.videoSubtitleModeHotkeyEnabled ? resolveVideoSubtitleModeHotkey(config.videoSubtitleModeHotkey, config.customVideoSubtitleModeHotkey) : '', feature: '视频字幕显示模式切换'},
+        {hotkey: config.commandPaletteEnabled ? resolveCommandPaletteHotkey(config.commandPaletteHotkey, config.customCommandPaletteHotkey) : '', feature: '全局命令面板'},
         {hotkey: inputBoxTranslationTriggerHotkey(config.inputBoxTranslationTrigger, config.customInputBoxTranslationHotkey), feature: '输入框翻译'},
         {hotkey: config.informationHighlight?.hotkeyEnabled === true ? config.informationHighlight.hotkey ?? '' : '', feature: '智能高亮'},
     ];

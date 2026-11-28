@@ -477,11 +477,11 @@ describe('architecture module boundaries', () => {
     });
 
     it('按需加载的大体积资源不得被扩展运行时代码静态引入', () => {
-        // 六种非中文界面文案只能经构建期 JSON 按需加载。
+        // 七种非简体中文界面文案只能经构建期 JSON 按需加载。
         const allowed = new Map<string, RegExp>([
-            ['src/core/i18n/bundles.ts', /^\.\/messages\/(?:en-US|es-ES|fr-FR|ja-JP|ko-KR|ru-RU)$/u],
+            ['src/core/i18n/bundles.ts', /^\.\/messages\/(?:zh-TW|en-US|es-ES|fr-FR|ja-JP|ko-KR|ru-RU)$/u],
         ]);
-        const onDemand = /^(?:@\/src\/core\/i18n\/bundles|\.\/bundles|(?:@\/src\/core\/i18n\/|\.\/|\.\.\/)messages\/(?:en-US|es-ES|fr-FR|ja-JP|ko-KR|ru-RU))$/u;
+        const onDemand = /^(?:@\/src\/core\/i18n\/bundles|\.\/bundles|(?:@\/src\/core\/i18n\/|\.\/|\.\.\/)messages\/(?:zh-TW|en-US|es-ES|fr-FR|ja-JP|ko-KR|ru-RU))$/u;
         const violations: string[] = [];
         for (const file of listSourceFiles('src')) {
             const path = relativePath(file);

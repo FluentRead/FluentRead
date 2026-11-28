@@ -143,6 +143,12 @@ describe('options navigation view-model', () => {
     expect(filterNavigationItems('典藏画报')).toEqual([
       expect.objectContaining({ id: 'settings-interface' }),
     ])
+    expect(filterNavigationItems('素净极简')).toEqual([
+      expect.objectContaining({ id: 'settings-interface' }),
+    ])
+    expect(filterNavigationItems('建筑蓝图')).toEqual([
+      expect.objectContaining({ id: 'settings-interface' }),
+    ])
     // 译文样式与颜色都集中在外观与界面页，不再同时命中通用设置。
     for (const keyword of ['译文样式', '下划线颜色', '译文颜色', '标记底色', '模糊遮罩']) {
       expect(filterNavigationItems(keyword)).toEqual([

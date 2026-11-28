@@ -1,9 +1,10 @@
 /**
  * @file src/features/document-translation/ui/richPreviewSync.ts
- * 文件职责：让 HTML、Markdown、纯文本与 ePub 章节的隔离预览在译文逐段到达时原位更新，而不是重新载入整页并丢失滚动位置。
- * 主要内容：把新生成的预览 HTML 解析成文档后，与预览框里现有的正文逐节点比对，只改写发生变化的文字、属性和子树；提供按文档规模放慢的节流间隔，避免长文档每到一段译文就整篇比对；从预览框的标题收集目录（原文与译文配对），并按目录项滚动到对应标题；标记预览是否处于翻译进行中，供预览样式显示等待占位；读出预览滚动到全文的比例，供翻译从正在阅读的位置开始。
- * 模块边界：只做 DOM 同步与读取，不生成预览 HTML、不发起翻译、不决定何时刷新；预览框不允许执行脚本，无法访问其文档时返回 false，由页面退回整页载入。
+ * 文件职责：让 HTML、Markdown、纯文本与 ePub 章节的隔离预览在译文逐段到达时原位更新，并提供按片段 ID 的增量 DOM 补丁与滚动目录高亮追踪。
+ * 主要内容：支持通过 patchRichPreviewSegments 按 data-segment-id 就地更新已变化的译文节点并切换等待态；提供整页 DOM 差异同步 syncRichPreview、按文档规模调节的节流间隔 richPreviewInterval、标题目录收集与平滑跳转、翻译忙态标记、滚动进度读取，以及基于视口偏移的当前活跃标题定位 findActiveRichHeadingId 与 findActiveRichOutlineIndex。
+ * 模块边界：只做安全 DOM 同步与读取，不生成预览 HTML、不发起翻译、不执行脚本也不注入未转义 HTML；预览框不可访问或结构不匹配时返回 false，由上层退回整页同步或重载。
  */
+import {hasDistinctTranslation} from '@/src/core/translation/result';
 
 interface PreviewFrame {contentDocument?: Document | null}
 type PreviewParser = (html: string) => Document | null;
@@ -50,6 +51,121 @@ export function syncRichPreview(frame: PreviewFrame | null | undefined, html: st
     return true;
 }
 
+export interface RichPreviewSegmentPatch {
+    id: number;
+    source?: string;
+    translation: string;
+}
+
+export interface PatchRichPreviewOptions {
+    mode: 'source' | 'bilingual' | 'translated';
+    format?: 'markdown' | 'txt' | 'html' | 'epub';
+}
+
+function setMultilineText(element: Element, text: string): void {
+    const doc = element.ownerDocument!;
+    while (element.firstChild) element.removeChild(element.firstChild);
+    const lines = text.replace(/\r\n?/gu, '\n').split('\n');
+    lines.forEach((line, index) => {
+        if (index > 0) element.appendChild(doc.createElement('br'));
+        element.appendChild(doc.createTextNode(line));
+    });
+}
+
+const MARKDOWN_INLINE_SIGNAL = /[*_`~[\]$]/u;
+
+type PatchPlan =
+    | {
+        kind: 'unit';
+        target: Element;
+        sourceEl: Element | null;
+        translationEl: Element | null;
+        referenceEl: Element;
+        sourceText: string;
+        translation: string;
+        distinct: boolean;
+    }
+    | {
+        kind: 'inline';
+        translationTarget: Element;
+        text: string;
+    };
+
+/**
+ * 按片段 ID 原位补丁更新预览框内已变化的单元，避免长文档每到达几条译文就重建整篇 HTML 并运行 DOMParser。
+ * 先全量校验再提交 DOM 写入（原子性），遇到模式变化、节点缺失、任务复选框、多段合并引用或含复杂 Markdown 行内语法时返回 false，交由上层退回 syncRichPreview。
+ */
+export function patchRichPreviewSegments(
+    frame: PreviewFrame | null | undefined,
+    updates: readonly RichPreviewSegmentPatch[],
+    options: PatchRichPreviewOptions,
+): boolean {
+    const body = frame?.contentDocument?.body;
+    if (!body) return false;
+    const article = body.querySelector('article[data-reader-mode]');
+    if (article && article.getAttribute('data-reader-mode') !== options.mode) return false;
+    if (!article && options.mode !== 'bilingual') return false;
+    if ((options.format === 'html' || options.format === 'epub') && options.mode !== 'bilingual') return false;
+    if (updates.length === 0) return true;
+    const doc = body.ownerDocument!;
+
+    const plans: PatchPlan[] = [];
+    for (const update of updates) {
+        if (options.format === 'markdown' && MARKDOWN_INLINE_SIGNAL.test(update.translation)) return false;
+        const target = body.querySelector(`[data-segment-id="${update.id}"]`);
+        if (!target) return false;
+
+        if (target.classList.contains('reader-unit')) {
+            if (target.classList.contains('task-item') || target.getAttribute('data-multi-segment') === 'true') return false;
+            const sourceEl = target.querySelector(':scope > .reader-source') ?? target.querySelector('.reader-source');
+            const translationEl = target.querySelector(':scope > .reader-translation') ?? target.querySelector('.reader-translation');
+            const referenceEl = sourceEl ?? translationEl;
+            if (!referenceEl) return false;
+            const sourceText = update.source ?? sourceEl?.textContent ?? '';
+            const distinct = options.mode !== 'source' && hasDistinctTranslation(sourceText, update.translation);
+            if (!distinct && !sourceEl && options.format === 'markdown' && MARKDOWN_INLINE_SIGNAL.test(sourceText)) return false;
+            plans.push({kind: 'unit', target, sourceEl, translationEl, referenceEl, sourceText, translation: update.translation, distinct});
+            continue;
+        }
+
+        const translationTarget = target.matches(TRANSLATION) ? target : target.querySelector(TRANSLATION);
+        if (!translationTarget) return false;
+        const trimmed = update.translation.trim();
+        if (!trimmed || (update.source !== undefined && !hasDistinctTranslation(update.source, trimmed))) return false;
+        plans.push({kind: 'inline', translationTarget, text: trimmed});
+    }
+
+    for (const plan of plans) {
+        if (plan.kind === 'inline') {
+            setMultilineText(plan.translationTarget, plan.text);
+            continue;
+        }
+        plan.target.classList.toggle('is-pending', options.mode !== 'source' && !plan.distinct);
+        const tag = plan.referenceEl.tagName.toLowerCase();
+        const headingClass = plan.referenceEl.classList.contains('reader-heading') ? ' reader-heading' : '';
+        if (plan.distinct) {
+            if (options.mode === 'translated' && plan.sourceEl) plan.sourceEl.remove();
+            let nextTranslation = plan.translationEl;
+            if (!nextTranslation) {
+                nextTranslation = doc.createElement(tag);
+                nextTranslation.setAttribute('class', `reader-translation fluentread-translation${headingClass}`);
+                plan.target.appendChild(nextTranslation);
+            }
+            setMultilineText(nextTranslation, plan.translation);
+        } else {
+            plan.translationEl?.remove();
+            if (!plan.sourceEl) {
+                const restored = doc.createElement(tag);
+                restored.setAttribute('class', `reader-source${headingClass}`);
+                setMultilineText(restored, plan.sourceText);
+                plan.target.appendChild(restored);
+            }
+        }
+    }
+
+    return true;
+}
+
 /** 翻译进行中的刷新间隔：短文档四分之一秒一次，片段越多越慢，最长两秒。 */
 export function richPreviewInterval(segmentCount: number): number {
     return Math.min(2000, Math.max(250, Math.round(segmentCount / 8)));
@@ -90,6 +206,38 @@ export function collectRichOutline(frame: PreviewFrame | null | undefined): Rich
         previous = heading;
     });
     return items;
+}
+
+function headingViewportTop(heading: Element, scrollTop: number): number {
+    if (typeof heading.getBoundingClientRect === 'function') return heading.getBoundingClientRect().top;
+    const offsetTop = (heading as Element & {offsetTop?: number}).offsetTop;
+    return typeof offsetTop === 'number' ? offsetTop - scrollTop : 0;
+}
+
+/** 返回当前视口最接近顶部（含偏移容差）的目录标题序号；无标题或预览不可访问时返回 -1。 */
+export function findActiveRichOutlineIndex(frame: PreviewFrame | null | undefined, offset = 80): number {
+    const doc = frame?.contentDocument;
+    const body = doc?.body;
+    if (!body) return -1;
+    const outline = collectRichOutline(frame);
+    if (outline.length === 0) return -1;
+    const headings = body.querySelectorAll(HEADINGS);
+    const scrollTop = doc.scrollingElement?.scrollTop ?? 0;
+    let activeIndex = outline[0].index;
+    for (const item of outline) {
+        const heading = headings[item.index];
+        if (headingViewportTop(heading, scrollTop) <= offset) activeIndex = item.index;
+        else break;
+    }
+    return activeIndex;
+}
+
+/** 返回当前视口活跃标题的 DOM id，无显式 id 时返回 `h${index}`，供侧栏目录高亮。 */
+export function findActiveRichHeadingId(frame: PreviewFrame | null | undefined, offset = 80): string | null {
+    const activeIndex = findActiveRichOutlineIndex(frame, offset);
+    if (activeIndex < 0) return null;
+    const heading = frame!.contentDocument!.body!.querySelectorAll(HEADINGS)[activeIndex];
+    return heading.getAttribute('id') || `h${activeIndex}`;
 }
 
 /** 滚动到目录项对应的标题；预览已经变化、找不到该标题时返回 false。 */

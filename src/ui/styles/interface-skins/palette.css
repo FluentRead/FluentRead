@@ -1,7 +1,7 @@
 /**
  * @file src/ui/styles/interface-skins/palette.css
  * 文件职责：为所有传统色风格提供共享的 Popup 与 Options 组件适配层，把每套风格声明的造型变量落到具体组件上，避免每套风格重复维护完整选择器集合。
- * 主要内容：定义一份造型契约——版面底色、主卡片、控件、顶部按钮、快捷入口卡片、图标底、站点开关与主按钮各有一组带默认值的变量，风格模块只需覆盖与自己造型有关的部分；所有表面都是平涂的纯色，不使用渐变、模糊或光效，品牌图标保持原样；设置页的工作区、侧栏与分组卡片始终使用中性纯色表面，侧栏选中项用正文色文字配浅色底，并保留可辨识的状态与键盘焦点。
+ * 主要内容：定义一份造型契约——版面底色、主卡片、控件、顶部按钮、快捷入口卡片、图标底、站点开关与主按钮各有一组带默认值的变量，风格模块只需覆盖与自己造型有关的部分；所有表面都是平涂的纯色，不使用渐变、模糊或光效，品牌图标保持原样；设置页的工作区、侧栏与分组卡片始终使用中性纯色表面，侧栏选中项用正文色文字配浅色底，并保留可辨识的状态与键盘焦点（服务目录主选择按钮与移除按钮均采用内缩焦点环，主选择聚焦绘制在整行 `.library-item` 上以防裁切）。
  * 层叠约定：同时限定皮肤类型与 ID，使亮暗色基础样式不能因打包顺序覆盖风格语义。
  * 模块边界：本文件只匹配 data-interface-skin-kind="palette"，不声明任何具体风格的色值或造型；新增或删除单套风格只需调整注册表、入口 import 和对应风格模块。
  */
@@ -314,12 +314,18 @@
   box-shadow: 0 0 0 5px color-mix(in srgb, var(--brand) 10%, transparent);
 }
 
-:root[data-interface-skin-kind="palette"][data-interface-skin] button:focus-visible,
+:root[data-interface-skin-kind="palette"][data-interface-skin] button:not(.library-select):not(.library-remove):focus-visible,
 :root[data-interface-skin-kind="palette"][data-interface-skin] select:focus-visible,
 :root[data-interface-skin-kind="palette"][data-interface-skin] input:focus-visible,
 :root[data-interface-skin-kind="palette"][data-interface-skin] a:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
+}
+
+:root[data-interface-skin-kind="palette"][data-interface-skin] .library-item:has(> .library-select:focus-visible),
+:root[data-interface-skin-kind="palette"][data-interface-skin] .library-remove:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
 }
 
 /* Options：使用同一组语义变量覆盖页面骨架与高频控件；主操作按钮与菜单栏主按钮同色。 */

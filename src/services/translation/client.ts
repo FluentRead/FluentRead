@@ -2,7 +2,7 @@
  * @file src/services/translation/client.ts
  * 字幕参考：单条与批量请求冻结并限制字幕文档的相邻 cue 字符串，资格与缓存由后台统一判断。
  * 文件职责：作为页面与后台翻译 broker 之间的客户端代理，统一管理单条、批量和视频字幕翻译的队列、取消、重试、超时、上下文与统计。
- * 主要内容：在等待前冻结调用选项和配置，先按语言证据预检，再统一排队发送单条、批量或字幕请求；按原始入场预算做有界重试，退避时释放客户端并发槽；取消和超时时通知后台停止请求。
+ * 主要内容：在等待前冻结调用选项和配置，先按语言证据预检，再统一排队发送单条、批量或字幕请求；按原始入场预算做有界重试（其中本地模型默认 120 秒、浏览器内置单条默认 300 秒、AI 沿用配置秒数加 1 秒收尾），退避时释放客户端并发槽；取消和超时时通知后台停止请求。
  * 模块边界：客户端不实现供应商协议、不直接读写翻译缓存，也不修改全文 DOM；单条、批量与字幕调用的信号贯穿本地排队和已启动传输，等待取消不占用活动传输租约；内部槽请求保留空响应供调用方严格解析和逐槽回退，本模块属于跨 feature 的请求编排服务；后台 runtime/broker 负责 provider 与缓存，各 feature 负责展示和会话状态。
  */
 /**
@@ -60,6 +60,7 @@ const TRANSLATION_COUNT_SAVE_INTERVAL = 500;
 const COUNT_SAVE_RETRY_INTERVAL = 1_000;
 const COUNT_SAVE_MAX_AUTOMATIC_RETRIES = 3;
 const DEFAULT_TRANSLATION_TIMEOUT_MS = 45_000;
+const DEFAULT_LOCAL_TRANSLATION_TIMEOUT_MS = 120_000;
 const DEFAULT_CHROME_TRANSLATION_TIMEOUT_MS = 300_000;
 const TRANSLATION_RESPONSE_GRACE_MS = 1_000;
 let translationRequestSequence = 0;
@@ -80,10 +81,11 @@ function createTranslationClientRequestId(): string {
   return `translation-${translationRequestNonce}-${translationRequestSequence}`;
 }
 
-/** 设置秒数属于后台 AI 预算；页面额外等待一秒收取后台超时结果。批量 Chrome 沿用 45 秒，单条允许模型准备；显式 timeout 保留既有总等待语义。 */
+/** 设置秒数属于后台 AI 预算；页面额外等待一秒收取后台超时结果。批量 Chrome 沿用 45 秒，单条允许模型准备；本地模型使用 120 秒推理预算；显式 timeout 保留既有总等待语义。 */
 export function getTranslationTimeout(service: string, explicitTimeout?: number, batch = false): number {
   if (explicitTimeout !== undefined) return explicitTimeout;
   if (service === services.chromeTranslator) return batch ? DEFAULT_TRANSLATION_TIMEOUT_MS : DEFAULT_CHROME_TRANSLATION_TIMEOUT_MS;
+  if (service === services.localTranslation) return DEFAULT_LOCAL_TRANSLATION_TIMEOUT_MS;
   return servicesType.isAI(service)
     ? normalizeAiRequestTimeoutMs(config.aiRequestTimeoutMs) + TRANSLATION_RESPONSE_GRACE_MS
     : DEFAULT_TRANSLATION_TIMEOUT_MS;
@@ -413,7 +415,7 @@ export async function translateText(origin: string, context: string = document.t
     // 槽包保留真实响应，由调用方解析并回退。
     return !text && options.validateTranslationSlots !== true && options.validateInlineCodeTranslation !== true
       ? origin : text;
-  }, Boolean(signal) || selectedService === services.chromeTranslator);
+  }, Boolean(signal) || selectedService === services.chromeTranslator || selectedService === services.localTranslation);
   // 只统计已成功完成的调用；同一富文本回退产生的短请求仍由延迟队列合并落盘。
   scheduleTranslationCountSave();
   return result;
@@ -484,7 +486,7 @@ export async function translateTextBatch(
     const translated = [...origins];
     pendingIndexes.forEach((originalIndex, resultIndex) => { translated[originalIndex] = result[resultIndex]!; });
     return translated;
-  }, Boolean(signal) || selectedService === services.chromeTranslator);
+  }, Boolean(signal) || selectedService === services.chromeTranslator || selectedService === services.localTranslation);
   scheduleTranslationCountSave();
   return result;
 }

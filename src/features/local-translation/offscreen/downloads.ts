@@ -2,7 +2,7 @@
  * @file src/features/local-translation/offscreen/downloads.ts
  *
  * 文件职责：持有独立于设置页和后台 Service Worker 生命周期的模型下载任务。
- * 主要内容：串行排队、即时任务回执、限频进度、磁盘恢复、暂停和删除互斥；重开页面仅订阅已有状态。
+ * 主要内容：模型间串行排队、单模型多文件有界并发下载与失败联停、并发初始化盘面恢复、即时任务回执、限频进度、暂停和删除互斥；重开页面仅订阅已有状态。
  * 模块边界：模型文件读写交给 artifactStore，旧缓存交给 modelCache，推理释放和状态通知由应用组合根注入。
  */
 import {
@@ -12,11 +12,13 @@ import {
 import {
     LOCAL_MODEL_CACHE, artifactComplete, artifactDownloadedBytes, downloadTranslationArtifact,
     getTranslationArtifacts, invalidateTranslationArtifactReceipt, removeTranslationArtifact,
+    type TranslationArtifact,
 } from './artifactStore';
 import {isLocalTranslationModelCached, removeLocalTranslationModelFiles} from './modelCache';
 import {supportsHunyuanTranslation, supportsOpusTranslation} from '@/src/platform/browser/localTranslationSupport';
 
 const STATE_URL = 'https://fluentread.invalid/local-translation-downloads-v2';
+const DOWNLOAD_FILE_CONCURRENCY = 3;
 type StoredDownloadState = LocalTranslationDownloadState & {needsReverification?: boolean};
 export interface LocalTranslationDownloadDependencies {
     onChange?(state: LocalTranslationDownloadSnapshot): Promise<void>;
@@ -54,34 +56,42 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
             const cache = await caches.open(LOCAL_MODEL_CACHE);
             const response = await cache.match(STATE_URL);
             const saved = await response?.json().catch(() => undefined) as {version: 2; tasks: StoredDownloadState[]} | undefined;
-            for (const model of LOCAL_TRANSLATION_MODELS) {
+            const resolved = await Promise.all(LOCAL_TRANSLATION_MODELS.map(async (model) => {
                 const artifacts = getTranslationArtifacts(model.value);
                 let downloadedBytes = 0;
                 let complete = artifacts.length > 0;
-                for (const file of artifacts) {
-                    const verified = await artifactComplete(file);
-                    downloadedBytes += verified ? file.size : await artifactDownloadedBytes(file);
-                    complete &&= verified;
-                }
                 if (model.legacy) {
                     complete = await isLocalTranslationModelCached(model.value);
                     downloadedBytes = complete ? model.downloadSizeMb * 1_000_000 : 0;
+                } else {
+                    const checked = await Promise.all(artifacts.map(async (file) => {
+                        const verified = await artifactComplete(file);
+                        return {verified, bytes: verified ? file.size : await artifactDownloadedBytes(file)};
+                    }));
+                    for (const item of checked) {
+                        downloadedBytes += item.bytes;
+                        complete &&= item.verified;
+                    }
                 }
                 const previous = saved?.version === 2 && Array.isArray(saved.tasks)
                     ? saved.tasks.find((state) => state.model === model.value) : undefined;
                 // 重验中断后即使所有键都存在，也不能丢掉尚未完成的哈希校验意图。
                 const reverify = !model.legacy && previous?.phase !== 'idle'
                     && (previous?.needsReverification === true || previous?.error === 'integrity');
-                states.set(model.value, {
+                return {
                     model: model.value,
-                    phase: reverify ? 'paused' : complete ? 'ready' : downloadedBytes || previous && previous.phase !== 'idle' ? 'paused' : 'idle',
-                    downloadedBytes,
-                    totalBytes: artifacts.reduce((sum, file) => sum + file.size, 0) || model.downloadSizeMb * 1_000_000,
-                    bytesPerSecond: 0,
-                    updatedAt: Math.max(Date.now(), (previous?.updatedAt || 0) + 1),
-                    ...(reverify ? {needsReverification: true} : {}),
-                });
-            }
+                    state: {
+                        model: model.value,
+                        phase: reverify ? 'paused' : complete ? 'ready' : downloadedBytes || previous && previous.phase !== 'idle' ? 'paused' : 'idle',
+                        downloadedBytes,
+                        totalBytes: artifacts.reduce((sum, file) => sum + file.size, 0) || model.downloadSizeMb * 1_000_000,
+                        bytesPerSecond: 0,
+                        updatedAt: Math.max(Date.now(), (previous?.updatedAt || 0) + 1),
+                        ...(reverify ? {needsReverification: true} : {}),
+                    } satisfies StoredDownloadState,
+                };
+            }));
+            for (const entry of resolved) states.set(entry.model, entry.state);
             await persist();
         })().catch((error) => { initialized = undefined; throw error; });
         return initialized;
@@ -102,32 +112,80 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
             }
             update(model, {phase: 'downloading', error: undefined});
             await persist();
-            const progressByFile = new Map<string, number>();
-            for (const file of files) progressByFile.set(`${file.repo}/${file.path}`, await artifactDownloadedBytes(file));
+            const progressByFile = new Map<string, number>(
+                await Promise.all(files.map(async (file) => [`${file.repo}/${file.path}`, await artifactDownloadedBytes(file)] as const)),
+            );
+            const verifyingFiles = new Set<string>();
+            let remainingFiles = files.length;
             let lastBytes = states.get(model)!.downloadedBytes;
             let lastAt = Date.now();
-            for (const file of files) {
-                if (controller.signal.aborted) throw new DOMException('Paused', 'AbortError');
-                if (reverify) await invalidateTranslationArtifactReceipt(file);
-                if (controller.signal.aborted) throw new DOMException('Paused', 'AbortError');
-                await downloadTranslationArtifact(file, controller.signal, (bytes, verifying) => {
-                    const now = Date.now();
-                    progressByFile.set(`${file.repo}/${file.path}`, bytes);
-                    const total = [...progressByFile.values()].reduce((sum, value) => sum + value, 0);
-                    const elapsed = now - lastAt;
-                    if (elapsed >= 500) {
-                        update(model, {bytesPerSecond: Math.max(0, (total - lastBytes) * 1000 / elapsed)});
-                        lastBytes = total;
-                        lastAt = now;
+            if (controller.signal.aborted) throw new DOMException('Paused', 'AbortError');
+            const abortOnWriteFailure = () => controller.abort();
+            const runController = new AbortController();
+            const abortRun = () => runController.abort();
+            controller.signal.addEventListener('abort', abortRun, {once: true});
+            const downloadFile = async (file: TranslationArtifact, signal: AbortSignal): Promise<void> => {
+                const fileKey = `${file.repo}/${file.path}`;
+                if (reverify) {
+                    await invalidateTranslationArtifactReceipt(file);
+                    if (signal.aborted) throw new DOMException('Paused', 'AbortError');
+                }
+                let wasVerifying = false;
+                try {
+                    await downloadTranslationArtifact(file, signal, (bytes, verifying) => {
+                        if (signal.aborted) return;
+                        const now = Date.now();
+                        progressByFile.set(fileKey, bytes);
+                        if (verifying) verifyingFiles.add(fileKey);
+                        else verifyingFiles.delete(fileKey);
+                        const total = [...progressByFile.values()].reduce((sum, value) => sum + value, 0);
+                        const elapsed = now - lastAt;
+                        if (elapsed >= 500) {
+                            update(model, {bytesPerSecond: Math.max(0, (total - lastBytes) * 1000 / elapsed)});
+                            lastBytes = total;
+                            lastAt = now;
+                        }
+                        update(model, {phase: verifyingFiles.size > 0 ? 'verifying' : 'downloading', downloadedBytes: total});
+                        if (now - lastProgress >= 500) {
+                            lastProgress = now;
+                            void persist().catch(abortOnWriteFailure);
+                        }
+                    });
+                } finally {
+                    remainingFiles--;
+                    wasVerifying = verifyingFiles.delete(fileKey);
+                }
+                if (signal.aborted) throw new DOMException('Paused', 'AbortError');
+                if (wasVerifying && verifyingFiles.size === 0 && remainingFiles > 0) {
+                    update(model, {phase: 'downloading'});
+                    void persist().catch(abortOnWriteFailure);
+                }
+            };
+            let firstError: unknown;
+            let hasError = false;
+            let cursor = 0;
+            try {
+                const workerCount = Math.min(DOWNLOAD_FILE_CONCURRENCY, files.length);
+                await Promise.all(Array.from({length: workerCount}, async () => {
+                    while (cursor < files.length && !runController.signal.aborted) {
+                        const file = files[cursor++]!;
+                        try {
+                            await downloadFile(file, runController.signal);
+                        } catch (error) {
+                            if (!hasError) {
+                                hasError = true;
+                                firstError = error;
+                            }
+                            runController.abort();
+                            return;
+                        }
                     }
-                    update(model, {phase: verifying ? 'verifying' : 'downloading', downloadedBytes: total});
-                    if (now - lastProgress >= 500) {
-                        lastProgress = now;
-                        void persist().catch(() => controller.abort());
-                    }
-                });
-                if (controller.signal.aborted) throw new DOMException('Paused', 'AbortError');
+                }));
+            } finally {
+                controller.signal.removeEventListener('abort', abortRun);
             }
+            if (hasError) throw firstError;
+            if (controller.signal.aborted) throw new DOMException('Paused', 'AbortError');
             update(model, {phase: 'ready', downloadedBytes: states.get(model)!.totalBytes, bytesPerSecond: 0, error: undefined, needsReverification: undefined});
         } catch (error) {
             const code = error instanceof Error && error.name === 'QuotaExceededError' ? 'storage'

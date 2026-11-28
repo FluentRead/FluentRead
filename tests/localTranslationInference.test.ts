@@ -65,6 +65,17 @@ describe('local model language routes and bounded generation', () => {
     expect(splitLocalTranslationText('')).toEqual([]);
   });
 
+  it('greedily packs consecutive sentences up to maxLength without crossing line or paragraph breaks', () => {
+    expect(splitLocalTranslationText('Hello world. How are you? Fine.')).toEqual(['Hello world. How are you? Fine.']);
+    expect(splitLocalTranslationText('  Hello.\n\nWorld!  ')).toEqual(['  Hello.\n\n', 'World!  ']);
+    expect(splitLocalTranslationText('First. Second.\n\nThird. Fourth.')).toEqual(['First. Second.\n\n', 'Third. Fourth.']);
+    expect(splitLocalTranslationText('First. Second.\r\n\r\nThird. Fourth.')).toEqual(['First. Second.\r\n\r\n', 'Third. Fourth.']);
+    expect(splitLocalTranslationText('Alpha.\nBeta.')).toEqual(['Alpha.\n', 'Beta.']);
+    expect(splitLocalTranslationText('\nWorld.')).toEqual(['\n', 'World.']);
+    expect(splitLocalTranslationText('One. Two. Three.', 10)).toEqual(['One. Two. ', 'Three.']);
+    expect(splitLocalTranslationText('Hi! ' + 'X'.repeat(25) + '. End.', 20)).toEqual(['Hi! ', 'X'.repeat(20), 'XXXXX. End.']);
+  });
+
   it('uses the translation-specific Hunyuan prompt and preserves the original source literally', () => {
     expect(hunyuanTranslationPrompt('材料 <x>', 'zh', 'en')).toContain('材料 <x>');
     expect(hunyuanTranslationPrompt('print', 'en', 'ja')).toContain('Japanese');

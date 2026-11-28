@@ -4610,6 +4610,10 @@ describe("全文翻译可见性锚点", () => {
         {service: 'ai', enabled: true, model: 'mt-only', configured: 1, expected: 1},
         {service: 'microsoft', enabled: true, model: '', configured: 1, expected: 1},
         {service: 'composite:fixture', enabled: true, model: '', configured: 1, expected: 1},
+        {service: 'localTranslation', enabled: false, model: '', configured: 1, expected: 1},
+        {service: 'localTranslation', enabled: false, model: '', configured: 2, expected: 2},
+        {service: 'localTranslation', enabled: false, model: '', configured: 6, expected: 2},
+        {service: 'localTranslation', enabled: false, model: '', configured: 0, expected: 2},
     ])('候选准备容量仅为可用 AI 多段保留一批 %j', ({service, enabled, model, configured, expected}) => {
         expect(getFullPageTranslationCandidateConcurrency(translationSnapshot({service, model, enableAIMultiSegment: enabled}), configured))
             .toBe(expected);

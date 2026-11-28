@@ -267,6 +267,15 @@ describe('userscript remote UI language data', () => {
             expect(Object.keys(currentUserscriptLanguageBundle(language).messages).some(key => key.startsWith(prefix))).toBe(false);
         }
     });
+    it('omits extension-only local translation model management copy from userscript bundles', () => {
+        const prefix = 'settings.localTranslation.';
+        expect(extensionChinese[`${prefix}hunyuan3`]).toBeTruthy();
+        expect(Object.keys(zhCNMessages).some(key => key.startsWith(prefix))).toBe(false);
+        for (const language of Object.keys(extensionBundles) as (keyof typeof extensionBundles)[]) {
+            expect(extensionBundles[language].messages[`${prefix}hunyuan3`]).toBeTruthy();
+            expect(Object.keys(currentUserscriptLanguageBundle(language).messages).some(key => key.startsWith(prefix))).toBe(false);
+        }
+    });
     it('keeps the complete settings notice aligned with the shared locale source', () => {
         const component = readFileSync(resolve(process.cwd(), 'src/features/settings/ui/services/ServiceConfiguration.vue'), 'utf8');
         expect(component).toContain("translateLegacy('" + mimoRetirementSource + "')");

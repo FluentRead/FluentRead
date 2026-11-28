@@ -63,7 +63,7 @@ describe('Offscreen platform client', () => {
         const closeDocument = vi.fn(async () => undefined);
         const createDocument = vi.fn(async () => undefined);
         const runtime: OffscreenRuntimeApi = {
-            getContexts: async () => ++queries === 3 ? query.promise : [{}],
+            getContexts: async () => ++queries === 2 ? query.promise : [{}],
             get lastError() {return runtimeError;},
             sendMessage(message, callback) {
                 const type = (message as {type: string}).type;
@@ -84,14 +84,14 @@ describe('Offscreen platform client', () => {
             runtimeError = undefined;
             for (let i = 0; i < 96; i++) await Promise.resolve();
         }
-        expect(queries).toBe(3);
+        expect(queries).toBe(2);
         secondController.abort();
         firstController.abort();
         expect(await first).toMatchObject({name: 'AbortError'});
         expect(await second).toMatchObject({name: 'AbortError'});
         query.resolve([{}]);
         for (let i = 0; i < 96; i++) await Promise.resolve();
-        expect(queries).toBe(3);
+        expect(queries).toBe(2);
         expect(closeDocument).not.toHaveBeenCalled();
         expect(createDocument).not.toHaveBeenCalled();
         expect(vi.getTimerCount()).toBe(0);
@@ -655,6 +655,7 @@ describe('Offscreen platform client', () => {
 
         runtime.setRuntimeError({message: 'port closed'});
         await expect(client.send({type: 'PING'})).rejects.toThrow('port closed');
+        await expect(client.ensureDocument()).rejects.toThrow('无法创建 Offscreen 文档：port closed');
         runtime.setRuntimeError({});
         await expect(client.send({type: 'PING'})).rejects.toThrow('Offscreen 消息发送失败');
     });
@@ -970,6 +971,171 @@ describe('Offscreen platform client', () => {
             throw new TypeError('send failed');
         });
         await expect(presentClient.sendIfPresent({type: 'STOP'})).rejects.toThrow('send failed');
+    });
+
+    it('已就绪文档后续 send 跳过重复 getContexts 与 READY 探测，接收端消失时自动重建并恢复快路径', async () => {
+        let runtimeError: {message?: string} | undefined;
+        let readyCount = 0;
+        let disappearOnNextPing = false;
+        const getContexts = vi.fn(async () => [{}]);
+        const sendMessage = vi.fn((message: unknown, callback: (response: unknown) => void) => {
+            const type = (message as {type?: unknown}).type;
+            if (type === OFFSCREEN_READY_MESSAGE_TYPE) {
+                readyCount += 1;
+                callback({success: true, ready: true});
+                return;
+            }
+            if (disappearOnNextPing) {
+                disappearOnNextPing = false;
+                runtimeError = {message: 'Could not establish connection. Receiving end does not exist.'};
+                callback(undefined);
+                runtimeError = undefined;
+                return;
+            }
+            callback({success: true, type});
+        });
+        const runtime: OffscreenRuntimeApi = {
+            get lastError() { return runtimeError; },
+            getContexts,
+            sendMessage,
+        };
+        const closeDocument = vi.fn(async () => undefined);
+        const createDocument = vi.fn(async () => undefined);
+        const client = createOffscreenClient({
+            getRuntime: () => runtime,
+            getOffscreen: () => ({closeDocument, createDocument}),
+            readyRetryAttempts: 1,
+        });
+
+        await expect(client.send({type: 'FIRST'})).resolves.toEqual({success: true, type: 'FIRST'});
+        expect(getContexts).toHaveBeenCalledTimes(1);
+        expect(readyCount).toBe(1);
+
+        await expect(client.send({type: 'SECOND'})).resolves.toEqual({success: true, type: 'SECOND'});
+        await expect(client.send({type: 'THIRD'})).resolves.toEqual({success: true, type: 'THIRD'});
+        expect(getContexts).toHaveBeenCalledTimes(1);
+        expect(readyCount).toBe(1);
+
+        // ensureDocument 始终执行权威探测。
+        await expect(client.ensureDocument()).resolves.toBeUndefined();
+        expect(getContexts).toHaveBeenCalledTimes(2);
+        expect(readyCount).toBe(2);
+
+        // 已就绪状态下接收端突然消失，单次重建后继续恢复快路径。
+        disappearOnNextPing = true;
+        await expect(client.send({type: 'RECOVER'})).resolves.toEqual({success: true, type: 'RECOVER'});
+        expect(closeDocument).toHaveBeenCalledOnce();
+        expect(createDocument).toHaveBeenCalledOnce();
+        expect(getContexts).toHaveBeenCalledTimes(3);
+        expect(readyCount).toBe(3);
+
+        await expect(client.send({type: 'AFTER_RECOVER'})).resolves.toEqual({success: true, type: 'AFTER_RECOVER'});
+        expect(getContexts).toHaveBeenCalledTimes(3);
+        expect(readyCount).toBe(3);
+
+        // 已就绪状态下预取消的 send 仍立即发送取消消息且不触发 getContexts 或业务消息。
+        const aborted = new AbortController();
+        aborted.abort();
+        await expect(client.send({type: 'SKIPPED'}, {
+            signal: aborted.signal,
+            cancelMessage: {type: 'CANCEL_FAST'},
+        })).rejects.toMatchObject({name: 'AbortError'});
+        expect(getContexts).toHaveBeenCalledTimes(3);
+        expect(sendMessage).toHaveBeenLastCalledWith(
+            {type: 'CANCEL_FAST', target: 'offscreen'},
+            expect.any(Function),
+        );
+    });
+
+    it('已就绪文档遇到在途准备、空上下文查询、sendIfPresent 或跨 epoch 迟到 READY 时均保持安全串行', async () => {
+        vi.useFakeTimers();
+        const probeQuery = deferred<unknown[]>();
+        const creation = deferred<void>();
+        let contextsResult: unknown[] = [{}];
+        let readyCallbacks: Array<(response: unknown) => void> = [];
+        let holdReady = false;
+        let readyCount = 0;
+        const sentTypes: string[] = [];
+        const getContexts = vi.fn(() => {
+            if (contextsResult === probeQueryResultSentinel) return probeQuery.promise;
+            return Promise.resolve(contextsResult);
+        });
+        const probeQueryResultSentinel: unknown[] = [];
+        const sendMessage = vi.fn((message: unknown, callback: (response: unknown) => void) => {
+            const type = (message as {type: string}).type;
+            sentTypes.push(type);
+            if (type === OFFSCREEN_READY_MESSAGE_TYPE) {
+                readyCount += 1;
+                if (holdReady) readyCallbacks.push(callback);
+                else callback({success: true, ready: true});
+            } else {
+                callback({success: true, type});
+            }
+        });
+        const createDocument = vi.fn(() => creation.promise);
+        const client = createOffscreenClient({
+            getRuntime: () => ({getContexts, sendMessage}),
+            getOffscreen: () => ({createDocument}),
+            preparationTimeoutMs: 20,
+            readyRetryAttempts: 1,
+        });
+
+        // 1. sendIfPresent 不会把未握手文档提升为就绪态；随后的 send 仍执行 READY 握手。
+        await expect(client.sendIfPresent({type: 'OPTIONAL_BEFORE_READY'}))
+            .resolves.toEqual({success: true, type: 'OPTIONAL_BEFORE_READY'});
+        expect(readyCount).toBe(0);
+        await expect(client.send({type: 'WARM'})).resolves.toEqual({success: true, type: 'WARM'});
+        expect(readyCount).toBe(1);
+
+        // 2. documentReady=true 但 preparingDocument 在途时，send 必须等待当前准备完成。
+        contextsResult = probeQueryResultSentinel;
+        const probing = client.ensureDocument();
+        await Promise.resolve();
+        const behindProbe = client.send({type: 'BEHIND_PROBE'});
+        await Promise.resolve();
+        expect(sentTypes).not.toContain('BEHIND_PROBE');
+        probeQuery.resolve([{}]);
+        await expect(probing).resolves.toBeUndefined();
+        await expect(behindProbe).resolves.toEqual({success: true, type: 'BEHIND_PROBE'});
+        expect(readyCount).toBe(2);
+
+        // 3. hasDocument 观察到空文档集合时会立即失效 documentReady 并递增 epoch。
+        contextsResult = [];
+        await expect(client.hasDocument()).resolves.toBe(false);
+        contextsResult = [{}];
+        await expect(client.send({type: 'AFTER_EMPTY'})).resolves.toEqual({success: true, type: 'AFTER_EMPTY'});
+        expect(readyCount).toBe(3);
+
+        // 4. 在途 READY 握手期间 hasDocument([]) 递增 epoch 时，即使该 READY 随后返回成功也不得置位 documentReady。
+        holdReady = true;
+        const staleReadyEnsure = client.ensureDocument();
+        for (let i = 0; i < 8; i += 1) await Promise.resolve();
+        expect(readyCallbacks).toHaveLength(1);
+        contextsResult = [];
+        await expect(client.hasDocument()).resolves.toBe(false);
+        const staleEpochCallback = readyCallbacks.shift()!;
+        staleEpochCallback({success: true, ready: true});
+        await expect(staleReadyEnsure).resolves.toBeUndefined();
+
+        holdReady = false;
+        contextsResult = [{}];
+        await expect(client.send({type: 'AFTER_STALE_EPOCH'})).resolves.toEqual({success: true, type: 'AFTER_STALE_EPOCH'});
+        expect(readyCount).toBe(5);
+
+        // 5. prepare 在 mutateDocument 期间超时后，滞留的创建操作仍由 documentReady=false 保护，send 必须等待变更结束。
+        contextsResult = [];
+        const mutatingEnsure = client.ensureDocument().catch(error => error);
+        for (let i = 0; i < 8; i += 1) await Promise.resolve();
+        expect(createDocument).toHaveBeenCalledOnce();
+        await vi.advanceTimersByTimeAsync(20);
+        await expect(mutatingEnsure).resolves.toMatchObject({message: '无法创建 Offscreen 文档：Offscreen 文档准备超时'});
+
+        contextsResult = [{}];
+        const behindMutation = client.send({type: 'BEHIND_MUTATION'});
+        for (let i = 0; i < 8; i += 1) await Promise.resolve();
+        expect(sentTypes).not.toContain('BEHIND_MUTATION');
+        creation.resolve();
+        await expect(behindMutation).resolves.toEqual({success: true, type: 'BEHIND_MUTATION'});
     });
 
     it('binds the production singleton lazily to the Chrome globals', async () => {

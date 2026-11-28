@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/services/ServiceCatalogItem.vue
  * 文件职责：为完整服务目录渲染紧凑的服务选择行。
- * 主要内容：本地图标、可换行的完整服务名称、接口性质与状态标签、可访问的选中状态，以及无悬浮气泡的移除按钮；目录短名称行保留 44px 命中高度，长名称自然增高。
+ * 主要内容：本地图标、可换行的完整服务名称、接口性质与状态标签、可访问的选中状态，以及无悬浮气泡的移除按钮；目录短名称行保留 44px 命中高度，长名称自然增高；键盘聚焦主选择按钮时在整行容器绘制内缩焦点环，避免在移除按钮前被截断或溢出目录滚动区。
  * 模块边界：只发出服务选择与移除意图，不直接修改配置、不测试连接、不发起翻译。
  -->
 <template>
@@ -57,7 +57,9 @@ const { t } = useUiI18n()
 .library-metadata { display: flex; align-items: center; flex: 0 1 auto; flex-wrap: wrap; gap: 4px; min-width: 0; max-width: 100%; }
 .library-metadata:empty { display: none; }
 .library-item :deep(.service-brand-icon) { width: 28px; height: 28px; border-radius: 8px; }
-button:focus-visible { outline: 2px solid var(--brand-strong, #bd2853); outline-offset: 2px; }
+.library-item:has(> .library-select:focus-visible) { outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand-strong, #bd2853)); outline-offset: -2px; }
+.library-select:focus-visible { outline: none; }
+.library-remove:focus-visible { outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand-strong, #bd2853)); outline-offset: -2px; }
 
 @media (min-width: 701px) and (max-width: 1100px) { .library-select { padding-inline: 4px; } }
 @media (max-width: 700px) { .library-select { padding: 6px; gap: 7px; } }

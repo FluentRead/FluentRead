@@ -1,10 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     clearWordDictionaryCache,
-    isSingleEnglishWord,
     lookupWord,
     mergeWordCardData,
-    normalizeEnglishWord,
     parseDatamuseWord,
     parseEcdictEntry,
     parseFreeDictionaryEntry,
@@ -12,6 +10,7 @@ import {
     parseWiktApiEntry,
     selectPronunciations,
 } from '@/src/features/selection-translation/services/wordDictionary';
+import {isSingleEnglishWord, normalizeEnglishWord} from '@/src/features/selection-translation/services/wordNormalization';
 
 function response(payload: unknown, ok = true, status = ok ? 200 : 503): Response {
     return {

@@ -1069,13 +1069,11 @@ describe('options UI composition architecture', () => {
     expect(styleSettings).toContain(':class="preset.className"')
     expect(styleSettings).toContain('getTranslationAppearanceStyle(appearance.value)')
     for (const field of ['textColor', 'lineColor', 'fillColor']) expect(styleSettings).toContain(`v-model="appearance.${field}"`)
-    expect(source('src/features/settings/ui/ReadingAssistanceSettings.vue')).not.toContain('v-model="config.bilingualSentenceHighlightEnabled"')
-    expect(source('src/features/settings/ui/ReadingAssistanceSettings.vue')).toContain('data-testid="current-sentence-highlight-style"')
     expect(styleSettings).toContain("t('settings.translationStyle.bilingualOnly')")
     expect(styleSettings).toContain('@click="config.display = 1"')
     expect(styleSettings).toContain('container-type: inline-size')
     // 设置搜索的控件直达目标必须指向真实元素。
-    expect(source('src/features/settings/ui/ReadingAssistanceSettings.vue')).toContain('id="translation-sentence-highlight"')
+    expect(source('src/features/settings/ui/SentenceHighlightStyleSettings.vue')).toContain('id="translation-sentence-highlight"')
     expect(styleSettings).toContain('id="translation-appearance-panel"')
     for (const testId of ['bilingual-highlight-preview', 'bilingual-highlight-preview-source', 'bilingual-highlight-preview-translation']) {
       expect(preview).toContain(`data-testid="${testId}"`)

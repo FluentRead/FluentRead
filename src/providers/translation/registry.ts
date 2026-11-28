@@ -36,8 +36,7 @@ import volcTranslation from "./volc-translation";
 import doubao from "./doubao";
 import chatgptPlan from './chatgpt-plan';
 
-import type {TranslationProvider, TranslationProviderRegistry, TranslationProviderResult} from '@/src/services/translation/types';
-import type {TranslationProviderRequest} from '@/src/services/translation/types';
+import type {TranslationProvider, TranslationProviderRegistry, TranslationProviderRequest, TranslationProviderResult} from '@/src/services/translation/types';
 
 /** 注册单条服务时校验输入形状，避免 any 把数组静默传入只接受文本的协议。 */
 function singleTextProvider(provider: TranslationProvider<TranslationProviderResult, string>): TranslationProvider<TranslationProviderResult> {

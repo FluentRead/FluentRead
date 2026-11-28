@@ -330,13 +330,14 @@ describe('final boundary B independent local-download ownership', () => {
         await pausedFinal.promise;
         expect((await manager.status()).tasks.find(task => task.model === ids.opusZhEn))
             .toMatchObject({phase: 'paused', bytesPerSecond: 0, error: undefined});
-        expect(download).toHaveBeenCalledOnce();
+        const initialCalls = download.mock.calls.length;
+        expect(initialCalls).toBe(Math.min(3, actual.getTranslationArtifacts(ids.opusZhEn).length));
         download.mockImplementation(async () => undefined);
         await manager.start(ids.opusZhEn);
         await resumedFinal.promise;
         expect((await manager.status()).tasks.find(task => task.model === ids.opusZhEn))
             .toMatchObject({phase: 'ready', bytesPerSecond: 0, error: undefined});
-        expect(download).toHaveBeenCalledTimes(1 + actual.getTranslationArtifacts(ids.opusZhEn).length);
+        expect(download).toHaveBeenCalledTimes(initialCalls + actual.getTranslationArtifacts(ids.opusZhEn).length);
     });
 });
 

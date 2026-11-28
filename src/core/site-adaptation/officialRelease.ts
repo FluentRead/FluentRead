@@ -7,7 +7,7 @@
 import {parseSiteRulePack, SITE_RULE_LIMITS} from './schema';
 import type {SiteRulePack} from './types';
 
-export const OFFICIAL_SITE_RULE_RELEASE_FORMAT = 1;
+const OFFICIAL_SITE_RULE_RELEASE_FORMAT = 1;
 export const OFFICIAL_SITE_RULE_ENVELOPE_MAX_BYTES = SITE_RULE_LIMITS.bytes * 2 + 512;
 const SIGNING_CONTEXT = 'FluentRead official site rules v1\n';
 

@@ -1,6 +1,6 @@
 /**
  * @file src/core/config/informationHighlightModel.ts
- * 文件职责：固定可选信息高亮模型的来源、版本、字节数和内容校验值，并保留默认模型兼容入口。
+ * 文件职责：固定可选信息高亮模型的来源、版本、字节数和内容校验值，并提供默认模型解析。
  * 主要内容：仅允许预训练的 Qwen2.5-0.5B Base 参与原文下一词预测，不把指令/聊天模型列为意外度选项；保留 Apache-2.0 ONNX q4f16 固定清单，纯身份列表可独立裁剪。
  * 模块边界：纯元数据，不初始化推理、不下载权重；SHA-256 来自官方 LFS 元数据及该固定版本实际小文件。
  */
@@ -30,10 +30,3 @@ export const INFORMATION_HIGHLIGHT_MODELS: readonly InformationHighlightModel[] 
 export function getInformationHighlightModel(value: unknown): InformationHighlightModel {
     return INFORMATION_HIGHLIGHT_MODELS.find(model => model.id === value) ?? INFORMATION_HIGHLIGHT_MODELS[0];
 }
-// 旧入口始终指向默认模型；固定 revision 与文件 URL 不变，兼容已校验的 v1 离线缓存。
-const defaultModel = INFORMATION_HIGHLIGHT_MODELS[0];
-export const INFORMATION_HIGHLIGHT_MODEL = defaultModel.repository;
-export const INFORMATION_HIGHLIGHT_MODEL_NAME = defaultModel.name;
-export const INFORMATION_HIGHLIGHT_MODEL_REVISION = defaultModel.revision;
-export const INFORMATION_HIGHLIGHT_MODEL_FILES = defaultModel.files;
-export const INFORMATION_HIGHLIGHT_MODEL_BYTES = defaultModel.bytes;

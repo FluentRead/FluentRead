@@ -20,4 +20,4 @@ export {
     type VocabularyContext,
     type VocabularyContextInput,
 } from './learningModel';
-export {sanitizeVocabularyVideoSource, sanitizeVocabularyVideoUrl, vocabularySourceContext, vocabularySourceLink} from './source';
+export {sanitizeVocabularyVideoSource, sanitizeVocabularyVideoUrl} from './source';

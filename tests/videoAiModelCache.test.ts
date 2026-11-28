@@ -1,6 +1,8 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {cacheVideoAiModelFiles, cacheVideoAiQ4ModelFiles, cacheVideoAiQ8ModelFiles, getVideoAiModelFileUrl, readCachedVideoAiModels, VIDEO_AI_Q4_MODEL_FILES, VIDEO_AI_Q8_MODEL_FILES, VIDEO_AI_SMALL_MODEL_FILES} from '@/src/features/video-subtitle/offscreen/modelCache';
+import {cacheVideoAiModelFiles, cacheVideoAiQ4ModelFiles, cacheVideoAiQ8ModelFiles, getVideoAiModelFileUrl, readCachedVideoAiModelState, VIDEO_AI_Q4_MODEL_FILES, VIDEO_AI_Q8_MODEL_FILES, VIDEO_AI_SMALL_MODEL_FILES} from '@/src/features/video-subtitle/offscreen/modelCache';
 import type {DownloadProgress} from '@/src/core/download/progress';
+
+const readCachedVideoAiModels = async (receipts: unknown) => (await readCachedVideoAiModelState(receipts)).models;
 
 afterEach(() => {vi.unstubAllGlobals(); vi.useRealTimers();});
 

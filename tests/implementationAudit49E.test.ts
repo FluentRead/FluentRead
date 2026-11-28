@@ -372,9 +372,10 @@ describe('audit 49 E real Vue client model settings', () => {
         }
         ports.message.mockResolvedValue({success:true,ready:true,inpaintingReady:true,bytes:1});await vi.advanceTimersByTimeAsync(1500);await settle();
         expect(container.querySelector('[role="alert"]')).toBeNull();
-        const remove=[...container.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent==='清除已下载资源')!;
         for(const response of [undefined,{success:false}]){
-            ports.message.mockResolvedValueOnce(response);remove.click();await settle();
+            [...container.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent==='清除已下载资源')!.click();await settle();
+            ports.message.mockResolvedValueOnce(response);
+            [...container.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent==='确认清除')!.click();await settle();
             expect(container.querySelector('[role="alert"]')!.textContent).toBe('漫画识别模型清除失败');
         }
     });
@@ -415,10 +416,13 @@ describe('audit 49 E real Vue client model settings', () => {
         expect(container.querySelector('[role="alert"]')!.textContent).toContain('状态读取失败');
         ports.message.mockResolvedValue({success: true, ready: true, inpaintingReady: true, bytes: 1024, source: 'official'});
         await vi.advanceTimersByTimeAsync(1500); await settle(); expect(container.querySelector('[role="alert"]')).toBeNull();
-        const remove = [...container.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '清除已下载资源')!;
-        remove.click(); await settle(); expect(ports.message).toHaveBeenCalledWith({type: 'fluentReadMangaModelRemove'});
+        const clickRemoveAndConfirm = async () => {
+            [...container.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '清除已下载资源')!.click(); await settle();
+            [...container.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '确认清除')!.click(); await settle();
+        };
+        await clickRemoveAndConfirm(); expect(ports.message).toHaveBeenCalledWith({type: 'fluentReadMangaModelRemove'});
         ports.message.mockResolvedValueOnce({success:false,error:'Failed to load https://hf-mirror.com/controlled-model.onnx'});
-        remove.click();await settle();expect(container.querySelector('[role="alert"]')!.textContent).toBe('漫画识别模型清除失败');
+        await clickRemoveAndConfirm(); expect(container.querySelector('[role="alert"]')!.textContent).toBe('漫画识别模型清除失败');
         expect(container.textContent).not.toContain('hf-mirror');
     });
     it('keeps offline import usable and renders the actionable file validation failure', async () => {
@@ -536,7 +540,7 @@ describe('audit 49 E real Vue client model settings', () => {
         vi.useFakeTimers(); const settings = new Config(); settings.imageTranslationMangaEnabled = false; settings.useCache = true;
         const initialHover = settings.imageTranslationHoverEnabled;
         const imageChanged = vi.fn();
-        const {container, props} = await mount(MangaSettings, {settings, imageEnabled: false, available: true, serviceOptions: [{value: 'fixture', label: 'Fixture service'}], 'onUpdate:imageEnabled': imageChanged});
+        const {container, props} = await mount(MangaSettings, {settings, imageEnabled: false, available: true, 'onUpdate:imageEnabled': imageChanged});
         const select = async (label: string, value: string) => {container.querySelector<HTMLButtonElement>(`[aria-label="${label}"] [data-option-value="${value}"]`)!.click(); await settle();};
         container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="网页图片翻译"]')!.click(); await settle(); expect(imageChanged).toHaveBeenCalledWith(true);
         props.imageEnabled = true; await settle();
@@ -559,7 +563,7 @@ describe('audit 49 E real Vue client model settings', () => {
         settings.from = 'en';
         settings.imageTranslationOcrEngine = 'paddle';
         settings.imageTranslationMangaEnabled = true;
-        const {container} = await mount(MangaSettings, {settings, imageEnabled: true, available: true, serviceOptions: []});
+        const {container} = await mount(MangaSettings, {settings, imageEnabled: true, available: true});
         const manager = () => container.querySelector('[data-testid="manga-model-manager"]')!;
         expect(manager().querySelector('header')!.textContent).toContain('PaddleOCR · 用于图片与漫画');
         for (const source of ['ru', 'ko', 'ar', 'he']) {
@@ -590,7 +594,7 @@ describe('audit 49 E real Vue client model settings', () => {
         settings.imageTranslationOcrEngine = 'paddle';
         settings.imageTranslationMangaEnabled = true;
         const {container} = await mount({
-            render: () => h(MangaSettings, {settings, imageEnabled: true, available: true, serviceOptions: []}, {
+            render: () => h(MangaSettings, {settings, imageEnabled: true, available: true}, {
                 resources: () => h('section', {'data-testid': 'fixture-language-packs'}, [h('input')]),
             }),
         });
@@ -612,7 +616,7 @@ describe('audit 49 E real Vue client model settings', () => {
     });
     it('rejects invalid manga URLs, selectors and a full rule list through the actual form', async () => {
         vi.useFakeTimers(); const settings = new Config(); settings.imageTranslationMangaSites = [];
-        const {container, props} = await mount(MangaSettings, {settings, imageEnabled: false, available: true, serviceOptions: []});
+        const {container, props} = await mount(MangaSettings, {settings, imageEnabled: false, available: true});
         const submit = async (url: string, css: string) => {
             const address = container.querySelector<HTMLInputElement>('form input[type="url"]')!, selector = container.querySelector<HTMLInputElement>('form input[aria-label="漫画图片选择器"]')!;
             address.value = url; address.dispatchEvent(new Event('input', {bubbles: true})); selector.value = css; selector.dispatchEvent(new Event('input', {bubbles: true}));
@@ -626,7 +630,7 @@ describe('audit 49 E real Vue client model settings', () => {
     });
     it('adds and deletes validated manga rules via the actual rendered form and parent configuration', async () => {
         const settings = new Config(); settings.imageTranslationMangaSites = [];
-        const {container, props} = await mount(MangaSettings, {settings, imageEnabled: false, available: true, serviceOptions: []});
+        const {container, props} = await mount(MangaSettings, {settings, imageEnabled: false, available: true});
         const address = container.querySelector<HTMLInputElement>('form input[aria-label="阅读页或阅读路径"]')!, selector = container.querySelector<HTMLInputElement>('form input[aria-label="漫画图片选择器"]')!;
         address.value = 'https://fixture.example/chapter/'; address.dispatchEvent(new Event('input', {bubbles: true}));
         selector.value = 'main img'; selector.dispatchEvent(new Event('input', {bubbles: true}));

@@ -28,10 +28,12 @@ import {
     summarizeSelectionContext,
 } from '@/src/features/selection-translation/core';
 import {
-    buildEdgeTtsSsml,
-    edgeTtsVoiceCandidatesForLanguage,
     synthesizeEdgeTts,
 } from '@/src/features/selection-translation/services/edgeTts';
+import {
+    buildEdgeTtsSsml,
+    edgeTtsVoiceCandidatesForLanguage,
+} from '@/src/features/selection-translation/services/edgeTtsPolicy';
 import { matchesConfiguredHotkey, matchesModifierOnlyHotkey, resolveConfiguredHotkey, shouldClaimConfiguredHotkey } from '@/src/core/hotkey';
 import { normalizeSelectionTtsVoiceOrder, selectionTtsVoiceLocale } from '@/src/core/config/selectionTts';
 import {detectlang} from '@/src/core/language/detect';

@@ -10,7 +10,7 @@ export {
     type VocabularyBackgroundContext,
 } from '@/src/features/vocabulary/background';
 
-export {createMaterialBackgroundHandler, type MaterialBackgroundContext} from '@/src/features/vocabulary/materialBackground';
+export type {MaterialBackgroundContext} from '@/src/features/vocabulary/materialBackground';
 
 import browser from 'webextension-polyfill';
 import type {Config} from '@/src/core/config/model';

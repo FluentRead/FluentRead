@@ -860,7 +860,7 @@ describe('shared UI actual client SFC lifecycle', () => {
   });
   it('projects skin previews and updates their accessible labels and tokens across every registry entry', async () => {
     const mounted = await mount(InterfaceSkinPreview, {skin: skin(), previewLabel: 'Preview'});
-    for (const chosen of interfaceSkinOptions) {mounted.props.skin = chosen;mounted.props.previewLabel = chosen.label;await settle();const section = mounted.root.querySelector('section')!;expect(section.getAttribute('data-preview-skin')).toBe(chosen.value);expect(section.getAttribute('aria-label')).toBe(chosen.label);expect(section.style.getPropertyValue('--interface-popup-width')).toBe(`${chosen.popupWidth}px`);expect(section.querySelector('.preview-popup')!.getAttribute('data-preview-skin')).toBe(chosen.value);expect(mounted.root.querySelectorAll('button,input')).toHaveLength(0);}
+    for (const chosen of interfaceSkinOptions) {mounted.props.skin = chosen;mounted.props.previewLabel = chosen.label;await settle();const section = mounted.root.querySelector('section')!;expect(section.getAttribute('data-preview-skin')).toBe(chosen.value);expect(section.getAttribute('aria-label')).toBe(chosen.label);expect(section.style.getPropertyValue('--interface-popup-width')).toBe(`${chosen.popupWidth}px`);expect(section.querySelector('.preview-popup')!.getAttribute('data-preview-skin')).toBe(chosen.value);expect(section.querySelectorAll('button,input')).toHaveLength(0);expect(mounted.root.querySelectorAll('.skin-stage-theme-switch button[data-preview-theme-btn]')).toHaveLength(3);}
   });
   it('previews the compact coffee and sidebar icons in their real order when the browser supports a sidebar', async () => {
     sidebarPreview.available = true;

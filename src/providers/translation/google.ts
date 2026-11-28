@@ -7,7 +7,7 @@
  */
 
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
-import {getImageLabelSlots, getTranslationProviderLanguages, isImageTextBatch} from '@/src/services/translation/requestSnapshot';
+import {getImageLabelSlots, getTranslationProviderLanguages, getTranslationRequestScheduler, isImageTextBatch, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import {createHttpStatusError} from '@/src/platform/http/errors';
 import {
     getDynamicFreeProviderWeight,
@@ -20,7 +20,6 @@ import {
     createRuntimeAbortContext,
     runtimeFetch,
 } from '@/src/platform/http/runtime';
-import {requireTranslationProviderConfig, getTranslationRequestScheduler} from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderRequest} from '@/src/services/translation/types';
 import type {TranslationRequestLease} from '@/src/services/translation/requestScheduler';
 import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';

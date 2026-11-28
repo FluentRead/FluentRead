@@ -12,7 +12,6 @@ import WebDavBackup from '@/src/features/settings/ui/WebDavBackup.vue';
 import ParagraphHandlingSettings from '@/src/features/settings/ui/ParagraphHandlingSettings.vue';
 import ToolbarClickSetting from '@/src/features/settings/ui/components/ToolbarClickSetting.vue';
 import SelectionSettings from '@/src/features/settings/ui/SelectionSettings.vue';
-import ReadingAssistanceSettings from '@/src/features/settings/ui/ReadingAssistanceSettings.vue';
 import ExcludedLanguageSettings from '@/src/features/settings/ui/ExcludedLanguageSettings.vue';
 import ExcludedTagSettings from '@/src/features/settings/ui/ExcludedTagSettings.vue';
 import HarnessPromptSettings from '@/src/features/settings/ui/HarnessPromptSettings.vue';
@@ -20,7 +19,6 @@ import {Config} from '@/src/core/config/model';
 import {EMPTY_DICTIONARY_FIELDS} from '@/src/core/config/dictionaryWorkspace';
 import {normalizeEagerTranslationCharacters, normalizeMinTranslationTextLength} from '@/src/core/config/pageTranslation';
 import {options, getMultilingualTargetLanguageLabel} from '@/src/core/config/catalog';
-import {SENTENCE_HIGHLIGHT_STYLES} from '@/src/core/config/sentenceHighlight';
 import {getDefaultHarnessPrompt} from '@/src/core/harness/prompts';
 import {HARNESS_PROMPT_MAX_LENGTH, HARNESS_PROMPT_VARIABLES} from '@/src/core/config/harness';
 const webdav=vi.hoisted(()=>({settings:vi.fn(),clear:vi.fn(),save:vi.fn(),test:vi.fn(),confirm:vi.fn(),success:vi.fn(),warning:vi.fn(),status:vi.fn(),prepare:vi.fn(),prepareDelete:vi.fn(),cancel:vi.fn()}));
@@ -183,17 +181,6 @@ it('leaves a newer edit and its caret untouched when it arrives before inserted-
   ui.host.querySelector('.harness-prompt-variables button')!.dispatchEvent(new win.Event('click',{bubbles:true}));
   preferences.systemPrompt='Newer edit';await flush();expect(field.value).toBe('Newer edit');expect(focus).not.toHaveBeenCalled();
 });
-it('shows active reading styles, handles missing profiles, enables bilingual view and emits style navigation',async()=>{
-  const config=reactive(new Config());config.display=2;config.bilingualSentenceHighlightEnabled=false;const configure=vi.fn();const ui=mount(ReadingAssistanceSettings,{config,onConfigureStyle:configure});
-  const current=()=>ui.host.querySelector('[data-testid="current-sentence-highlight-style"]')!.textContent;
-  expect(current()).toBe('common.none');await click(button(ui.host,'settings.translationStyle.switchToBilingual'));expect(config.display).toBe(1);expect(ui.host.querySelector('.reading-assistance-note')).toBeNull();
-  await click(ui.host.querySelector('[data-preview-theme]')!);expect(ui.host.querySelector('[data-preview-theme]')!.getAttribute('data-preview-theme')).toBe('dark');
-  await click(ui.host.querySelector('[data-testid="personal-corrections-enabled"]')!);expect(config.personalCorrectionsEnabled).toBe(true);
-  await click(ui.host.querySelector('[data-testid="open-sentence-highlight-styles"]')!);expect(configure).toHaveBeenCalledOnce();
-  config.bilingualSentenceHighlightEnabled=true;config.activeSentenceHighlightProfileId='example';config.bilingualSentenceHighlightProfiles=[{id:'example',name:'My style'} as any];await flush();expect(current()).toBe('My style');
-  config.activeSentenceHighlightProfileId='gone';config.bilingualSentenceHighlightStyle=SENTENCE_HIGHLIGHT_STYLES[0]!.value;await flush();expect(current()).toBe(SENTENCE_HIGHLIGHT_STYLES[0]!.labelKey);
-  config.bilingualSentenceHighlightStyle='missing' as any;await flush();expect(current()).toBe('sentenceHighlight.title');
-});
 it('preserves selected uncommon languages when collapsed, normalizes toggles, clears and relabels after locale changes',async()=>{
   const selected=options.to[options.to.length-1]!.value;let ui:ReturnType<typeof mount>;
   ui=mount(ExcludedLanguageSettings,{modelValue:[selected],'onUpdate:modelValue':(value:string[])=>{ui.props.modelValue=value;}});
@@ -265,11 +252,6 @@ it.each(['unmount','close','reopen'] as const)('does not clear a WebDAV connecti
 });
 it('clears only the connection revision shown in the current WebDAV confirmation',async()=>{
   webdav.confirm.mockResolvedValue(undefined);const ui=mount(WebDavBackup,{});await click(ui.host.querySelector('[data-testid="webdav-setup"]')!);await click(ui.host.querySelector('[data-testid="webdav-clear"]')!);expect(webdav.clear).toHaveBeenCalledOnce();expect(webdav.clear).toHaveBeenCalledWith('revision-a');expect(ui.host.querySelector('[data-dialog]')).toBeNull();expect(webdav.success).toHaveBeenCalledWith('settings.webdav.cleared');
-});
-
-it('omits extension-only personal corrections in the userscript reading settings',async()=>{
-  vi.resetModules();vi.stubEnv('BROWSER','userscript');const UserscriptReading=(await import('@/src/features/settings/ui/ReadingAssistanceSettings.vue')).default;
-  const ui=mount(UserscriptReading,{config:reactive(new Config())});expect(ui.host.querySelector('[data-testid="personal-corrections-enabled"]')).toBeNull();
 });
 
 it.each(['cancel','error','disposed-result'] as const)('handles WebDAV clear %s without late success feedback',async scenario=>{

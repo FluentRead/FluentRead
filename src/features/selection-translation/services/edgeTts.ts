@@ -32,12 +32,6 @@ import {
     splitEdgeTtsText,
 } from './edgeTtsPolicy';
 
-export {
-    buildEdgeTtsSsml,
-    edgeTtsVoiceCandidatesForLanguage,
-    formatEdgeTtsRate,
-} from './edgeTtsPolicy';
-
 export interface EdgeTtsAudio {
     audio: ArrayBuffer;
     contentType: string;

@@ -13,6 +13,7 @@
 
 import {config} from '@/src/services/config/store';
 import {normalizeMaxConcurrentTranslations} from '@/src/core/config/model';
+import {createTranslationAbortError as createQueueAbortError} from './errors';
 
 const COMPACTION_HEAD_THRESHOLD = 1024;
 
@@ -304,12 +305,6 @@ export function enqueueTranslation<T>(
     if (retry && retry.delayMs > 0) entry.delayTimer = setTimeout(submit, retry.delayMs);
     else submit();
   });
-}
-
-function createQueueAbortError(): Error {
-  const error = new Error('翻译已取消');
-  error.name = 'AbortError';
-  return error;
 }
 
 /**

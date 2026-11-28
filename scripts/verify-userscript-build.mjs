@@ -153,7 +153,9 @@ const artifactBytes = Buffer.byteLength(source);
 // 按既有 1 KB 步长最小增加 38 KB 至 2,163,100，余 817 字节；保留全部协议、资源、排除项和 VM 断言。
 // 在 db6d05720（#1446）基础上合入多源 TTS 退避熔断、47 音色配置、语速控制、七语本地化与播控 UI 优化（后台与本地 Kokoro 不进入油猴产物），
 // 按既有 1 KB 步长最小增加 25 KB 至 2,188,100；保留全部协议、资源、排除项和 VM 断言。
-const MAX_USERSCRIPT_BYTES = 2_188_100;
+// 合入 PR #1458（12 套 Popup 皮肤及 skinStudio 七语词条）后实测 2,199,535 字节，超出 11,435 字节；
+// 按既有 1 KB 步长最小增加 13 KB 至 2,201,100；保留全部协议、资源、排除项和 VM 断言。
+const MAX_USERSCRIPT_BYTES = 2_201_100;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

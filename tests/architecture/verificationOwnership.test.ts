@@ -9,7 +9,6 @@ import {auditVueOwners, isDeclarativeVue, sourceHash, type VueOwner} from '../he
 const PROJECT_ROOT = resolve(__dirname, '../..');
 const AUDITED_EXTENSIONS = /\.(?:cjs|css|html|js|mjs|ts|vue)$/u;
 const PRODUCT_ROOTS = [
-    'assets/styles',
     'docs/.vitepress',
     'entrypoints',
     'scripts',
@@ -120,7 +119,6 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
     if (path.startsWith('components/')
         || path.startsWith('entrypoints/')
         || path.startsWith('src/')
-        || path.startsWith('assets/styles/')
         || path === 'wxt.config.ts') {
         owners.add('chrome-firefox-build');
     }

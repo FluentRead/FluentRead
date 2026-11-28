@@ -161,7 +161,7 @@ function jsonCredentialValue(value: unknown): unknown {
     return value;
 }
 
-export function credentialsEqual(left: ConfigCredentials, right: ConfigCredentials): boolean {
+export function jsonValuesEqual(left: unknown, right: unknown): boolean {
     const pending: Array<[unknown, unknown]> = [[left, right]];
     const compared = new WeakMap<object, WeakSet<object>>();
     while (pending.length > 0) {
@@ -189,6 +189,10 @@ export function credentialsEqual(left: ConfigCredentials, right: ConfigCredentia
         }
     }
     return true;
+}
+
+export function credentialsEqual(left: ConfigCredentials, right: ConfigCredentials): boolean {
+    return jsonValuesEqual(left, right);
 }
 
 export function sanitizeConfigCredentials(value: unknown): Record<string, unknown> {

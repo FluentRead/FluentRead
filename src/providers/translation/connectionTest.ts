@@ -14,6 +14,7 @@ import {getCompositeTranslationProvider, isCompositeTranslationProviderId} from 
 import {resolveTranslationRequestModel} from '@/src/core/config/requestModel';
 import {createCompositeTranslationRoutingState} from '@/src/services/translation/compositeRouting';
 import {formatServiceError} from '@/src/services/translation/serviceErrors';
+import {createTranslationAbortError} from '@/src/services/translation/errors';
 import {isCustomOpenAIProviderId, LEGACY_CUSTOM_OPENAI_PROVIDER_ID} from '@/src/core/config/customOpenAI';
 import {attachTranslationModelUsageObserver, attachTranslationProviderConfig, attachTranslationRequestScheduler} from '@/src/services/translation/requestSnapshot';
 import type {TranslationRequestScheduler} from '@/src/services/translation/requestScheduler';
@@ -240,9 +241,7 @@ export async function runTranslationServiceConnectionTest(
 }
 
 function connectionTestAbortError(): Error {
-    const error = new Error('翻译请求已取消');
-    error.name = 'AbortError';
-    return error;
+    return createTranslationAbortError('翻译请求已取消');
 }
 
 function normalizeConnectionTestTimeout(value: number | undefined, fallback: number, maximum = fallback): number {

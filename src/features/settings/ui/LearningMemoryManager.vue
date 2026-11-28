@@ -22,7 +22,7 @@
     <form v-if="editor" class="fr-memory-editor" @submit.prevent="saveMemory">
       <h3>{{ editor.id ? t('learning.memoryEdit') : t('learning.memoryAdd') }}</h3>
       <label class="fr-memory-field"><span>{{ t('learning.memoryKind') }}</span>
-        <UiSelect v-model="editor.kind" :disabled="mutating" :aria-label="t('learning.memoryKind')"><ElOption v-for="kind in kinds" :key="kind.value" :value="kind.value" :label="translateControlLabel(kind.label)" /></UiSelect>
+        <UiSelect v-model="editor.kind" :disabled="mutating" :aria-label="t('learning.memoryKind')"><ElOption v-for="kind in kinds" :key="kind.value" :value="kind.value" :label="translateLegacy(kind.label)" /></UiSelect>
       </label>
       <label class="fr-memory-field"><span>{{ t('learning.memoryContent') }}</span>
         <textarea v-model="editor.content" rows="7" maxlength="2000" required :disabled="mutating" :aria-label="t('learning.memoryContent')" :placeholder="t('learning.memoryPlaceholder')" data-i18n-ignore />
@@ -61,8 +61,6 @@
 <script setup lang="ts">
 import UiSelect from '@/src/ui/components/UiSelect.vue';
 import {ElOption} from 'element-plus';
-import {useUiI18n as useControlI18n} from '@/src/ui/i18n';
-const {translateLegacy: translateControlLabel} = useControlI18n();
 
 import {computed, onBeforeUnmount, onDeactivated, onMounted, ref, watch} from 'vue'
 import {clearLearningMemories, deleteLearningMemory, listLearningMemories, saveLearningMemory, type LearningMemory} from '@/src/features/reading-assistant/public'

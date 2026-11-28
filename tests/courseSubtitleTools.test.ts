@@ -162,4 +162,50 @@ describe('Course subtitle study and export', () => {
         expect(f.save).toHaveBeenCalledOnce();
         expect(f.tools.canOpen()).toBe(false);
     });
+
+    it('仅隐藏浮动字幕（enabled=false）且功能仍开启时保留已打开的学习面板，并取消挂起的导出', async () => {
+        vi.useFakeTimers();
+        const {document, window} = parseHTML('<html><body><div id="player"><video></video></div></body></html>');
+        vi.stubGlobal('document', document);
+        vi.stubGlobal('window', window);
+        const doc = document as unknown as Document;
+        const player = doc.getElementById('player')!, video = doc.querySelector('video')!;
+        const config = new Config();
+        Object.assign(config, {on: true, videoTranslationEnabled: true, from: 'en', to: 'zh-Hans'});
+        let enabled = true;
+        const track = {cues, languageCode: 'en', sourceLanguage: 'en'};
+        const tools = createCourseSubtitleTools({
+            platform: 'bilibili', config, document: doc,
+            location: new URL('https://www.bilibili.com/video/BV1xx411c7mD/') as unknown as Location,
+            subscribe: () => vi.fn(),
+            readTarget: () => ({player, video}),
+            readCompleteTrack: () => track,
+            readIdentity: () => 'lesson:1',
+            isEnabled: () => enabled,
+            peek: () => undefined,
+            translate: vi.fn(async s => `译文 ${s}`),
+            save: vi.fn(),
+            updateMenu: vi.fn(),
+        });
+        expect(tools.canOpen()).toBe(true);
+        await tools.openLearning();
+        const menu = createVideoPlayerMenu('zh-CN', true);
+        doc.body.append(menu);
+        const button = menu.querySelector<HTMLButtonElement>('[data-action="download-bilingual-subtitles"]')!;
+        const pending = tools.startDownload(menu, button, 'bilingual');
+        await vi.advanceTimersByTimeAsync(0);
+
+        enabled = false;
+        expect(tools.canOpen()).toBe(false);
+        tools.sync();
+        await pending;
+        expect(viewPort.unmount).not.toHaveBeenCalled();
+        expect(viewPort.move).toHaveBeenCalledWith(player);
+
+        // 功能总开关关闭时才强制关闭学习面板
+        config.videoTranslationEnabled = false;
+        tools.sync();
+        expect(viewPort.unmount).toHaveBeenCalledOnce();
+        tools.destroy();
+    });
 });

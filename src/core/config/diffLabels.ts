@@ -111,6 +111,8 @@ export const VIDEO_DISPLAY_MODE_LABELS = new Map<unknown, string>([
 ]);
 export const VIDEO_SUBTITLE_MODE_HOTKEY_ACTION_LABELS = new Map<unknown, string>([
     ['bilingual-original', '双语 ↔ 原文'],
+    ['listening-cycle', '听力练习（关 → 原文 → 双语）'],
+    ['toggle-visibility', '显示 ↔ 关闭'],
     ['cycle-display', '双语 → 译文 → 原文'],
     ['cycle-all', '双语 → 译文 → 原文 → 关闭'],
 ]);

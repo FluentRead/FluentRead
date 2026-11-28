@@ -76,7 +76,7 @@ import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy'
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection'
 import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation'
 import {resolveCommandPaletteHotkey} from '@/src/core/config/commandPalette'
-import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut'
+import {resolveReservedVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut'
 import {resolveWritingHotkey} from '@/src/core/config/writing'
 import {findEnabledQuickTranslationHotkeyConflict, inputBoxTranslationTriggerHotkey} from '@/src/core/config/quickTranslation'
 const CustomHotkeyInput = defineAsyncComponent(() => import('@/src/ui/components/CustomHotkeyInput.vue'))
@@ -102,7 +102,7 @@ function hotkeyConflict(hotkey: string, enabled = props.config.informationHighli
     config.sectionTranslationHotkeyEnabled ? resolveSectionTranslationHotkey(config.sectionTranslationHotkey, config.customSectionTranslationHotkey) : '',
     config.paragraphCopyEnabled ? resolveParagraphCopyHotkey(config.paragraphCopyHotkey, config.customParagraphCopyHotkey) : '',
     config.selectionAreaEnabled ? resolveAreaTranslationHotkey(config.selectionAreaHotkey, config.customSelectionAreaHotkey) : '',
-    config.videoSubtitleModeHotkeyEnabled ? resolveVideoSubtitleModeHotkey(config.videoSubtitleModeHotkey, config.customVideoSubtitleModeHotkey) : '',
+    resolveReservedVideoSubtitleModeHotkey(config),
     config.commandPaletteEnabled ? resolveCommandPaletteHotkey(config.commandPaletteHotkey, config.customCommandPaletteHotkey) : '',
     inputBoxTranslationTriggerHotkey(config.inputBoxTranslationTrigger, config.customInputBoxTranslationHotkey), resolveReservedClickSelectionHotkey(config), resolveWritingHotkey(config.writing)]
   return taken.some(item => canonicalizeHotkey(item || '').toLocaleLowerCase() === identity) || findEnabledQuickTranslationHotkeyConflict(config.quickTranslationProfiles ?? [], hotkey)

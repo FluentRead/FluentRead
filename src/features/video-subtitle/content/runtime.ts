@@ -127,6 +127,7 @@ import {createVideoSubtitleDownloads} from './downloads';
 import {confirmVideoSubtitleExport} from './exportPrompt';
 import {createSubtitleLayoutObserver} from './subtitleLayoutObserver';
 import {clearVideoSubtitleModeNotice} from './modeShortcut';
+import {registerActiveVideoSubtitleModeController} from './activeModeController';
 
 type VideoConfigPatch = Partial<Pick<Config, 'videoTranslationEnabled' | 'videoSubtitleVisible' | 'videoSubtitleDisplayMode' | 'videoSubtitleFontSize' | 'videoSubtitleOffsetMs' | 'videoLocalModel' | 'videoSubtitleAppearance'>>;
 
@@ -207,8 +208,7 @@ function mountVideoSubtitleRuntime(): () => void {
   const capturedSubtitleTracks = new TimedTextTrackCache(() => pretranslationTrackKey);
   const humanCaptions = new YoutubeHumanCaptions((input, init) => fetch(input, init), () => {
     if (destroyed) return;
-    resetTranslationState();
-    scheduleUpdate();
+    resetTranslationState(); scheduleUpdate(); nativeFullscreen.sync();
   });
   // 已是目标语言的字幕直接返回原文：不请求翻译服务，渲染层据此只显示原文一行。
   const videoTranslator = new VideoTranslationCache((text, signal) => isVideoSubtitleInTargetLanguage(text, config.to)
@@ -225,8 +225,8 @@ function mountVideoSubtitleRuntime(): () => void {
     nativeSync: () => nativeFullscreen.sync(),
     scheduleLayout: () => scheduleSubtitleLayout(),
     updateMenu: () => updatePlayerUiState(),
-    updateCaption: () => scheduleUpdate(),
-    resetCaption: () => resetTranslationState(),
+    updateCaption: () => { lastSource = ''; scheduleUpdate(); },
+    resetCaption: (preserveReading) => resetTranslationState(false, preserveReading),
   });
   const learning = createVideoSentenceLearningSession({markUi: markVideoUi, place: learningPlacement.place,
     load: async () => (await import('../ui/VideoSentenceLearning.vue')).default,
@@ -327,36 +327,26 @@ function mountVideoSubtitleRuntime(): () => void {
   }));
   const syncXVideoCaptionSource = () => xCaptionSource.sync();
 
-  const clearRenderedTranslation = () => clearRenderedVideoTranslation(document);
   const deactivateNormalizedCaption = () => { deactivateNormalizedVideoCaption(document); normalizedCaptionActive = false; };
 
   const clearProgressiveCaption = () => {
-    progressiveCueKey = '';
-    progressiveCue = null;
-    progressiveTranslation = '';
+    progressiveCueKey = ''; progressiveCue = null; progressiveTranslation = '';
     deactivateNormalizedCaption();
   };
 
   const cancelStableCaption = () => {
     if (stableCaptionTimer) clearTimeout(stableCaptionTimer);
-    stableCaptionTimer = undefined;
-    stableCaptionSource = '';
-    stableCaptionOverlay = null;
-    stableCaptionStartedAt = undefined;
+    stableCaptionTimer = undefined; stableCaptionSource = ''; stableCaptionOverlay = null; stableCaptionStartedAt = undefined;
   };
 
-  const resetTranslationState = (preserveCaptionWait = false) => {
+  const resetTranslationState = (preserveCaptionWait = false, preserveReading = false) => {
     if (!preserveCaptionWait) cancelStableCaption();
     generation += 1;
-    reading.clear();
-    lastSource = '';
-    lastTranslatedSource = '';
-    lastTranslatedText = '';
-    humanCaptionKey = '';
-    pendingTranslationSource = '';
-    pendingTranslationOverlay = null;
+    if (!preserveReading) reading.clear();
+    lastSource = ''; lastTranslatedSource = ''; lastTranslatedText = ''; humanCaptionKey = '';
+    pendingTranslationSource = ''; pendingTranslationOverlay = null;
     clearProgressiveCaption();
-    clearRenderedTranslation();
+    clearRenderedVideoTranslation(document, preserveReading);
     document.getElementById(VIDEO_SUBTITLE_PANEL_ID)?.classList.remove(VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS);
   };
 
@@ -419,15 +409,19 @@ function mountVideoSubtitleRuntime(): () => void {
     return videoTranslator.request(source, prefetch);
   };
 
-  const nativeFullscreen = createNativeFullscreenSubtitles(() => ({
-    video: observedVideo as HTMLVideoElement | null, enabled: canReadVideo() && isSupportedVideoPage(),
-    cues: pretranslationCues, mode: normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode),
-    offsetMs: subtitleOffsetMs, language: config.to, bilingualOrder: config.videoSubtitleAppearance.bilingualOrder,
-    revision: `${videoTranslator.revision}:${humanCaptions.revision}:${config.to}:${config.videoPreferHumanSubtitles}`,
-    translation: (source, cue) => (config.videoPreferHumanSubtitles ? humanCaptions.at(cue.startMs + cue.durationMs / 2) : '')
-      || (isVideoSubtitleInTargetLanguage(source, config.to) ? source : videoTranslator.peek(source)),
-    reading: {enabled: reading.enabled(), source: reading.state.source, text: reading.state.result?.text || ''},
-  }));
+  const nativeFullscreen = createNativeFullscreenSubtitles(() => {
+    const mode = normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode);
+    return {
+      video: observedVideo as HTMLVideoElement | null, enabled: canReadVideo() && isSupportedVideoPage(),
+      cues: pretranslationCues, mode, offsetMs: subtitleOffsetMs,
+      language: mode === 'original-only' ? (reading.sourceContext.getLanguage() || config.from) : config.to,
+      bilingualOrder: config.videoSubtitleAppearance.bilingualOrder,
+      revision: `${videoTranslator.revision}:${humanCaptions.revision}:${config.to}:${config.videoPreferHumanSubtitles}`,
+      translation: (source, cue) => (config.videoPreferHumanSubtitles ? humanCaptions.at(cue.startMs + cue.durationMs / 2) : '')
+        || (isVideoSubtitleInTargetLanguage(source, config.to) ? source : videoTranslator.peek(source)),
+      reading: {enabled: reading.enabled(), source: reading.state.source, text: reading.state.result?.text || ''},
+    };
+  });
 
   const getCurrentVideoTimeMs = () => readVideoPlaybackTimeMs(
     playerLocator.getTarget()?.player || (isYouTubeVideoPage() ? findVideoPlayer() : null), observedVideo);
@@ -489,13 +483,10 @@ function mountVideoSubtitleRuntime(): () => void {
     const cueKey = getProgressiveCueKey(cue);
     if (cueKey !== progressiveCueKey) {
       deactivateNormalizedCaption();
-      progressiveCueKey = cueKey;
-      progressiveCue = cue;
+      progressiveCueKey = cueKey; progressiveCue = cue;
       progressiveTranslation = videoTranslator.peek(cue.text) || '';
-      ++generation;
-      lastTranslatedSource = '';
-      lastTranslatedText = '';
-      writeVideoCaptionText(overlay, '');
+      ++generation; lastTranslatedSource = ''; lastTranslatedText = '';
+      if (!progressiveTranslation) writeVideoCaptionText(overlay, '');
     } else {
       progressiveCue = cue;
     }
@@ -506,12 +497,14 @@ function mountVideoSubtitleRuntime(): () => void {
     // YouTube 的整句与逐词字幕都使用同一个双语面板；避免每次换句在
     // 原生定位和归一化定位之间跳动，播放控件动画也不再分别移动两行。
     normalizedCaptionActive ||= captionDiffersFromCue || syntheticCaptionActive || isYouTubeVideoPage();
+    lastSource = source;
     if (normalizedCaptionActive) {
       const player = playerLocator.getTarget()?.player || (isYouTubeVideoPage() ? findVideoPlayer() : null);
-      if (player) reading.renderCaption(player, container, isMediaSubtitlePage() ? '' : cue.text, overlay.textContent || '');
-    }
-    lastSource = source;
-    renderProgressiveCaption(source, overlay, container);
+      if (player) {
+        if (isMediaSubtitlePage()) renderSynchronizedXCaption(container, cue.text, progressiveTranslation);
+        else reading.renderCaption(player, container, cue.text, progressiveTranslation ? visibleTranslation(progressiveTranslation, cue.text).trim() : '');
+      }
+    } else renderProgressiveCaption(source, overlay, container);
     if (progressiveTranslation) return true;
 
     const requestGeneration = generation;
@@ -545,11 +538,13 @@ function mountVideoSubtitleRuntime(): () => void {
   };
 
   const primeUpcomingVideoCaptions = () => {
-    if (destroyed || !canTranslateVideo() || !observedVideo || pretranslationCues.length === 0) return;
+    if (destroyed || !canReadVideo() || !observedVideo || pretranslationCues.length === 0) return;
     if (isXVideoPage() && !isAiFullActive() && !xCaptionSource.isNativeCaptionActive()) return;
     const currentMs = observedVideo.currentTime * 1000 - subtitleOffsetMs;
-    videoTranslator.primeUpcoming(pretranslationCues, currentMs,
-      getVideoPretranslationWindowMs(config.videoService || config.service), observedVideo.playbackRate, getCachedVideoTranslation);
+    if (canTranslateVideo()) {
+      videoTranslator.primeUpcoming(pretranslationCues, currentMs,
+        getVideoPretranslationWindowMs(config.videoService || config.service), observedVideo.playbackRate, getCachedVideoTranslation);
+    }
     if (reading.enabled()) reading.prefetchUpcoming(pretranslationCues, currentMs);
   };
 
@@ -564,7 +559,10 @@ function mountVideoSubtitleRuntime(): () => void {
     ensurePretranslationTrack();
     scheduleUpdate();
   });
-  const schedulePretranslation = (immediate = false) => pretranslationController.schedule(immediate);
+  const schedulePretranslation = (immediate = false) => {
+    if (!canReadVideo() || (!canTranslateVideo() && !reading.enabled())) { pretranslationController.clear(); return; }
+    pretranslationController.schedule(immediate);
+  };
 
   const setPretranslationTrack = (key: string, entry: { url: string; cues: VideoSubtitleCue[] }) => {
     // 字幕时间行只在有时间轴时出现；打开的菜单需在轨道到达或清空时立即更新。
@@ -633,7 +631,7 @@ function mountVideoSubtitleRuntime(): () => void {
 
   const ensurePretranslationTrack = () => {
     if (destroyed || !canReadVideo()) return;
-    if (isYouTubeVideoPage()) humanCaptions.sync(document, window.location, config.to, config.videoPreferHumanSubtitles);
+    if (isYouTubeVideoPage() && canTranslateVideo()) humanCaptions.sync(document, window.location, config.to, config.videoPreferHumanSubtitles);
 
     // 自动恢复的缓存让位于后来到达的原生字幕；用户主动生成的 AI 时间轴保持稳定。
     const native = isMediaSubtitlePage() ? xCaptionSource.readNativeTrack() : null;
@@ -1077,6 +1075,7 @@ function mountVideoSubtitleRuntime(): () => void {
   const closeMenu = () => menuControls.closeMenu();
   const handleDocumentClick = (event: MouseEvent) => menuControls.handleDocumentClick(event);
   const handleDocumentKeydown = (event: KeyboardEvent) => menuControls.handleDocumentKeydown(event);
+  const unregisterActiveModeController = registerActiveVideoSubtitleModeController(menuControls.createActiveModeController());
 
   const startTranslationLoop = () => {
     if (translationLoopRunning) return;
@@ -1209,20 +1208,24 @@ function mountVideoSubtitleRuntime(): () => void {
         const youtubeSelection = isYouTubeVideoPage() && !hasAdjustedTimeline()
           ? selectYoutubeCaptionCue(pretranslationCues, source, getCurrentVideoTimeMs()) : undefined;
         if (youtubeSelection?.stale) return resetTranslationState();
-        // YouTube 的滚动字幕 DOM 可能只含当前句前缀；轨道与播放时间能确认时显示完整 cue。
-        const original = youtubeSelection?.cue?.text || source;
+        // YouTube 的滚动字幕 DOM 可能只含当前句前缀；轨道与播放时间能确认时显示完整 cue 并维护时钟与卡拉 OK 进度。
+        const matchedCue = hasAdjustedTimeline() ? getAdjustedCaptionCue()
+          : isYouTubeVideoPage() ? youtubeSelection?.cue || null : selectProgressiveCue(source);
+        const original = matchedCue?.text || source;
+        const nextCueKey = matchedCue ? getProgressiveCueKey(matchedCue) : '';
         cancelStableCaption();
-        if (original !== lastSource) {
-          generation += 1;
-          lastSource = original;
-          lastTranslatedSource = '';
-          lastTranslatedText = '';
-          pendingTranslationSource = '';
-          pendingTranslationOverlay = null;
-          progressiveCueKey = '';
-          progressiveCue = null;
-          progressiveTranslation = '';
+        if (original === lastSource && normalizedCaptionActive && progressiveCueKey === nextCueKey
+          && !(reading.enabled() && reading.state.status === 'idle')) {
+          progressiveCue = matchedCue;
+          if (matchedCue) startCaptionClock();
+          return;
         }
+        if (original !== lastSource || progressiveCueKey !== nextCueKey) {
+          generation += 1; lastSource = original; lastTranslatedSource = ''; lastTranslatedText = '';
+          pendingTranslationSource = ''; pendingTranslationOverlay = null;
+          progressiveCueKey = nextCueKey; progressiveCue = matchedCue; progressiveTranslation = '';
+        }
+        if (matchedCue) startCaptionClock();
         reading.renderCaption(player, container, original, '');
         normalizedCaptionActive = true;
         return;
@@ -1288,7 +1291,7 @@ function mountVideoSubtitleRuntime(): () => void {
     if (isYouTubeVideoPage() && source !== stableCaptionSource) {
       // 新原文一出现就撤下上一句译文及其异步资格；请求仍可合并/预取，
       // 但不能在稳定等待期间让两种语言分别显示前后两句。
-      resetTranslationState(true);
+      resetTranslationState(true, true);
       reading.renderCaption(player, container, source, '');
       normalizedCaptionActive = true;
     }
@@ -1350,6 +1353,12 @@ function mountVideoSubtitleRuntime(): () => void {
   const handlePageShow = () => { startUiSyncTimer(); syncPlayerUi(); scheduleSubtitleLayout(); };
 
   const observeCaptionContainer = () => {
+    if (!canReadVideo()) {
+      captionObserver?.disconnect(); captionObserver = undefined; observedContainer = null;
+      const container = findCaptionContainer();
+      if (container) applyVideoDisplayState(container);
+      return;
+    }
     const container = findCaptionContainer();
     if (!container) {
       captionObserver?.disconnect();
@@ -1393,21 +1402,14 @@ function mountVideoSubtitleRuntime(): () => void {
       closeSentenceLearning();
       videoPageKey = nextVideoPageKey;
       downloads.cancel();
-      captionObserver?.disconnect();
-      captionObserver = undefined;
-      observedContainer = null;
-      capturedSubtitleTracks.clear();
-      xSubtitleLoader.reset();
-      hlsAudio.reset();
-      xSubtitleCues = [];
-      aiCues = [];
-      stopFullAiSubtitleGeneration();
-      clearPretranslationState(true);
-      resetTranslationState();
+      captionObserver?.disconnect(); captionObserver = undefined; observedContainer = null;
+      humanCaptions.clear(); capturedSubtitleTracks.clear();
+      xSubtitleLoader.reset(); hlsAudio.reset(); xSubtitleCues = []; aiCues = [];
+      stopFullAiSubtitleGeneration(); clearPretranslationState(true); resetTranslationState();
     }
     videoPageKey = nextVideoPageKey;
     syncNativeCaptionVisibility();
-    if (!canReadVideo()) closeSentenceLearning();
+    if (!(config.on && config.videoTranslationEnabled)) closeSentenceLearning();
     if (!isSupportedVideoPage() || !config.on) {
       humanCaptions.clear();
       observeSubtitleLayout(null, null);
@@ -1422,6 +1424,7 @@ function mountVideoSubtitleRuntime(): () => void {
     }
     syncPretranslationConfig();
     syncVideoElement();
+    syncNativeCaptionVisibility();
     nativeFullscreen.sync();
     const learningTarget = playerLocator.getTarget();
     if (learning.isOpen() && (learningTarget ? !learning.syncPlayer(learningTarget.player, learningTarget.video) : !learning.isConnected())) closeSentenceLearning();
@@ -1450,7 +1453,7 @@ function mountVideoSubtitleRuntime(): () => void {
   const unsubscribePlayer = playerLocator.subscribe(() => syncPlayerUi());
   const unsubscribeFullscreen = onFullscreenChange(document, scheduleSubtitleLayout);
   document.addEventListener('click', handleDocumentClick, true);
-  document.addEventListener('keydown', handleDocumentKeydown, true);
+  window.addEventListener('keydown', handleDocumentKeydown, true);
   document.addEventListener('visibilitychange', handleVideoVisibilityChange);
   window.addEventListener('resize', scheduleSubtitleLayout);
   window.addEventListener('orientationchange', scheduleSubtitleLayout);
@@ -1512,31 +1515,29 @@ function mountVideoSubtitleRuntime(): () => void {
       }
     }
     syncPretranslationConfig();
-    syncPlayerUi();
-    karaoke.sync();
-    if (observedContainer) {
-      applyVideoDisplayState(observedContainer);
-      syncTranslationOverlayPosition(observedContainer);
-    }
-    if (newlyEnabled && isMediaSubtitlePage()) void restoreCachedAiSubtitles();
-    if (!nextConfig.on || !nextConfig.videoTranslationEnabled || nextConfig.videoSubtitleVisible === false || normalizeVideoSubtitleDisplayMode(nextConfig.videoSubtitleDisplayMode) === 'original-only') {
-      humanCaptions.clear();
-      if (!nextConfig.on || !nextConfig.videoTranslationEnabled) { downloads.cancel(); aiModelSetup.reset(); }
-      if ((!nextConfig.on || !nextConfig.videoTranslationEnabled) && isAiFullActive()) {
-        stopFullAiSubtitleGeneration();
+    const displayMode = normalizeVideoSubtitleDisplayMode(nextConfig.videoSubtitleDisplayMode);
+    if (!nextConfig.on || !nextConfig.videoTranslationEnabled || nextConfig.videoSubtitleVisible === false) {
+      if (!nextConfig.on || !nextConfig.videoTranslationEnabled) {
+        humanCaptions.clear(); downloads.cancel(); aiModelSetup.reset();
+        if (isAiFullActive()) stopFullAiSubtitleGeneration();
       }
       clearPretranslationState(false, true);
-      resetTranslationState();
-      // 切换仅原文后立即重建 X 原文层，不留到下一秒轮询才恢复。
-      if (nextConfig.on && nextConfig.videoTranslationEnabled && nextConfig.videoSubtitleVisible !== false) scheduleUpdate();
+      syncPlayerUi(); karaoke.sync();
       return;
     }
-    observeCaptionContainer();
-    scheduleUpdate();
+    if (canReadVideo() && displayMode === 'original-only') {
+      pretranslationController.clear();
+      videoTranslator.cancelPending();
+      syncPlayerUi(); karaoke.sync();
+      if (newlyEnabled && isMediaSubtitlePage()) void restoreCachedAiSubtitles();
+      return;
+    }
+    syncPlayerUi(); karaoke.sync();
+    if (newlyEnabled && isMediaSubtitlePage()) void restoreCachedAiSubtitles();
   });
 
   return () => {
-    destroyed = true; clearVideoSubtitleModeNotice();
+    destroyed = true; unregisterActiveModeController(); clearVideoSubtitleModeNotice();
     reading.destroy();
     learning.destroy();
     learningPlacement.dispose();
@@ -1573,7 +1574,7 @@ function mountVideoSubtitleRuntime(): () => void {
     unsubscribeConfig();
     unsubscribeFullscreen();
     document.removeEventListener('click', handleDocumentClick, true);
-    document.removeEventListener('keydown', handleDocumentKeydown, true);
+    window.removeEventListener('keydown', handleDocumentKeydown, true);
     document.removeEventListener('visibilitychange', handleVideoVisibilityChange);
     window.removeEventListener('resize', scheduleSubtitleLayout);
     window.removeEventListener('orientationchange', scheduleSubtitleLayout);

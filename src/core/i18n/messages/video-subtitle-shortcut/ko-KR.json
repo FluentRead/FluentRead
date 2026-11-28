@@ -1,0 +1,18 @@
+{
+  "video.modeShortcut.action.listening-cycle": "듣기 연습 (끄기 → 원문 → 이중 언어)",
+  "video.modeShortcut.action.listening-cycleDescription": "자막 끄기 상태에서 시작해 원문만, 이중 언어를 거쳐 다시 끄기로 전환합니다. 먼저 듣기에 집중한 뒤 원문과 번역을 확인할 수 있습니다.",
+  "video.modeShortcut.action.toggle-visibility": "표시 ↔ 끄기 (현재 모드 유지)",
+  "video.modeShortcut.action.toggle-visibilityDescription": "현재 선택한 이중 언어, 번역만 또는 원문만 모드를 유지한 채 한 번의 키 입력으로 영상 자막을 숨기거나 다시 표시합니다.",
+  "video.modeShortcut.hotkeyNeedModifier": "영상 자막 단축키는 플레이어 단일 키와 겹치지 않도록 보조 키를 포함하거나 기능 키(F1–F12)를 사용해야 합니다",
+  "video.modeShortcut.enabledDescriptionCustomEmpty": "켜면 영상 페이지에서 단축키로 자막 표시 모드를 전환합니다. 사용자 지정 단축키를 녹화하기 전에는 임시로 {shortcut}을(를) 사용합니다.",
+  "video.modeShortcut.conflictInline": "현재 조합이 \"{feature}\"과(와) 충돌합니다. 아래에서 단축키를 변경한 뒤 다시 켜 주세요.",
+  "video.modeShortcut.disabledByConflict": "영상 자막 모드 단축키가 \"{feature}\"과(와) 충돌하여 자동으로 꺼졌습니다. 「번역 및 표시」에서 단축키를 변경해 주세요.",
+  "video.modeShortcut.switchedWithKey": "영상 자막 모드를 전환했습니다: {mode} ({shortcut})",
+  "video.modeShortcut.menuBadge": "단축키 {shortcut}",
+  "video.modeShortcut.appearanceEnabledHint": "단축키 켜짐: {shortcut} ({action})",
+  "video.modeShortcut.appearanceDisabledHint": "「번역 및 표시 → 자막 표시 모드 전환 단축키」에서 키보드 원키 전환을 켤 수 있습니다",
+  "video.localMedia.translateNow": "자막 번역",
+  "video.localMedia.hiddenListeningHint": "자막이 숨겨져 있습니다(듣기 모드). 문장을 클릭하면 해당 위치로 이동해 재생합니다",
+  "commandPalette.action.switchVideoSubtitleMode.title": "영상 자막 모드 전환",
+  "commandPalette.action.switchVideoSubtitleMode.description": "현재 영상 자막 단축키 규칙에 따라 이중 언어, 원문만, 번역만 또는 끄기로 전환합니다"
+}

@@ -102,6 +102,13 @@ describe('视频字幕显示模式快捷键设置组件生命周期与冲突校�
         state.handleCustomHotkeyConfirm('none');
         expect(props.config.videoSubtitleModeHotkey).toBe('Alt+M');
         expect(props.config.customVideoSubtitleModeHotkey).toBe('');
+
+        // 未录制自定义热键时的开关说明对齐实际兜底快捷键
+        props.config.videoSubtitleModeHotkey = 'custom';
+        props.config.customVideoSubtitleModeHotkey = '';
+        expect(state.enabledDescription).toBe('video.modeShortcut.enabledDescriptionCustomEmpty');
+        props.config.customVideoSubtitleModeHotkey = 'F8';
+        expect(state.enabledDescription).toBe('video.modeShortcut.enabledDescription');
     });
 
     it('离开分区、KeepAlive 失活、关闭总开关或替换配置后关闭草稿并阻止迟到提交', async () => {
@@ -133,37 +140,55 @@ describe('视频字幕显示模式快捷键设置组件生命周期与冲突校�
         expect(props.config.videoSubtitleModeHotkey).toBe('Alt+M');
     });
 
-    it('检测与其他功能及快捷方案的快捷键冲突，阻止开启或改键', () => {
+    it('检测与其他功能及快捷方案的快捷键冲突，关闭态仍可改键解死锁并拦截裸播放器单键', () => {
         props.config.videoSubtitleModeHotkeyEnabled = false;
         props.config.floatingBallHotkey = 'Alt+M';
+        expect(state.currentHotkeyConflict).toBe('video.modeShortcut.conflictInline');
         state.handleEnabledChange(true);
         expect(props.config.videoSubtitleModeHotkeyEnabled).toBe(false);
         expect(feedback.warning).toHaveBeenCalledTimes(1);
 
-        props.config.floatingBallHotkey = 'Alt+T';
+        // 关闭状态下可以直接更换为无冲突预设或自定义快捷键解除冲突死锁
+        state.handleHotkeyChange('Alt+B');
+        expect(props.config.videoSubtitleModeHotkey).toBe('Alt+B');
+        expect(state.currentHotkeyConflict).toBe('');
         state.handleEnabledChange(true);
         expect(props.config.videoSubtitleModeHotkeyEnabled).toBe(true);
 
+        // 拦截裸单键（Space / ArrowLeft / m），放行功能键 F9 与清除回退
+        expect(state.findHotkeyConflict('Space')).toBe('video.modeShortcut.hotkeyNeedModifier');
+        expect(state.findHotkeyConflict('ArrowLeft')).toBe('video.modeShortcut.hotkeyNeedModifier');
+        expect(state.findHotkeyConflict('m')).toBe('video.modeShortcut.hotkeyNeedModifier');
+        expect(state.findHotkeyConflict('F9')).toBe('');
+
+        props.config.floatingBallHotkey = 'Alt+T';
+        props.config.videoSubtitleModeHotkey = 'Alt+M';
         props.config.paragraphCopyEnabled = true;
         props.config.paragraphCopyHotkey = 'Alt+C';
         expect(state.findHotkeyConflict('Alt+C')).toBe('video.modeShortcut.hotkeyConflict');
 
         state.handleHotkeyChange('custom');
+        state.handleCustomHotkeyConfirm('Space');
+        expect(props.config.videoSubtitleModeHotkey).toBe('Alt+M');
         state.handleCustomHotkeyConfirm('Alt+C');
         expect(props.config.videoSubtitleModeHotkey).toBe('Alt+M');
         state.handleCustomHotkeyCancel();
         expect(state.showCustomHotkeyDialog).toBe(false);
     });
 
-    it('全文/悬浮/划词快捷键协调器也会识别已启用的视频字幕模式快捷键占用', () => {
+    it('全文/悬浮/划词快捷键协调器也会识别已启用的视频字幕模式快捷键占用，关闭视频翻译总开关后释放', () => {
         const scope = runtime.effectScope();
         const configRef = runtime.ref(Object.assign(new Config(), {
+            videoTranslationEnabled: true,
             videoSubtitleModeHotkeyEnabled: true,
             videoSubtitleModeHotkey: 'Alt+M',
             customVideoSubtitleModeHotkey: '',
         }));
         const shortcuts = scope.run(() => useTranslationShortcutSettings(configRef))!;
         expect(shortcuts.quickTranslationConflictMessage('Alt+M')).toBe('quickTranslation.legacyConflictEdit');
+        configRef.value.videoTranslationEnabled = false;
+        expect(shortcuts.quickTranslationConflictMessage('Alt+M')).toBe('');
+        configRef.value.videoTranslationEnabled = true;
         configRef.value.videoSubtitleModeHotkeyEnabled = false;
         expect(shortcuts.quickTranslationConflictMessage('Alt+M')).toBe('');
         scope.stop();

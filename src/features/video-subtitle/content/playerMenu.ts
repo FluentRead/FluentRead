@@ -120,6 +120,13 @@ function createHeader(language: UiLanguage, compact = false): HTMLElement {
     return title;
 }
 
+function createModeShortcutBadge(): HTMLElement {
+    const badge = createTextElement('span', 'fluent-read-video-menu-mode-shortcut', '');
+    badge.dataset.modeShortcutBadge = 'true';
+    badge.hidden = true;
+    return badge;
+}
+
 function createModeGroup(language: UiLanguage): HTMLElement {
     const group = createTextElement('div', 'fluent-read-video-menu-mode-group', '');
     group.setAttribute('role', 'group');
@@ -498,7 +505,7 @@ export function createVideoPlayerMenu(language: UiLanguage, withLocalGeneration:
         const label = keyedText('span', '', 'video.subtitleTools', language);
         delete more.dataset.i18nKey;
         more.replaceChildren(label, createIcon('next'));
-        watch.append(createModeGroup(language), createSubtitleOrderRow(language), createSourceStatus(language), primary, more);
+        watch.append(createModeShortcutBadge(), createModeGroup(language), createSubtitleOrderRow(language), createSourceStatus(language), primary, more);
 
         const tools = createTextElement('div', 'fluent-read-video-menu-tools', '');
         tools.id = 'fluent-read-video-menu-tools';
@@ -517,7 +524,7 @@ export function createVideoPlayerMenu(language: UiLanguage, withLocalGeneration:
     }
 
     const display = createTextElement('div', 'fluent-read-video-menu-section fluent-read-video-menu-display', '');
-    display.append(createModeGroup(language), createSubtitleOrderRow(language), createTimingRow(language));
+    display.append(createModeShortcutBadge(), createModeGroup(language), createSubtitleOrderRow(language), createTimingRow(language));
     const translationStatus = createTranslationStatus(language);
     const actions = createDownloadDisclosure(language);
     actions.classList.add('fluent-read-video-menu-actions');
@@ -760,6 +767,21 @@ export function renderVideoMenuMode(menu: HTMLElement, selected: VideoMenuMode, 
     const group = menu.querySelector<HTMLElement>('.fluent-read-video-menu-mode-group');
     const title = disabled ? disabledReason : '';
     if (group && group.title !== title) group.title = title;
+}
+
+/** 按需展示模式切换快捷键胶囊；未启用或无快捷键时隐藏，不触发多余 DOM 写入。 */
+export function renderVideoMenuModeShortcut(menu: HTMLElement, shortcut: string | null, language: UiLanguage): void {
+    const badge = menu.querySelector<HTMLElement>('[data-mode-shortcut-badge]');
+    if (!badge) return;
+    const normalized = shortcut?.trim() || '';
+    const hide = !normalized;
+    if (badge.hidden !== hide) badge.hidden = hide;
+    if (hide) {
+        if (badge.textContent) badge.textContent = '';
+        return;
+    }
+    const text = translateVideoUi('video.modeShortcut.menuBadge', language, {shortcut: normalized});
+    if (badge.textContent !== text) badge.textContent = text;
 }
 
 /** 持久配置更新时复用按钮；无时间轴且无偏移时整行收起，仍允许清除已有偏移。 */
@@ -1158,6 +1180,7 @@ export function syncVideoPlayerMenuLayout(menu: HTMLElement): void {
         translationStatusVisible,
         translationStatusText,
         translationRetryVisible,
+        rowVisible('[data-mode-shortcut-badge]'),
         rowVisible('[data-timing-row]'),
         rowVisible('[data-subtitle-order-hint]'),
         rowVisible('[data-native-fullscreen-hint]'),

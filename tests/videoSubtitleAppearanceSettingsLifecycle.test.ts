@@ -30,6 +30,7 @@ const dom = await vi.hoisted(async () => {
 import * as Vue from 'vue';
 import {Config, normalizeConfig} from '@/src/core/config/model';
 import * as appearanceModule from '@/src/core/config/videoSubtitleAppearance';
+import * as shortcutModule from '@/src/core/config/videoSubtitleShortcut';
 import * as shadowSelectModule from '@/src/ui/shadowSelectOutside';
 import {translate, translateLegacyText, type UiLanguage} from '@/src/core/i18n';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
@@ -39,7 +40,7 @@ const locale = Vue.ref<UiLanguage>('zh-CN');
 const capabilities = {extensionDom: true};
 const i18nPort = {useUiI18n: () => ({
     language: locale,
-    t: (key: string) => translate(key, locale.value),
+    t: (key: string, params?: Record<string, string | number>) => translate(key, locale.value, params),
     translateLegacy: (value: string) => translateLegacyText(value, locale.value),
 })};
 // Vendor ports expose the same public model events through native DOM controls.
@@ -68,6 +69,7 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
         vue: Vue,
         'element-plus': {ElSelect, ElOption, ElColorPicker, ElTooltip, ClickOutside: {}},
         '@/src/core/config/videoSubtitleAppearance': appearanceModule,
+        '@/src/core/config/videoSubtitleShortcut': shortcutModule,
         '@/src/platform/browser/capabilities': {browserCapabilities: capabilities},
         '@/src/ui/shadowSelectOutside': shadowSelectModule,
         '@/src/ui/i18n': i18nPort,
@@ -488,5 +490,22 @@ describe('视频字幕外观设置实际客户端模板', () => {
         expect(props.config.videoSubtitleAppearance).toMatchObject({autoBottom: true, bottomOffset: 22, fontScale: 320, readingAnnotation: false});
         expect(previous.videoSubtitleAppearance).toEqual(appearanceModule.DEFAULT_VIDEO_SUBTITLE_APPEARANCE);
         expect(control<HTMLElement>(previewSelector).style.getPropertyValue('--fluent-read-video-subtitle-font-scale')).toBe('320%');
+    });
+
+    it('字幕显示模式下方实时展示模式切换快捷键开启/关闭状态提示', async () => {
+        await mount(normalizeConfig({
+            videoTranslationEnabled: true,
+            videoSubtitleModeHotkeyEnabled: false,
+            videoSubtitleModeHotkey: 'Alt+M',
+            videoSubtitleModeHotkeyAction: 'listening-cycle',
+        }));
+        const hint = '[data-video-subtitle-mode-shortcut-hint]';
+        expect(control(hint).textContent).toBe(translate('video.modeShortcut.appearanceDisabledHint', 'zh-CN'));
+
+        props.config.videoSubtitleModeHotkeyEnabled = true;
+        await settle();
+        expect(control(hint).textContent).toContain(
+            translate('video.modeShortcut.action.listening-cycle', 'zh-CN'),
+        );
     });
 });

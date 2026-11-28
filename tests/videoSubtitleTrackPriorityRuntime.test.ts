@@ -61,7 +61,12 @@ import {Config} from '@/src/core/config/model';
 import {services} from '@/src/core/config/catalog';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 // 唯一 runtime import：移入 repo 后默认消费真实源码；私有 runner 可 alias 两份完整字节快照做同一测试对照。
-import {mountVideoSubtitleTranslation} from '@/src/features/video-subtitle/public';
+import {
+  getActiveVideoSubtitleModeController,
+  mountVideoSubtitleTranslation,
+  registerActiveVideoSubtitleModeController,
+  videoSubtitleModeLabelKey,
+} from '@/src/features/video-subtitle/public';
 import {
   VIDEO_AI_CAPTION_CONTAINER_ID, VIDEO_NATIVE_CUE_HIDDEN_CLASS, VIDEO_NORMALIZED_CAPTION_OVERLAY_ID,
   VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS, VIDEO_SUBTITLE_PANEL_ID,
@@ -323,20 +328,39 @@ describe('public mounted reading annotation integration', () => {
     await vi.advanceTimersByTimeAsync(1200); expect(ports.annotate).toHaveBeenCalledOnce();
   });
 
-  it('仅原文带读音切回双语时同一cue立即开始翻译，保留原句与缓存读音', async () => {
+  it('仅原文带读音切回双语时同一cue立即开始翻译，保留原句与缓存读音且稳定等待期间读音不闪断', async () => {
     const source = '今日はいい天気です。';
+    const pendingTranslation = deferred<string>();
+    ports.translate.mockReturnValueOnce(pendingTranslation.promise);
     Object.assign(ports.config, {from: 'ja', videoSubtitleDisplayMode: 'original-only', videoPreferHumanSubtitles: false});
     (ports.config as unknown as Config).videoSubtitleAppearance.readingAnnotation = true;
-    const f = fixture(undefined, 'youtube'); f.setCaption(source); f.start(); await vi.advanceTimersByTimeAsync(300);
+    const f = fixture(undefined, 'youtube'); f.setCaption(source); const dispose = f.start(); await vi.advanceTimersByTimeAsync(300);
     const reading = f.document.getElementById('fluent-read-video-subtitle-reading')!;
     expect(f.displayed().source).toBe(source); expect(reading.textContent).toBe('Reading: ' + source);
     expect(ports.translate).not.toHaveBeenCalled(); expect(ports.annotate).toHaveBeenCalledOnce();
-    f.changeConfig({videoSubtitleDisplayMode: 'bilingual'}); await vi.advanceTimersByTimeAsync(300);
+    f.changeConfig({videoSubtitleDisplayMode: 'bilingual'});
+    // 切换瞬间（译文稳定等待期间）：读音节点保持挂载与内容不闪断
+    expect(f.document.getElementById('fluent-read-video-subtitle-reading')).toBe(reading);
+    expect(reading.textContent).toBe('Reading: ' + source);
+    await vi.advanceTimersByTimeAsync(300);
+    pendingTranslation.resolve(translation(source));
+    await vi.advanceTimersByTimeAsync(0);
     expect(ports.translate).toHaveBeenCalledWith(source, expect.any(AbortSignal), undefined);
     expect(f.callsFor(source)).toBe(1); expect(f.displayed()).toMatchObject({source, translated: translation(source), active: true});
     expect(f.document.getElementById('fluent-read-video-subtitle-reading')).toBe(reading);
     expect(reading.textContent).toBe('Reading: ' + source); expect(ports.annotate).toHaveBeenCalledOnce();
     await vi.advanceTimersByTimeAsync(1200); expect(f.callsFor(source)).toBe(1); expect(ports.annotate).toHaveBeenCalledOnce();
+    // 活跃视频模式控制器随挂载注册并在卸载时注销，公共入口导出完整
+    expect(typeof registerActiveVideoSubtitleModeController).toBe('function');
+    expect(videoSubtitleModeLabelKey('bilingual')).toBe('video.modeBilingual');
+    const activeController = getActiveVideoSubtitleModeController();
+    expect(activeController).not.toBeNull();
+    expect(activeController!.getCurrentMode()).toBe('bilingual');
+    expect(activeController!.switchMode()).toBe('original-only');
+    expect(ports.config.videoSubtitleDisplayMode).toBe('original-only');
+    dispose();
+    expect(getActiveVideoSubtitleModeController()).toBeNull();
+    await vi.advanceTimersByTimeAsync(200);
   });
 
   it('换句、仅译文与关闭作废旧读音，恢复原文模式复用当前句结果', async () => {
@@ -2158,6 +2182,63 @@ it('原文模式收到大量新命名轨时保留当前轨，恢复双语仍使�
   }
   f.changeConfig({videoSubtitleDisplayMode: 'bilingual'}); f.emitVideo('timeupdate'); await vi.advanceTimersByTimeAsync(300);
   expect(f.displayed()).toMatchObject({source: 'Original active sentence.', translated: translation('Original active sentence.')});
+});
+
+it('双语与仅原文往返保留人工字幕与译文缓存，仅原文同步推进 progressiveCue 并清理过期句', async () => {
+  Object.assign(ports.config, {from: 'en', videoPreferHumanSubtitles: true});
+  const sentence = 'Reusable human track sentence.';
+  const f = fixture(undefined, 'youtube'); f.video.currentTime = .5;
+  const script = f.document.createElement('script');
+  script.textContent = 'var ytInitialPlayerResponse=' + JSON.stringify({videoDetails: {videoId: 'cue-proof'}, captions: {
+    playerCaptionsTracklistRenderer: {captionTracks: [
+      {baseUrl: 'https://www.youtube.com/api/timedtext?v=cue-proof&lang=en', languageCode: 'en', name: {simpleText: 'English'}},
+      {baseUrl: 'https://www.youtube.com/api/timedtext?v=cue-proof&lang=zh-Hans', languageCode: 'zh-Hans', name: {simpleText: '简体中文'}},
+    ]},
+  }}) + ';';
+  f.document.head.appendChild(script);
+  const json3 = (text: string) => JSON.stringify({events: [{tStartMs: 0, dDurationMs: 1000, segs: [{utf8: text}]}]});
+  ports.fetch.mockImplementation(async (input: string) => {
+    const lang = new URL(String(input)).searchParams.get('lang');
+    return new Response(json3(lang === 'zh-Hans' ? '人工译文缓存' : sentence));
+  });
+  f.setCaption(sentence); const dispose = f.start(); await settle();
+  expect(f.displayed()).toMatchObject({source: sentence, translated: '人工译文缓存'});
+  const humanFetches = () => ports.fetch.mock.calls.filter(([u]) => new URL(String(u)).searchParams.get('lang') === 'zh-Hans').length;
+  expect(humanFetches()).toBe(1);
+
+  // 切到仅原文再切回双语：不清空人工轨缓存，不重拉网络
+  f.changeConfig({videoSubtitleDisplayMode: 'original-only'}); await settle();
+  expect(f.displayed()).toMatchObject({source: sentence, translated: ''});
+  f.changeConfig({videoSubtitleDisplayMode: 'bilingual'}); await settle();
+  expect(f.displayed()).toMatchObject({source: sentence, translated: '人工译文缓存'});
+  expect(humanFetches()).toBe(1);
+
+  // 仅原文下播放时间超过 cue 结束点时清理滚动句残留
+  f.changeConfig({videoSubtitleDisplayMode: 'original-only'}); await settle();
+  f.video.currentTime = 2.0; f.emitVideo('timeupdate'); await settle();
+  expect(f.displayed().source).toBe('');
+  dispose();
+});
+
+it('仅译文首句创建字幕层即同步模式类名，且菜单切 off 不强关已打开的完整句学习面板', async () => {
+  Object.assign(ports.config, {videoSubtitleDisplayMode: 'translation-only', videoPreferHumanSubtitles: false});
+  vi.stubGlobal('__VUE_DEVTOOLS_GLOBAL_HOOK__', {emit: vi.fn()});
+  const f = fixture('First translation-only sentence.', 'html-video');
+  const dispose = f.start(); await vi.advanceTimersByTimeAsync(80);
+  const layer = f.document.getElementById('fluent-read-video-subtitle-layer')!;
+  expect(layer.classList.contains('fluent-read-video-display-translation-only')).toBe(true);
+
+  f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)!.hidden = false;
+  clickMenu(f, '[data-action="open-sentence-learning"]');
+  await vi.dynamicImportSettled(); await settle();
+  expect(f.document.getElementById('fluent-read-video-learning-panel')).not.toBeNull();
+
+  // 仅隐藏浮动字幕（videoSubtitleVisible=false）时保留学习面板；停用视频字幕总功能时才关闭
+  f.changeConfig({videoSubtitleVisible: false}); await settle();
+  expect(f.document.getElementById('fluent-read-video-learning-panel')).not.toBeNull();
+  f.changeConfig({videoTranslationEnabled: false}); await settle();
+  expect(f.document.getElementById('fluent-read-video-learning-panel')).toBeNull();
+  dispose();
 });
 
 

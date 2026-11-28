@@ -120,6 +120,20 @@ describe('legacy userscript migration', () => {
         existing.selectionAreaEnabled = true;
         existing.disableImageTranslator = false;
         existing.videoTranslationEnabled = true;
+        existing.videoSubtitleModeHotkeyEnabled = true;
+        existing.videoSubtitleModeHotkey = 'Alt+M';
+        existing.quickTranslationProfiles = [{
+            id: 'quick-alt-m',
+            action: 'full-page',
+            enabled: true,
+            hotkey: 'Alt+M',
+            service: '',
+            model: '',
+            targetLanguage: '',
+            displayMode: 'inherit',
+            fullPageMode: 'inherit',
+            glossaryIds: [],
+        }];
         existing.maxConcurrentTranslations = 99;
         existing.token[services.openai] = 'preserved-token';
         existing.extra = {preserved: true};
@@ -137,6 +151,8 @@ describe('legacy userscript migration', () => {
         expect(stored.selectionAreaEnabled).toBe(false);
         expect(stored.disableImageTranslator).toBe(true);
         expect(stored.videoTranslationEnabled).toBe(false);
+        expect(stored.videoSubtitleModeHotkeyEnabled).toBe(false);
+        expect(stored.quickTranslationProfiles[0]?.enabled).toBe(true);
         expect(stored.maxConcurrentTranslations).toBe(20);
         expect(stored.token[services.openai]).toBe('preserved-token');
         expect(stored.extra).toEqual({preserved: true});
@@ -211,5 +227,11 @@ describe('legacy userscript migration', () => {
         await ensureUserscriptConfigForTest();
 
         expect(readStoredConfig(values).count).toBe(16);
+    });
+
+    it('非对象配置输入在 userscript 归一化后同样关闭视频字幕模式快捷键', () => {
+        const normalized = normalizeUserscriptConfig(null);
+        expect(normalized.videoTranslationEnabled).toBe(false);
+        expect(normalized.videoSubtitleModeHotkeyEnabled).toBe(false);
     });
 });

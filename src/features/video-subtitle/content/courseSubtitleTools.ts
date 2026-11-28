@@ -30,6 +30,7 @@ interface CourseSubtitleToolsPorts {
     readTarget(): VideoSentenceLearningTarget | null;
     readCompleteTrack(): CourseTrack | null;
     readIdentity(): string;
+    isEnabled?(): boolean;
     translate(text: string, signal: AbortSignal, sourceLanguage: string): Promise<string>;
     peek(source: string): string | undefined;
     save(srt: string, label: string, cues: readonly VideoSubtitleCue[], format: SubtitleExportFormat): void;
@@ -55,7 +56,7 @@ export function createCourseSubtitleTools(ports: CourseSubtitleToolsPorts) {
         translateVideoUi(key, getVideoUiLanguage(config.uiLanguage), params);
     const placement = createVideoLearningPlacementOwner(() => config.videoSentenceLearningAppearance, ports.subscribe);
     const currentTrack = () => !disposed && config.on && config.videoTranslationEnabled ? ports.readCompleteTrack() : null;
-    const canOpen = () => Boolean(currentTrack()?.cues.length);
+    const canOpen = () => Boolean(currentTrack()?.cues.length && ports.isEnabled?.() !== false);
     const translate = (text: string, signal: AbortSignal) => {
         const track = currentTrack();
         return track ? ports.translate(text, signal, track.sourceLanguage) : Promise.reject(createVideoSubtitleAbortError());
@@ -109,14 +110,18 @@ export function createCourseSubtitleTools(ports: CourseSubtitleToolsPorts) {
     function sync() {
         const current = ports.readIdentity();
         const track = currentTrack();
+        const active = ports.isEnabled?.() !== false;
         if (identity !== current || !track?.cues.length) {
             identity = current;
             cancelExports();
             learning.close();
-        } else if (learning.isOpen()) {
-            const target = ports.readTarget();
-            if (!target || !learning.syncPlayer(target.player, target.video)) learning.close();
-            else learning.updateCues(track.cues, track.sourceLanguage);
+        } else {
+            if (!active) cancelExports();
+            if (learning.isOpen()) {
+                const target = ports.readTarget();
+                if (!target || !learning.syncPlayer(target.player, target.video)) learning.close();
+                else learning.updateCues(track.cues, track.sourceLanguage);
+            }
         }
     }
     return {

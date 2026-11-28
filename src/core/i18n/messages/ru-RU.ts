@@ -11,6 +11,7 @@ import selfHelpText from './self-help/ru-RU.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
 import {dictionaryWorkspaceMessages} from './dictionaryWorkspace';
+import {videoSubtitleShortcutMessages} from './videoSubtitleShortcut';
 import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesRussianMessages} from './sectionTranslationRulesRussian';
 import {sectionTranslationRulesLegacyText} from './sectionTranslationRulesLegacy';
@@ -601,6 +602,7 @@ export const ruRUMessages = {
     ...privacyProtectionMessages["ru-RU"],
     ...selectionDictionaryMessages["ru-RU"],
     ...dictionaryWorkspaceMessages["ru-RU"],
+    ...videoSubtitleShortcutMessages["ru-RU"],
     ...sectionTranslationRulesRussianMessages,
     "settings.requestLimits.retryIntervals": "Интервалы повторов",
     "settings.requestLimits.apiKeyRecovery": "Пауза неисправного API Key",

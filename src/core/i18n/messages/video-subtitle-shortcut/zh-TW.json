@@ -1,0 +1,18 @@
+{
+  "video.modeShortcut.action.listening-cycle": "聽力練習（關閉 → 原文 → 雙語）",
+  "video.modeShortcut.action.listening-cycleDescription": "從關閉無字幕開始，依序切到僅原文、雙語，再回到關閉，方便先盲聽再核對原文與譯文。",
+  "video.modeShortcut.action.toggle-visibility": "顯示 ↔ 關閉（保留目前模式）",
+  "video.modeShortcut.action.toggle-visibilityDescription": "一鍵隱藏或還原影片字幕，始終保留你目前的雙語、僅譯文或僅原文選擇。",
+  "video.modeShortcut.hotkeyNeedModifier": "影片字幕快速鍵須包含修飾鍵或使用功能鍵（F1-F12），避免佔用播放器單鍵",
+  "video.modeShortcut.enabledDescriptionCustomEmpty": "開啟後在影片頁面按快速鍵切換字幕顯示模式；尚未錄製自訂組合鍵時將暫用 {shortcut}。",
+  "video.modeShortcut.conflictInline": "目前組合鍵與「{feature}」衝突，可先更換下方組合鍵後再開啟。",
+  "video.modeShortcut.disabledByConflict": "影片字幕模式快速鍵與「{feature}」衝突，已自動關閉，請在「翻譯與顯示」中更換組合鍵。",
+  "video.modeShortcut.switchedWithKey": "影片字幕已切換為：{mode}（{shortcut}）",
+  "video.modeShortcut.menuBadge": "快速鍵 {shortcut}",
+  "video.modeShortcut.appearanceEnabledHint": "快速鍵已開啟：{shortcut}（{action}）",
+  "video.modeShortcut.appearanceDisabledHint": "可在「翻譯與顯示 → 字幕顯示模式快速鍵」開啟鍵盤一鍵切換",
+  "video.localMedia.translateNow": "翻譯字幕",
+  "video.localMedia.hiddenListeningHint": "字幕已隱藏（盲聽模式），點擊句子可跳轉播放",
+  "commandPalette.action.switchVideoSubtitleMode.title": "切換影片字幕模式",
+  "commandPalette.action.switchVideoSubtitleMode.description": "依目前影片字幕快速鍵規則切換雙語、僅原文、僅譯文或關閉"
+}

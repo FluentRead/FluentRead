@@ -144,7 +144,10 @@ export class LocalMediaTranscriptionSession {
         };
     }
 
-    async transcribe(source: LocalMediaAudioSource, translateAfter = true): Promise<boolean> {
+    async transcribe(
+        source: LocalMediaAudioSource,
+        translateAfter: boolean | (() => boolean) = true,
+    ): Promise<boolean> {
         if (this.disposed) return false;
         this.abortActive('cancel');
         const revision = ++this.revision;
@@ -248,7 +251,8 @@ export class LocalMediaTranscriptionSession {
             }
             this.cues = finalCues;
 
-            if (translateAfter) {
+            const shouldTranslate = typeof translateAfter === 'function' ? translateAfter() : translateAfter;
+            if (shouldTranslate) {
                 await this.runTranslationPass(revision, controller.signal);
                 if (!this.isCurrent(revision, controller.signal)) return false;
             }

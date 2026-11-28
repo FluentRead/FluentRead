@@ -1494,6 +1494,17 @@ describe('设置父模板分区字段与编辑确认',()=>{
         await f.emit('feature:视频字幕翻译','update:modelValue',false);expect(f.state.config.videoTranslationEnabled).toBe(false);
         expect(f.state.config).toMatchObject({videoService:'microsoft',videoSourceLanguage:'ja',videoMeetingAutoEnabled:true,videoPreferHumanSubtitles:false,videoGlossaryIds:[]});
         await f.emit('feature:视频字幕翻译','update:modelValue',true);expect((await f.port('el-select:视频原语言')).attrs.disabled).toBe(false);expect(f.query).not.toHaveBeenCalled();
+
+        // 重新开启视频翻译时，若其已启用的字幕模式快捷键与现有功能冲突，自动关闭字幕模式快捷键避免双重占用
+        f.state.config.videoTranslationEnabled=false;
+        f.state.config.videoSubtitleModeHotkeyEnabled=true;
+        f.state.config.videoSubtitleModeHotkey='Alt+M';
+        f.state.config.floatingBallHotkey='custom';
+        f.state.config.customFloatingBallHotkey='Alt+M';
+        await settle();
+        await f.emit('feature:视频字幕翻译','update:modelValue',true);
+        expect(f.state.config.videoTranslationEnabled).toBe(true);
+        expect(f.state.config.videoSubtitleModeHotkeyEnabled).toBe(false);
     });
     it('图片/圈选开关分别广播，OCR源语言回写不改变网页目标语言',async()=>{
         const f=await settingsUiFixture('settings-image-translation',{on:true,disableImageTranslator:false,selectionAreaEnabled:false,to:'en'});f.query.mockResolvedValue([{id:8}]);

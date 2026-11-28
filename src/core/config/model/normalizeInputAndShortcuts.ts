@@ -57,7 +57,7 @@ import {
     normalizeCustomCommandPaletteHotkey,
     resolveCommandPaletteHotkey,
 } from '../commandPalette';
-import {resolveVideoSubtitleModeHotkey} from '../videoSubtitleShortcut';
+import {resolveReservedVideoSubtitleModeHotkey} from '../videoSubtitleShortcut';
 import {resolveWritingHotkey} from '../writing';
 import {normalizeContextMenuEntryPreferences} from '@/src/core/context-menu/domain';
 import {resolveConfiguredHotkey} from '@/src/core/hotkey';
@@ -246,6 +246,7 @@ function normalizeToolsAndQuickProfiles(normalized: Config, source: Partial<Conf
     normalized.contextMenuEntries = normalizeContextMenuEntryPreferences(source.contextMenuEntries);
     normalized.contextMenuShowTargetLanguage = normalized.contextMenuShowTargetLanguage !== false;
     normalized.contextMenuShowShortcut = normalized.contextMenuShowShortcut !== false;
+    const reservedVideoSubtitleModeHotkey = resolveReservedVideoSubtitleModeHotkey(normalized);
     normalized.quickTranslationProfiles = normalizeQuickTranslationProfiles(
         source.quickTranslationProfiles,
         {
@@ -269,9 +270,7 @@ function normalizeToolsAndQuickProfiles(normalized: Config, source: Partial<Conf
                 ...(normalized.sectionTranslationHotkeyEnabled
                     ? [resolveSectionTranslationHotkey(normalized.sectionTranslationHotkey, normalized.customSectionTranslationHotkey)]
                     : []),
-                ...(normalized.videoSubtitleModeHotkeyEnabled
-                    ? [resolveVideoSubtitleModeHotkey(normalized.videoSubtitleModeHotkey, normalized.customVideoSubtitleModeHotkey)]
-                    : []),
+                ...(reservedVideoSubtitleModeHotkey ? [reservedVideoSubtitleModeHotkey] : []),
                 ...(resolveWritingHotkey(normalized.writing)
                     ? [resolveWritingHotkey(normalized.writing)]
                     : []),

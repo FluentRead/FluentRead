@@ -1,0 +1,18 @@
+{
+  "video.modeShortcut.action.listening-cycle": "リスニング練習（オフ → 原文 → 二言語）",
+  "video.modeShortcut.action.listening-cycleDescription": "字幕オフから始まり、原文のみ・二言語・オフの順に切り替えます。まず音声だけを聞き、あとで原文と訳文を確認できます。",
+  "video.modeShortcut.action.toggle-visibility": "表示 ↔ オフ（現在のモードを保持）",
+  "video.modeShortcut.action.toggle-visibilityDescription": "二言語・訳文のみ・原文のみの選択を保ったまま、ワンキーで動画字幕の表示と非表示を切り替えます。",
+  "video.modeShortcut.hotkeyNeedModifier": "動画字幕ショートカットには修飾キーを含めるかファンクションキー（F1〜F12）を使用してください（プレーヤーの単一キー操作と競合しないようにするため）",
+  "video.modeShortcut.enabledDescriptionCustomEmpty": "有効にすると動画ページでショートカットから字幕表示モードを切り替えられます。カスタム組み合わせが未登録の間は {shortcut} を使用します。",
+  "video.modeShortcut.conflictInline": "現在の組み合わせは「{feature}」と競合しています。下のショートカットを変更してから有効にしてください。",
+  "video.modeShortcut.disabledByConflict": "動画字幕モードのショートカットが「{feature}」と競合したため自動でオフになりました。「翻訳と表示」で組み合わせを変更してください。",
+  "video.modeShortcut.switchedWithKey": "動画字幕を切り替えました：{mode}（{shortcut}）",
+  "video.modeShortcut.menuBadge": "ショートカット {shortcut}",
+  "video.modeShortcut.appearanceEnabledHint": "ショートカット有効：{shortcut}（{action}）",
+  "video.modeShortcut.appearanceDisabledHint": "「翻訳と表示 → 字幕表示モード切り替えショートカット」でキーボード切り替えを有効にできます",
+  "video.localMedia.translateNow": "字幕を翻訳",
+  "video.localMedia.hiddenListeningHint": "字幕は非表示です（リスニングモード）。文をクリックするとその位置へジャンプします",
+  "commandPalette.action.switchVideoSubtitleMode.title": "動画字幕モードを切り替え",
+  "commandPalette.action.switchVideoSubtitleMode.description": "現在の動画字幕ショートカット設定に従って二言語・原文のみ・訳文のみ・オフを切り替えます"
+}

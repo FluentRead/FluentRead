@@ -1,0 +1,18 @@
+{
+  "video.modeShortcut.action.listening-cycle": "Listening practice (Off → Original → Bilingual)",
+  "video.modeShortcut.action.listening-cycleDescription": "Start with subtitles off, then cycle to Original only, Bilingual, and back to Off so you can listen first and check captions after.",
+  "video.modeShortcut.action.toggle-visibility": "Show ↔ Off (keep current mode)",
+  "video.modeShortcut.action.toggle-visibilityDescription": "Hide or restore video subtitles with one keypress while keeping your current Bilingual, Translated, or Original selection.",
+  "video.modeShortcut.hotkeyNeedModifier": "Video subtitle shortcuts must include a modifier key or use a function key (F1–F12) to avoid colliding with single-key player controls",
+  "video.modeShortcut.enabledDescriptionCustomEmpty": "Press the shortcut on video pages to switch subtitle display modes; {shortcut} will be used until a custom shortcut is recorded.",
+  "video.modeShortcut.conflictInline": "This combination conflicts with \"{feature}\". Change the shortcut below before turning it on.",
+  "video.modeShortcut.disabledByConflict": "The video subtitle mode shortcut conflicted with \"{feature}\" and was turned off automatically. Choose another combination in Translation & display.",
+  "video.modeShortcut.switchedWithKey": "Video subtitles switched to: {mode} ({shortcut})",
+  "video.modeShortcut.menuBadge": "Shortcut {shortcut}",
+  "video.modeShortcut.appearanceEnabledHint": "Shortcut enabled: {shortcut} ({action})",
+  "video.modeShortcut.appearanceDisabledHint": "Enable one-key switching in Translation & display → Subtitle mode shortcut",
+  "video.localMedia.translateNow": "Translate subtitles",
+  "video.localMedia.hiddenListeningHint": "Subtitles are hidden (listening mode). Click any sentence to jump playback.",
+  "commandPalette.action.switchVideoSubtitleMode.title": "Switch video subtitle mode",
+  "commandPalette.action.switchVideoSubtitleMode.description": "Switch between Bilingual, Original only, Translated only, or Off using your current video subtitle shortcut rule"
+}

@@ -1,19 +1,55 @@
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
-const {generateText, streamResult, createModel, normalizeError} = vi.hoisted(() => {
-    const generateText = vi.fn();
-    const streamResult = async (input: {model: unknown; messages: unknown; tools: unknown; abortSignal: AbortSignal}) => {
-        const value = await generateText(input);
-        const parts: unknown[] = (value.textChunks ?? (value.text ? [value.text] : [])).map((text: string) => ({type: 'text-delta', id: 'text', text}));
-        for (const call of value.toolCalls ?? []) parts.push({type: 'tool-call', toolCallId: call.toolCallId, toolName: call.toolName, input: call.input});
-        if (value.error) parts.push({type: 'error', error: value.error});
-        return {stream: (async function* () { for (const part of parts) yield part; })(),
-            finalStep: Promise.resolve({response: {modelId: value.response?.modelId}}), responseMessages: Promise.resolve(value.response?.messages ?? []), usage: Promise.resolve(value.usage), finishReason: Promise.resolve(value.finishReason ?? 'stop')};
+const {generateText, createModel, normalizeError} = vi.hoisted(() => ({
+    generateText: vi.fn(),
+    createModel: vi.fn(),
+    normalizeError: vi.fn((error: unknown) => error instanceof Error ? error : new Error(String(error))),
+}));
+vi.mock('@/src/services/harness/generation', async () => {
+    const {createBilibiliVisibleStream} = await import('@/src/services/harness/visibleStream');
+    const {createHarnessUsageEvent} = await import('@/src/services/harness/usage');
+    return {
+        normalizeHarnessModelError: normalizeError,
+        createHarnessGenerator: (config: unknown, service: string, model: string, tools: readonly {name: string}[], recordUsage?: (event: any) => void) => {
+            createModel(config, service, model);
+            const toolMap = Object.fromEntries(tools.map(definition => [definition.name, definition]));
+            return async (input: {system: string; messages: unknown[]; signal: AbortSignal; onText?: (text: string) => void}) => {
+                const startedAt = Date.now();
+                const record = (event: any) => { try { recordUsage?.(event); } catch { /* 本地统计故障不能影响阅读。 */ } };
+                let text = '';
+                const bilibiliText = service === 'bilibili' ? createBilibiliVisibleStream() : undefined;
+                const toolCalls: Array<{id: string; name: string; input: unknown}> = [];
+                try {
+                    const value = await generateText({instructions: input.system, messages: input.messages, tools: toolMap, abortSignal: input.signal});
+                    for (const chunk of value.textChunks ?? (value.text ? [value.text] : [])) {
+                        if (bilibiliText) {
+                            const visible = bilibiliText.append(chunk);
+                            if (visible !== text) { text = visible; input.onText?.(text); }
+                        } else {
+                            text += chunk;
+                            input.onText?.(text);
+                        }
+                    }
+                    for (const call of value.toolCalls ?? []) toolCalls.push({id: call.toolCallId, name: call.toolName, input: call.input});
+                    if (value.error) throw value.error;
+                    if (service === 'bilibili') {
+                        const finishReason = value.finishReason ?? 'stop';
+                        if (finishReason === 'length') throw new Error('B站讲解已截断，请缩短选文后重试');
+                        if (finishReason !== 'stop') throw new Error('B站没有返回完整有效的讲解，请重试');
+                        text = bilibiliText!.finish();
+                    }
+                    record(createHarnessUsageEvent({service, model, actualModel: value.response?.modelId, startedAt, durationMs: Date.now() - startedAt, usage: value.usage, outcome: 'success'}));
+                    const assistant = (value.response?.messages ?? []).find((message: {role: string}) => message.role === 'assistant');
+                    return {assistant: {role: 'assistant', content: service === 'bilibili' ? [{type: 'text', text}] : assistant?.content ?? [{type: 'text', text}]}, text, toolCalls};
+                } catch (error) {
+                    record(createHarnessUsageEvent({service, model, startedAt, durationMs: Date.now() - startedAt,
+                        outcome: input.signal.aborted ? (input.signal.reason instanceof Error && /超时/u.test(input.signal.reason.message) ? 'timeout' : 'cancelled') : 'error'}));
+                    throw error;
+                }
+            };
+        },
     };
-    return {generateText, streamResult, createModel: vi.fn(() => ({})), normalizeError: vi.fn((error: unknown) => error instanceof Error ? error : new Error(String(error)))};
 });
-vi.mock('ai', () => ({streamText: streamResult, tool: (definition: unknown) => definition}));
-vi.mock('@/src/services/harness/modelGateway', () => ({createHarnessLanguageModel: createModel, normalizeHarnessModelError: normalizeError}));
 
 import {UI_LANGUAGE_OPTIONS} from '@/src/core/i18n/language';
 import {HARNESS_ACTIONS} from '@/src/core/config/harness';
@@ -636,17 +672,16 @@ describe('Harness runtime', () => {
         expect(failedProgress).toEqual(['partial']);
     });
 
-    it('disables the SDK default raw-error logger while retaining the normalized error path', async () => {
+    it('keeps raw transport errors out of console.error while retaining the normalized error path', async () => {
         const error = new Error('fixture provider error');
         generateText.mockResolvedValue({error});
-        const result = await createHarnessRuntime(config).run({type: 'fluentReadHarness', action: 'run', requestId: 'no-raw-sdk-log', intent: 'meaning', question: '', selection: {text: 'Fixture source', context: '', sentence: ''}}, new AbortController().signal);
-        expect(result).toMatchObject({success: false, error: 'fixture provider error'});
-        expect(normalizeError).toHaveBeenCalledWith(error, 'openai', 'secret', undefined);
-        const onError = generateText.mock.calls[0][0].onError;
-        expect(onError).toBeTypeOf('function');
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-        try { onError({error}); expect(consoleError).not.toHaveBeenCalled(); }
-        finally { consoleError.mockRestore(); }
+        try {
+            const result = await createHarnessRuntime(config).run({type: 'fluentReadHarness', action: 'run', requestId: 'no-raw-sdk-log', intent: 'meaning', question: '', selection: {text: 'Fixture source', context: '', sentence: ''}}, new AbortController().signal);
+            expect(result).toMatchObject({success: false, error: 'fixture provider error'});
+            expect(normalizeError).toHaveBeenCalledWith(error, 'openai', 'secret', undefined);
+            expect(consoleError).not.toHaveBeenCalled();
+        } finally { consoleError.mockRestore(); }
     });
 
     it('supplies source identities after context permission and length limits without promoting memory or sentence metadata', async () => {

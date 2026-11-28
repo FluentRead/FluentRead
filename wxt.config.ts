@@ -36,14 +36,17 @@ import {
     aiSdkGatewayStubBuildPlugin,
     attachRolldownTransformFilters,
     configureExtensionUiChunks,
+    configureSharedContentScriptBuild,
     extendRemoteConfigBuildConfig,
     extendScopedChineseCatalogBuildConfig,
     extendSubframePageContextBuildConfig,
     extendSubframeSiteCatalogBuildConfig,
     extendSubframeSiteRulesBuildConfig,
+    groupContentScriptRuntimes,
     groupModuleWorkers,
     pruneEntrypointVitePlugins,
     remoteConfigStorageBuildPlugin,
+    sharedContentScriptBuildPlugin,
     subframePageContextBuildPlugin,
     subframeSiteCatalogBuildPlugin,
     subframeSiteRulesBuildPlugin,
@@ -76,6 +79,9 @@ export {
     pruneEntrypointVitePlugins,
     attachRolldownTransformFilters,
     groupModuleWorkers,
+    groupContentScriptRuntimes,
+    sharedContentScriptBuildPlugin,
+    configureSharedContentScriptBuild,
     configureExtensionUiChunks,
 };
 
@@ -245,6 +251,7 @@ export default defineConfig({
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);
+            groupContentScriptRuntimes(groups);
         },
         'vite:build:extendConfig': (entrypoints, viteConfig) => {
             extendRemoteConfigBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
@@ -254,6 +261,7 @@ export default defineConfig({
             extendScopedChineseCatalogBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
             pruneEntrypointVitePlugins(entrypoints, viteConfig as {plugins?: unknown[]});
             attachRolldownTransformFilters(viteConfig as {plugins?: unknown[]});
+            configureSharedContentScriptBuild(entrypoints, viteConfig);
             configureExtensionUiChunks(entrypoints, viteConfig);
             // Vite 的动态导入预加载帮助器访问 document；模块 Worker 只能使用原生 import。
             if (entrypoints.every(entrypoint => entrypoint.type === 'unlisted-script')) {

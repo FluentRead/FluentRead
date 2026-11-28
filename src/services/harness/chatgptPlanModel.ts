@@ -1,16 +1,67 @@
 /**
  * @file src/services/harness/chatgptPlanModel.ts
- * 文件职责：将 ChatGPT 套餐 Responses 协议适配为现有阅读和写作使用的 AI SDK LanguageModel v3。
+ * 文件职责：将 ChatGPT 套餐 Responses 协议适配为现有阅读和写作使用的轻量模型端口。
  * 主要内容：保留系统指令、完整多轮文本/图片和本地工具调用历史，将函数分组为 namespace；实时转发文字进度，完整完成后提交工具调用和用量，拒绝截断或失败生成。
- * 模块边界：不另建阅读会话或工具执行器，不接触 OAuth 令牌；传输由固定本机助手负责，本地工具继续交由现有 Harness 执行。
+ * 模块边界：不另建阅读会话或工具执行器，不接触 OAuth 令牌，不依赖第三方 AI SDK；传输由固定本机助手负责，本地工具继续交由现有 Harness 执行。
  */
-import type {LanguageModel} from 'ai';
 import {ChatGPTPlanError, requestChatGPTPlanResponse, type ChatGPTPlanPayload} from '@/src/platform/chatgpt-plan/bridge';
 import {readChatGPTPlanStream, streamChatGPTPlanEvents} from '@/src/platform/chatgpt-plan/events';
-type Model = Extract<LanguageModel, {specificationVersion: 'v3'}>;
-type Call = Parameters<Model['doGenerate']>[0];
-type Result = Awaited<ReturnType<Model['doGenerate']>>;
-type StreamPart = Awaited<ReturnType<Model['doStream']>>['stream'] extends ReadableStream<infer T> ? T : never;
+export type ChatGPTPlanToolResultOutput =
+    | {type: 'text'; value: string}
+    | {type: 'error-text'; value: string}
+    | {type: 'json'; value: unknown}
+    | {type: 'error-json'; value: unknown}
+    | {type: 'execution-denied'; reason?: string}
+    | {type: string; value?: unknown; reason?: string};
+export type ChatGPTPlanPromptPart =
+    | {type: 'text'; text: string}
+    | {type: 'file'; data: string | URL | Uint8Array; mediaType: string}
+    | {type: 'tool-call'; toolCallId: string; toolName: string; input: unknown}
+    | {type: 'tool-result'; toolCallId: string; toolName?: string; output: ChatGPTPlanToolResultOutput}
+    | {type: 'reasoning'; text?: string};
+export type ChatGPTPlanPromptMessage =
+    | {role: 'system'; content: string}
+    | {role: 'user' | 'assistant' | 'tool'; content: readonly ChatGPTPlanPromptPart[]};
+export interface ChatGPTPlanModelCall {
+    prompt: readonly ChatGPTPlanPromptMessage[];
+    tools?: readonly ({type: 'function'; name: string; description?: string; inputSchema: Record<string, unknown>} | {type: 'provider'; name?: string})[];
+    toolChoice?: {type: 'auto' | 'none' | 'required' | 'tool'; toolName?: string};
+    abortSignal?: AbortSignal;
+}
+export type ChatGPTPlanResultPart =
+    | {type: 'text'; text: string}
+    | {type: 'tool-call'; toolCallId: string; toolName: string; input: string};
+export interface ChatGPTPlanUsage {
+    inputTokens: {total: number | undefined; noCache: number | undefined; cacheRead: number | undefined; cacheWrite: undefined};
+    outputTokens: {total: number | undefined; text: number | undefined; reasoning: number | undefined};
+}
+export interface ChatGPTPlanFinishReason {unified: 'stop' | 'tool-calls'; raw: string}
+export interface ChatGPTPlanModelResult {
+    content: ChatGPTPlanResultPart[];
+    finishReason: ChatGPTPlanFinishReason;
+    usage: ChatGPTPlanUsage;
+    warnings: unknown[];
+    response: {id: string | undefined; modelId: string | undefined};
+}
+export type ChatGPTPlanStreamPart =
+    | {type: 'stream-start'; warnings: unknown[]}
+    | {type: 'text-start'; id: string}
+    | {type: 'text-delta'; id: string; delta: string}
+    | {type: 'text-end'; id: string}
+    | {type: 'tool-call'; toolCallId: string; toolName: string; input: string}
+    | {type: 'finish'; usage: ChatGPTPlanUsage; finishReason: ChatGPTPlanFinishReason};
+export interface ChatGPTPlanHarnessModel {
+    specificationVersion: 'v3';
+    provider: 'fluentread-chatgpt-plan';
+    modelId: string;
+    supportedUrls: Record<string, RegExp[]>;
+    doGenerate(options: ChatGPTPlanModelCall): Promise<ChatGPTPlanModelResult>;
+    doStream(options: ChatGPTPlanModelCall): Promise<{stream: ReadableStream<ChatGPTPlanStreamPart>}>;
+}
+type Model = ChatGPTPlanHarnessModel;
+type Call = ChatGPTPlanModelCall;
+type Result = ChatGPTPlanModelResult;
+type StreamPart = ChatGPTPlanStreamPart;
 function record(value: unknown): Record<string, unknown> {
     return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }

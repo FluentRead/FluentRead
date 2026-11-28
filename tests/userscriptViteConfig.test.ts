@@ -2856,19 +2856,14 @@ describe('standalone OpenAI transport build boundary', () => {
             expect(chunk.moduleIds).toContain(transport);
             expect(chunk.moduleIds.includes(standaloneOwner)).toBe(lightweight);
             expect(chunk.moduleIds.includes(`${owner}.ts`)).toBe(!lightweight);
-            expect(chunk.moduleIds.includes(http)).toBe(lightweight);
-            const externalSDK = !lightweight && standalone === '0' && greasy === '1';
-            expect(chunk.imports.slice().sort()).toEqual(externalSDK ? ['@ai-sdk/openai-compatible', 'ai'] : []);
-            expect(chunk.moduleIds.some(id => /\/node_modules\/ai\/dist\//u.test(id))).toBe(!lightweight && !externalSDK);
-            expect(chunk.moduleIds.some(id => /\/node_modules\/@ai-sdk\/openai-compatible\/dist\//u.test(id))).toBe(!lightweight && !externalSDK);
-            if (lightweight) expect(chunk.moduleIds.filter(id => /\/node_modules\/(?:@ai-sdk\/|ai\/|zod\/)/u.test(id))).toEqual([]);
+            expect(chunk.moduleIds.includes(http)).toBe(true);
+            expect(chunk.imports).toEqual([]);
+            expect(chunk.moduleIds.filter(id => /\/node_modules\/(?:@ai-sdk\/|ai\/|zod\/)/u.test(id))).toEqual([]);
             const realm = {openAIOwnerFixture: undefined as Array<(call: unknown) => Promise<string>> | undefined,
                 window: {}, URL, URLSearchParams, Headers, Request, Response, AbortController, AbortSignal, TextDecoder, TextEncoder,
                 ReadableStream, WritableStream, TransformStream, fetch: forbiddenFetch,
                 Uint8Array, ArrayBuffer, Error, TypeError, DOMException, structuredClone, performance,
-                crypto: globalThis.crypto, setTimeout, clearTimeout, console,
-                // Greasy 的外部出口也使用安装的真实 SDK，只把固定 @require 的加载位置替换为内存对象。
-                FluentReadUserscriptVendor: externalSDK ? {ai: await import('ai'), openAICompatible: await import('@ai-sdk/openai-compatible')} : undefined};
+                crypto: globalThis.crypto, setTimeout, clearTimeout, console};
             runInNewContext(chunk.code, realm, {timeout: 5_000});
             const runs = realm.openAIOwnerFixture!;
             expect(runs).toHaveLength(imports.length);

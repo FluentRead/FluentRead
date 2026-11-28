@@ -5,9 +5,31 @@
  * 模块边界：不 mock SDK、不读取研究目录、不联网；不替代共享 transport 的预算、租约、用量与真实浏览器验收。
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {openAICompatibleSdkExecution as sdkExecution} from '@/src/providers/translation/ai-sdk/openai-compatible';
+import {createOpenAICompatible} from '@ai-sdk/openai-compatible';
+import {generateText} from 'ai';
+import {normalizeAiSdkError} from '@/src/providers/translation/ai-sdk/errors';
+import {openAICompatibleSdkExecution} from '@/src/providers/translation/ai-sdk/openai-compatible';
 import {standaloneOpenAIExecution} from '@/src/providers/translation/ai-sdk/openai-http';
+import {readOpenAICompatibleText, type OpenAICompatibleMessageContent} from '@/src/providers/translation/ai-sdk/openai-response-text';
 import type {OpenAICompatibleCall, OpenAICompatibleExecution} from '@/src/providers/translation/ai-sdk/openai-transport';
+
+const sdkExecution: OpenAICompatibleExecution = {
+  async run(call) {
+    const provider = createOpenAICompatible({
+      name: 'fluentread', baseURL: call.endpoint.baseURL, apiKey: call.apiKey,
+      headers: call.headers, queryParams: call.endpoint.queryParams,
+      fetch: call.fetch, transformRequestBody: () => call.requestBody,
+    });
+    const result = await generateText({
+      model: provider(call.requestBody.model as string),
+      prompt: 'FluentRead OpenAI-compatible request',
+      maxRetries: call.maxRetries, abortSignal: call.signal, include: {responseBody: true},
+    });
+    const response = result.finalStep.response.body as {choices: Array<{message: {content?: OpenAICompatibleMessageContent}}>};
+    return readOpenAICompatibleText(response.choices[0].message.content);
+  },
+  normalizeError: normalizeAiSdkError,
+};
 
 const EPOCH = Date.UTC(2026, 9, 15);
 const SECRET = 'contract-fixture-secret';
@@ -147,6 +169,10 @@ afterEach(() => {
 });
 
 describe('standalone OpenAI HTTP contract against the real SDK', () => {
+  it('routes the extension openai-compatible execution through standaloneOpenAIExecution', () => {
+    expect(openAICompatibleSdkExecution).toBe(standaloneOpenAIExecution);
+  });
+
   it('preserves the browser headers, exact custom body, model and query encoding', async () => {
     const requestBody = {model: 'custom/model', messages: [{role: 'developer', content: 'Fixture instructions'},
       {role: 'user', content: [{type: 'image_url', image_url: {url: 'data:image/png;base64,AAAA'}}, {type: 'text', text: 'Fixture text'}]}],

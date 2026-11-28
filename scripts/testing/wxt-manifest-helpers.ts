@@ -182,5 +182,12 @@ export function createExtensionWebAccessibleResources(
             matches: ['<all_urls>'],
             ...(env.browser === 'safari' ? {} : {use_dynamic_url: true}),
         },
+        {
+            // 内容脚本隔离世界通过原生 import() 加载共享 ESM 运行时与按需分块；
+            // 必须保持稳定地址（不得设 use_dynamic_url: true），否则动态 UUID 违反内容脚本 script-src 'self'。
+            // 仅限定 content-scripts/chunks/*.js，不暴露扩展页面（popup/options/offscreen/sidepanel）的 chunks/*.js。
+            resources: ['content-scripts/chunks/*.js'],
+            matches: ['<all_urls>'],
+        },
     ];
 }

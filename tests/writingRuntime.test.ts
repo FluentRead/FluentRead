@@ -1,8 +1,55 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-const mocks = vi.hoisted(() => ({stream: vi.fn(), model: vi.fn((_config: any, _service: string, _model: string) => ({})), normalize: vi.fn((error: unknown) => error instanceof Error ? error : new Error(String(error)))}));
-vi.mock('ai', () => ({streamText: mocks.stream, tool: (definition: unknown) => definition}));
-vi.mock('@/src/services/harness/modelGateway', () => ({createHarnessLanguageModel: mocks.model, normalizeHarnessModelError: mocks.normalize}));
+const mocks = vi.hoisted(() => ({
+    useReal: false,
+    stream: vi.fn(),
+    model: vi.fn((_config: any, _service: string, _model: string) => ({})),
+    normalize: vi.fn((error: unknown, _service?: string, _apiKey?: string, _customHeaders?: string) => error instanceof Error ? error : new Error(String(error))),
+}));
+vi.mock('@/src/services/harness/generation', async actual => {
+    const real = await actual<typeof import('@/src/services/harness/generation')>();
+    const {createHarnessUsageEvent} = await import('@/src/services/harness/usage');
+    return {
+        ...real,
+        normalizeHarnessModelError: (...args: Parameters<typeof real.normalizeHarnessModelError>) => mocks.useReal ? real.normalizeHarnessModelError(...args) : mocks.normalize(...args),
+        createHarnessGenerator: (config: any, service: string, modelId: string, tools: readonly any[], recordUsage?: (event: any) => void, options?: any) => {
+            if (mocks.useReal) return real.createHarnessGenerator(config, service, modelId, tools, recordUsage, options);
+            mocks.model(config, service, modelId);
+            const toolMap = tools.length ? Object.fromEntries(tools.map(t => [t.name, t])) : undefined;
+            return async (input: {system: string; messages: unknown[]; signal: AbortSignal; onText?: (text: string) => void}) => {
+                const startedAt = Date.now();
+                const purpose = options?.purpose ?? 'reading';
+                try {
+                    const result = await mocks.stream({
+                        instructions: input.system, messages: input.messages,
+                        ...(toolMap ? {tools: toolMap} : {}),
+                        abortSignal: input.signal, maxRetries: 0, maxOutputTokens: options?.maxOutputTokens,
+                    });
+                    let text = '';
+                    const toolCalls: Array<{id: string; name: string; input: unknown}> = [];
+                    for await (const part of result.stream) {
+                        if (input.signal.aborted) throw new Error('已停止生成');
+                        if (part.type === 'error') throw part.error;
+                        if (part.type === 'text-delta') { text += part.text; input.onText?.(text); }
+                        else if (part.type === 'tool-call') toolCalls.push({id: part.toolCallId, name: part.toolName, input: part.input});
+                    }
+                    const finishReason = await (result.finishReason ?? Promise.resolve('stop'));
+                    const [usage, {response}, messages] = await Promise.all([result.usage, result.finalStep, result.responseMessages]);
+                    if (input.signal.aborted) throw new Error('已停止生成');
+                    options?.validateStep?.({text, toolCalls, actualModel: response.modelId, finishReason});
+                    recordUsage?.({...createHarnessUsageEvent({service, model: modelId, actualModel: response.modelId || modelId, startedAt, durationMs: Date.now() - startedAt, usage, outcome: 'success'}), purpose});
+                    const assistant = messages.find((message: {role: string}) => message.role === 'assistant');
+                    return {assistant: {role: 'assistant', content: assistant?.content ?? [{type: 'text', text}]}, text, toolCalls};
+                } catch (error) {
+                    recordUsage?.({...createHarnessUsageEvent({service, model: modelId, startedAt, durationMs: Date.now() - startedAt,
+                        outcome: input.signal.aborted ? (input.signal.reason instanceof Error && /超时/u.test(input.signal.reason.message) ? 'timeout' : 'cancelled') : 'error'}), purpose});
+                    throw error;
+                }
+            };
+        },
+    };
+});
 import {Config} from '@/src/core/config/model';
+import {setRuntimeFetch} from '@/src/platform/http/runtime';
 import {WRITING_ACTIONS, WRITING_LANGUAGES, WRITING_LENGTHS, WRITING_STYLES, WRITING_ROLES, WRITING_TONES} from '@/src/core/config/writing';
 import {options, services} from '@/src/core/config/catalog';
 import * as harnessLoop from '@/src/core/harness/loop';
@@ -14,8 +61,8 @@ function config() { const current = new Config(); current.writing.enabled = true
 function stream(parts: any[] = [{type: 'text-delta', text: 'Draft'}], actual = 'actual-writer') {
   return {stream: (async function* () { for (const part of parts) yield part; })(), usage: Promise.resolve({inputTokens: 10, outputTokens: 5, totalTokens: 15}), finalStep: Promise.resolve({response: {modelId: actual}}), responseMessages: Promise.resolve([])};
 }
-beforeEach(() => { mocks.stream.mockReset().mockImplementation(() => stream()); mocks.model.mockClear(); mocks.normalize.mockClear(); });
-afterEach(() => vi.useRealTimers());
+beforeEach(() => { mocks.useReal = false; mocks.stream.mockReset().mockImplementation(() => stream()); mocks.model.mockClear(); mocks.normalize.mockClear(); });
+afterEach(() => { mocks.useReal = false; setRuntimeFetch(); vi.useRealTimers(); });
 describe('Writing model runtime', () => {
   it('rejects disabled services before memory lookup, model creation and streaming', async () => {
     const current = config(); current.disabledTranslationServices = ['openai']; const recall = vi.fn();
@@ -289,6 +336,8 @@ describe('Writing Harness tools and memory', () => {
     ['read_context', {url: 'https://outside.test'}],
     ['read_context', new Date()],
     ['search_memory', {query: ''}],
+    ['search_memory', {query: 42}],
+    ['search_memory', {query: 'writing', extra: true}],
     ['search_memory', {query: '🙂'.repeat(251)}],
     ['search_memory', Object.assign(new Date(), {query: 'writing'})],
     ['send_reply', {}],
@@ -339,35 +388,32 @@ describe('Writing Harness tools and memory', () => {
   });
 });
 
-describe('Writing Harness AI SDK protocol', () => {
-  it('round-trips real SDK tool messages and saved memory into a final draft', async () => {
-    const sdk = await vi.importActual<typeof import('ai')>('ai');
-    const {MockLanguageModelV3} = await import('ai/test');
-    const usage = {inputTokens: {total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0}, outputTokens: {total: 5, text: 5, reasoning: 0}};
+describe('Writing Harness wire protocol', () => {
+  it('round-trips real SSE tool messages and saved memory into a final draft', async () => {
+    mocks.useReal = true;
+    const sse = (chunks: unknown[]) => new Response(
+      chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n',
+      {headers: {'content-type': 'text/event-stream'}},
+    );
+    const usage = {prompt_tokens: 10, completion_tokens: 5, total_tokens: 15};
     const steps = [
-      [{type: 'tool-call' as const, toolCallId: 'context-1', toolName: 'read_context', input: '{}'}],
-      [{type: 'tool-call' as const, toolCallId: 'memory-1', toolName: 'search_memory', input: '{"query":"writing"}'}],
-      [{type: 'text-start' as const, id: 'text'}, {type: 'text-delta' as const, id: 'text', delta: 'A complete reply.'}, {type: 'text-end' as const, id: 'text'}],
+      [{model: 'sdk-writer', choices: [{delta: {tool_calls: [{index: 0, id: 'context-1', function: {name: 'read_context', arguments: '{}'}}]}, finish_reason: 'tool_calls'}], usage}],
+      [{model: 'sdk-writer', choices: [{delta: {tool_calls: [{index: 0, id: 'memory-1', function: {name: 'search_memory', arguments: '{"query":"writing"}'}}]}, finish_reason: 'tool_calls'}], usage}],
+      [{model: 'sdk-writer', choices: [{delta: {content: 'A complete reply.'}, finish_reason: 'stop'}], usage}],
     ];
-    const model = new MockLanguageModelV3({doStream: async () => {
-      const chunks = steps.shift()!;
-      return {stream: new ReadableStream({start(controller) {
-        controller.enqueue({type: 'stream-start', warnings: []});
-        controller.enqueue({type: 'response-metadata', modelId: 'sdk-writer'});
-        chunks.forEach(chunk => controller.enqueue(chunk));
-        controller.enqueue({type: 'finish', finishReason: {unified: steps.length ? 'tool-calls' : 'stop', raw: undefined}, usage});
-        controller.close();
-      }})};
-    }});
-    mocks.model.mockReturnValueOnce(model); mocks.stream.mockImplementation(sdk.streamText);
+    const bodies: any[] = [];
+    setRuntimeFetch(async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return sse(steps.shift()!);
+    });
     const c = config(); c.harness.memoryEnabled = true;
     const recall = vi.fn(async () => [{id: 'preference', kind: 'preference' as const, content: 'Prefer concrete wording', createdAt: 1, updatedAt: 1}]);
     const record = vi.fn();
     const result = await createWritingRuntime(() => c, record, {recall})(request, controller().signal, vi.fn());
     expect(result).toEqual({success: true, text: 'A complete reply.', service: 'openai', model: 'sdk-writer'});
-    expect(model.doStreamCalls).toHaveLength(3);
-    expect(model.doStreamCalls[1].prompt).toContainEqual({role: 'tool', content: [expect.objectContaining({type: 'tool-result', toolCallId: 'context-1', toolName: 'read_context', output: {type: 'text', value: request.context}})]});
-    expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('Prefer concrete wording');
+    expect(bodies).toHaveLength(3);
+    expect(bodies[1].messages).toContainEqual({role: 'tool', tool_call_id: 'context-1', content: request.context});
+    expect(JSON.stringify(bodies[2].messages)).toContain('Prefer concrete wording');
     expect(recall).toHaveBeenCalledWith('writing'); expect(record).toHaveBeenCalledTimes(3);
   });
 });

@@ -22,15 +22,23 @@ vi.mock('@/src/app/translation/runtime', () => ({cleanupTranslationCache: vi.fn(
 vi.mock('@/src/app/translation/visionProbeRuntime', () => ({modelVisionProbe: {resolve: vi.fn()}}));
 vi.mock('@/src/platform/storage/modelUsageRepository', () => ({getModelUsageRepository: () => ({})}));
 vi.mock('@/src/features/vocabulary/repository', () => ({vocabularyBook: {pruneUndo: async () => undefined}}));
-vi.mock('ai', () => ({streamText: (...args: unknown[]) => state.model(...args), tool: (definition: unknown) => definition}));
-vi.mock('@/src/services/harness/modelGateway', async original => ({
-    ...await original<typeof import('@/src/services/harness/modelGateway')>(), createHarnessLanguageModel: () => ({}),
-}));
 vi.mock('@/src/services/harness/generation', async original => {
     const native = await original<typeof import('@/src/services/harness/generation')>();
     const lightweight = await import('@/userscript/readingGeneration');
-    return {...native, createHarnessGenerator: (...args: Parameters<typeof native.createHarnessGenerator>) =>
-        (state.lightweight ? lightweight.createHarnessGenerator : native.createHarnessGenerator)(...args)};
+    return {
+        ...native,
+        createHarnessGenerator: (...args: Parameters<typeof native.createHarnessGenerator>) => {
+            if (state.lightweight) return lightweight.createHarnessGenerator(args[0], args[1], args[2], args[3], args[4]);
+            return async (input: {system: string; messages: readonly unknown[]; signal: AbortSignal; onText?: (text: string) => void}) => {
+                const res = await state.model({instructions: input.system, messages: input.messages, abortSignal: input.signal});
+                let text = '';
+                for await (const part of res.stream) {
+                    if (part.type === 'text-delta') { text += part.text; input.onText?.(text); }
+                }
+                return {assistant: {role: 'assistant' as const, content: [{type: 'text', text}]}, text, toolCalls: []};
+            };
+        },
+    };
 });
 vi.mock('webextension-polyfill', async () => ({default: (await import('@/userscript/browser')).default}));
 
@@ -244,7 +252,7 @@ it('rejects an explicit null context-tool argument at the actual shared executio
     setRuntimeFetch(fetcher);
     try {
         setPlatformMessageHandler(createPlatformMessageHandler(vi.fn()));const run=begin();await vi.waitFor(()=>expect(run.result).toHaveBeenCalledOnce());
-        expect(run.result.mock.calls[0][0]).toMatchObject({success:false,error:'理解请求未完成，请重试'});
+        expect(run.result.mock.calls[0][0]).toMatchObject({success:false,error:'阅读助手工具调用次数已达上限'});
         expect(fetcher).toHaveBeenCalledOnce();expect(run.error).not.toHaveBeenCalled();expect(state.model).not.toHaveBeenCalled();
     } finally {setRuntimeFetch();}
 });

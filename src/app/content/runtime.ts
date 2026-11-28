@@ -4,7 +4,7 @@
  * 主要内容：通过既有配置订阅即时重排网页双语与仅译文工件，不重发翻译请求；按全局配置同步当前文档的译文字体，刷新与路由变化保留选择，停用、挂起和销毁只撤销文档样式，恢复时重新应用；装配学习材料继续阅读的来源校验、定位与自动位置更新生命周期；先排除原始 XML 文档与失效扩展上下文，再安装内联 page.css 并按 capability 和配置挂载页面功能；配置变更时更新页面私有网站名单索引，按已提交地址检查自动翻译与站点禁用，锚点跳转保留请求，协调停用、往返缓存暂停恢复与销毁。
  * 模块边界：本文件只负责依赖装配和页面激活所有权，不实现具体翻译算法、组件内部状态、provider 请求或配置存储；这些职责分别属于 features、services 与 platform。
  */
-import {createLearningContentFeatures} from './learningFeatures';
+import {createLearningContentFeatures, isLazyWritingAssistantMounted, mountLazyWritingAssistant, unmountLazyWritingAssistant} from './learningFeatures';
 import {createReaderContentFeatures} from './readerFeatures';
 import {createCommandPaletteContentFeature} from './commandPaletteFeature';
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
@@ -56,7 +56,6 @@ import {createPageTranslationFontRuntime} from './pageTranslationFont';
 import {consumeArxivPaperReading, mountPaperReading, waitForPaperReadingDom} from './paperReading';
 import {translate} from '@/src/core/i18n';
 import {showPageNotice} from '@/src/features/page-notice/public';
-import {isWritingAssistantMounted, mountWritingAssistant, unmountWritingAssistant} from '@/src/features/writing-assistant/public';
 import {mountWritingShortcut} from '@/src/features/writing-assistant/shortcutRuntime';
 export async function startContentApp(ctx: ContentScriptContext,
     capabilities: BrowserCapabilities = browserCapabilities): Promise<void> {
@@ -180,7 +179,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         const resetFullPageKeyboardGesture = hotkeys.installFloatingBallHotkey(activationController.signal);
         mountConfiguredQuickTranslation(config, hotkeys, () => currentPageSiteDisabled, activationController.signal,
             () => { resetHoverKeyboardGesture(); resetFullPageKeyboardGesture(); }, mailFullPageToggle);
-        if (import.meta.env.BROWSER !== 'userscript' && capabilities.browser !== 'userscript') mountWritingShortcut(activationController.signal, {isSiteDisabled: () => currentPageSiteDisabled, mount: () => mountWritingAssistant(ctx), unmount: unmountWritingAssistant, isMounted: isWritingAssistantMounted});
+        if (import.meta.env.BROWSER !== 'userscript' && capabilities.browser !== 'userscript') mountWritingShortcut(activationController.signal, {isSiteDisabled: () => currentPageSiteDisabled, mount: () => mountLazyWritingAssistant(ctx), unmount: unmountLazyWritingAssistant, isMounted: isLazyWritingAssistantMounted});
         activePageFeatureRegistry = createContentFeatureRegistry([
             ...createLearningContentFeatures(ctx, config, capabilities),
             ...createReaderContentFeatures(ctx, config),

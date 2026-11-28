@@ -4,7 +4,6 @@
  * 主要内容：每个端口只接收一个有界请求，向后台传递可信发送者以隔离隐私窗口，配置、导航、断连、超时后阻止迟到输出。
  * 模块边界：不读密钥或浏览器全局；由应用层注入配置就绪、资格和生成函数。
  */
-import {z} from 'zod';
 import {isProtocolInputObject} from '@/src/core/messaging/validation';
 import {WRITING_ACTIONS, WRITING_LENGTHS, WRITING_SITES, WRITING_STYLES, WRITING_ROLE_MAX_LENGTH, WRITING_TONE_MAX_LENGTH, isWritingLanguage, normalizeWritingLanguage, normalizeWritingLength} from '@/src/core/config/writing';
 import type {WritingRequest, WritingResponse, WritingProgress, WritingStreamMessage} from './types';
@@ -16,28 +15,54 @@ export interface WritingPort {
     onDisconnect: {addListener(fn: () => void): void; removeListener(fn: () => void): void};
     postMessage(message: WritingStreamMessage): void;
 }
-// Keep the transport's UTF-16 limits when Zod counts Unicode code points.
-const boundedText = (limit: number) => z.string().refine(value => value.length <= limit);
-const historyEntrySchema = z.preprocess(
-    input => isProtocolInputObject(input) ? input : null,
-    z.strictObject({question: boundedText(2000), answer: boundedText(12000)}),
-);
-const requestSchema = z.strictObject({
-    type: z.literal('fluentReadWriting'), action: z.literal('run'), requestId: z.string().regex(/^[\w.:-]{1,128}$/u),
-    intent: z.string().refine(value => WRITING_ACTIONS.some(item => item.id === value)),
-    instruction: boundedText(2000), draft: boundedText(12000), context: boundedText(12000),
-    language: boundedText(32).refine(isWritingLanguage).transform(normalizeWritingLanguage),
-    tone: boundedText(WRITING_TONE_MAX_LENGTH).regex(/^[^\u0000-\u001f\u007f]*$/u).trim().min(1),
-    length: z.string().refine(value => value === 'auto' || WRITING_LENGTHS.some(item => item.value === value)).prefault('short').transform(normalizeWritingLength),
-    style: z.string().refine(value => WRITING_STYLES.some(item => item.value === value)).prefault('auto'),
-    role: boundedText(WRITING_ROLE_MAX_LENGTH).regex(/^[^\u0000-\u001f\u007f]*$/u).trim().min(1).prefault('auto'),
-    site: z.enum(WRITING_SITES).optional(),
-    history: z.array(historyEntrySchema).max(4),
-});
+const REQUEST_KEYS = new Set([
+    'type', 'action', 'requestId', 'intent', 'instruction', 'draft', 'context',
+    'language', 'tone', 'length', 'style', 'role', 'site', 'history',
+]);
+const REQUEST_ID_PATTERN = /^[\w.:-]{1,128}$/u;
+const CONTROL_CHAR_FREE_PATTERN = /^[^\u0000-\u001f\u007f]*$/u;
+// Keep the transport's UTF-16 code-unit limits without pulling a schema compiler into background.
+const isBoundedText = (value: unknown, limit: number): value is string => typeof value === 'string' && value.length <= limit;
+const parseBoundedLabel = (value: unknown, limit: number): string | null => {
+    if (!isBoundedText(value, limit) || !CONTROL_CHAR_FREE_PATTERN.test(value)) return null;
+    const trimmed = value.trim();
+    return trimmed.length >= 1 ? trimmed : null;
+};
 export const parseWritingRequest = (value: unknown): WritingRequest | null => {
     if (!isProtocolInputObject(value)) return null;
-    const parsed = requestSchema.safeParse(value);
-    return parsed.success ? parsed.data as WritingRequest : null;
+    for (const key in value) if (!REQUEST_KEYS.has(key)) return null;
+    if (value.type !== 'fluentReadWriting' || value.action !== 'run') return null;
+    if (typeof value.requestId !== 'string' || !REQUEST_ID_PATTERN.test(value.requestId)) return null;
+    if (typeof value.intent !== 'string' || !WRITING_ACTIONS.some(item => item.id === value.intent)) return null;
+    if (!isBoundedText(value.instruction, 2000) || !isBoundedText(value.draft, 12000) || !isBoundedText(value.context, 12000)) return null;
+    if (!isBoundedText(value.language, 32) || !isWritingLanguage(value.language)) return null;
+    const tone = parseBoundedLabel(value.tone, WRITING_TONE_MAX_LENGTH);
+    if (!tone) return null;
+    const rawLength = value.length === undefined ? 'short' : value.length;
+    if (typeof rawLength !== 'string' || (rawLength !== 'auto' && !WRITING_LENGTHS.some(item => item.value === rawLength))) return null;
+    const style = value.style === undefined ? 'auto' : value.style;
+    if (typeof style !== 'string' || !WRITING_STYLES.some(item => item.value === style)) return null;
+    const role = value.role === undefined ? 'auto' : parseBoundedLabel(value.role, WRITING_ROLE_MAX_LENGTH);
+    if (!role) return null;
+    if (value.site !== undefined && (typeof value.site !== 'string' || !WRITING_SITES.some(item => item === value.site))) return null;
+    if (!Array.isArray(value.history) || value.history.length > 4) return null;
+    const history: Array<{question: string; answer: string}> = [];
+    for (const entry of value.history) {
+        if (!isProtocolInputObject(entry)) return null;
+        for (const key in entry) if (key !== 'question' && key !== 'answer') return null;
+        if (!isBoundedText(entry.question, 2000) || !isBoundedText(entry.answer, 12000)) return null;
+        history.push({question: entry.question, answer: entry.answer});
+    }
+    return {
+        type: 'fluentReadWriting', action: 'run', requestId: value.requestId,
+        intent: value.intent as WritingRequest['intent'],
+        instruction: value.instruction, draft: value.draft, context: value.context,
+        language: normalizeWritingLanguage(value.language), tone,
+        length: normalizeWritingLength(rawLength),
+        style: style as WritingRequest['style'], role,
+        ...(value.site !== undefined ? {site: value.site as WritingRequest['site']} : {}),
+        history,
+    };
 };
 export function createWritingHandler(deps: {
     extensionId: string; optionsUrl: string; ready: Promise<unknown>;

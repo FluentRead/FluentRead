@@ -1260,4 +1260,54 @@ describe('deep slim Layer 1 + Layer 2 edge branches and contracts', () => {
         extendSubframeSiteCatalogBuildConfig([{type: 'content-script', name: 'content'}], multiCfg);
         expect(multiCfg.plugins).toHaveLength(0);
     });
+
+    it('lazy-loads writing assistant on demand and cancels late mounts on unmount or invalid context', async () => {
+        vi.resetModules();
+        let mounted = false;
+        const mountWritingAssistant = vi.fn(async () => { mounted = true; });
+        const unmountWritingAssistant = vi.fn(() => { mounted = false; });
+        const isWritingAssistantMounted = vi.fn(() => mounted);
+        vi.doMock('webextension-polyfill', () => ({default: {extension: {inIncognitoContext: false}, runtime: {}}}));
+        vi.doMock('@/src/app/content/personalCorrections', () => ({mountPersonalCorrectionContent: vi.fn(), unmountPersonalCorrectionContent: vi.fn()}));
+        vi.doMock('@/src/features/vocabulary/material/content/public', () => ({mountMaterialContent: vi.fn()}));
+        vi.doMock('@/src/features/vocabulary/content/public', () => ({mountVocabularyReencounter: vi.fn(), unmountVocabularyReencounter: vi.fn()}));
+        vi.doMock('@/src/features/share-card/public', () => ({mountShareCard: vi.fn(), unmountShareCard: vi.fn(), isShareCardMounted: () => false}));
+        vi.doMock('@/src/features/writing-assistant/public', () => ({
+            mountWritingAssistant,
+            unmountWritingAssistant,
+            isWritingAssistantMounted,
+        }));
+        try {
+            const learning = await import('@/src/app/content/learningFeatures');
+            expect(learning.isLazyWritingAssistantMounted()).toBe(false);
+            learning.unmountLazyWritingAssistant();
+            expect(unmountWritingAssistant).not.toHaveBeenCalled();
+
+            // Cancel while the initial dynamic import is in flight via unmount.
+            const liveCtx = {isInvalid: false} as never;
+            const pending = learning.mountLazyWritingAssistant(liveCtx);
+            learning.unmountLazyWritingAssistant();
+            await pending;
+            expect(mountWritingAssistant).not.toHaveBeenCalled();
+
+            // Skip mounting when context is invalid even after the module is already cached.
+            await learning.mountLazyWritingAssistant({isInvalid: true} as never);
+            expect(mountWritingAssistant).not.toHaveBeenCalled();
+
+            // Normal mount and unmount reuse the cached module cleanly.
+            await learning.mountLazyWritingAssistant(liveCtx);
+            expect(mountWritingAssistant).toHaveBeenCalledOnce();
+            expect(learning.isLazyWritingAssistantMounted()).toBe(true);
+            learning.unmountLazyWritingAssistant();
+            expect(unmountWritingAssistant).toHaveBeenCalledOnce();
+            expect(learning.isLazyWritingAssistantMounted()).toBe(false);
+        } finally {
+            vi.doUnmock('webextension-polyfill');
+            vi.doUnmock('@/src/app/content/personalCorrections');
+            vi.doUnmock('@/src/features/vocabulary/material/content/public');
+            vi.doUnmock('@/src/features/vocabulary/content/public');
+            vi.doUnmock('@/src/features/share-card/public');
+            vi.doUnmock('@/src/features/writing-assistant/public');
+        }
+    });
 });

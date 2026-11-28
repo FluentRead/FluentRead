@@ -17,7 +17,10 @@ class HttpFailure extends Error implements LlmHttpFailure {
     readonly statusCode?: number,
     readonly responseHeaders?: Record<string, string>,
     readonly responseBody?: string,
-  ) { super(message); }
+  ) {
+    super(message);
+    this.name = 'LlmHttpFailure';
+  }
 }
 
 function isAbort(error: unknown): boolean {

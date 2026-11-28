@@ -1,7 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {HarnessLedger, deriveEventMessage, deriveMessages, foldSurface, isSurfaceEvent} from '@/src/core/harness/surface';
 import {runHarnessLoop, type HarnessGenerateResult, type HarnessToolDefinition} from '@/src/core/harness/loop';
-import {z} from 'zod';
 import {z as zod3} from 'zod/v3';
 import {readContextInputSchema} from '@/src/services/harness/generation';
 import {isReadContextInput, READ_CONTEXT_INPUT_SCHEMA} from '@/src/services/harness/readContext';
@@ -36,7 +35,7 @@ describe('tool-free reading generation', () => {
 describe('shared read_context wire validation', () => {
     it('preserves the wire schema and Zod 3 behavior for JSON, inherited keys and non-JSON tool values', () => {
         const previous = zod3.object({reason: zod3.string().max(200).optional()}).strict();
-        expect(z.toJSONSchema(readContextInputSchema, {target: 'draft-7', io: 'input'}))
+        expect(readContextInputSchema.jsonSchema)
             .toEqual({...READ_CONTEXT_INPUT_SCHEMA, $schema: 'http://json-schema.org/draft-07/schema#'});
         const inputs: unknown[] = [undefined, null, true, 0, NaN, '', [], ['reason'], () => undefined,
             {}, {reason: undefined}, {reason: ''}, {reason: 'x'.repeat(200)}, {reason: 'x'.repeat(201)},

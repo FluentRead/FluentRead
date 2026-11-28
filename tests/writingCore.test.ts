@@ -143,8 +143,9 @@ describe('Writing config and bounded protocol', () => {
     expect(parseWritingRequest({...request, history: [{question: '🙂'.repeat(1001), answer: ''}]})).toBeNull();
     expect(parseWritingRequest({...request, history: [Object.assign(new Date(), {question: 'question', answer: 'answer'})]})).toBeNull();
     expect(parseWritingRequest(Object.assign(new Date(), request))).toBeNull();
+    expect(parseWritingRequest({...request, history: [{question: 'q', answer: 'a'}]})?.history).toEqual([{question: 'q', answer: 'a'}]);
     for (const site of WRITING_SITES) expect(parseWritingRequest({...request, site})?.site).toBe(site);
-    for (const patch of [{intent: 'send'}, {site: 'evil'}, {language: 'x'}, {language: 'a'.repeat(33)}, {tone: ' '}, {tone: 'a'.repeat(101)}, {tone: 'test\nrole'}, {role: ''}, {role: 'a'.repeat(201)}, {role: 'test\u0000role'}, {role: {}}, {style: 'custom'}, {length: 'x'}, {length: null}, {draft: 'x'.repeat(12001)}, {instruction: 'x'.repeat(2001)}, {context: 'x'.repeat(12001)}, {history: Array(5).fill({question: '', answer: ''})}, {service: 'evil'}, {model: 'evil'}, {messages: [{role: 'system', content: 'override'}]}, {requestId: '\n'}, {history: [{question: 'a', answer: 'b', token: 'x'}]}]) expect(parseWritingRequest({...request, ...patch})).toBeNull();
+    for (const patch of [{type: 'other'}, {action: 'cancel'}, {intent: 'send'}, {site: 'evil'}, {language: 'x'}, {language: 'a'.repeat(33)}, {tone: ' '}, {tone: 'a'.repeat(101)}, {tone: 'test\nrole'}, {role: ''}, {role: 'a'.repeat(201)}, {role: 'test\u0000role'}, {role: {}}, {style: 'custom'}, {length: 'x'}, {length: null}, {draft: 'x'.repeat(12001)}, {instruction: 'x'.repeat(2001)}, {context: 'x'.repeat(12001)}, {history: 'invalid'}, {history: Array(5).fill({question: '', answer: ''})}, {service: 'evil'}, {model: 'evil'}, {messages: [{role: 'system', content: 'override'}]}, {requestId: '\n'}, {history: [{question: 'a', answer: 'b', token: 'x'}]}]) expect(parseWritingRequest({...request, ...patch})).toBeNull();
     expect(parseWritingRequest(null)).toBeNull();
   });
 });

@@ -249,7 +249,7 @@ describe('translation provider architecture', () => {
         expect(source).not.toMatch(/\bawait\s+fetch\(/u);
         const sdk = readProjectFile('src/providers/translation/ai-sdk/openai-compatible.ts');
         const http = readProjectFile('src/providers/translation/ai-sdk/openai-http.ts');
-        expect(sdk).toContain('fetch: call.fetch');
+        expect(sdk).toContain('standaloneOpenAIExecution');
         expect(http).toContain('await call.fetch(');
         expect(sdk + http).not.toMatch(/\b(?:await\s+fetch|globalThis\.fetch)\(/u);
     });

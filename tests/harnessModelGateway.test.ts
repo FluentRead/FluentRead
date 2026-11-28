@@ -1,40 +1,71 @@
 /**
  * @file tests/harnessModelGateway.test.ts
- * 文件职责：验证 Harness 模型网关的服务边界、端点、凭据、取消和工具调用请求协议。
- * 主要内容：使用真实 AI SDK provider 加 mock fetch 检查 OpenAI-compatible payload。
+ * 文件职责：验证 Harness 轻量模型网关的服务边界、端点、凭据、取消、工具调用、多 Key 轮转和 ChatGPT 套餐协议。
+ * 主要内容：使用真实轻量 HTTP/SSE 生成器与可控 runtimeFetch 检查 OpenAI-compatible、Claude、Gemini、B站及 ChatGPT 套餐请求和响应行为。
  * 模块边界：测试不访问真实网络，不覆盖 UI、会话、Config 持久化或背景路由。
  */
 import {afterEach, describe, expect, it, vi} from 'vitest';
 const planBuild = vi.hoisted(() => ({enabled: false}));
+const planBridge = vi.hoisted(() => ({respond: vi.fn()}));
 vi.mock('@/src/platform/chatgpt-plan/buildMode', () => ({get chatGPTPlanDevelopmentEnabled() {return planBuild.enabled;}}));
-import {generateText, streamText, tool} from 'ai';
-import {z} from 'zod';
+vi.mock('@/src/platform/chatgpt-plan/bridge', async actual => {
+  const real = await actual<typeof import('@/src/platform/chatgpt-plan/bridge')>();
+  return {...real, requestChatGPTPlanResponse: (...args: Parameters<typeof real.requestChatGPTPlanResponse>) => planBridge.respond(...args)};
+});
 import {reactive} from 'vue';
 import {Config} from '@/src/core/config/model';
 import {currentModelIds, services} from '@/src/core/config/catalog';
-import {createHarnessLanguageModel, getHarnessModelInputKey, normalizeHarnessModelError, sanitizeHarnessModelMessage} from '@/src/services/harness/modelGateway';
+import {createHarnessGenerator} from '@/src/services/harness/generation';
+import {createHarnessStreamExecutor, getHarnessModelInputKey, normalizeHarnessModelError, sanitizeHarnessModelMessage} from '@/src/services/harness/modelGateway';
 import {BILIBILI_FREE_TRANSLATION_DOMAIN, BILIBILI_FREE_TRANSLATION_MODEL} from '@/src/core/config/freeTranslation';
 import {setRuntimeFetch} from '@/src/platform/http/runtime';
 import {createHarnessRuntime} from '@/src/services/harness/runtime';
+import type {HarnessGenerateInput, HarnessToolDefinition} from '@/src/core/harness/loop';
 
-function response(body: unknown): Response {
-  return new Response(JSON.stringify(body), {status: 200, headers: {'content-type': 'application/json'}});
-}
+const sse = (chunks: unknown[]) => new Response(
+  chunks.map(chunk => `data: ${typeof chunk === 'string' ? chunk : JSON.stringify(chunk)}\n\n`).join(''),
+  {status: 200, headers: {'content-type': 'text/event-stream'}},
+);
+const openaiSse = (content = 'done') => sse([
+  {id: 'chat', choices: [{index: 0, delta: {role: 'assistant', content}, finish_reason: null}]},
+  {id: 'chat', choices: [{index: 0, delta: {}, finish_reason: 'stop'}]},
+  '[DONE]',
+]);
+const claudeSse = (text = 'claude answer') => sse([
+  {type: 'message_start', message: {id: 'msg_1', type: 'message', role: 'assistant', model: 'claude-sonnet-5', content: [], stop_reason: null, usage: {input_tokens: 2, output_tokens: 0}}},
+  {type: 'content_block_start', index: 0, content_block: {type: 'text', text: ''}},
+  {type: 'content_block_delta', index: 0, delta: {type: 'text_delta', text}},
+  {type: 'content_block_stop', index: 0},
+  {type: 'message_delta', delta: {stop_reason: 'end_turn'}, usage: {output_tokens: 3}},
+  {type: 'message_stop'},
+]);
+const geminiSse = (text = 'gemini answer') => sse([
+  {candidates: [{content: {role: 'model', parts: [{text}]}, finishReason: 'STOP'}], usageMetadata: {promptTokenCount: 2, candidatesTokenCount: 3, totalTokenCount: 5}},
+]);
+const promptInput = (text = 'Explain', overrides: Partial<HarnessGenerateInput> = {}): HarnessGenerateInput => ({
+  system: 'System',
+  messages: [{role: 'user', content: text}],
+  tools: [],
+  signal: new AbortController().signal,
+  ...overrides,
+});
 
 describe('harness model gateway', () => {
-  it.each([services.openai, services.bilibili, services.chatgptPlan, 'custom:closed'])('rejects disabled %s before constructing any AI transport', service => {
-    const config = new Config(); config.disabledTranslationServices = [service];
-    const before = JSON.stringify(config);
-    expect(() => createHarnessLanguageModel(config, service, 'saved-model')).toThrow('所选翻译服务已关闭');
-    expect(JSON.stringify(config)).toBe(before);
-  });
   afterEach(() => {
     setRuntimeFetch();
     planBuild.enabled = false;
+    planBridge.respond.mockReset();
+  });
+
+  it.each([services.openai, services.bilibili, services.chatgptPlan, 'custom:closed'])('rejects disabled %s before constructing any AI transport', service => {
+    const config = new Config(); config.disabledTranslationServices = [service];
+    const before = JSON.stringify(config);
+    expect(() => createHarnessGenerator(config, service, 'saved-model', [])).toThrow('所选翻译服务已关闭');
+    expect(JSON.stringify(config)).toBe(before);
   });
 
   it.each(['gpt-4o', 'o3', 'gpt-5', 'gpt-6-luna', 'gpt-6.1-terra', 'future-model-alias'])(
-    'serializes completion limits for %s in generation and streaming without mutating settings', async modelId => {
+    'serializes completion limits for %s in streaming without mutating settings', async modelId => {
       const config = new Config();
       for (const [custom, expectedLimit] of [
         ['', 1200], ['{"max_tokens":64}', 64],
@@ -52,13 +83,11 @@ describe('harness model gateway', () => {
           const body = JSON.parse(serialized); calls.push(body);
           expect(body.max_completion_tokens).toBe(expectedLimit);
           if (custom.includes('service_tier')) expect(body).toMatchObject({service_tier: 'fast', reasoning_effort: 'none'});
-          if (body.stream) return new Response('data: {"choices":[{"index":0,"delta":{"content":"done"},"finish_reason":null}]}\n\ndata: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', {headers: {'content-type': 'text/event-stream'}});
-          return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
+          return openaiSse('done');
         });
-        const model = createHarnessLanguageModel(config, services.openai, modelId);
-        expect((await generateText({model, prompt: 'Explain', maxOutputTokens: 1200, maxRetries: 0})).text).toBe('done');
-        expect(await streamText({model, prompt: 'Explain', maxOutputTokens: 1200, maxRetries: 0}).text).toBe('done');
-        expect(calls).toHaveLength(2);
+        const generate = createHarnessGenerator(config, services.openai, modelId, []);
+        expect((await generate(promptInput())).text).toBe('done');
+        expect(calls).toHaveLength(1);
         expect(JSON.stringify(config)).toBe(before);
       }
     },
@@ -71,28 +100,28 @@ describe('harness model gateway', () => {
       setRuntimeFetch(async (_input, init) => {
         const body = JSON.parse(String(init?.body));
         expect(body.max_tokens).toBe(1200); expect(body).not.toHaveProperty('max_completion_tokens');
-        return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
+        return openaiSse('done');
       });
-      await generateText({model: createHarnessLanguageModel(config, service, modelId), prompt: 'Explain', maxOutputTokens: 1200, maxRetries: 0});
+      await createHarnessGenerator(config, service, modelId, [])(promptInput());
     },
   );
 
-  it('merges OpenAI generation parameters while retaining SDK session and protocol ownership', async () => {
+  it('merges OpenAI generation parameters while retaining session and protocol ownership', async () => {
     const config = new Config();
     const originalKey = getHarnessModelInputKey(config, services.openai, 'gpt-6-luna');
-    config.customBody[services.openai] = JSON.stringify({model: 'wrong', messages: [], tools: [], tool_choice: 'none', parallel_tool_calls: false, stream: true, stream_options: {bad: true}, response_format: {type: 'bad'}, temperature: 0.2, service_tier: 'fast', reasoning_effort: 'none'});
+    config.customBody[services.openai] = JSON.stringify({model: 'wrong', messages: [], tools: [], tool_choice: 'none', parallel_tool_calls: false, stream: false, stream_options: {bad: true}, response_format: {type: 'bad'}, temperature: 0.2, service_tier: 'fast', reasoning_effort: 'none'});
     expect(getHarnessModelInputKey(config, services.openai, 'gpt-6-luna')).not.toBe(originalKey);
+    const tools: HarnessToolDefinition[] = [{name: 'lookup', description: 'lookup', input: {type: 'object', properties: {q: {type: 'string'}}}}];
     setRuntimeFetch(async (_input, init) => {
       const body = JSON.parse(String(init?.body));
       expect(body).toMatchObject({model: 'gpt-6-luna', temperature: 0.2, service_tier: 'fast', reasoning_effort: 'none'});
       expect(body.messages).toEqual([{role: 'system', content: 'System'}, {role: 'user', content: 'Explain'}]);
       expect(body.tools[0].function.name).toBe('lookup');
       expect(body.tool_choice).not.toBe('none'); expect(body.parallel_tool_calls).not.toBe(false);
-      expect(body.stream).not.toBe(true); expect(body).not.toHaveProperty('stream_options'); expect(body).not.toHaveProperty('response_format');
-      expect(body).not.toHaveProperty('max_tokens'); expect(body).not.toHaveProperty('max_completion_tokens');
-      return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
+      expect(body.stream).toBe(true); expect(body).not.toHaveProperty('stream_options'); expect(body).not.toHaveProperty('response_format');
+      return openaiSse('done');
     });
-    await generateText({model: createHarnessLanguageModel(config, services.openai, 'gpt-6-luna'), instructions: 'System', prompt: 'Explain', tools: {lookup: tool({inputSchema: z.object({q: z.string()})})}, maxRetries: 0});
+    await createHarnessGenerator(config, services.openai, 'gpt-6-luna', tools, undefined, {allowedTools: ['lookup']})(promptInput('Explain', {tools}));
   });
 
   it.each([
@@ -112,9 +141,9 @@ describe('harness model gateway', () => {
       expect(body).not.toHaveProperty(field === 'max_tokens' ? 'max_completion_tokens' : 'max_tokens');
       if (custom.includes('service_tier')) expect(body).toMatchObject({reasoning_effort: 'none', service_tier: 'fast'});
       if (service === services.deepseek) expect(body.thinking).toEqual({type: 'enabled'});
-      return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
+      return openaiSse('done');
     });
-    await generateText({model: createHarnessLanguageModel(config, service, 'alias'), prompt: 'Explain', maxOutputTokens: 1200, maxRetries: 0});
+    await createHarnessGenerator(config, service, 'alias', [])(promptInput());
     config.customBody[service] = '{"temperature":0.4}';
     expect(getHarnessModelInputKey(config, service, 'alias')).not.toBe(key);
   });
@@ -122,28 +151,28 @@ describe('harness model gateway', () => {
   it('rejects invalid OpenAI custom JSON before sending a request', async () => {
     const config = new Config(); config.customBody[services.openai] = '{invalid';
     const fetch = vi.fn(); setRuntimeFetch(fetch);
-    await expect(generateText({model: createHarnessLanguageModel(config, services.openai, 'gpt-6-luna'), prompt: 'Explain', maxRetries: 0})).rejects.toThrow('有效的 JSON 对象');
+    await expect(createHarnessGenerator(config, services.openai, 'gpt-6-luna', [])(promptInput())).rejects.toThrow('有效的 JSON 对象');
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it.each([services.claude, services.gemini])('tracks a native %s proxy change without exposing its credentials', service => {
-    const config = new Config();delete config.proxy[service];
+    const config = new Config(); delete config.proxy[service];
     const direct = getHarnessModelInputKey(config, service, 'reader');
     config.proxy[service] = 'https://fixture.test/native?token=private-value';
     const proxied = getHarnessModelInputKey(config, service, 'reader');
-    expect(proxied).not.toBe(direct);expect(proxied).toMatch(/^[a-f0-9]{64}$/u);expect(proxied).not.toContain('private-value');
-    config.proxy[service] += ' ';expect(getHarnessModelInputKey(config, service, 'reader')).toBe(proxied);
+    expect(proxied).not.toBe(direct); expect(proxied).toMatch(/^[a-f0-9]{64}$/u); expect(proxied).not.toContain('private-value');
+    config.proxy[service] += ' '; expect(getHarnessModelInputKey(config, service, 'reader')).toBe(proxied);
   });
 
   it('keeps invalid gateway inputs comparable for cancellation and distinguishes repaired endpoint/header inputs', () => {
-    const config = new Config();config.deepseekApiType = 'responses';
+    const config = new Config(); config.deepseekApiType = 'responses';
     const invalid = getHarnessModelInputKey(config, services.deepseek, 'reader');
-    expect(invalid).toMatch(/^[a-f0-9]{64}$/u);config.deepseekApiType = 'chat';
+    expect(invalid).toMatch(/^[a-f0-9]{64}$/u); config.deepseekApiType = 'chat';
     expect(getHarnessModelInputKey(config, services.deepseek, 'reader')).not.toBe(invalid);
-    const service = 'custom:key-identity';config.customOpenAIProviders = [{id: service, name: 'Local', endpoint: 'http://localhost:11434/v1', models: ['reader']}];
-    config.customHeaders[service] = '{invalid';const badHeader = getHarnessModelInputKey(config, service, 'reader');
+    const service = 'custom:key-identity'; config.customOpenAIProviders = [{id: service, name: 'Local', endpoint: 'http://localhost:11434/v1', models: ['reader']}];
+    config.customHeaders[service] = '{invalid'; const badHeader = getHarnessModelInputKey(config, service, 'reader');
     config.customHeaders[service] = '{"x-a":"private-value"}';
-    const repaired = getHarnessModelInputKey(config, service, 'reader');expect(repaired).not.toBe(badHeader);expect(repaired).not.toContain('private-value');
+    const repaired = getHarnessModelInputKey(config, service, 'reader'); expect(repaired).not.toBe(badHeader); expect(repaired).not.toContain('private-value');
   });
 
   it.each([
@@ -162,28 +191,97 @@ describe('harness model gateway', () => {
     const bodies: Record<string, unknown>[] = [];
     setRuntimeFetch(async (_input, init) => {
       const body = JSON.parse(String(init?.body)); bodies.push(body);
-      if (body.stream) return new Response('data: {"choices":[{"index":0,"delta":{"content":"done"},"finish_reason":null}]}\n\ndata: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', {headers: {'content-type': 'text/event-stream'}});
-      return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
+      return openaiSse('done');
     });
-    const model = createHarnessLanguageModel(config, service, legacy);
-    expect((await generateText({model, prompt: 'Explain', maxRetries: 0})).text).toBe('done');
-    expect(await streamText({model, prompt: 'Explain', maxRetries: 0}).text).toBe('done');
-    expect(bodies.map(body => body.model)).toEqual([expected, expected]);
+    const generate = createHarnessGenerator(config, service, legacy, []);
+    expect((await generate(promptInput())).text).toBe('done');
+    expect(bodies.map(body => body.model)).toEqual([expected]);
     expect(JSON.stringify(config)).toBe(before);
   });
 
-  it('refuses saved ChatGPT requests in the public build before any transport and preserves their configuration', () => {
+  it('refuses saved ChatGPT requests in the public build and streams text, tools, usage and errors when enabled', async () => {
     const config = new Config(); config.service = services.chatgptPlan;
     config.model[services.chatgptPlan] = 'saved-account-model';
     const before = JSON.stringify(config); const fetch = vi.fn(); setRuntimeFetch(fetch);
-    expect(() => createHarnessLanguageModel(config, services.chatgptPlan, 'saved-account-model'))
+    expect(() => createHarnessGenerator(config, services.chatgptPlan, 'saved-account-model', []))
       .toThrow('尚未开放公开接入');
-    try {createHarnessLanguageModel(config, services.chatgptPlan, 'saved-account-model');}
+    try {createHarnessGenerator(config, services.chatgptPlan, 'saved-account-model', []);}
     catch (error) {expect(error).toMatchObject({kind: 'bad-request', retryable: false});}
     expect(fetch).not.toHaveBeenCalled(); expect(JSON.stringify(config)).toBe(before);
+
     planBuild.enabled = true;
-    expect(createHarnessLanguageModel(config, services.chatgptPlan, 'saved-account-model'))
-      .toMatchObject({provider: 'fluentread-chatgpt-plan', modelId: 'saved-account-model'});
+    expect(() => createHarnessGenerator(config, services.chatgptPlan, 'saved-account-model', [{name: 'bad_tool', description: 'no', input: {}}])).toThrow('不支持的阅读助手工具');
+
+    const planEvent = (type: string, fields: Record<string, unknown> = {}) => `data: ${JSON.stringify({type, ...fields})}\n\n`;
+    const planResp = (body: string) => new Response(body, {headers: {'Content-Type': 'text/event-stream'}});
+    const toolDef: HarnessToolDefinition[] = [{name: 'read_context', description: 'read', input: {type: 'object'}}];
+    const searchTool: HarnessToolDefinition[] = [{name: 'search_memory', description: 'search', input: {type: 'object', properties: {query: {type: 'string'}}}}];
+    const usageSink = vi.fn();
+    const validateStep = vi.fn();
+    planBridge.respond.mockResolvedValueOnce(planResp(
+      planEvent('response.output_text.delta', {delta: '套餐'})
+      + planEvent('response.output_text.delta', {delta: '回答'})
+      + planEvent('response.completed', {
+        response: {
+          id: 'r1', status: 'completed', model: 'saved-account-model',
+          output: [
+            {type: 'message', role: 'assistant', status: 'completed', content: [{type: 'output_text', text: '套餐回答'}]},
+            {type: 'function_call', namespace: 'fluentread', call_id: 'c1', name: 'fluentread.read_context', arguments: '{"reason":"check"}'},
+          ],
+          usage: {input_tokens: 10, output_tokens: 4, input_tokens_details: {cached_tokens: 2}, output_tokens_details: {reasoning_tokens: 1}},
+        },
+      }),
+    ));
+    const onText = vi.fn();
+    const generated = await createHarnessGenerator(config, services.chatgptPlan, 'saved-account-model', toolDef, usageSink, {validateStep})({
+      system: 'Sys',
+      messages: [
+        {role: 'user', content: 'Hello'},
+        {role: 'assistant', content: [{type: 'text', text: 'Prior'}]},
+        {role: 'user', content: null as never},
+      ],
+      tools: toolDef,
+      signal: new AbortController().signal,
+      onText,
+    });
+    expect(generated.text).toBe('套餐回答');
+    expect(onText).toHaveBeenCalledWith('套餐回答');
+    expect(generated.toolCalls).toEqual([{id: 'c1', name: 'read_context', input: {reason: 'check'}}]);
+    expect(validateStep).toHaveBeenCalledWith(expect.objectContaining({actualModel: 'saved-account-model', finishReason: 'tool-calls'}));
+    expect(usageSink).toHaveBeenCalledWith(expect.objectContaining({
+      serviceId: services.chatgptPlan, inputTokens: 10, outputTokens: 4, totalTokens: 14, cachedInputTokens: 2, reasoningTokens: 1, outcome: 'success',
+    }));
+
+    // Empty system prompt, explicit schema tool, missing usage, tool-only output & failing usage sink
+    planBridge.respond.mockResolvedValueOnce(planResp(planEvent('response.completed', {
+      response: {
+        id: 'r2', status: 'completed', model: 'saved-account-model',
+        output: [{type: 'function_call', namespace: 'fluentread', call_id: 'c2', name: 'search_memory', arguments: '{"query":"q"}'}],
+      },
+    })));
+    const toolOnly = await createHarnessGenerator(config, services.chatgptPlan, 'saved-account-model', searchTool, () => {throw new Error('sink');}, {
+      allowedTools: ['search_memory'], purpose: 'writing',
+    })({system: '', messages: [{role: 'user', content: 'Hi'}], tools: searchTool, signal: new AbortController().signal});
+    expect(toolOnly.text).toBe('');
+    expect(toolOnly.toolCalls).toEqual([{id: 'c2', name: 'search_memory', input: {query: 'q'}}]);
+
+    // Invalid tool JSON
+    planBridge.respond.mockResolvedValueOnce(planResp(planEvent('response.completed', {
+      response: {
+        id: 'r3', status: 'completed', model: 'saved-account-model',
+        output: [{type: 'function_call', namespace: 'fluentread', call_id: 'c3', name: 'read_context', arguments: '{broken'}],
+      },
+    })));
+    await expect(createHarnessGenerator(config, services.chatgptPlan, 'saved-account-model', toolDef, usageSink)(promptInput())).rejects.toThrow('不是有效 JSON');
+    expect(usageSink.mock.lastCall?.[0]).toMatchObject({outcome: 'error'});
+
+    // Timeout & cancelled outcomes + unreported usage when stream finishes without finish event
+    for (const reason of [new Error('请求超时'), new Error('user cancelled')]) {
+      const abort = new AbortController();
+      planBridge.respond.mockImplementationOnce(async () => {abort.abort(reason); throw reason;});
+      await expect(createHarnessGenerator(config, services.chatgptPlan, 'saved-account-model', [], usageSink)(promptInput('Hi', {signal: abort.signal}))).rejects.toThrow();
+      expect(usageSink.mock.lastCall?.[0].outcome).toBe(reason.message.includes('超时') ? 'timeout' : 'cancelled');
+    }
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -236,10 +334,10 @@ describe('harness model gateway', () => {
       expect(body.messages).toEqual([{role: 'system', content: 'Explain in Chinese'}, {role: 'user', content: 'Source only'}]);
       expect(body).not.toHaveProperty('tools');
       expect(JSON.stringify(init)).not.toContain('must-not-send');
-      return response({choices: [{message: {role: 'assistant', content: '免费讲解'}, finish_reason: 'stop'}]});
+      return openaiSse('免费讲解');
     });
-    const model = createHarnessLanguageModel(config, services.bilibili, 'untrusted-model');
-    expect((await generateText({model, system: 'Explain in Chinese', prompt: 'Source only', tools: {lookup: tool({inputSchema: z.object({q: z.string()})})}})).text).toBe('免费讲解');
+    const generate = createHarnessGenerator(config, services.bilibili, 'untrusted-model', []);
+    expect((await generate({system: 'Explain in Chinese', messages: [{role: 'user', content: 'Source only'}], tools: [], signal: new AbortController().signal})).text).toBe('免费讲解');
     config.token[services.bilibili] = 'changed';
     config.proxy[services.bilibili] = 'https://changed.fixture';
     expect(getHarnessModelInputKey(config, services.bilibili, 'changed-model')).toBe(key);
@@ -251,18 +349,18 @@ describe('harness model gateway', () => {
     setRuntimeFetch(async (_input, init) => {
       expect(init?.signal).toBe(signal);
       expect(JSON.parse(String(init?.body)).stream).toBe(true);
-      return new Response('data: {"id":"bili","choices":[{"index":0,"delta":{"role":"assistant","content":"讲解"},"finish_reason":null}]}\n\ndata: {"id":"bili","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', {headers: {'content-type': 'text/event-stream'}});
+      return openaiSse('讲解');
     });
-    expect(await streamText({model: createHarnessLanguageModel(config, services.bilibili, ''), prompt: 'Explain', abortSignal: signal, maxRetries: 0}).text).toBe('讲解');
+    expect((await createHarnessGenerator(config, services.bilibili, '', [])(promptInput('Explain', {signal}))).text).toBe('讲解');
     const failed = vi.fn(async () => new Response('{"error":{"message":"rate limited"}}', {status: 429}));
     setRuntimeFetch(failed);
-    await expect(generateText({model: createHarnessLanguageModel(config, services.bilibili, ''), prompt: 'Explain', maxRetries: 0})).rejects.toMatchObject({statusCode: 429});
+    await expect(createHarnessGenerator(config, services.bilibili, '', [])(promptInput())).rejects.toMatchObject({statusCode: 429});
     expect(failed).toHaveBeenCalledOnce();
     setRuntimeFetch(async () => { throw new DOMException('Aborted', 'AbortError'); });
-    await expect(generateText({model: createHarnessLanguageModel(config, services.bilibili, ''), prompt: 'Explain', abortSignal: signal, maxRetries: 0})).rejects.toThrow('Aborted');
+    await expect(createHarnessGenerator(config, services.bilibili, '', [])(promptInput('Explain', {signal}))).rejects.toThrow('Aborted');
   });
 
-  it('keeps actual SDK transport errors out of the runtime console and still reports sanitized failures', async () => {
+  it('keeps transport errors out of the runtime console and still reports sanitized failures', async () => {
     const config = new Config(); config.on = true; config.harness.enabled = true; config.harness.service = services.bilibili;
     const secret = 'sk-fixture-private-123456';
     const source = 'FIXTURE_PRIVATE_SOURCE';
@@ -270,21 +368,14 @@ describe('harness model gateway', () => {
     setRuntimeFetch(failed);
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      // 对照真实 SDK 默认行为，确保该错误确实会触发原始控制台日志。
-      const baseline = streamText({model: createHarnessLanguageModel(config, services.bilibili, ''), prompt: source, maxRetries: 0});
-      let rawError: unknown;
-      for await (const part of baseline.stream) if (part.type === 'error') rawError = part.error;
-      expect(rawError).toMatchObject({statusCode: 400});
-      expect(consoleError).toHaveBeenCalledWith(rawError);
-      consoleError.mockClear();
       const record = vi.fn();
-      const result = await createHarnessRuntime(() => config, () => record).run({type: 'fluentReadHarness', action: 'run', requestId: 'actual-sdk-no-raw-log', intent: 'meaning', question: '', selection: {text: source, context: 'FIXTURE_PRIVATE_CONTEXT', sentence: ''}}, new AbortController().signal);
+      const result = await createHarnessRuntime(() => config, () => record).run({type: 'fluentReadHarness', action: 'run', requestId: 'actual-no-raw-log', intent: 'meaning', question: '', selection: {text: source, context: 'FIXTURE_PRIVATE_CONTEXT', sentence: ''}}, new AbortController().signal);
       expect(result).toMatchObject({success: false, error: expect.stringContaining('HTTP 400')});
       expect(JSON.stringify(result)).not.toContain(secret);
       expect(JSON.stringify(result)).not.toContain(source);
       expect(consoleError).not.toHaveBeenCalled();
       expect(record).toHaveBeenCalledWith(expect.objectContaining({outcome: 'error', serviceId: services.bilibili}));
-      expect(failed).toHaveBeenCalledTimes(2);
+      expect(failed).toHaveBeenCalledTimes(1);
     } finally { consoleError.mockRestore(); }
   });
 
@@ -293,30 +384,31 @@ describe('harness model gateway', () => {
     config.customOpenAIProviders = [{id: 'custom:test', name: 'Test', endpoint: 'https://local.test/v1/chat/completions?tenant=a&tenant=b', models: ['my-model']}];
     config.token['custom:test'] = 'secret-key';
     config.customHeaders['custom:test'] = '{"x-opencode-session":"stable-harness-session"}';
+    const tools: HarnessToolDefinition[] = [{name: 'lookup', description: 'lookup', input: {type: 'object', properties: {q: {type: 'string'}}}}];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
       expect(String(input)).toContain('tenant=a');
       expect(body.model).toBe('my-model');
       expect(new Headers(init?.headers).get('x-opencode-session')).toBe('stable-harness-session');
       expect(body.tools?.[0]?.function?.name).toBe('lookup');
-      expect(body.messages).toEqual([{role: 'user', content: 'Explain this sentence'}]);
-      expect((init?.headers as Record<string, string>).authorization).toContain('secret-key');
-      return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
+      expect(body.messages).toEqual([{role: 'system', content: 'System'}, {role: 'user', content: 'Explain this sentence'}]);
+      expect(new Headers(init?.headers).get('authorization')).toContain('secret-key');
+      return openaiSse('done');
     });
     setRuntimeFetch(fetchMock);
-    const model = createHarnessLanguageModel(config, 'custom:test', 'my-model');
-    await generateText({model, messages: [{role: 'user', content: 'Explain this sentence'}], tools: {lookup: tool({description: 'lookup', inputSchema: z.object({q: z.string()})})}});
+    const generate = createHarnessGenerator(config, 'custom:test', 'my-model', tools, undefined, {allowedTools: ['lookup']});
+    await generate(promptInput('Explain this sentence', {tools}));
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it('rejects machine services and DeepSeek Responses mode', () => {
+  it('rejects machine services and DeepSeek Responses mode', async () => {
     const config = new Config();
-    expect(() => createHarnessLanguageModel(config, services.google, 'x')).toThrow('尚未适配');
-    expect(() => createHarnessLanguageModel(config, 'unknown-service', 'x')).toThrow('尚未适配');
-    expect(() => createHarnessLanguageModel(config, services.openai, '   ')).toThrow('选择一个模型');
+    expect(() => createHarnessGenerator(config, services.google, 'x', [])).toThrow('尚未适配');
+    expect(() => createHarnessGenerator(config, 'unknown-service', 'x', [])).toThrow('尚未适配');
+    expect(() => createHarnessGenerator(config, services.openai, '   ', [])).toThrow('选择一个模型');
     config.deepseekApiType = 'responses';
-    expect(() => createHarnessLanguageModel(config, services.deepseek, 'deepseek-chat')).toThrow('Responses');
-    expect(() => createHarnessLanguageModel({...config, token: {...config.token, [services.zhipu]: 'invalid'}} as Config, services.zhipu, 'glm-test')).toThrow('id.secret');
+    await expect(createHarnessGenerator(config, services.deepseek, 'deepseek-chat', [])(promptInput())).rejects.toThrow('Responses');
+    await expect(createHarnessGenerator({...config, token: {...config.token, [services.zhipu]: 'invalid'}} as Config, services.zhipu, 'glm-test', [])(promptInput())).rejects.toThrow('id.secret');
   });
 
   it('adds DeepSeek thinking without replacing session messages', async () => {
@@ -326,11 +418,10 @@ describe('harness model gateway', () => {
       const body = JSON.parse(String(init?.body));
       expect(body.thinking).toEqual({type: 'enabled'});
       expect(body.messages).toEqual([{role: 'system', content: 'Use Chinese'}, {role: 'user', content: 'Explain'}]);
-      return response({choices: [{message: {role: 'assistant', content: 'ok'}, finish_reason: 'stop'}]});
+      return openaiSse('ok');
     });
     setRuntimeFetch(fetchMock);
-    const model = createHarnessLanguageModel(config, services.deepseek, 'deepseek-chat');
-    await generateText({model, instructions: 'Use Chinese', prompt: 'Explain'});
+    await createHarnessGenerator(config, services.deepseek, 'deepseek-chat', [])(promptInput('Explain', {system: 'Use Chinese'}));
   });
 
   it('supports explicit compatible endpoint overrides and disabled thinking', async () => {
@@ -341,11 +432,11 @@ describe('harness model gateway', () => {
       const body = JSON.parse(String(init?.body));
       if (String(input).includes('deepseek.test')) expect(body.thinking).toEqual({type: 'disabled'});
       expect(String(input)).toMatch(/(?:deepseek|qwen)\.test/u);
-      return response({choices: [{message: {role: 'assistant', content: 'ok'}, finish_reason: 'stop'}]});
+      return openaiSse('ok');
     });
     setRuntimeFetch(fetchMock);
-    await generateText({model: createHarnessLanguageModel(config, services.deepseek, 'deepseek-chat'), prompt: 'hello'});
-    await generateText({model: createHarnessLanguageModel(config, services.tongyi, currentModelIds.tongyiTokenPlan), prompt: 'hello'});
+    await createHarnessGenerator(config, services.deepseek, 'deepseek-chat', [])(promptInput('hello'));
+    await createHarnessGenerator(config, services.tongyi, currentModelIds.tongyiTokenPlan, [])(promptInput('hello'));
   });
 
   it('builds a Zhipu bearer token and preserves a configured endpoint query', async () => {
@@ -357,10 +448,10 @@ describe('harness model gateway', () => {
       const authorization = new Headers(init?.headers).get('authorization') || '';
       expect(authorization.startsWith('Bearer ey')).toBe(true);
       expect(authorization).not.toContain('private-secret');
-      return response({choices: [{message: {role: 'assistant', content: 'ok'}, finish_reason: 'stop'}]});
+      return openaiSse('ok');
     });
     setRuntimeFetch(fetchMock);
-    await generateText({model: createHarnessLanguageModel(config, services.zhipu, 'glm-test'), prompt: 'Explain'});
+    await createHarnessGenerator(config, services.zhipu, 'glm-test', [])(promptInput());
   });
 
   it('adds service specific headers for Azure and OpenRouter', async () => {
@@ -372,20 +463,20 @@ describe('harness model gateway', () => {
       expect(new Headers(init?.headers).get('api-key')).toBe('azure-secret');
       expect(new Headers(init?.headers).has('authorization')).toBe(false);
       expect(JSON.parse(String(init?.body)).model).toBe('reader');
-      return response({choices: [{message: {role: 'assistant', content: 'ok'}, finish_reason: 'stop'}]});
+      return openaiSse('ok');
     });
     setRuntimeFetch(azureFetch);
-    await generateText({model: createHarnessLanguageModel(azure, services.azureOpenai, 'reader'), prompt: 'hello'});
+    await createHarnessGenerator(azure, services.azureOpenai, 'reader', [])(promptInput('hello'));
 
     const router = new Config();
     router.token[services.openrouter] = 'router-secret';
     const routerFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       expect(new Headers(init?.headers).get('HTTP-Referer')).toBe('https://read.thinkstu.com');
       expect(new Headers(init?.headers).get('X-Title')).toBe('FluentRead Harness');
-      return response({choices: [{message: {role: 'assistant', content: 'ok'}, finish_reason: 'stop'}]});
+      return openaiSse('ok');
     });
     setRuntimeFetch(routerFetch);
-    await generateText({model: createHarnessLanguageModel(router, services.openrouter, 'openrouter/test'), prompt: 'hello'});
+    await createHarnessGenerator(router, services.openrouter, 'openrouter/test', [])(promptInput('hello'));
   });
 
   it('normalizes the Azure Foundry resource endpoint for v1 without a dated API version', async () => {
@@ -396,10 +487,10 @@ describe('harness model gateway', () => {
       expect(String(input)).toBe('https://reader.services.ai.azure.com/openai/v1/chat/completions');
       expect(new Headers(init?.headers).get('api-key')).toBe('azure-secret');
       expect(JSON.parse(String(init?.body)).model).toBe('deepseek-deployment');
-      return response({choices: [{message: {role: 'assistant', content: 'ok'}, finish_reason: 'stop'}]});
+      return openaiSse('ok');
     });
     setRuntimeFetch(fetchMock);
-    await generateText({model: createHarnessLanguageModel(config, services.azureOpenai, 'deepseek-deployment'), prompt: 'hello'});
+    await createHarnessGenerator(config, services.azureOpenai, 'deepseek-deployment', [])(promptInput('hello'));
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
@@ -411,45 +502,43 @@ describe('harness model gateway', () => {
       expect(String(input)).toBe('https://claude-proxy.test/v1/messages');
       expect(new Headers(init?.headers).get('x-api-key')).toBe('claude-secret');
       expect(new Headers(init?.headers).get('anthropic-dangerous-direct-browser-access')).toBe('true');
-      return response({id: 'msg_1', type: 'message', role: 'assistant', content: [{type: 'text', text: 'claude answer'}], stop_reason: 'end_turn', usage: {input_tokens: 2, output_tokens: 3}});
+      return claudeSse('claude answer');
     });
     setRuntimeFetch(fetchMock);
-    const result = await generateText({model: createHarnessLanguageModel(config, services.claude, 'claude-sonnet-5'), prompt: 'Explain'});
-    expect(result.text).toBe('claude answer');
+    expect((await createHarnessGenerator(config, services.claude, 'claude-sonnet-5', [])(promptInput())).text).toBe('claude answer');
     const directFetch = vi.fn(async (input: RequestInfo | URL) => {
       expect(String(input)).toContain('api.anthropic.com');
-      return response({id: 'msg_2', type: 'message', role: 'assistant', content: [{type: 'text', text: 'direct'}], stop_reason: 'end_turn', usage: {input_tokens: 1, output_tokens: 1}});
+      return claudeSse('direct');
     });
     setRuntimeFetch(directFetch);
     const directConfig = new Config();
     directConfig.token[services.claude] = 'direct-secret';
-    expect((await generateText({model: createHarnessLanguageModel(directConfig, services.claude, 'claude-test'), prompt: 'Explain', maxOutputTokens: 1200})).text).toBe('direct');
-    expect(createHarnessLanguageModel(new Config(), services.claude, 'claude-no-key')).toBeTruthy();
+    expect((await createHarnessGenerator(directConfig, services.claude, 'claude-test', [])(promptInput())).text).toBe('direct');
+    expect(createHarnessGenerator(new Config(), services.claude, 'claude-no-key', [])).toBeTruthy();
   });
 
-  it('uses native Gemini generateContent API and honors configured proxy', async () => {
+  it('uses native Gemini streamGenerateContent API and honors configured proxy', async () => {
     const config = new Config();
     config.token[services.gemini] = 'gemini-secret';
-    config.proxy[services.gemini] = 'https://gemini-proxy.test/v1beta/models/gemini-test:generateContent';
+    config.proxy[services.gemini] = 'https://gemini-proxy.test/v1beta/models/gemini-test:streamGenerateContent?alt=sse';
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      expect(String(input)).toBe('https://gemini-proxy.test/v1beta/models/gemini-test:generateContent');
-      return response({candidates: [{content: {role: 'model', parts: [{text: 'gemini answer'}]}, finishReason: 'STOP'}], usageMetadata: {promptTokenCount: 2, candidatesTokenCount: 3, totalTokenCount: 5}});
+      expect(String(input)).toBe('https://gemini-proxy.test/v1beta/models/gemini-test:streamGenerateContent?alt=sse');
+      return geminiSse('gemini answer');
     });
     setRuntimeFetch(fetchMock);
-    const result = await generateText({model: createHarnessLanguageModel(config, services.gemini, 'gemini-test'), prompt: 'Explain'});
-    expect(result.text).toBe('gemini answer');
-    expect(createHarnessLanguageModel(new Config(), services.gemini, 'gemini-test')).toBeTruthy();
+    expect((await createHarnessGenerator(config, services.gemini, 'gemini-test', [])(promptInput())).text).toBe('gemini answer');
+    expect(createHarnessGenerator(new Config(), services.gemini, 'gemini-test', [])).toBeTruthy();
   });
 
   it('uses the Token Plan endpoint for the matching Qwen model', async () => {
     const config = new Config();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       expect(String(input)).toContain('token-plan.cn-beijing.maas.aliyuncs.com');
-      return response({choices: [{message: {role: 'assistant', content: 'ok'}, finish_reason: 'stop'}]});
+      return openaiSse('ok');
     });
     setRuntimeFetch(fetchMock);
-    await generateText({model: createHarnessLanguageModel(config, services.tongyi, currentModelIds.tongyiTokenPlan), prompt: 'hello'});
-    expect(createHarnessLanguageModel(config, services.tongyi, 'qwen-normal')).toBeTruthy();
+    await createHarnessGenerator(config, services.tongyi, currentModelIds.tongyiTokenPlan, [])(promptInput('hello'));
+    expect(createHarnessGenerator(config, services.tongyi, 'qwen-normal', [])).toBeTruthy();
   });
 
   it('normalizes provider details without leaking credential query values', () => {
@@ -468,8 +557,24 @@ describe('harness model gateway', () => {
       throw new DOMException('Aborted', 'AbortError');
     });
     setRuntimeFetch(fetchMock);
-    const model = createHarnessLanguageModel(config, services.openai, 'gpt-test');
-    await expect(generateText({model, prompt: 'hello', abortSignal: controller.signal})).rejects.toThrow();
+    await expect(createHarnessGenerator(config, services.openai, 'gpt-test', [])(promptInput('hello', {signal: controller.signal}))).rejects.toThrow();
+  });
+
+  it('assembles Gemini streaming search_memory partialArgs safely and falls back to default read_context schema', async () => {
+    const config = new Config();
+    config.token[services.gemini] = 'gemini-secret';
+    const tools: HarnessToolDefinition[] = [{name: 'search_memory', description: 'search', input: {type: 'object', properties: {query: {type: 'string'}}}}];
+    setRuntimeFetch(async () => sse([
+      {candidates: [{content: {parts: [{functionCall: {id: 'mem-1', name: 'search_memory', willContinue: true, partialArgs: [{jsonPath: '$.query', stringValue: 'hel', willContinue: true}]}}]}}]},
+      {candidates: [{content: {parts: [{functionCall: {partialArgs: [{jsonPath: '$.query', stringValue: 'lo'}]}}]}, finishReason: 'STOP'}]},
+    ]));
+    const result = await createHarnessStreamExecutor(config, services.gemini, 'gemini-2.5-flash', tools, undefined, {allowedTools: ['search_memory']})(promptInput('Explain', {tools}));
+    expect(result.toolCalls).toEqual([{id: 'mem-1', name: 'search_memory', input: {query: 'hello'}}]);
+
+    setRuntimeFetch(async () => sse([
+      {candidates: [{content: {parts: [{functionCall: {id: 'bad', name: 'read_context', partialArgs: [null]}}]}, finishReason: 'STOP'}]},
+    ]));
+    await expect(createHarnessStreamExecutor(config, services.gemini, 'gemini-2.5-flash', [{name: 'read_context', description: 'read', input: {type: 'object'}}])(promptInput('Explain'))).rejects.toThrow('read_context 工具参数无效');
   });
 });
 
@@ -484,17 +589,12 @@ describe('harness model gateway multi-key rotation', () => {
     return config;
   }
 
-  it('keeps native model metadata and freezes reactive settings during failover', async () => {
+  it('freezes reactive settings during failover', async () => {
     const config = reactive(new Config());
     config.apiKeys[services.gemini] = ['native-A', 'native-B'];
     config.token[services.gemini] = 'native-A';
     config.proxy[services.gemini] = 'https://native.fixture/generate';
-    const model = createHarnessLanguageModel(config, services.gemini, 'gemini-fixture');
-    expect(typeof model).toBe('object');
-    if (typeof model === 'string') throw new Error('Expected native model');
-    expect(model.modelId).toBe('gemini-fixture');
-    expect(model.provider).toContain('gemini');
-    expect(model.supportedUrls).toHaveProperty('*');
+    const generate = createHarnessGenerator(config, services.gemini, 'gemini-fixture', []);
     config.proxy[services.gemini] = 'https://changed.fixture/generate';
     config.apiKeys[services.gemini] = ['changed-key'];
     const seen: string[] = [];
@@ -503,9 +603,9 @@ describe('harness model gateway multi-key rotation', () => {
       const key = new Headers(init?.headers).get('x-goog-api-key')!;
       seen.push(key);
       if (key === 'native-A') return new Response(JSON.stringify({error: {message: 'API key not valid'}}), {status: 401});
-      return response({candidates: [{content: {role: 'model', parts: [{text: 'native answer'}]}, finishReason: 'STOP'}]});
+      return geminiSse('native answer');
     });
-    expect((await generateText({model, prompt: 'hello'})).text).toBe('native answer');
+    expect((await generate(promptInput('hello'))).text).toBe('native answer');
     expect(seen).toEqual(['native-A', 'native-B']);
   });
 
@@ -516,11 +616,11 @@ describe('harness model gateway multi-key rotation', () => {
       const key = new Headers(init?.headers).get('authorization')?.replace(/^Bearer\s+/u, '') || '';
       seen.push(key);
       if (key === 'fixture-A') return new Response(JSON.stringify({error: {message: 'invalid key'}}), {status: 401});
-      return response({choices: [{message: {role: 'assistant', content: key}, finish_reason: 'stop'}]});
+      return openaiSse(key);
     }));
-    const model = createHarnessLanguageModel(config, 'custom:rotation-generate', 'fixture');
-    expect((await generateText({model, prompt: 'one'})).text).toBe('fixture-B');
-    expect((await generateText({model, prompt: 'two'})).text).toMatch(/^fixture-[BC]$/u);
+    const generate = createHarnessGenerator(config, 'custom:rotation-generate', 'fixture', []);
+    expect((await generate(promptInput('one'))).text).toBe('fixture-B');
+    expect((await generate(promptInput('two'))).text).toMatch(/^fixture-[BC]$/u);
     expect(seen.slice(0, 3)).toEqual(['fixture-A', 'fixture-B', expect.any(String)]);
     expect(seen[2]).not.toBe('fixture-A');
   });
@@ -532,16 +632,9 @@ describe('harness model gateway multi-key rotation', () => {
       const key = new Headers(init?.headers).get('authorization')?.replace(/^Bearer\s+/u, '') || '';
       seen.push(key);
       if (key === 'fixture-A') return new Response(JSON.stringify({error: {message: 'rate limited'}}), {status: 429});
-      const body = [
-        `data: ${JSON.stringify({id: 'stream', object: 'chat.completion.chunk', created: 1, model: 'fixture', choices: [{index: 0, delta: {role: 'assistant', content: key}, finish_reason: null}]})}`,
-        '',
-        `data: ${JSON.stringify({id: 'stream', object: 'chat.completion.chunk', created: 1, model: 'fixture', choices: [{index: 0, delta: {}, finish_reason: 'stop'}]})}`,
-        '', 'data: [DONE]', '', '',
-      ].join('\n');
-      return new Response(body, {status: 200, headers: {'content-type': 'text/event-stream'}});
+      return openaiSse(key);
     }));
-    const result = streamText({model: createHarnessLanguageModel(config, 'custom:rotation-stream', 'fixture'), prompt: 'stream'});
-    expect(await result.text).toBe('fixture-B');
+    expect((await createHarnessGenerator(config, 'custom:rotation-stream', 'fixture', [])(promptInput('stream'))).text).toBe('fixture-B');
     expect(seen).toEqual(['fixture-A', 'fixture-B']);
 
     const partialConfig = multiKeyConfig('custom:rotation-partial');
@@ -555,29 +648,28 @@ describe('harness model gateway multi-key rotation', () => {
       }});
       return new Response(stream, {status: 200, headers: {'content-type': 'text/event-stream'}});
     }));
-    const partial = streamText({model: createHarnessLanguageModel(partialConfig, 'custom:rotation-partial', 'fixture'), prompt: 'partial'});
-    const chunks = partial.textStream[Symbol.asyncIterator]();
-    expect(await chunks.next()).toEqual({value: 'once', done: false});
+    const onText = vi.fn();
+    const pending = createHarnessGenerator(partialConfig, 'custom:rotation-partial', 'fixture', [])(promptInput('partial', {onText}));
+    await vi.waitFor(() => expect(onText).toHaveBeenCalledWith('once'));
     transport!.error(new Error('partial stream failure'));
-    await expect(chunks.next()).rejects.toMatchObject({message: 'Failed to process successful response', cause: {message: 'partial stream failure'}});
+    await expect(pending).rejects.toThrow('partial stream failure');
     expect(calls).toBe(1);
   });
 });
 
-
 it('网关拒绝非法头并遮罩错误回显，头配置快照不随后续编辑改变', async () => {
-    const config = new Config();
-    config.customOpenAIProviders = [{id: 'custom:headers', name: 'Headers', endpoint: 'https://fixture.example/v1/chat/completions', models: ['model']}];
-    config.customHeaders['custom:headers'] = '{"x":1}';
-    expect(() => createHarnessLanguageModel(config, 'custom:headers', 'model')).toThrow('自定义请求头');
-    expect(normalizeHarnessModelError(new Error('failure'), 'custom:headers', '', '{oops').message).toContain('failure');
-    config.customHeaders['custom:headers'] = '{"x-auth":"private-header"}';
-    expect(normalizeHarnessModelError(new Error('private-header rejected'), 'custom:headers', '', config.customHeaders['custom:headers']).message).not.toContain('private-header');
-    const model = createHarnessLanguageModel(config, 'custom:headers', 'model');
-    config.customHeaders['custom:headers'] = '{"x-auth":"changed"}';
-    setRuntimeFetch(async (_input, init) => {
-        expect(new Headers(init?.headers).get('x-auth')).toBe('private-header');
-        return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
-    });
-    try { await generateText({model, prompt: 'fixture'}); } finally { setRuntimeFetch(); }
+  const config = new Config();
+  config.customOpenAIProviders = [{id: 'custom:headers', name: 'Headers', endpoint: 'https://fixture.example/v1/chat/completions', models: ['model']}];
+  config.customHeaders['custom:headers'] = '{"x":1}';
+  await expect(createHarnessGenerator(config, 'custom:headers', 'model', [])(promptInput('fixture'))).rejects.toThrow('自定义请求头');
+  expect(normalizeHarnessModelError(new Error('failure'), 'custom:headers', '', '{oops').message).toContain('failure');
+  config.customHeaders['custom:headers'] = '{"x-auth":"private-header"}';
+  expect(normalizeHarnessModelError(new Error('private-header rejected'), 'custom:headers', '', config.customHeaders['custom:headers']).message).not.toContain('private-header');
+  const generate = createHarnessGenerator(config, 'custom:headers', 'model', []);
+  config.customHeaders['custom:headers'] = '{"x-auth":"changed"}';
+  setRuntimeFetch(async (_input, init) => {
+    expect(new Headers(init?.headers).get('x-auth')).toBe('private-header');
+    return openaiSse('done');
+  });
+  try { await generate(promptInput('fixture')); } finally { setRuntimeFetch(); }
 });

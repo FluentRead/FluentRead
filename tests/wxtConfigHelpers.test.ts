@@ -49,6 +49,9 @@ describe('wxt.config extracted helpers', () => {
         expect(wxtConfig.pruneEntrypointVitePlugins).toBe(viteHelpers.pruneEntrypointVitePlugins);
         expect(wxtConfig.attachRolldownTransformFilters).toBe(viteHelpers.attachRolldownTransformFilters);
         expect(wxtConfig.groupModuleWorkers).toBe(viteHelpers.groupModuleWorkers);
+        expect(wxtConfig.groupContentScriptRuntimes).toBe(viteHelpers.groupContentScriptRuntimes);
+        expect(wxtConfig.sharedContentScriptBuildPlugin).toBe(viteHelpers.sharedContentScriptBuildPlugin);
+        expect(wxtConfig.configureSharedContentScriptBuild).toBe(viteHelpers.configureSharedContentScriptBuild);
         expect(wxtConfig.configureExtensionUiChunks).toBe(viteHelpers.configureExtensionUiChunks);
         expect(typeof wxtConfig.createExtensionManifest).toBe('function');
     });
@@ -100,10 +103,12 @@ describe('wxt.config extracted helpers', () => {
         expect(Array.isArray(safari.optional_permissions)).toBe(true);
         expect(safari.optional_permissions!.length).toBeGreaterThan(0);
 
-        const chromeResources = manifestHelpers.createExtensionWebAccessibleResources({browser: 'chrome'}) as Array<{use_dynamic_url?: boolean}>;
-        const safariResources = manifestHelpers.createExtensionWebAccessibleResources({browser: 'safari'}) as Array<{use_dynamic_url?: boolean}>;
+        const chromeResources = manifestHelpers.createExtensionWebAccessibleResources({browser: 'chrome'}) as Array<{resources: string[]; matches: string[]; use_dynamic_url?: boolean}>;
+        const safariResources = manifestHelpers.createExtensionWebAccessibleResources({browser: 'safari'}) as Array<{resources: string[]; matches: string[]; use_dynamic_url?: boolean}>;
         expect(chromeResources[2]!.use_dynamic_url).toBe(true);
         expect(safariResources[2]!.use_dynamic_url).toBeUndefined();
+        expect(chromeResources[3]).toEqual({resources: ['content-scripts/chunks/*.js'], matches: ['<all_urls>']});
+        expect(safariResources[3]).toEqual({resources: ['content-scripts/chunks/*.js'], matches: ['<all_urls>']});
     });
 
     it('escapeExtensionNoncharacters 仅转义 chunk 中的 U+FFFE 与 U+FFFF', () => {
@@ -243,5 +248,160 @@ describe('wxt.config extracted helpers', () => {
         expect(stubCode).toContain('specificationVersion: "v4"');
         expect(stubCode).toContain('gateway');
         expect(gatewayPlugin.load('\0other')).toBeNull();
+    });
+
+    it('共享内容脚本 ESM 构建组正确分组、改写 ENTRYPOINT/Shadow CSS 并重建各入口 CSS 与轻量 classic 加载器', () => {
+        const makeEntry = (name: string, type = 'content-script', cssInjectionMode?: string) => ({
+            name,
+            type,
+            inputPath: `/repo/entrypoints/${name}.ts`,
+            outputDir: '/repo/.output/chrome-mv3',
+            options: cssInjectionMode ? {cssInjectionMode} : {},
+        });
+        const content = makeEntry('content', 'content-script', 'ui');
+        const netease = makeEntry('neteaseMailFrame', 'content-script', 'ui');
+        const supported = makeEntry('supportedFrame', 'content-script', 'ui');
+        const video = makeEntry('videoSubtitleFrame', 'content-script', 'manual');
+        const bridge = makeEntry('youtubeBridge', 'content-script');
+        const background = makeEntry('background', 'background');
+        const groups = [background, content, bridge, netease, supported, video] as unknown as Parameters<typeof viteHelpers.groupContentScriptRuntimes>[0];
+
+        viteHelpers.groupContentScriptRuntimes(groups);
+        expect(groups).toEqual([background, [content, netease, supported, video], bridge]);
+        // 幂等：重复调用不会拆散或重排已分组内容脚本。
+        const snapshot = [...groups];
+        viteHelpers.groupContentScriptRuntimes(groups);
+        expect(groups).toEqual(snapshot);
+
+        // 少于 2 个共享内容脚本时保持原样。
+        const single = [content, bridge] as unknown as Parameters<typeof viteHelpers.groupContentScriptRuntimes>[0];
+        viteHelpers.groupContentScriptRuntimes(single);
+        expect(single).toEqual([content, bridge]);
+
+        const entries = [content, netease, supported, video];
+        expect(viteHelpers.isSharedContentScriptGroup(entries)).toBe(true);
+        expect(viteHelpers.isSharedContentScriptGroup([content])).toBe(false);
+        expect(viteHelpers.isSharedContentScriptGroup([content, bridge])).toBe(false);
+
+        const viteCfg: {mode?: string; build?: Record<string, unknown>; plugins?: unknown[]} = {
+            mode: 'production',
+            build: {rollupOptions: {output: {}}},
+            plugins: [],
+        };
+        viteHelpers.configureSharedContentScriptBuild([content], viteCfg as never);
+        expect(viteCfg.plugins).toEqual([]);
+
+        viteHelpers.configureSharedContentScriptBuild(entries, viteCfg as never);
+        expect(viteCfg.build!.modulePreload).toBe(false);
+        expect((viteCfg.build!.rolldownOptions as {output: Record<string, unknown>}).output.entryFileNames)
+            .toBe('content-scripts/chunks/[name].esm.js');
+        expect((viteCfg.build!.rolldownOptions as {output: Record<string, unknown>}).output.chunkFileNames)
+            .toBe('content-scripts/chunks/[name]-[hash].js');
+        expect(viteCfg.plugins).toHaveLength(1);
+
+        const plugin = viteHelpers.sharedContentScriptBuildPlugin(entries, true);
+        const virtualTransformed = plugin.transform.handler(
+            'new ContentScriptContext(import.meta.env.ENTRYPOINT, options);',
+            '\0virtual:wxt-content-script-isolated-world-entrypoint?/repo/entrypoints/neteaseMailFrame.ts',
+        );
+        expect(virtualTransformed?.code).toBe('new ContentScriptContext("neteaseMailFrame", options);');
+        expect(plugin.transform.handler('plain', '/repo/src/app/content/runtime.ts')).toBeNull();
+
+        const shadowRootSource = [
+            'async function createShadowRootUi(ctx, options) {',
+            '\tif (!options.inheritStyles) css.push(`/* WXT Shadow Root Reset */ :host{all:initial !important;}`);',
+            '\tif (ctx.options?.cssInjectionMode === "ui") {',
+            '\t\tconst entryCss = await loadCss();',
+            '\t}',
+            '}',
+            'async function loadCss() {',
+            '\tconst url = browser.runtime.getURL(`/content-scripts/${import.meta.env.ENTRYPOINT}.css`);',
+            '}',
+        ].join('\n');
+        const transformedShadow = plugin.transform.handler(
+            shadowRootSource,
+            '/repo/node_modules/wxt/dist/utils/content-script-ui/shadow-root.mjs',
+        );
+        expect(transformedShadow?.code).toContain('globalThis.__FLUENTREAD_CONTENT_UI_CSS__?.[ctx?.contentScriptName]');
+        expect(transformedShadow?.code).toContain('loadCss(ctx?.contentScriptName)');
+        expect(() => plugin.transform.handler(
+            'changed upstream',
+            '/repo/node_modules/wxt/dist/utils/content-script-ui/shadow-root.mjs',
+        )).toThrow(/shadow-root\.mjs/u);
+
+        const emitted: Array<{type: 'asset'; fileName: string; source: string}> = [];
+        const bundle: Record<string, any> = {
+            'content-scripts/chunks/content.esm.js': {
+                type: 'chunk',
+                fileName: 'content-scripts/chunks/content.esm.js',
+                imports: ['content-scripts/chunks/shared.js'],
+                dynamicImports: ['content-scripts/chunks/writing.js'],
+                viteMetadata: {importedCss: new Set(['assets/cs-content.css'])},
+            },
+            'content-scripts/chunks/neteaseMailFrame.esm.js': {
+                type: 'chunk',
+                fileName: 'content-scripts/chunks/neteaseMailFrame.esm.js',
+                imports: ['content-scripts/chunks/shared.js'],
+                dynamicImports: [],
+                viteMetadata: {importedCss: new Set()},
+            },
+            'content-scripts/chunks/supportedFrame.esm.js': {
+                type: 'chunk',
+                fileName: 'content-scripts/chunks/supportedFrame.esm.js',
+                imports: [],
+                dynamicImports: ['content-scripts/chunks/edx.js'],
+                viteMetadata: {importedCss: new Set()},
+            },
+            'content-scripts/chunks/videoSubtitleFrame.esm.js': {
+                type: 'chunk',
+                fileName: 'content-scripts/chunks/videoSubtitleFrame.esm.js',
+                imports: ['content-scripts/chunks/edx.js'],
+                dynamicImports: [],
+                viteMetadata: {importedCss: new Set()},
+            },
+            'content-scripts/chunks/shared.js': {
+                type: 'chunk',
+                fileName: 'content-scripts/chunks/shared.js',
+                imports: [],
+                dynamicImports: [],
+                viteMetadata: {importedCss: new Set(['assets/cs-shared.css'])},
+            },
+            'content-scripts/chunks/writing.js': {
+                type: 'chunk',
+                fileName: 'content-scripts/chunks/writing.js',
+                imports: [],
+                dynamicImports: [],
+                viteMetadata: {importedCss: new Set(['assets/cs-writing.css'])},
+            },
+            'content-scripts/chunks/edx.js': {
+                type: 'chunk',
+                fileName: 'content-scripts/chunks/edx.js',
+                imports: [],
+                dynamicImports: [],
+                viteMetadata: {importedCss: new Set(['assets/cs-edx.css'])},
+            },
+            'assets/cs-shared.css': {type: 'asset', fileName: 'assets/cs-shared.css', source: '.shared{color:red}'},
+            'assets/cs-writing.css': {type: 'asset', fileName: 'assets/cs-writing.css', source: '.writing{color:blue}'},
+            'assets/cs-content.css': {type: 'asset', fileName: 'assets/cs-content.css', source: '.content{color:green}'},
+            'assets/cs-edx.css': {type: 'asset', fileName: 'assets/cs-edx.css', source: '.edx{color:orange}'},
+        };
+        plugin.generateBundle.handler.call({emitFile: (file) => emitted.push(file)}, {}, bundle);
+
+        const emittedByName = Object.fromEntries(emitted.map((item) => [item.fileName, item.source]));
+        expect(emittedByName['content-scripts/content.css']).toBe('.shared{color:red}\n.writing{color:blue}\n.content{color:green}');
+        expect(emittedByName['content-scripts/neteaseMailFrame.css']).toBe('.shared{color:red}');
+        expect(emittedByName['content-scripts/supportedFrame.css']).toBe('.edx{color:orange}');
+        expect(emittedByName['content-scripts/videoSubtitleFrame.css']).toBeUndefined();
+        expect(emittedByName['content-scripts/content.js']).toContain('/content-scripts/content.css');
+        expect(emittedByName['content-scripts/content.js']).toContain('WXT Shadow Root Reset');
+        expect(emittedByName['content-scripts/content.js']).toContain('content-scripts/chunks/content.esm.js');
+        expect(emittedByName['content-scripts/neteaseMailFrame.js']).toContain('/content-scripts/neteaseMailFrame.css');
+        expect(emittedByName['content-scripts/supportedFrame.js']).toContain('content-scripts/supportedFrame.css');
+        expect(emittedByName['content-scripts/supportedFrame.js']).not.toContain('WXT Shadow Root Reset');
+        expect(emittedByName['content-scripts/videoSubtitleFrame.js']).toContain('content-scripts/chunks/videoSubtitleFrame.esm.js');
+        expect(Object.keys(bundle).filter((name) => name.startsWith('assets/cs-'))).toEqual([]);
+
+        expect(() => plugin.generateBundle.handler.call({emitFile: () => undefined}, {}, {}))
+            .toThrow(/ESM 入口缺失/u);
     });
 });

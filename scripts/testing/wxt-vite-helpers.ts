@@ -17,6 +17,15 @@ import {scopedChineseCatalogBuildPlugin} from '../i18n/scopedChineseCatalogPlugi
 const PROJECT_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
 const SUBFRAME_CONTENT_SCRIPT_NAMES = new Set(['youtubeEmbed', 'videoSubtitleFrame', 'supportedFrame', 'neteaseMailFrame']);
+export const SHARED_CONTENT_SCRIPT_NAMES: ReadonlySet<string> = new Set([
+    'content',
+    'supportedFrame',
+    'neteaseMailFrame',
+    'videoSubtitleFrame',
+]);
+const SHADOW_UI_CONTENT_SCRIPT_NAMES = new Set(['content', 'neteaseMailFrame']);
+const VIRTUAL_ISOLATED_CS_PREFIX = '\0virtual:wxt-content-script-isolated-world-entrypoint?';
+const WXT_SHADOW_ROOT_MODULE = /[\\/]wxt[\\/]dist[\\/]utils[\\/]content-script-ui[\\/]shadow-root\.mjs$/u;
 const SUBFRAME_CATALOG_HOSTS: Readonly<Record<string, readonly string[]>> = {
     neteaseMailFrame: ['mail.163.com', 'mail.126.com', 'mail.yeah.net'],
     supportedFrame: ['hf.space', 'disqus.com', 'www.kaggleusercontent.com', 'mail.qq.com', 'courses.edx.org'],
@@ -356,8 +365,233 @@ export function groupModuleWorkers(groups: EntrypointGroup[]): void {
     if (workers.length < 2) return;
     const index = groups.indexOf(workers[0]);
     for (const worker of workers) groups.splice(groups.indexOf(worker), 1);
-    // 只组合明确使用模块加载的自有 Worker；内容脚本和 classic background 仍由 WXT 单独打包。
+    // 只组合明确使用模块加载的自有 Worker；classic background 与轻桥仍由 WXT 单独打包。
     groups.splice(index, 0, workers);
+}
+
+/** 判断当前构建组是否为共享 ESM 依赖块的内容脚本组合。 */
+export function isSharedContentScriptGroup(entrypoints: readonly {type: string; name?: string}[]): boolean {
+    return entrypoints.length >= 2 && entrypoints.every((entrypoint) =>
+        entrypoint.type === 'content-script'
+        && typeof entrypoint.name === 'string'
+        && SHARED_CONTENT_SCRIPT_NAMES.has(entrypoint.name));
+}
+
+/**
+ * 将四个重型内容脚本（顶层网页、受限子 frame、网易邮箱、视频字幕子 frame）合并为单次 ESM 构建，
+ * 共享 Vue / 翻译核心 / i18n / 配置等 chunk，并各自生成轻量 classic 加载器保持原有清单与隔离世界入口。
+ */
+export function groupContentScriptRuntimes(groups: EntrypointGroup[]): void {
+    const runtimes = groups.filter((group): group is Entrypoint =>
+        !Array.isArray(group) && group.type === 'content-script' && SHARED_CONTENT_SCRIPT_NAMES.has(group.name));
+    if (runtimes.length < 2) return;
+    const index = groups.indexOf(runtimes[0]);
+    for (const runtime of runtimes) groups.splice(groups.indexOf(runtime), 1);
+    groups.splice(index, 0, runtimes);
+}
+
+export interface SharedContentScriptEntry {
+    readonly type: string;
+    readonly name: string;
+    readonly inputPath?: string;
+    readonly options?: object;
+}
+
+interface SharedContentBundleChunk {
+    readonly type: 'chunk';
+    readonly fileName: string;
+    readonly imports?: readonly string[];
+    readonly dynamicImports?: readonly string[];
+    readonly viteMetadata?: {readonly importedCss?: ReadonlySet<string>};
+}
+
+interface SharedContentBundleAsset {
+    readonly type: 'asset';
+    readonly fileName: string;
+    readonly source: string | Uint8Array;
+}
+
+type SharedContentBundleItem = SharedContentBundleChunk | SharedContentBundleAsset;
+
+function normalizeModulePath(value: string): string {
+    return value.replaceAll('\\', '/');
+}
+
+function buildClassicContentScriptLoader(name: string, esmEntryPath: string, isProduction: boolean): string {
+    const esmLiteral = JSON.stringify(esmEntryPath);
+    const loadEsm = `void import(r.getURL(${esmLiteral})).catch(e=>{if(r.id)throw e;});`;
+    if (SHADOW_UI_CONTENT_SCRIPT_NAMES.has(name)) {
+        const cssLiteral = JSON.stringify(`/content-scripts/${name}.css`);
+        const warnFn = isProduction ? '()=>{}' : 'console.warn.bind(console)';
+        return `(()=>{const r=(typeof browser!=="undefined"?browser:chrome)?.runtime;if(!r?.id)return;const w=${warnFn};(globalThis.__FLUENTREAD_CONTENT_UI_CSS__??={})[${JSON.stringify(name)}]={reset:"/* WXT Shadow Root Reset */ :host{all:initial !important;}",loadCss:async()=>{const u=r.getURL(${cssLiteral});try{return await(await fetch(u)).text()}catch(e){w(\`Failed to load styles @ \${u}\`,e);return""}}};${loadEsm}})();\n`;
+    }
+    if (name === 'supportedFrame') {
+        return `(()=>{const r=(typeof browser!=="undefined"?browser:chrome)?.runtime;if(!r?.id)return;globalThis.__FLUENTREAD_SUPPORTED_FRAME_CSS_URL__=r.getURL("content-scripts/supportedFrame.css");${loadEsm}})();\n`;
+    }
+    return `(()=>{const r=(typeof browser!=="undefined"?browser:chrome)?.runtime;if(!r?.id)return;${loadEsm}})();\n`;
+}
+
+function collectReachableChunkCss(
+    entryFileName: string,
+    chunks: ReadonlyMap<string, SharedContentBundleChunk>,
+): string[] {
+    const visited = new Set<string>();
+    const collected: string[] = [];
+    const seenCss = new Set<string>();
+    const visit = (fileName: string): void => {
+        if (visited.has(fileName)) return;
+        visited.add(fileName);
+        const chunk = chunks.get(fileName);
+        if (!chunk) return;
+        for (const imported of chunk.imports ?? []) visit(imported);
+        for (const dynamicImport of chunk.dynamicImports ?? []) visit(dynamicImport);
+        for (const cssFile of chunk.viteMetadata?.importedCss ?? []) {
+            if (!seenCss.has(cssFile)) {
+                seenCss.add(cssFile);
+                collected.push(cssFile);
+            }
+        }
+    };
+    visit(entryFileName);
+    return collected;
+}
+
+/**
+ * 为共享 ESM 内容脚本构建组修复多入口 ENTRYPOINT 标识、Shadow UI 样式路由，
+ * 并在 generateBundle 后置阶段按各入口依赖图重建原始 `content-scripts/<name>.css` 与轻量 classic 加载器。
+ */
+export function sharedContentScriptBuildPlugin(
+    entrypoints: readonly SharedContentScriptEntry[],
+    isProduction = true,
+) {
+    const inputPathToName = new Map<string, string>();
+    for (const entrypoint of entrypoints) {
+        if (typeof entrypoint.inputPath === 'string') {
+            inputPathToName.set(normalizeModulePath(entrypoint.inputPath), entrypoint.name);
+        }
+    }
+    const resetLine = 'if (!options.inheritStyles) css.push(`/* WXT Shadow Root Reset */ :host{all:initial !important;}`);';
+    const loadCallLine = 'const entryCss = await loadCss();';
+    const loadDeclPattern = /async function loadCss\(\)\s*\{\s*const url = browser\.runtime\.getURL\(`\/content-scripts\/\$\{import\.meta\.env\.ENTRYPOINT\}\.css`\);/u;
+
+    return {
+        name: 'fluentread-shared-content-scripts',
+        transform: {
+            order: 'pre' as const,
+            handler(code: string, id: string) {
+                if (id.startsWith(VIRTUAL_ISOLATED_CS_PREFIX)) {
+                    const inputPath = normalizeModulePath(id.slice(VIRTUAL_ISOLATED_CS_PREFIX.length));
+                    const entryName = inputPathToName.get(inputPath);
+                    if (!entryName || !code.includes('import.meta.env.ENTRYPOINT')) return null;
+                    return {
+                        code: code.replaceAll('import.meta.env.ENTRYPOINT', JSON.stringify(entryName)),
+                        map: null,
+                    };
+                }
+                const cleanId = id.split('?', 1)[0] ?? id;
+                if (!WXT_SHADOW_ROOT_MODULE.test(cleanId)) return null;
+                if (!code.includes(resetLine) || !code.includes(loadCallLine) || !loadDeclPattern.test(code)) {
+                    throw new Error('WXT shadow-root.mjs 结构已变化，无法安全适配共享内容脚本样式加载器');
+                }
+                const transformed = code
+                    .replace(
+                        resetLine,
+                        'const __frEntryUi = globalThis.__FLUENTREAD_CONTENT_UI_CSS__?.[ctx?.contentScriptName];\n\t'
+                        + 'if (!options.inheritStyles) css.push(__frEntryUi?.reset ?? `/* WXT Shadow Root Reset */ :host{all:initial !important;}`);',
+                    )
+                    .replace(
+                        loadCallLine,
+                        'const entryCss = await (__frEntryUi ? __frEntryUi.loadCss() : loadCss(ctx?.contentScriptName));',
+                    )
+                    .replace(
+                        loadDeclPattern,
+                        'async function loadCss(entryName = import.meta.env.ENTRYPOINT) {\n\tconst url = browser.runtime.getURL(`/content-scripts/${entryName}.css`);',
+                    );
+                return {code: transformed, map: null};
+            },
+        },
+        generateBundle: {
+            order: 'post' as const,
+            handler(
+                this: {emitFile: (file: {type: 'asset'; fileName: string; source: string}) => void},
+                _options: unknown,
+                bundle: Record<string, SharedContentBundleItem>,
+            ) {
+                const chunks = new Map<string, SharedContentBundleChunk>();
+                const intermediateCss = new Map<string, string>();
+                for (const [fileName, item] of Object.entries(bundle)) {
+                    if (item.type === 'chunk') {
+                        chunks.set(fileName, item);
+                    } else if (item.type === 'asset' && fileName.endsWith('.css')) {
+                        const text = typeof item.source === 'string'
+                            ? item.source
+                            : Buffer.from(item.source).toString('utf8');
+                        intermediateCss.set(fileName, text);
+                    }
+                }
+                for (const entrypoint of entrypoints) {
+                    const esmFileName = `content-scripts/chunks/${entrypoint.name}.esm.js`;
+                    if (!chunks.has(esmFileName)) {
+                        throw new Error(`共享内容脚本 ESM 入口缺失：${esmFileName}`);
+                    }
+                    const cssInjectionMode = (entrypoint.options as {cssInjectionMode?: unknown} | undefined)?.cssInjectionMode;
+                    if (cssInjectionMode === 'ui') {
+                        const cssFiles = collectReachableChunkCss(esmFileName, chunks);
+                        const combinedCss = cssFiles
+                            .map((cssFile) => intermediateCss.get(cssFile) ?? '')
+                            .filter((part) => part.length > 0)
+                            .join('\n');
+                        if (combinedCss.length > 0) {
+                            this.emitFile({
+                                type: 'asset',
+                                fileName: `content-scripts/${entrypoint.name}.css`,
+                                source: combinedCss,
+                            });
+                        }
+                    }
+                    this.emitFile({
+                        type: 'asset',
+                        fileName: `content-scripts/${entrypoint.name}.js`,
+                        source: buildClassicContentScriptLoader(entrypoint.name, esmFileName, isProduction),
+                    });
+                }
+                for (const cssFile of intermediateCss.keys()) {
+                    delete bundle[cssFile];
+                }
+            },
+        },
+    };
+}
+
+/** 配置共享内容脚本 ESM 组的独立 chunk 目录、禁用宿主文档 modulePreload 并挂载加载器生成插件。 */
+export function configureSharedContentScriptBuild(
+    entrypoints: readonly SharedContentScriptEntry[],
+    config: InlineConfig,
+    isProduction = config.mode === 'production',
+): void {
+    if (!isSharedContentScriptGroup(entrypoints)) return;
+    const build = config.build ??= {};
+    build.modulePreload = false;
+    const applyOutput = (container: {output?: unknown}): void => {
+        const output = container.output ??= {};
+        for (const target of (Array.isArray(output) ? output : [output]) as Record<string, unknown>[]) {
+            target.entryFileNames = 'content-scripts/chunks/[name].esm.js';
+            target.chunkFileNames = 'content-scripts/chunks/[name]-[hash].js';
+            target.assetFileNames = 'assets/cs-[name]-[hash].[ext]';
+            if (target.codeSplitting === undefined && target.manualChunks === undefined) {
+                target.codeSplitting = {
+                    groups: [
+                        {name: 'vue-runtime', test: /[\\/]node_modules[\\/](?:@vue[\\/](?:reactivity|runtime-core|runtime-dom|shared)|vue)[\\/]/u},
+                        {name: 'domain-parser', test: /[\\/]node_modules[\\/](?:tldts|tldts-core)[\\/]/u},
+                    ],
+                };
+            }
+        }
+    };
+    const buildRecord = build as Record<string, {output?: unknown} | undefined>;
+    if (buildRecord.rollupOptions) applyOutput(buildRecord.rollupOptions);
+    applyOutput(build.rolldownOptions ??= {});
+    config.plugins = [...(config.plugins ?? []), sharedContentScriptBuildPlugin(entrypoints, isProduction)];
 }
 
 /** 页面共用的框架、域名数据与简体中文目录独立成块，避免与共享配置/规则合并出超 500 kB 的 i18n 公共块。 */

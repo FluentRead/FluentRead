@@ -5,6 +5,7 @@ import type {PluginOption} from 'vite';
 import {defineConfig, type ConfigEnv, type UserManifest} from 'wxt';
 import {resolveBrowserCapabilities} from './src/platform/browser/capabilities';
 import {sharedOnnxBuildPlugin, sharedOnnxDist} from './scripts/wasm/manga-onnx-build';
+import {kokoroPhonemizerBuildPlugin} from './scripts/wasm/kokoro-phonemizer-build';
 import {kokoroTransformersBuildPlugin} from './scripts/wasm/kokoro-transformers-build';
 import {packageWasmDiagnostics} from './scripts/wasm/package-diagnostics';
 import {tesseractSdkBuildPlugin} from './scripts/wasm/tesseract-sdk-build';
@@ -14,6 +15,7 @@ import {defuddleEntityBuildPlugin} from './scripts/testing/defuddle-entity-build
 import {dictionaryScriptBuildPlugin} from './scripts/testing/dictionary-script-build';
 import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
 import {checkExtensionSize} from './scripts/testing/extension-size-budget';
+import {fontkitSlimBuildPlugin} from './scripts/testing/fontkit-slim-build';
 import {francRuntimeBuildPlugin} from './scripts/testing/franc-runtime-build';
 import {createPdfReaderBidiBuildPlugin} from './scripts/testing/pdfjs-bidi-build';
 import {createReadingDictionaryAliases} from './scripts/testing/reading-annotation-build';
@@ -132,10 +134,12 @@ function getBuildStaticSetup() {
                 createDeepLXRuntimeBuildPlugin(__dirname),
                 createPdfReaderBidiBuildPlugin(__dirname),
                 extensionCspBuildPlugin(),
+                fontkitSlimBuildPlugin(),
                 defuddleEntityBuildPlugin(),
                 francRuntimeBuildPlugin(),
                 sharedOnnxBuildPlugin(),
                 kokoroTransformersBuildPlugin(),
+                kokoroPhonemizerBuildPlugin(),
                 aiSdkGatewayStubBuildPlugin(),
                 wllamaExtensionWorker(),
                 tesseractSdkBuildPlugin(),

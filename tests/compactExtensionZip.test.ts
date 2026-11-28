@@ -8,6 +8,7 @@ import {runInNewContext} from 'node:vm';
 import JSZip from 'jszip';
 import {
     compactExtensionZip,
+    MIN_COMPACT_ENTRY_BYTES,
     parseStandardZip,
     readStandardZipEntry,
     verifyExtensionZipPreservation,
@@ -79,7 +80,7 @@ function positions(bytes: Buffer) {
     }
     return {end, entries, first: entries[0]!};
 }
-async function compact(options: {workerTimeoutMs?: number} = {}) {
+async function compact(options: {workerTimeoutMs?: number; concurrency?: number} = {}) {
     return compactExtensionZip(zipPath, root, {cacheDirectory: cache, ...options});
 }
 function released() {
@@ -130,8 +131,9 @@ describe('扩展 ZIP 无损 WASM 压缩', () => {
         expect(await fs.readFile(zipPath)).toEqual(original); released();
     });
     it('只有一个条目获益时保留另外两个 WASM 的原压缩数据', async () => {
-        const original = await fixture(); let count = 0;
-        control.start = (worker, data) => worker.emit('message', deflateRawSync(data, {level: count++ === 0 ? 9 : 0}));
+        const original = await fixture();
+        const firstSource = source(0);
+        control.start = (worker, data) => worker.emit('message', deflateRawSync(data, {level: data.equals(firstSource) ? 9 : 0}));
         const result = await compact(); expect(result.entries.filter(entry => entry.afterBytes < entry.beforeBytes)).toHaveLength(1);
         const output = await fs.readFile(zipPath);
         for (const name of names.slice(1)) {
@@ -247,6 +249,67 @@ describe('扩展 ZIP 无损 WASM 压缩', () => {
         await fs.writeFile(zipPath, await asyncifyZip.generateAsync({type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: {level: 1}}));
         await expect(compact()).rejects.toThrow('同时包含多个 ONNX WASM 条目');
     });
+    it('扩展重压覆盖所有 >= 100 KiB 的 DEFLATE 条目，跳过小条目与 STORE 条目，并按摘要去重与限流并发', async () => {
+        const zip = new JSZip();
+        names.forEach((name, index) => zip.file(name, source(index), {date, createFolders: false, compression: 'DEFLATE'}));
+        const largeScript = Buffer.from(('export const payload = "fluentread-large-script-chunk";\n').repeat(2200));
+        const largeJson = Buffer.from(JSON.stringify({items: Array.from({length: 5000}, (_, i) => `message-${i}-reusable`)}));
+        const largeStored = Buffer.alloc(MIN_COMPACT_ENTRY_BYTES + 1024, 0x41);
+        expect(largeScript.length).toBeGreaterThanOrEqual(MIN_COMPACT_ENTRY_BYTES);
+        expect(largeJson.length).toBeGreaterThanOrEqual(MIN_COMPACT_ENTRY_BYTES);
+
+        zip.file('content.js', largeScript, {date, createFolders: false, compression: 'DEFLATE'});
+        zip.file('duplicate-content.js', largeScript, {date, createFolders: false, compression: 'DEFLATE'});
+        zip.file('i18n/en-US.json', largeJson, {date, createFolders: false, compression: 'DEFLATE'});
+        zip.file('stored-large.bin', largeStored, {date, createFolders: false, compression: 'STORE'});
+        zip.file('small.txt', 'tiny-unchanged'.repeat(50), {date, createFolders: false, compression: 'DEFLATE'});
+        const original = await zip.generateAsync({type: 'nodebuffer', platform: 'UNIX', compression: 'DEFLATE', compressionOptions: {level: 1}});
+        await fs.writeFile(zipPath, original);
+
+        let active = 0;
+        let peak = 0;
+        control.start = (worker, data) => {
+            active += 1;
+            peak = Math.max(peak, active);
+            setTimeout(() => {
+                active -= 1;
+                worker.emit('message', deflateRawSync(data, {level: 9}));
+            }, 5);
+        };
+
+        const result = await compact({concurrency: 2});
+        const output = await fs.readFile(zipPath);
+        expect(peak).toBe(2);
+        expect(result.entries.map(e => e.name)).toEqual([
+            ...names,
+            'content.js',
+            'duplicate-content.js',
+            'i18n/en-US.json',
+        ]);
+        // duplicate-content.js 复用 content.js 同摘要在途任务，只启动 5 个 worker。
+        expect(control.instances).toHaveLength(5);
+        expect(result.entries.find(e => e.name === 'duplicate-content.js')?.cacheHit).toBe(true);
+        expect(result.savedBytes).toBeGreaterThan(0);
+        released();
+
+        await expect(verifyExtensionZipPreservation(original, output)).resolves.toBeUndefined();
+
+        // 非目标的 STORE 大文件和小 DEFLATE 文件本地记录保持逐字节不变。
+        for (const untouched of ['stored-large.bin', 'small.txt']) {
+            const old = positions(original).entries.find(entry => entry.name === untouched)!;
+            const next = positions(output).entries.find(entry => entry.name === untouched)!;
+            const oldSize = original.readUInt32LE(old.central + 20);
+            const nextSize = output.readUInt32LE(next.central + 20);
+            expect(output.subarray(next.local, next.data + nextSize)).toEqual(original.subarray(old.local, old.data + oldSize));
+        }
+
+        // 第二次重压全量命中磁盘缓存，不再启动任何新 worker。
+        await fs.writeFile(zipPath, original);
+        const cached = await compact({concurrency: 2});
+        expect(cached.entries.every(entry => entry.cacheHit)).toBe(true);
+        expect(control.instances).toHaveLength(5);
+        expect(await fs.readFile(zipPath)).toEqual(output);
+    });
 });
 
 type Mutator = (bytes: Buffer, p: ReturnType<typeof positions>) => void;
@@ -308,7 +371,7 @@ describe('完整 ZIP 保留契约', () => {
                 original = insertArchiveBytes(original, 0, Buffer.from('PREFIX')); output = Buffer.from(original); output[0] ^= 1; reason = '前缀';
             } else if (kind === 'suffix') {
                 const p = positions(original); output = insertArchiveBytes(original, p.first.data + original.readUInt32LE(p.first.central + 20), Buffer.from('PADDING')); reason = '尾部字节';
-            } else {output = await fixture({level: 9}); reason = '非 WASM 条目字节';}
+            } else {output = await fixture({level: 9}); reason = '非目标条目字节';}
             await expect(verifyExtensionZipPreservation(original, output)).rejects.toThrow(reason);
         });
     it('重压保留标准 ZIP 的前缀及目标文件之后的对齐字节', async () => {

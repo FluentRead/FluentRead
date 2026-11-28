@@ -11,8 +11,7 @@ import {method, urls} from "@/src/core/config/constants";
 import {resolveConfiguredModel, services} from "@/src/core/config/catalog";
 import {commonMsgTemplate} from '@/src/services/translation/templates';
 import {stripTranslationReasoning as contentPostHandler} from '@/src/core/translation/prompts';
-import hmacSha256 from 'crypto-js/hmac-sha256';
-import base64 from 'crypto-js/enc-base64';
+import {hmacSha256Base64Url} from '@/src/shared/crypto/lightCrypto';
 import {isApiKeyRequired} from "@/src/core/config/validation";
 import {createHttpStatusError, createImageInputHttpError, readJsonResponse} from '@/src/platform/http/errors';
 import {abortErrorFromSignal, cancelUnreadResponseBody, createRuntimeAbortContext, runtimeFetch} from '@/src/platform/http/runtime';
@@ -171,7 +170,7 @@ function generateJWT(secret: string, header: any, payload: any) {
     const encodedHeader = base64UrlSafe(btoa(JSON.stringify(header)));
     const encodedPayload = base64UrlSafe(btoa(JSON.stringify(payload)));
     // 生成 jwt 签名
-    let hmacsha256 = base64UrlSafe(hmacSha256(encodedHeader + "." + encodedPayload, secret).toString(base64))
+    const hmacsha256 = hmacSha256Base64Url(`${encodedHeader}.${encodedPayload}`, secret);
     return `${encodedHeader}.${encodedPayload}.${hmacsha256}`;
 }
 

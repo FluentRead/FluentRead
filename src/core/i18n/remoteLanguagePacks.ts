@@ -1,14 +1,35 @@
 /**
  * @file src/core/i18n/remoteLanguagePacks.ts
- * 文件职责：声明五种非默认界面语言的固定远程基线资产元数据，以及基线与局部增量的纯函数生成与合并规则。
- * 主要内容：固定已提交的五种语言基线路径、精确字节长度与 SHA-256，提供 delta-v1 增量包格式识别、构建期增量计算与运行时无损合并，确保还原后的资源包与完整词典逐项等价。
+ * 文件职责：声明五种非默认界面语言的固定远程基线资产元数据，以及 delta-v1 远程增量包与 compact-v1 离线紧凑包的纯函数校验、生成与无损还原规则。
+ * 主要内容：固定已提交的五种语言基线路径、精确字节长度与 SHA-256，提供嵌套消息键展平、delta-v1 增量包格式识别/计算/合并，以及 compact-v1 离线紧凑语言包（en-US 嵌套消息键与 zh-TW 字符/短语规则加局部补丁）的校验与无损还原，确保还原后的资源包与完整词典逐项等价。
  * 模块边界：本文件属于 core 纯数据与纯算法层，不导入任何外部语言 JSON 文件、不发起网络请求、不访问存储或 DOM。
  */
 
 import {buildGithubAssetMirrorUrls} from '../assets/mirrors';
-import type {LegacyPatternEntry, MessageCatalog, RegisteredUiLanguage, UiLanguageBundle} from './types';
+import type {LegacyPatternEntry, LegacyPatternSet, MessageCatalog, RegisteredUiLanguage, UiLanguageBundle} from './types';
 
 export type RemoteDeltaUiLanguage = Exclude<RegisteredUiLanguage, 'en-US' | 'zh-TW'>;
+
+export interface NestedMessageCatalog {
+    readonly [segment: string]: string | NestedMessageCatalog;
+}
+
+export type LegacyTextPatch = string | readonly (number | string)[];
+
+export interface CompactLegacyTextCodec {
+    readonly charMap: readonly [string, string];
+    readonly phrases: readonly (readonly [string, string])[];
+    readonly auto: readonly string[];
+    readonly patch: Readonly<Record<string, LegacyTextPatch>>;
+}
+
+export interface CompactUiLanguageBundle {
+    readonly format: 'compact-v1';
+    readonly messages: NestedMessageCatalog;
+    readonly legacyText?: MessageCatalog;
+    readonly legacyCodec?: CompactLegacyTextCodec;
+    readonly legacyPatterns: LegacyPatternSet;
+}
 
 export interface RemoteLanguageBaseAsset {
     readonly language: RemoteDeltaUiLanguage;
@@ -24,7 +45,7 @@ export interface DeltaUiLanguageBundle {
     readonly basePath: string;
     readonly baseBytes: number;
     readonly baseSha256: string;
-    readonly messages: MessageCatalog;
+    readonly messages: NestedMessageCatalog;
     readonly legacyText: MessageCatalog;
     readonly removedMessages?: readonly string[];
     readonly removedLegacyText?: readonly string[];
@@ -99,14 +120,124 @@ function isPatternOrderPhase(value: unknown): boolean {
     return value === undefined || (Array.isArray(value) && value.every(Number.isSafeInteger));
 }
 
+export function isNestedMessageCatalog(value: unknown): value is NestedMessageCatalog {
+    if (!isPlainRecord(value)) return false;
+    return Object.values(value).every(child => typeof child === 'string' || isNestedMessageCatalog(child));
+}
+
+export function flattenMessageCatalog(catalog: NestedMessageCatalog): Record<string, string> {
+    const flat: Record<string, string> = {};
+    const visit = (node: NestedMessageCatalog, prefix: string): void => {
+        for (const [segment, value] of Object.entries(node)) {
+            const key = prefix ? (segment ? `${prefix}.${segment}` : prefix) : segment;
+            if (typeof value === 'string') flat[key] = value;
+            else visit(value, key);
+        }
+    };
+    visit(catalog, '');
+    return flat;
+}
+
+function isLegacyTextPatch(value: unknown): value is LegacyTextPatch {
+    if (typeof value === 'string') return true;
+    if (!Array.isArray(value) || value.length % 3 !== 0) return false;
+    for (let i = 0; i < value.length; i += 3) {
+        const skip = value[i];
+        const del = value[i + 1];
+        const ins = value[i + 2];
+        if (!Number.isSafeInteger(skip) || (skip as number) < 0) return false;
+        if (!Number.isSafeInteger(del) || (del as number) < 0) return false;
+        if (typeof ins !== 'string') return false;
+    }
+    return true;
+}
+
+function isCompactLegacyTextCodec(value: unknown): value is CompactLegacyTextCodec {
+    if (!isPlainRecord(value)) return false;
+    const {charMap, phrases, auto, patch} = value;
+    if (!Array.isArray(charMap) || charMap.length !== 2
+        || typeof charMap[0] !== 'string' || typeof charMap[1] !== 'string'
+        || charMap[0].length !== charMap[1].length) return false;
+    if (!Array.isArray(phrases) || !phrases.every(entry =>
+        Array.isArray(entry) && entry.length === 2
+        && typeof entry[0] === 'string' && entry[0].length > 0
+        && typeof entry[1] === 'string')) return false;
+    if (!Array.isArray(auto) || !auto.every(item => typeof item === 'string')) return false;
+    if (!isPlainRecord(patch) || !Object.values(patch).every(isLegacyTextPatch)) return false;
+    return true;
+}
+
+export function isCompactUiLanguageBundle(value: unknown): value is CompactUiLanguageBundle {
+    if (!isPlainRecord(value) || value.format !== 'compact-v1') return false;
+    if (!isNestedMessageCatalog(value.messages)) return false;
+    if (value.legacyText === undefined && value.legacyCodec === undefined) return false;
+    if (value.legacyText !== undefined && (!isPlainRecord(value.legacyText) || !Object.values(value.legacyText).every(item => typeof item === 'string'))) return false;
+    if (value.legacyCodec !== undefined && !isCompactLegacyTextCodec(value.legacyCodec)) return false;
+    if (!isPlainRecord(value.legacyPatterns)) return false;
+    return isLegacyPatternList(value.legacyPatterns.early) && isLegacyPatternList(value.legacyPatterns.late);
+}
+
+function applyLegacyPatch(base: string, patch: LegacyTextPatch): string {
+    if (typeof patch === 'string') return patch;
+    let out = '';
+    let cursor = 0;
+    for (let i = 0; i < patch.length; i += 3) {
+        const skip = patch[i] as number;
+        const del = patch[i + 1] as number;
+        const ins = patch[i + 2] as string;
+        out += base.slice(cursor, cursor + skip) + ins;
+        cursor += skip + del;
+    }
+    return out + base.slice(cursor);
+}
+
+function decodeCompactLegacyText(codec: CompactLegacyTextCodec): Record<string, string> {
+    const [fromChars, toChars] = codec.charMap;
+    const charTable = new Map<string, string>();
+    for (let i = 0; i < fromChars.length; i += 1) {
+        charTable.set(fromChars[i]!, toChars[i]!);
+    }
+    const transform = (source: string): string => {
+        let mapped = '';
+        for (let i = 0; i < source.length; i += 1) {
+            const ch = source[i]!;
+            mapped += charTable.get(ch) ?? ch;
+        }
+        for (const [from, to] of codec.phrases) {
+            if (mapped.includes(from)) mapped = mapped.split(from).join(to);
+        }
+        return mapped;
+    };
+    const legacyText: Record<string, string> = {};
+    for (const key of codec.auto) {
+        legacyText[key] = transform(key);
+    }
+    for (const [key, patch] of Object.entries(codec.patch)) {
+        legacyText[key] = applyLegacyPatch(transform(key), patch);
+    }
+    return legacyText;
+}
+
+/** 将离线紧凑语言包（compact-v1）无损还原为完整 UiLanguageBundle。 */
+export function expandCompactUiLanguageBundle(bundle: CompactUiLanguageBundle): UiLanguageBundle {
+    const legacyText: Record<string, string> = {
+        ...(bundle.legacyCodec ? decodeCompactLegacyText(bundle.legacyCodec) : undefined),
+        ...bundle.legacyText,
+    };
+    return {
+        messages: flattenMessageCatalog(bundle.messages),
+        legacyText,
+        legacyPatterns: bundle.legacyPatterns,
+    };
+}
+
 export function isDeltaUiLanguageBundle(value: unknown): value is DeltaUiLanguageBundle {
     if (!isPlainRecord(value)) return false;
     if (value.format !== 'delta-v1' || typeof value.language !== 'string' || !isRemoteDeltaUiLanguage(value.language)) return false;
     if (typeof value.baseRevision !== 'string' || typeof value.basePath !== 'string') return false;
     if (!Number.isSafeInteger(value.baseBytes) || (value.baseBytes as number) <= 0) return false;
     if (typeof value.baseSha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(value.baseSha256)) return false;
-    if (!isPlainRecord(value.messages) || !isPlainRecord(value.legacyText)) return false;
-    if (!Object.values(value.messages).every(item => typeof item === 'string')) return false;
+    if (!isNestedMessageCatalog(value.messages) || !isPlainRecord(value.legacyText)) return false;
     if (!Object.values(value.legacyText).every(item => typeof item === 'string')) return false;
     if (value.removedMessages !== undefined && (!Array.isArray(value.removedMessages) || !value.removedMessages.every(item => typeof item === 'string'))) return false;
     if (value.removedLegacyText !== undefined && (!Array.isArray(value.removedLegacyText) || !value.removedLegacyText.every(item => typeof item === 'string'))) return false;
@@ -189,7 +320,7 @@ export function mergeDeltaUiLanguageBundle(
         });
     };
 
-    const messages: Record<string, string> = {...baseline.messages, ...delta.messages};
+    const messages: Record<string, string> = {...baseline.messages, ...flattenMessageCatalog(delta.messages)};
     if (delta.removedMessages) {
         for (const key of delta.removedMessages) delete messages[key];
     }

@@ -2,7 +2,7 @@
  * @file src/platform/i18n/uiLanguageBundles.ts
  *
  * 文件职责：在扩展运行时按当前界面语言加载构建期生成的非中文资源包，并注册到 core i18n。
- * 主要内容：createUiLanguageBundleLoader 对同一语言的并发请求去重，同时支持完整本地 JSON（如 en-US）与 delta-v1 增量包（其余五语通过国内外多镜像校验并缓存固定基线后无损合并），失败时回退中文且允许下次重试；
+ * 主要内容：createUiLanguageBundleLoader 对同一语言的并发请求去重，同时支持完整本地 JSON、离线无损 compact-v1 紧凑包（en-US 与 zh-TW）以及 delta-v1 增量包（其余五语通过国内外多镜像校验并缓存固定基线后无损合并），失败时回退中文且允许下次重试；
  * ensureUiLanguageBundle 使用扩展自身资源 URL 与统一受校验缓存作为默认实现；renderWithUiLanguageBundle 让非响应式 UI 在资源到达后补一次渲染。
  * 模块边界：这里只负责资源读取和注册，不决定当前语言、不订阅配置，也不修改 DOM；
  * userscript 构建用静态注册全部语言的实现替换本模块，扩展 bundle 不得回退到静态 import 全部语言。
@@ -17,9 +17,11 @@ import {
     type UiLanguageBundle,
 } from '@/src/core/i18n';
 import {
+    expandCompactUiLanguageBundle,
     EXTENSION_I18N_BASE_CACHE,
     EXTENSION_I18N_BASE_REVISION,
     getRemoteLanguageBaseUrls,
+    isCompactUiLanguageBundle,
     isDeltaUiLanguageBundle,
     mergeDeltaUiLanguageBundle,
     REMOTE_LANGUAGE_BASE_ASSETS,
@@ -159,6 +161,10 @@ export function createUiLanguageBundleLoader(dependencies: UiLanguageBundleLoade
             const merged = mergeDeltaUiLanguageBundle(baseline, payload);
             if (!isUiLanguageBundle(merged)) throw new TypeError('合并后的界面语言资源格式无效');
             registerUiLanguageBundle(language, merged);
+            return true;
+        }
+        if (isCompactUiLanguageBundle(payload)) {
+            registerUiLanguageBundle(language, expandCompactUiLanguageBundle(payload));
             return true;
         }
         if (isUiLanguageBundle(payload)) {

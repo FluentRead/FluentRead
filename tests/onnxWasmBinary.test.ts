@@ -249,25 +249,41 @@ describe('kokoro modular transformers build plugin', () => {
         const entryCode = load(directId!);
         expect(entryCode).toContain('StyleTextToSpeech2Model');
         expect(entryCode).toContain('AutoTokenizer');
+        expect(entryCode).toContain('PreTrainedTokenizer');
+        expect(entryCode).toContain('loadTokenizer');
+        expect(entryCode).not.toContain('models/auto/tokenization_auto.js');
         expect(entryCode).toContain('MODEL_TYPE_MAPPING');
         expect(entryCode).toContain('registerTaskMappings');
 
-        const kokoroSrcImporter = resolve(
+        const kokoroSrcRoot = resolve(
             realpathSync(resolve(process.cwd(), 'node_modules/@huggingface/transformers-kokoro')),
-            'src/env.js',
+            'src',
         );
+        const kokoroSrcImporter = resolve(kokoroSrcRoot, 'env.js');
+        const modelingUtilsImporter = resolve(kokoroSrcRoot, 'models/modeling_utils.js');
         const emptyStub = resolveId('node:fs', kokoroSrcImporter);
         const streamStub = resolveId('node:stream', kokoroSrcImporter);
         const streamPromisesStub = resolveId('node:stream/promises', kokoroSrcImporter);
         const jinjaStub = resolveId('@huggingface/jinja', kokoroSrcImporter);
+        const logitsStub = resolveId('../generation/logits_process.js', modelingUtilsImporter);
+        const genConfigStub = resolveId('../generation/configuration_utils.js', modelingUtilsImporter);
+        const stoppingStub = resolveId('../generation/stopping_criteria.js', modelingUtilsImporter);
+        const samplerStub = resolveId('../generation/logits_sampler.js', modelingUtilsImporter);
+        const cacheStub = resolveId('../cache_utils.js', modelingUtilsImporter);
         expect(emptyStub).toBeTruthy();
         expect(resolveId('onnxruntime-node', kokoroSrcImporter)).toBe(emptyStub);
         expect(load(emptyStub!)).toContain('export default {}');
         expect(load(streamStub!)).toContain('Readable');
         expect(load(streamPromisesStub!)).toContain('pipeline');
         expect(load(jinjaStub!)).toContain('export class Template');
+        expect(load(logitsStub!)).toContain('LogitsProcessorList');
+        expect(load(genConfigStub!)).toContain('GenerationConfig');
+        expect(load(stoppingStub!)).toContain('StoppingCriteriaList');
+        expect(load(samplerStub!)).toContain('LogitsSampler');
+        expect(load(cacheStub!)).toContain('DynamicCache');
 
-        // 浏览器空桩仅限 @huggingface/transformers@4.2.0/src/ 内部使用。
+        // 浏览器空桩与自回归生成桩仅限 @huggingface/transformers@4.2.0/src/ 内部对应文件使用。
+        expect(resolveId('../generation/logits_process.js', kokoroSrcImporter)).toBeNull();
         expect(resolveId('node:fs', '/repo/src/features/local-tts/offscreen/tts.worker.ts')).toBeNull();
         expect(resolveId('@huggingface/jinja', '/repo/src/features/local-translation/offscreen/translation.worker.ts')).toBeNull();
         expect(load('\0unrelated-virtual-id')).toBeNull();
@@ -359,8 +375,21 @@ describe('kokoro modular transformers build plugin', () => {
 
         const baselineCode = await bundleWith([], false);
         const modularCode = await bundleWith([kokoroTransformersBuildPlugin()], false);
-        expect(Buffer.byteLength(baselineCode, 'utf8') - Buffer.byteLength(modularCode, 'utf8')).toBeGreaterThan(250_000);
-        for (const removedSymbol of ['BertModel', 'GPT2Model', 'WhisperModel', 'CLIPModel', 'ImageFeatureExtractor']) {
+        expect(Buffer.byteLength(baselineCode, 'utf8') - Buffer.byteLength(modularCode, 'utf8')).toBeGreaterThan(280_000);
+        for (const removedSymbol of [
+            'BertModel',
+            'GPT2Model',
+            'WhisperModel',
+            'CLIPModel',
+            'ImageFeatureExtractor',
+            'BertTokenizer',
+            'WhisperTokenizer',
+            'GPT2Tokenizer',
+            'LlamaTokenizer',
+            'BartTokenizer',
+            'AlbertTokenizer',
+            '`_call` should be implemented in a subclass',
+        ]) {
             expect(baselineCode).toContain(removedSymbol);
             expect(modularCode).not.toContain(removedSymbol);
         }
@@ -443,6 +472,32 @@ describe('kokoro modular transformers build plugin', () => {
             expect(Array.from(audio.audio)).toEqual([0.25, -0.25, 0.5]);
             expect(() => tts.tokenizer.apply_chat_template([], {chat_template: '{{ messages }}'}))
                 .toThrow('Chat templates are not bundled in the Kokoro TTS runtime.');
+            expect(() => tts.model._prepare_generation_config(null, {}))
+                .toThrow('Autoregressive text generation is not bundled in the Kokoro TTS runtime.');
+
+            // 验证精简 AutoTokenizer 在 PreTrainedTokenizerFast、TokenizersBackend、缺省及未知 tokenizer_class 下均保持兼容。
+            const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            try {
+                for (const tokenizerConfig of [
+                    {tokenizer_class: 'PreTrainedTokenizerFast', model_max_length: 512},
+                    {tokenizer_class: 'TokenizersBackend', model_max_length: 512},
+                    {model_max_length: 512},
+                ]) {
+                    mockFiles['tokenizer_config.json'] = JSON.stringify(tokenizerConfig);
+                    const tok = await mod.AutoTokenizer.from_pretrained('hexgrad/Kokoro-82M-v1.1-zh');
+                    const encoded = tok('hi', {truncation: true});
+                    expect(Array.from(encoded.input_ids.data, Number)).toEqual([0, 1, 2, 0]);
+                }
+                expect(warnSpy).not.toHaveBeenCalled();
+
+                mockFiles['tokenizer_config.json'] = JSON.stringify({tokenizer_class: 'CustomUnknownTokenizer', model_max_length: 512});
+                const fallbackTok = await mod.AutoTokenizer.from_pretrained('hexgrad/Kokoro-82M-v1.1-zh');
+                expect(Array.from(fallbackTok('hi', {truncation: true}).input_ids.data, Number)).toEqual([0, 1, 2, 0]);
+                expect(warnSpy).toHaveBeenCalledTimes(1);
+            } finally {
+                warnSpy.mockRestore();
+            }
+
             await tts.model.dispose();
 
             expect(ortCalls).toEqual([

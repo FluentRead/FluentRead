@@ -4,12 +4,8 @@
  * 主要内容：按码点预算且不切术语标记，生成公开网页协议所需签名，解密词霸响应，限制支持的中英方向；auto 使用解码正文槽的可信语言证据，明确非中英时以请求错误交回既有换线流程，不让英文协议标记决定源语言；有道按安全长度分块，拒绝响应明确声明的反向翻译，仅按本块完整身份恢复服务删除下划线的术语标记，缺失、重复或身份变化仍失败；保留文本槽、换行、边缘空白、取消和结构化失败分类，取消或 HTTP 失败后直接取消未读正文，不等待错误页 EOF。
  * 模块边界：本文件只负责固定匿名 HTTP provider；不读取账号、Cookie、用户密钥、代理或存储，不负责免费服务编排、重试和并发。
  */
-import AES from 'crypto-js/aes';
+import {aesEcbDecryptBase64Utf8, aesEcbEncryptUtf8Base64, md5Hex} from '@/src/shared/crypto/lightCrypto';
 import {translateFreeTextChunks} from './freeTextChunks';
-import encUtf8 from 'crypto-js/enc-utf8';
-import MD5 from 'crypto-js/md5';
-import modeECB from 'crypto-js/mode-ecb';
-import padPkcs7 from 'crypto-js/pad-pkcs7';
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import {detectChineseScript} from '@/src/core/language/detect';
 import {identifyTextLanguage} from '@/src/core/language/identify';
@@ -99,8 +95,8 @@ function youdaoTimestamp(query: string): string {
 }
 
 function youdaoSign(query: string, timestamp: string): string {
-    const queryDigest = MD5(query + YOUDAO_KEYFROM).toString();
-    return MD5(`${YOUDAO_CLIENT}${query}${timestamp}${YOUDAO_SECRET}${queryDigest}`).toString();
+    const queryDigest = md5Hex(query + YOUDAO_KEYFROM);
+    return md5Hex(`${YOUDAO_CLIENT}${query}${timestamp}${YOUDAO_SECRET}${queryDigest}`);
 }
 
 /** 有道会把 __FRTERM_nonce_0__ 写成 FRTERM nonce0 或 FRTERM nonce 0；只还原本块完整 nonce/index，不猜测丢字或跨块身份。 */
@@ -122,10 +118,7 @@ export function normalizeYoudaoProtectedTokens(query: string, translated: string
 function decryptIciba(content: unknown): Record<string, unknown> {
     if (typeof content !== 'string' || !content) throw failure('词霸返回内容无效', 'unavailable');
     try {
-        const plain = AES.decrypt(content, encUtf8.parse(ICIBA_RESPONSE_KEY), {
-            mode: modeECB,
-            padding: padPkcs7,
-        }).toString(encUtf8);
+        const plain = aesEcbDecryptBase64Utf8(content, ICIBA_RESPONSE_KEY);
         const value: unknown = JSON.parse(plain);
         if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
         return value as Record<string, unknown>;
@@ -143,8 +136,8 @@ async function fetchJson(provider: FreeChineseWebProvider, query: string, from: 
         url = `${YOUDAO_URL}&${params}`;
         init.method = 'GET';
     } else {
-        const digest = MD5(ICIBA_SIGN_PREFIX + query).toString().slice(0, 16);
-        const encryptedSign = AES.encrypt(digest, encUtf8.parse(ICIBA_SIGN_KEY), {mode: modeECB, padding: padPkcs7}).toString();
+        const digest = md5Hex(ICIBA_SIGN_PREFIX + query).slice(0, 16);
+        const encryptedSign = aesEcbEncryptUtf8Base64(digest, ICIBA_SIGN_KEY);
         const params = new URLSearchParams({from: from === 'zh-CHS' ? 'zh' : from, to: to === 'zh-CHS' ? 'zh' : to, q: query, client: ICIBA_CLIENT, auth_user: ICIBA_AUTH_USER, sign: encryptedSign});
         url = ICIBA_URL;
         init.headers = {'Content-Type': 'application/x-www-form-urlencoded'};

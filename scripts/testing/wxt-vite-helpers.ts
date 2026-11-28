@@ -38,6 +38,8 @@ function isAllBridgesOrWorklet(entrypoints: readonly {name?: string}[]): boolean
 const NON_CONTENT_SCRIPT_PLUGIN_NAMES = new Set([
     'fluentread-shared-onnx',
     'fluentread-kokoro-transformers',
+    'fluentread-kokoro-phonemizer',
+    'fluentread-fontkit-slim',
     'fluentread-ai-sdk-gateway-stub',
     'wllama-static-extension-worker',
     'fluent-read-tesseract-sdk-initialization',
@@ -62,6 +64,7 @@ const ROLLDOWN_TRANSFORM_FILTERS: Readonly<Record<string, RolldownTransformFilte
     'fluentread-extension-csp-vendor': {
         id: /(?:^|[\\/])(?:regenerator-runtime[\\/]runtime\.js|jszip[\\/]dist[\\/]jszip\.min\.js|pdfjs-dist[\\/]legacy[\\/]build[\\/]pdf\.mjs|@pdf-lib[\\/]fontkit[\\/]dist[\\/]fontkit\.es\.js|lodash-es[\\/]_root\.js|zod[\\/]v4[\\/]core[\\/]schemas\.js)$/,
     },
+    'fluentread-fontkit-slim': {id: /(?:^|[\\/])@pdf-lib[\\/]fontkit[\\/]dist[\\/]fontkit\.es\.js$/},
     'fluentread-defuddle-entity-decoder': {id: /(?:^|[\\/])defuddle[\\/]dist[\\/]index\.js$/},
     'fluentread-deferred-franc-models': {id: /(?:^|[\\/])franc-min[\\/]index\.js$/},
     'wllama-static-extension-worker': {id: /@wllama[\\/]wllama[\\/]esm[\\/]index\.js$/},

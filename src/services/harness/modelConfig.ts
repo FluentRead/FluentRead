@@ -4,8 +4,7 @@
  * 主要内容：规范化端点、请求头、Chat Completions 自定义生成参数与输出上限、思考开关和智谱签名，计算模型输入指纹，并对供应商错误中的凭据与网址参数脱敏。
  * 模块边界：只处理配置与错误值，不初始化 AI SDK、不发送网络请求；具体传输和密钥轮换由各运行环境的生成适配器负责。
  */
-import hmacSha256 from 'crypto-js/hmac-sha256';
-import base64 from 'crypto-js/enc-base64';
+import {hmacSha256Base64Url} from '@/src/shared/crypto/lightCrypto';
 import type {Config} from '@/src/core/config/model';
 import {currentModelIds, services} from '@/src/core/config/catalog';
 import {tongyiTokenPlanUrl, urls} from '@/src/core/config/constants';
@@ -30,8 +29,7 @@ export function zhipuBearer(apiKey: string): string {
   const encode = (value: string) => btoa(value).replace(/\+/gu, '-').replace(/\//gu, '_').replace(/=+$/gu, '');
   const header = encode(JSON.stringify({alg: 'HS256', sign_type: 'SIGN', typ: 'JWT'}));
   const payload = encode(JSON.stringify({api_key: key, exp: Math.floor(Date.now() / 1000) + 86_400, timestamp: Math.floor(Date.now() / 1000)}));
-  const signature = hmacSha256(`${header}.${payload}`, secret).toString(base64)
-    .replace(/\+/gu, '-').replace(/\//gu, '_').replace(/=+$/gu, '');
+  const signature = hmacSha256Base64Url(`${header}.${payload}`, secret);
   return `${header}.${payload}.${signature}`;
 }
 

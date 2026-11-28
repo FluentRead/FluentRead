@@ -27,15 +27,20 @@ import pdfBinaryDataManifest from '@/src/features/document-translation/services/
 import {createUiLanguageBundleFiles} from '@/src/core/i18n/bundles';
 import {
     createDeltaUiLanguageBundle,
+    expandCompactUiLanguageBundle,
     EXTENSION_I18N_BASE_REVISION,
+    flattenMessageCatalog,
     getRemoteLanguageBaseUrls,
+    isCompactUiLanguageBundle,
     isDeltaUiLanguageBundle,
+    isNestedMessageCatalog,
     mergeDeltaUiLanguageBundle,
     REMOTE_LANGUAGE_BASE_ASSETS,
+    type CompactUiLanguageBundle,
     type DeltaUiLanguageBundle,
     type RemoteDeltaUiLanguage,
 } from '@/src/core/i18n/remoteLanguagePacks';
-import {createExtensionUiLanguageBundleFiles} from '@/scripts/i18n/extensionLanguageBundles';
+import {createExtensionUiLanguageBundleFiles, nestMessageCatalog} from '@/scripts/i18n/extensionLanguageBundles';
 import {
     clearPinnedRemoteUiLanguageBaseCache,
     createUiLanguageBundleLoader,
@@ -214,7 +219,7 @@ describe('PDF.js pinned binary data factory', () => {
 });
 
 describe('delta UI language packs', () => {
-    it('keeps en-US and zh-TW full locally and reconstructs all 5 remote-base languages identically to full bundles', () => {
+    it('keeps en-US and zh-TW offline in lossless compact-v1 and reconstructs all 7 extension bundles identically to full bundles', () => {
         const fullFiles = new Map(createUiLanguageBundleFiles().map(item => [item.relativeDest, JSON.parse(item.contents)]));
         const extFiles = createExtensionUiLanguageBundleFiles(PROJECT_ROOT);
         expect(extFiles).toHaveLength(7);
@@ -223,9 +228,11 @@ describe('delta UI language packs', () => {
             const parsed = JSON.parse(contents);
             if (relativeDest === 'i18n/en-US.json' || relativeDest === 'i18n/zh-TW.json') {
                 expect(isDeltaUiLanguageBundle(parsed)).toBe(false);
-                expect(parsed).toEqual(fullFiles.get(relativeDest));
+                expect(isCompactUiLanguageBundle(parsed)).toBe(true);
+                expect(expandCompactUiLanguageBundle(parsed)).toEqual(fullFiles.get(relativeDest));
                 continue;
             }
+            expect(isCompactUiLanguageBundle(parsed)).toBe(false);
             expect(isDeltaUiLanguageBundle(parsed)).toBe(true);
             const language = relativeDest.slice('i18n/'.length, -'.json'.length) as RemoteDeltaUiLanguage;
             const baseline = JSON.parse(readFileSync(resolve(PROJECT_ROOT, REMOTE_LANGUAGE_BASE_ASSETS[language].path), 'utf8'));
@@ -234,7 +241,7 @@ describe('delta UI language packs', () => {
         }
     });
 
-    it('loads delta-v1 language bundles through createUiLanguageBundleLoader and registers merged translations', async () => {
+    it('loads offline compact-v1 (en-US, zh-TW) and delta-v1 language bundles through createUiLanguageBundleLoader', async () => {
         const extFiles = new Map(createExtensionUiLanguageBundleFiles(PROJECT_ROOT).map(item => [item.relativeDest, JSON.parse(item.contents)]));
         const jaDelta = extFiles.get('i18n/ja-JP.json');
         const jaBase = JSON.parse(readFileSync(resolve(PROJECT_ROOT, REMOTE_LANGUAGE_BASE_ASSETS['ja-JP'].path), 'utf8'));
@@ -242,16 +249,29 @@ describe('delta UI language packs', () => {
         const loadRemoteBase = vi.fn(async () => jaBase);
         const ensure = createUiLanguageBundleLoader({
             resolveUrl: path => `chrome-extension://id/${path}`,
-            fetch: async () => ({ok: true, status: 200, json: async () => jaDelta}),
+            fetch: async (url) => {
+                const rel = url.replace('chrome-extension://id/', '');
+                return {ok: true, status: 200, json: async () => extFiles.get(rel)};
+            },
             warn: vi.fn(),
             loadRemoteBase,
         });
+
+        await expect(ensure('zh-TW')).resolves.toBe(true);
+        await expect(ensure('en-US')).resolves.toBe(true);
+        expect(loadRemoteBase).not.toHaveBeenCalled();
+        expect(hasUiLanguageBundle('zh-TW')).toBe(true);
+        expect(hasUiLanguageBundle('en-US')).toBe(true);
+        expect(translate('common.brand', 'zh-TW')).toBe('流暢閱讀');
+        expect(translateLegacyText('查看原网页', 'zh-TW')).toBe('檢視原網頁');
+        expect(translate('common.brand', 'en-US')).toBe('FluentRead');
 
         await expect(ensure('ja-JP')).resolves.toBe(true);
         expect(loadRemoteBase).toHaveBeenCalledOnce();
         expect(hasUiLanguageBundle('ja-JP')).toBe(true);
         expect(translate('common.brand', 'ja-JP')).toBe('FluentRead');
         expect(translateLegacyText('查看原网页', 'ja-JP')).not.toBe('查看原网页');
+        expect(jaDelta.format).toBe('delta-v1');
     });
 });
 
@@ -698,6 +718,85 @@ describe('deep slim Layer 1 + Layer 2 edge branches and contracts', () => {
         ];
         for (const candidate of invalidCases) {
             expect(isDeltaUiLanguageBundle(candidate)).toBe(false);
+        }
+
+        // Cover nested message catalog flattening (including prefix collisions & non-nestable keys) and compact-v1 validation/expansion.
+        expect(isNestedMessageCatalog(null)).toBe(false);
+        expect(isNestedMessageCatalog({a: {b: 123}})).toBe(false);
+        const mixedCatalog = {
+            'a.b': 'parent',
+            'a.b.c': 'child',
+            'x.y.z': 'first',
+            'x.y': 'parentAfterChild',
+            'leading..dots': 'raw',
+            '.start': 'raw2',
+            'constructor.item': 'safe',
+        };
+        const nestedMixed = nestMessageCatalog(mixedCatalog);
+        expect(isNestedMessageCatalog(nestedMixed)).toBe(true);
+        expect(flattenMessageCatalog(nestedMixed)).toEqual(mixedCatalog);
+
+        const validCompact: CompactUiLanguageBundle = {
+            format: 'compact-v1',
+            messages: {common: {ok: '確定', '': '通用'}},
+            legacyCodec: {
+                charMap: ['简单网络', '簡單網絡'],
+                phrases: [['设置', '設定'], ['不会命中', '無']],
+                auto: ['简单设置', '无变化'],
+                patch: {
+                    '网络设置错误': [2, 2, '組態'],
+                    '特例': '完全替換',
+                },
+            },
+            legacyText: {'额外': '額外'},
+            legacyPatterns: {early: [['^a$', 'b']], late: []},
+        };
+        expect(isCompactUiLanguageBundle(validCompact)).toBe(true);
+        expect(expandCompactUiLanguageBundle(validCompact)).toEqual({
+            messages: {'common.ok': '確定', common: '通用'},
+            legacyText: {
+                '简单设置': '簡單設定',
+                '无变化': '无变化',
+                '网络设置错误': '網絡組態错误',
+                '特例': '完全替換',
+                '额外': '額外',
+            },
+            legacyPatterns: {early: [['^a$', 'b']], late: []},
+        });
+        expect(expandCompactUiLanguageBundle({
+            format: 'compact-v1',
+            messages: {a: '1'},
+            legacyText: {k: 'v'},
+            legacyPatterns: {early: [], late: []},
+        })).toEqual({
+            messages: {a: '1'},
+            legacyText: {k: 'v'},
+            legacyPatterns: {early: [], late: []},
+        });
+
+        const invalidCompactCases: unknown[] = [
+            null,
+            {...validCompact, format: 'bad'},
+            {...validCompact, messages: {a: 1}},
+            {format: 'compact-v1', messages: {}, legacyPatterns: {early: [], late: []}},
+            {...validCompact, legacyText: 'bad'},
+            {...validCompact, legacyText: {k: 1}},
+            {...validCompact, legacyCodec: null},
+            {...validCompact, legacyCodec: {...validCompact.legacyCodec!, charMap: ['ab', 'a']}},
+            {...validCompact, legacyCodec: {...validCompact.legacyCodec!, charMap: [1, 'a']}},
+            {...validCompact, legacyCodec: {...validCompact.legacyCodec!, phrases: [['', 'x']]}},
+            {...validCompact, legacyCodec: {...validCompact.legacyCodec!, phrases: ['bad']}},
+            {...validCompact, legacyCodec: {...validCompact.legacyCodec!, auto: [1]}},
+            {...validCompact, legacyCodec: {...validCompact.legacyCodec!, patch: null}},
+            {...validCompact, legacyCodec: {...validCompact.legacyCodec!, patch: {k: [0, 1]}}},
+            {...validCompact, legacyCodec: {...validCompact.legacyCodec!, patch: {k: [-1, 0, 'a']}}},
+            {...validCompact, legacyCodec: {...validCompact.legacyCodec!, patch: {k: [0, -1, 'a']}}},
+            {...validCompact, legacyCodec: {...validCompact.legacyCodec!, patch: {k: [0, 0, 1]}}},
+            {...validCompact, legacyPatterns: null},
+            {...validCompact, legacyPatterns: {early: [['bad']], late: []}},
+        ];
+        for (const candidate of invalidCompactCases) {
+            expect(isCompactUiLanguageBundle(candidate)).toBe(false);
         }
 
         // Test defaultLoadRemoteBase (no loadRemoteBase override) on valid and invalid remote JSON + invalid merged bundle.

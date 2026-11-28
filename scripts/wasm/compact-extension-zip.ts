@@ -1,7 +1,7 @@
 /**
  * @file scripts/wasm/compact-extension-zip.ts
- * 文件职责：在 WXT 完成扩展 ZIP 后，无损重压三个固定 WASM 条目的 DEFLATE 流，并提供标准 ZIP 的原生快速解析与 CRC32 校验工具。
- * 主要内容：使用 Node 原生 zlib（inflateRawSync 与 crc32）解析标准单盘 ZIP 的中央目录及本地记录，校验全量条目完整性，原样复制非目标跨度与元数据；隔离 worker 使用锁定 Zopfli 参数，按原文摘要缓存并复验，逐条校验 CRC/解压字节后原子替换更小的完整 ZIP。
+ * 文件职责：在 WXT 完成扩展 ZIP 后，无损重压固定 WASM 条目及所有体积达到阈值的 DEFLATE 条目，并提供标准 ZIP 的原生快速解析与 CRC32 校验工具。
+ * 主要内容：使用 Node 原生 zlib（inflateRawSync 与 crc32）解析标准单盘 ZIP 的中央目录及本地记录，校验全量条目完整性，原样复制非目标跨度与元数据；通过有界并发的隔离 worker 池使用锁定 Zopfli 参数，按原文摘要去重缓存并复验，逐条校验 CRC/解压字节后原子替换更小的完整 ZIP。
  * 模块边界：仅供构建 hook 与构建期产物校验复用，不改变 WASM、模型、文件名或运行时解码方式；不支持 ZIP64、加密、数据描述符或多盘，所有拒绝均在替换原 ZIP 之前。
  */
 import {createHash, randomUUID} from 'node:crypto';
@@ -30,6 +30,17 @@ function resolveTargetWasmFiles(entries: readonly {name: string}[]): readonly st
 }
 const COMPRESSOR_VERSION = '1.0.15';
 const CACHE_FORMAT = `sha256-zopfli-${COMPRESSOR_VERSION}-deflate-iterations-1`;
+/** 除三个固定 WASM 外，所有原始体积不少于 100 KiB 的 DEFLATE 条目也纳入无损 Zopfli 重压。 */
+export const MIN_COMPACT_ENTRY_BYTES = 100 * 1024;
+const DEFAULT_COMPACT_CONCURRENCY = 4;
+
+function resolveCompactTargetFiles(entries: readonly StandardZipEntry[], requiredWasmFiles: readonly string[]): readonly string[] {
+    const requiredSet = new Set(requiredWasmFiles);
+    const extraTargets = entries
+        .filter(entry => !requiredSet.has(entry.name) && entry.method === 8 && entry.originalSize >= MIN_COMPACT_ENTRY_BYTES)
+        .map(entry => entry.name);
+    return [...requiredWasmFiles, ...extraTargets];
+}
 
 export interface StandardZipEntry {
     name: string;
@@ -48,7 +59,10 @@ export interface StandardZipLayout {
     endOffset: number;
     localStart: number;
 }
-interface ZipLayout extends StandardZipLayout {targetWasmFiles: readonly string[]}
+interface ZipLayout extends StandardZipLayout {
+    requiredWasmFiles: readonly string[];
+    targetFiles: readonly string[];
+}
 export interface CompactExtensionZipResult {
     beforeBytes: number;
     afterBytes: number;
@@ -171,8 +185,9 @@ export function verifyStandardZipCrc32(bytes: Buffer, layout: StandardZipLayout 
 
 function parseZip(bytes: Buffer): ZipLayout {
     const standard = parseStandardZip(bytes);
-    const targetWasmFiles = resolveTargetWasmFiles(standard.entries);
-    return {...standard, targetWasmFiles};
+    const requiredWasmFiles = resolveTargetWasmFiles(standard.entries);
+    const targetFiles = resolveCompactTargetFiles(standard.entries, requiredWasmFiles);
+    return {...standard, requiredWasmFiles, targetFiles};
 }
 
 async function compressInWorker(data: Buffer, root: string, timeoutMs: number): Promise<Buffer> {
@@ -215,8 +230,8 @@ async function atomicWrite(file: string, bytes: Buffer, validate: () => Promise<
         throw error;
     }
 }
-async function cachedDeflate(original: Buffer, root: string, cache: string, timeoutMs: number) {
-    const sha256 = createHash('sha256').update(original).digest('hex'), file = resolve(cache, `${sha256}.deflate-cache`);
+async function cachedDeflate(original: Buffer, sha256: string, root: string, cache: string, timeoutMs: number) {
+    const file = resolve(cache, `${sha256}.deflate-cache`);
     let cached: Buffer;
     try {cached = await readFile(file);}
     catch (error) {
@@ -231,6 +246,35 @@ async function cachedDeflate(original: Buffer, root: string, cache: string, time
     requireZip(cached.length >= 32 && cached.subarray(0, 32).equals(createHash('sha256').update(compact).digest()), 'WASM 压缩缓存校验失败');
     verifyDeflate(compact, original);
     return {compact, sha256, cacheHit: true};
+}
+
+async function mapWithConcurrency<T, R>(
+    items: readonly T[],
+    concurrency: number,
+    task: (item: T) => Promise<R>,
+): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+    let failed = false;
+    let firstError: unknown;
+    const runSlot = async (): Promise<void> => {
+        while (!failed && nextIndex < items.length) {
+            const index = nextIndex;
+            nextIndex += 1;
+            try {
+                results[index] = await task(items[index]!);
+            } catch (error) {
+                if (!failed) {
+                    failed = true;
+                    firstError = error;
+                }
+            }
+        }
+    };
+    const slotCount = Math.min(Math.max(1, Math.floor(concurrency)), items.length);
+    await Promise.all(Array.from({length: slotCount}, () => runSlot()));
+    if (failed) throw firstError;
+    return results;
 }
 function repack(bytes: Buffer, layout: ZipLayout, replacements: Map<string, Buffer>): Buffer {
     const localOrder = [...layout.entries].sort((left, right) => left.localOffset - right.localOffset);
@@ -269,7 +313,7 @@ function verifyPreservationInternal(
     const end = Buffer.from(output.subarray(next.endOffset)); end.writeUInt32LE(layout.centralOffset, 16);
     requireZip(end.equals(original.subarray(layout.endOffset)), '重打包改变了 EOCD 元数据');
     requireZip(original.subarray(0, layout.localStart).equals(output.subarray(0, next.localStart)), '重打包改变了 ZIP 前缀');
-    const targetSet = new Set(layout.targetWasmFiles);
+    const targetSet = new Set(layout.targetFiles);
     for (let index = 0; index < layout.entries.length; index += 1) {
         const entry = layout.entries[index]!, rebuilt = next.entries[index]!;
         const metadata = Buffer.from(rebuilt.central); metadata.writeUInt32LE(entry.compressedSize, 20); metadata.writeUInt32LE(entry.localOffset, 42);
@@ -279,7 +323,7 @@ function verifyPreservationInternal(
         if (!targetSet.has(entry.name)) {
             requireZip(
                 original.subarray(entry.localOffset, entry.spanEnd).equals(output.subarray(rebuilt.localOffset, rebuilt.spanEnd)),
-                '重打包改变了非 WASM 条目字节');
+                '重打包改变了非目标条目字节');
             if (!verifiedOriginal) readStandardZipEntry(original, entry);
             continue;
         }
@@ -306,27 +350,44 @@ export async function verifyExtensionZipPreservation(original: Buffer, output: B
 
 /** WXT zip:extension:done 调用；返回体积测量，不增加运行时依赖或更改任何条目的解压内容。 */
 export async function compactExtensionZip(zipPath: string, root: string,
-    options: {cacheDirectory?: string; workerTimeoutMs?: number} = {}): Promise<CompactExtensionZipResult> {
+    options: {cacheDirectory?: string; workerTimeoutMs?: number; concurrency?: number} = {}): Promise<CompactExtensionZipResult> {
     const original = await readFile(zipPath), layout = parseZip(original);
     const require = createRequire(resolve(root, 'package.json'));
     const version = JSON.parse(await readFile(require.resolve('@gfx/zopfli/package.json'), 'utf8')).version;
     requireZip(version === COMPRESSOR_VERSION, '压缩器版本与缓存格式不一致');
-    const targetSet = new Set(layout.targetWasmFiles);
-    for (const name of layout.targetWasmFiles) {
-        const entry = layout.entries.find(candidate => candidate.name === name)!;
+    const entryByName = new Map(layout.entries.map(entry => [entry.name, entry]));
+    for (const name of layout.requiredWasmFiles) {
+        const entry = entryByName.get(name)!;
         requireZip(entry.method === 8, `固定 WASM 条目不是 DEFLATE：${name}`);
     }
+    const targetSet = new Set(layout.targetFiles);
     const targetBuffers = new Map<string, Buffer>();
     for (const entry of layout.entries) {
         const decoded = readStandardZipEntry(original, entry);
         if (targetSet.has(entry.name)) targetBuffers.set(entry.name, decoded);
     }
     const cache = options.cacheDirectory ?? resolve(root, '.wxt/zip-wasm-deflate', CACHE_FORMAT);
+    const timeoutMs = options.workerTimeoutMs ?? 180_000;
+    const inflightBySha256 = new Map<string, Promise<{compact: Buffer; sha256: string; cacheHit: boolean}>>();
+    const compacted = await mapWithConcurrency(
+        layout.targetFiles,
+        options.concurrency ?? DEFAULT_COMPACT_CONCURRENCY,
+        async name => {
+            const entry = entryByName.get(name)!;
+            const bytes = targetBuffers.get(name)!;
+            const sha256 = createHash('sha256').update(bytes).digest('hex');
+            let pending = inflightBySha256.get(sha256);
+            const deduplicated = pending !== undefined;
+            if (!pending) {
+                pending = cachedDeflate(bytes, sha256, root, cache, timeoutMs);
+                inflightBySha256.set(sha256, pending);
+            }
+            const result = await pending;
+            return {name, entry, bytes, compact: result.compact, sha256, cacheHit: deduplicated || result.cacheHit};
+        },
+    );
     const replacements = new Map<string, Buffer>(), entries: CompactExtensionZipResult['entries'] = [];
-    for (const name of layout.targetWasmFiles) {
-        const entry = layout.entries.find(candidate => candidate.name === name)!;
-        const bytes = targetBuffers.get(name)!;
-        const {compact, sha256, cacheHit} = await cachedDeflate(bytes, root, cache, options.workerTimeoutMs ?? 180_000);
+    for (const {name, entry, bytes, compact, sha256, cacheHit} of compacted) {
         if (compact.length < entry.compressedSize) replacements.set(name, compact);
         entries.push({name, originalBytes: bytes.length, beforeBytes: entry.compressedSize,
             afterBytes: Math.min(compact.length, entry.compressedSize), sha256, cacheHit});

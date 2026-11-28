@@ -3,8 +3,8 @@
  * 文件职责：为本地 Kokoro TTS Worker 提供按需模块化的 `@huggingface/transformers-kokoro`（4.2.0）构建入口。
  * 主要内容：
  * - 将 `@huggingface/transformers-kokoro` 与 `@uzen/kokoro-js` 内部的 `@huggingface/transformers` 统一解析到同一虚拟入口，保证 `env` 单例一致；
- * - 直接从上游锁定版本 `src/` 装配 Kokoro 实际使用的 5 个导出（`StyleTextToSpeech2Model`、`AutoTokenizer`、`Tensor`、`RawAudio`、`env`），并注册 `StyleTextToSpeech2Model` 映射，避免把 200+ 个无关视觉/语音/LLM 架构与 `@huggingface/jinja` 模板引擎打进 `localTtsWorker.js`；
- * - 仅为 `@huggingface/transformers@4.2.0/src/` 内部提供与上游 `dist/transformers.web.js` 一致的 Node 内置与 `onnxruntime-node` 浏览器空桩。
+ * - 直接从上游锁定版本 `src/` 装配 Kokoro 实际使用的 5 个导出（`StyleTextToSpeech2Model`、`AutoTokenizer`、`Tensor`、`RawAudio`、`env`），其中 `AutoTokenizer` 直接封装 `loadTokenizer` 与 `PreTrainedTokenizer`，避免打入 46 个无关模型分词器子类、200+ 个无关视觉/语音/LLM 架构、自回归生成模块与 `@huggingface/jinja` 模板引擎；
+ * - 仅为 `@huggingface/transformers@4.2.0/src/` 内部提供与上游 `dist/transformers.web.js` 一致的 Node 内置与 `onnxruntime-node` 浏览器空桩，以及仅限 `modeling_utils.js` 的自回归生成显式抛错桩。
  * 模块边界：纯构建期 Vite/Rolldown 插件，不影响 `@huggingface/transformers` v3.8.1（本地翻译/视频转写/智能高亮 Worker）或运行时缓存与推理逻辑。
  */
 import fs from 'node:fs';
@@ -21,12 +21,18 @@ const VIRTUAL_STUB_EMPTY = '\0fluentread-kokoro-stub:empty';
 const VIRTUAL_STUB_STREAM = '\0fluentread-kokoro-stub:node-stream';
 const VIRTUAL_STUB_STREAM_PROMISES = '\0fluentread-kokoro-stub:node-stream-promises';
 const VIRTUAL_STUB_JINJA = '\0fluentread-kokoro-stub:jinja';
+const VIRTUAL_STUB_LOGITS_PROCESS = '\0fluentread-kokoro-stub:logits-process';
+const VIRTUAL_STUB_GENERATION_CONFIG = '\0fluentread-kokoro-stub:generation-config';
+const VIRTUAL_STUB_STOPPING_CRITERIA = '\0fluentread-kokoro-stub:stopping-criteria';
+const VIRTUAL_STUB_LOGITS_SAMPLER = '\0fluentread-kokoro-stub:logits-sampler';
+const VIRTUAL_STUB_CACHE_UTILS = '\0fluentread-kokoro-stub:cache-utils';
 
 const REQUIRED_SOURCE_FILES = [
     'env.js',
     'models/modeling_utils.js',
     'models/style_text_to_speech_2/modeling_style_text_to_speech_2.js',
-    'models/auto/tokenization_auto.js',
+    'tokenization_utils.js',
+    'utils/logger.js',
     'utils/tensor.js',
     'utils/audio.js',
 ] as const;
@@ -37,6 +43,52 @@ const EMPTY_STUB_SPECIFIERS = new Set([
     'node:url',
     'onnxruntime-node',
 ]);
+
+const MODELING_UTILS_GENERATION_STUBS: Readonly<Record<string, string>> = {
+    '../generation/logits_process.js': VIRTUAL_STUB_LOGITS_PROCESS,
+    '../generation/configuration_utils.js': VIRTUAL_STUB_GENERATION_CONFIG,
+    '../generation/stopping_criteria.js': VIRTUAL_STUB_STOPPING_CRITERIA,
+    '../generation/logits_sampler.js': VIRTUAL_STUB_LOGITS_SAMPLER,
+    '../cache_utils.js': VIRTUAL_STUB_CACHE_UTILS,
+};
+
+const UNSUPPORTED_GENERATION_MESSAGE = 'Autoregressive text generation is not bundled in the Kokoro TTS runtime.';
+
+function unsupportedClassExports(names: readonly string[]): string {
+    return [
+        `class UnsupportedGenerationClass { constructor() { throw new Error(${JSON.stringify(UNSUPPORTED_GENERATION_MESSAGE)}); } }`,
+        ...names.map((name) => `export const ${name} = UnsupportedGenerationClass;`),
+        ``,
+    ].join('\n');
+}
+
+const GENERATION_STUB_CODE: Readonly<Record<string, string>> = {
+    [VIRTUAL_STUB_LOGITS_PROCESS]: unsupportedClassExports([
+        'LogitsProcessorList',
+        'ForcedBOSTokenLogitsProcessor',
+        'ForcedEOSTokenLogitsProcessor',
+        'SuppressTokensLogitsProcessor',
+        'SuppressTokensAtBeginLogitsProcessor',
+        'NoRepeatNGramLogitsProcessor',
+        'RepetitionPenaltyLogitsProcessor',
+        'NoBadWordsLogitsProcessor',
+        'MinLengthLogitsProcessor',
+        'MinNewTokensLengthLogitsProcessor',
+        'TemperatureLogitsWarper',
+        'ClassifierFreeGuidanceLogitsProcessor',
+    ]),
+    [VIRTUAL_STUB_GENERATION_CONFIG]: unsupportedClassExports(['GenerationConfig']),
+    [VIRTUAL_STUB_STOPPING_CRITERIA]: unsupportedClassExports([
+        'EosTokenCriteria',
+        'MaxLengthCriteria',
+        'StoppingCriteriaList',
+    ]),
+    [VIRTUAL_STUB_LOGITS_SAMPLER]: [
+        `export const LogitsSampler = { getSampler() { throw new Error(${JSON.stringify(UNSUPPORTED_GENERATION_MESSAGE)}); } };`,
+        ``,
+    ].join('\n'),
+    [VIRTUAL_STUB_CACHE_UTILS]: unsupportedClassExports(['DynamicCache']),
+};
 
 function normalizePath(filePath: string): string {
     return filePath.split('?')[0]!.replace(/\\/g, '/');
@@ -92,9 +144,31 @@ function buildModularEntryCode(realSrcDir: string): string {
         `    registerTaskMappings,`,
         `} from ${srcImport('models/modeling_utils.js')};`,
         `import {StyleTextToSpeech2Model} from ${srcImport('models/style_text_to_speech_2/modeling_style_text_to_speech_2.js')};`,
-        `import {AutoTokenizer} from ${srcImport('models/auto/tokenization_auto.js')};`,
+        `import {PreTrainedTokenizer, loadTokenizer} from ${srcImport('tokenization_utils.js')};`,
+        `import {logger} from ${srcImport('utils/logger.js')};`,
         `import {Tensor} from ${srcImport('utils/tensor.js')};`,
         `import {RawAudio} from ${srcImport('utils/audio.js')};`,
+        ``,
+        `const KOKORO_SUPPORTED_TOKENIZER_CLASSES = new Set(['PreTrainedTokenizer', 'TokenizersBackend']);`,
+        `class AutoTokenizer {`,
+        `    static async from_pretrained(`,
+        `        pretrained_model_name_or_path,`,
+        `        {progress_callback = null, config = null, cache_dir = null, local_files_only = false, revision = 'main'} = {},`,
+        `    ) {`,
+        `        const [tokenizerJSON, tokenizerConfig] = await loadTokenizer(pretrained_model_name_or_path, {`,
+        `            progress_callback,`,
+        `            config,`,
+        `            cache_dir,`,
+        `            local_files_only,`,
+        `            revision,`,
+        `        });`,
+        `        const tokenizerName = tokenizerConfig?.tokenizer_class?.replace(/Fast$/, '') ?? 'PreTrainedTokenizer';`,
+        `        if (!KOKORO_SUPPORTED_TOKENIZER_CLASSES.has(tokenizerName)) {`,
+        `            logger.warn(\`Unknown tokenizer class "\${tokenizerName}", attempting to construct from base class.\`);`,
+        `        }`,
+        `        return new PreTrainedTokenizer(tokenizerJSON, tokenizerConfig);`,
+        `    }`,
+        `}`,
         ``,
         `const styleTtsMapping = new Map([['style_text_to_speech_2', 'StyleTextToSpeech2Model']]);`,
         `MODEL_TYPE_MAPPING.set('StyleTextToSpeech2Model', MODEL_TYPES.EncoderOnly);`,
@@ -117,7 +191,7 @@ function buildModularEntryCode(realSrcDir: string): string {
 
 /**
  * 为本地 Kokoro TTS 注入模块化 `@huggingface/transformers-kokoro` 入口，
- * 避免打入 200+ 个无关模型架构、图像/视频处理器与 Jinja 聊天模板引擎。
+ * 避免打入 46 个无关分词器子类、200+ 个无关模型架构、自回归生成模块、图像/视频处理器与 Jinja 聊天模板引擎。
  */
 export function kokoroTransformersBuildPlugin(projectRoot = PROJECT_ROOT): Plugin {
     const {realSrcDir, srcPrefixes} = resolveKokoroTransformersSrc(projectRoot);
@@ -126,6 +200,11 @@ export function kokoroTransformersBuildPlugin(projectRoot = PROJECT_ROOT): Plugi
         if (!importer) return false;
         const normalized = normalizePath(importer);
         return srcPrefixes.some((prefix) => normalized.startsWith(prefix));
+    };
+    const isModelingUtilsImporter = (importer: string | undefined): boolean => {
+        if (!importer) return false;
+        const normalized = normalizePath(importer);
+        return srcPrefixes.some((prefix) => normalized === `${prefix}models/modeling_utils.js`);
     };
 
     return {
@@ -139,6 +218,9 @@ export function kokoroTransformersBuildPlugin(projectRoot = PROJECT_ROOT): Plugi
                 return VIRTUAL_ENTRY_ID;
             }
             if (!isInsideKokoroTransformersSrc(importer)) return null;
+            if (isModelingUtilsImporter(importer) && source in MODELING_UTILS_GENERATION_STUBS) {
+                return MODELING_UTILS_GENERATION_STUBS[source]!;
+            }
             if (EMPTY_STUB_SPECIFIERS.has(source)) return VIRTUAL_STUB_EMPTY;
             if (source === 'node:stream') return VIRTUAL_STUB_STREAM;
             if (source === 'node:stream/promises') return VIRTUAL_STUB_STREAM_PROMISES;
@@ -147,6 +229,7 @@ export function kokoroTransformersBuildPlugin(projectRoot = PROJECT_ROOT): Plugi
         },
         load(id) {
             if (id === VIRTUAL_ENTRY_ID) return entryCode;
+            if (id in GENERATION_STUB_CODE) return GENERATION_STUB_CODE[id]!;
             if (id === VIRTUAL_STUB_EMPTY) return 'export default {};\n';
             if (id === VIRTUAL_STUB_STREAM) {
                 return 'const noop = () => {};\nexport const Readable = {fromWeb: noop};\nexport default {Readable};\n';

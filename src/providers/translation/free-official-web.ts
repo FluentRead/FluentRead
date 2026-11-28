@@ -4,7 +4,7 @@
  * 主要内容：按码点预算且不切术语标记，按供应商协议处理临时网页参数、公开校验签名、语言映射与安全错误，保留文本槽、换行和空白；所有请求省略 Cookie，官网参数仅在本次调用中使用，失败或迟到取消时直接取消未读正文，避免等待错误页 EOF。
  * 模块边界：只访问固定供应商官方端点，不读取用户凭据、代理或存储；超时、并发、竞争和冷却由免费翻译编排层负责。
  */
-import MD5 from 'crypto-js/md5';
+import {md5Hex} from '@/src/shared/crypto/lightCrypto';
 import {translateFreeTextChunks} from './freeTextChunks';
 import {rebuildTranslationSlots} from '@/src/core/translation/slotProtocol';
 import {getTranslationGlossarySourceSlots} from '@/src/services/translation/requestSnapshot';
@@ -99,7 +99,7 @@ async function translateChunk(provider: OfficialFreeWebProvider, text: string, s
     } else if (provider === 'modernMtFree') {
         const ts = Date.now();
         // 官网页面公开的请求校验前缀，不是用户的 API Key。
-        const verify = MD5(`webkey_E3sTuMjpP8Jez49GcYpDVH7r#${ts}#${text}`).toString();
+        const verify = md5Hex(`webkey_E3sTuMjpP8Jez49GcYpDVH7r#${ts}#${text}`);
         result = await json(MODERNMT_URL, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-HTTP-Method-Override': 'GET'},
             body: JSON.stringify({q: text, source, target, ts, verify, hints: '', multiline: 'true'})}, signal);
         if (result?.status !== 200) throw failure(businessStatus(result?.status));

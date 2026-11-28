@@ -111,10 +111,24 @@ export function mountParagraphCopyContentFeature(
         showPageNotice(translate(key, normalizeUiLanguage(config.uiLanguage), params), tone, {key: 'paragraph-copy', signal});
     };
 
+    const clearPointer = (): void => {
+        pointerX = Number.NaN;
+        pointerY = Number.NaN;
+    };
+
     document.addEventListener('pointermove', (event) => {
+        if (!event.isTrusted) return;
         pointerX = event.clientX;
         pointerY = event.clientY;
     }, {capture: true, passive: true, signal});
+    window.addEventListener('blur', clearPointer, {signal});
+    document.addEventListener('mouseout', (event) => {
+        if (event.isTrusted && event.relatedTarget === null) clearPointer();
+    }, {signal});
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') clearPointer();
+    }, {signal});
+    document.addEventListener('fluentread-route-change', clearPointer, {signal});
 
     const resolveParagraph = (): Element | null => {
         const candidate = resolveTranslationCandidateAtPoint(pointerX, pointerY, config.translationScope);
@@ -158,7 +172,7 @@ export function mountParagraphCopyContentFeature(
     };
 
     document.addEventListener('keydown', (event) => {
-        if (!event.isTrusted || event.repeat) return;
+        if (!event.isTrusted || event.repeat || event.isComposing || event.keyCode === 229) return;
         if (!isEnabled()) return;
         if (!matchesParagraphCopyHotkey(event, config.paragraphCopyHotkey, config.customParagraphCopyHotkey)) return;
         if (isEditingInPage(event)) return;

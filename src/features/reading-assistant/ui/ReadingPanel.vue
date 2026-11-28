@@ -625,10 +625,13 @@ async function openLearningCollection(): Promise<void> {
     if (!response?.success) throw new Error(t('reading.openSavedFailed'));
   } catch (failure) { feedback.value = failure instanceof Error ? failure.message : t('reading.openSavedFailed'); }
 }
+let rememberToken = 0;
+let saveWordToken = 0;
 async function rememberLearning(): Promise<void> {
   if (props.privateContext || busy.value || stopped.value || error.value || !answer.value || remembering.value || remembered.value) return;
   const owner = currentTurnKey.value;
   const epoch = generation;
+  const token = ++rememberToken;
   const isCurrent = () => epoch === generation && currentTurnKey.value === owner && props.active && !props.privateContext;
   remembering.value = true;
   try {
@@ -638,11 +641,12 @@ async function rememberLearning(): Promise<void> {
     await completeMaterialCapture(operation, {kind: 'memory', id: memory.id, excerpt: activeText.value}, isCurrent);
     if (isCurrent()) { remembered.value = true; feedback.value = t('reading.noteSaved'); }
   } catch (failure) { if (isCurrent()) feedback.value = failure instanceof Error ? failure.message : t('reading.noteSaveFailed'); }
-  finally { remembering.value = false; }
+  finally { if (token === rememberToken) remembering.value = false; }
 }
 async function saveWord(): Promise<void> {
   if (!canSaveWord.value || saving.value) return;
   saving.value = true;
+  const token = ++saveWordToken;
   const savingText = activeText.value;
   const epoch = generation;
   const isCurrent = () => epoch === generation && activeText.value === savingText && props.active && canSaveWord.value;
@@ -658,11 +662,13 @@ async function saveWord(): Promise<void> {
     if (typeof id === 'string') await completeMaterialCapture(operation, {kind: 'vocabulary', id, excerpt: savingText}, isCurrent);
     if (isCurrent()) { saved.value = true; feedback.value = t('reading.sourceSaved'); }
   } catch (failure) { if (isCurrent()) feedback.value = failure instanceof Error ? failure.message : '收藏失败，请重试。'; }
-  finally { saving.value = false; }
+  finally { if (token === saveWordToken) saving.value = false; }
 }
 watch(() => JSON.stringify([props.preferences, effectiveService.value, props.targetLanguage, props.sourceLanguage, props.modelRevision]), () => { actionCache.clear(); cancelRequest(); stopped.value = true; feedback.value = '设置已更新，重新生成可使用新的设置。'; });
 watch(() => JSON.stringify(props.selection), () => {
   actionCache.clear(); cancelRequest(); restoreEpoch += 1;
+  rememberToken += 1; saveWordToken += 1;
+  remembering.value = false; saving.value = false;
   sourceExpanded.value = false;
   historicalText.value = ''; historicalContext.value = ''; previousAnswers.value = []; history.splice(0);
   sessionId = ''; anchorTurnId = ''; lastAnchorTurnId = ''; lastQuestion = ''; lastHistory = [];

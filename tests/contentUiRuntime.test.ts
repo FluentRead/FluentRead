@@ -1141,6 +1141,21 @@ describe('全文翻译进度面板 content runtime', () => {
     runtime.unmountTranslationProgressPanel();
     expect(mountedUi.remove).toHaveBeenCalledOnce();
   });
+
+  it('阴影宿主从页面脱离后重新挂载，不滞留在失效单例', async () => {
+    const detachedHost = {isConnected: false};
+    const detachedUi = {remove: vi.fn(), shadowHost: detachedHost, mounted: {}};
+    const liveUi = {remove: vi.fn(), shadowHost: {isConnected: true}, mounted: {}};
+    mocks.createVueShadowUi.mockResolvedValueOnce(detachedUi).mockResolvedValueOnce(liveUi);
+    const runtime = await import('@/src/features/full-page-translation/content/progressPanel');
+
+    await runtime.mountTranslationProgressPanel({isInvalid: false} as never);
+    await runtime.mountTranslationProgressPanel();
+    expect(detachedUi.remove).toHaveBeenCalledOnce();
+    expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);
+    runtime.unmountTranslationProgressPanel();
+    expect(liveUi.remove).toHaveBeenCalledOnce();
+  });
 });
 
  it('漫画入口订阅当前状态、只接收可信点击，卸载清理订阅', async () => {

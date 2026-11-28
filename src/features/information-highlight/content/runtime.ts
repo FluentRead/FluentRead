@@ -55,7 +55,9 @@ export function installInformationHighlight(document: Document, initial: Informa
     // 正文文字是浅色即视为深色页面（比背景色可靠：很多深色页面的 body 背景是透明的）。
     let dark = false;
     const readDark = () => {
-        const channels = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/u.exec(String(view.getComputedStyle(ports.scope ?? document.body).color));
+        const target = ports.scope ?? document.body ?? document.documentElement;
+        if (!target) return false;
+        const channels = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/u.exec(String(view.getComputedStyle(target).color));
         return Boolean(channels) && (0.2126 * Number(channels![1]) + 0.7152 * Number(channels![2]) + 0.0722 * Number(channels![3])) / 255 > 0.6;
     };
     const styles = new Map<Document | ShadowRoot, HTMLStyleElement>(), observers = new Map<Document | ShadowRoot, MutationObserver>();
@@ -138,7 +140,12 @@ export function installInformationHighlight(document: Document, initial: Informa
             ? `text-decoration-line: underline; text-decoration-color: rgb(${color} / ${informationHighlightOpacity(style, undefined, preferences.intensity, dark)}); text-decoration-thickness: 2px;`
             : `background-color: rgb(${color} / ${informationHighlightOpacity(style, undefined, preferences.intensity, dark)});`} }`;
     };
-    const ownStyle = (node: Node) => [...styles.values()].some(style => node === style || style.contains(node));
+    const ownStyle = (node: Node) => {
+        for (const style of styles.values()) {
+            if (node === style || style.contains(node)) return true;
+        }
+        return false;
+    };
     const irrelevant = (node: Node) => ownStyle(node) || Boolean((node.nodeType === 1 ? node as Element : node.parentElement)?.closest('[data-fluent-read-ui],[data-fluentread-pdf-decoration],[id^="fluent-read-"]'));
     function observe(root: Document | ShadowRoot): void {
         if (observers.has(root)) return;

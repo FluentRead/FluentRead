@@ -386,7 +386,13 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             if (nativeBounds.height && ownBounds.height) {
                 const scale = ownBounds.height / controlHeight;
                 const nativeCenter = nativeBounds.top + nativeBounds.height / 2 + (marker ? 0 : (topInset - bottomInset) * anchorScale / 2);
-                setStyleIfChanged(controlsHost.style, 'top', `${(nativeCenter - ownBounds.top - ownBounds.height / 2) / scale}px`);
+                // controlsHost 为 position: relative，ownBounds 已包含当前的 top 偏移，必须相对当前偏移增量修正而非直接覆写。
+                const currentTop = Number.parseFloat(controlsHost.style.top) || 0;
+                const delta = (nativeCenter - ownBounds.top - ownBounds.height / 2) / scale;
+                if (Math.abs(delta) >= 0.5) {
+                    const nextTop = Math.round((currentTop + delta) * 2) / 2;
+                    setStyleIfChanged(controlsHost.style, 'top', `${nextTop}px`);
+                }
             }
         }
         const enabled = captionsEnabled();

@@ -6,6 +6,7 @@ import {createReaderContentFeatures} from '@/src/app/content/readerFeatures';
 const mocks = vi.hoisted(() => ({
     isAreaTranslatorMounted: vi.fn(),
     isFloatingBallAllowedOnPage: vi.fn(),
+    isImageTranslatorMounted: vi.fn(),
     isImageTranslatorNeeded: vi.fn(),
     isMangaReaderPage: vi.fn(),
     mountAreaTranslator: vi.fn(),
@@ -58,7 +59,8 @@ describe('reading UI registry bindings', () => {
         const getElementById = vi.fn(() => ({}));
         vi.stubGlobal('document', {getElementById});
         mocks.isAreaTranslatorMounted.mockReturnValue(true);
-        expect(features.map(feature => feature.isMounted?.())).toEqual([true, true, true, undefined, undefined, true]);
+        mocks.isImageTranslatorMounted.mockReturnValue(true);
+        expect(features.map(feature => feature.isMounted?.())).toEqual([true, true, true, true, undefined, true]);
         expect(getElementById.mock.calls).toEqual([
             ['fluent-read-floating-ball-container'], ['fluent-read-selection-translator-container'],
             ['fluent-read-translation-status-container'],

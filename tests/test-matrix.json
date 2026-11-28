@@ -50,6 +50,9 @@
       "tests/testConfiguration.test.ts"
     ],
     "unit": [
+      "tests/fullPageRuntimeHelpers.test.ts",
+      "tests/useServiceCatalogActions.test.ts",
+      "tests/videoRuntimeMenuControls.test.ts",
       "tests/userscriptBuildCache.test.ts",
       "tests/wrappedParagraphs.test.ts",
       "tests/downloadTextFile.test.ts",
@@ -1049,7 +1052,8 @@
       "tests/facebookPublicPostReplySummary.test.ts",
       "tests/facebookPublicPostControls.test.ts",
       "tests/facebookPublicPostPreparation.test.ts",
-      "tests/facebookPublicPostHarness.test.ts"
+      "tests/facebookPublicPostHarness.test.ts",
+      "tests/auditBugfixRegressions.test.ts"
     ]
   }
 }

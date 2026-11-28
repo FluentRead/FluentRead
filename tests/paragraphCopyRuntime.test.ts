@@ -117,7 +117,7 @@ function mount(options: {hit?: unknown; clipboardFails?: boolean; withoutClipboa
         execCommand,
         selection,
         focus: (element) => {focused = element;},
-        pointerTo: (x, y) => emit('pointermove', {clientX: x, clientY: y}),
+        pointerTo: (x, y) => emit('pointermove', {isTrusted: true, clientX: x, clientY: y}),
         keydown: async (event = {}) => {
             emit('keydown', {
                 isTrusted: true,

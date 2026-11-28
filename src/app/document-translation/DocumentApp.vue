@@ -2478,7 +2478,7 @@ function toggleDelimitedColumn(columnIndex: number): void {
 const jsonGrouped = computed(() => isJsonDocument.value && jsonViewMode.value === 'table' && readerTab.value === 'read' && parsedDocument.value
   ? buildJsonGroupedRows(parsedDocument.value, translatedSegments.value, readerPage.value, READER_PAGE_SIZE) : null);
 const jsonTreeNodes = computed(() => isJsonDocument.value && jsonViewMode.value === 'tree' && readerTab.value === 'read' && parsedDocument.value
-  ? buildJsonTreeNodes(parsedDocument.value, translatedSegments.value, jsonExpandedPaths.value) : []);
+  ? buildJsonTreeNodes(parsedDocument.value, translatedSegments.value, jsonExpandedPaths.value, {maxNodes: jsonTreeVisibleLimit.value + 1}) : []);
 const visibleJsonTreeNodes = computed(() => jsonTreeNodes.value.slice(0, jsonTreeVisibleLimit.value));
 function toggleJsonTreePath(path: string): void {
   const next = new Set(jsonExpandedPaths.value);

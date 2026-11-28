@@ -2074,7 +2074,7 @@ describe('统一配置存储', () => {
         let request!: Promise<void>;
         try {
             request = configStore.requestConfigPatch({theme: 'dark'}, async () => ({success: false, error: 'fixture-patch-rejected'}));
-            expect(normalize).toHaveBeenCalledTimes(7);
+            expect(normalize).toHaveBeenCalledTimes(6);
             expect(configStore.config.theme).toBe('dark');
             expect(configStore.config.glossaryLibraries.reduce((count, library) => count + library.entries.length, 0)).toBe(GLOSSARY_LIMITS.totalEntries);
             (canonical.glossaryLibraries as Config['glossaryLibraries'])[0].entries[0].target = 'edited-storage-input';

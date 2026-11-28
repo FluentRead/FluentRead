@@ -1,45 +1,57 @@
 /**
  * @file src/features/image-translation/background/handlers.ts
  * 图片与漫画的后端偏好仅从后台当前配置读取，并随已有可取消任务发送。
- * 文件职责：定义跨域图片读取、整图翻译、文本批译、阶段进度、取消和语言包下载后台消息，并对来自页面或扩展 UI 的未知输入执行严格校验。
- * 同图语境：提示词型 AI 优先走有界有序多段协议，仅在用户开启 AI 上下文时附带简洁页面标题参考与 enableAIContext，协议异常时按同一上下文开关优雅回退至并行逐段通道；AI 上下文开启且未走多段协议时，逐位置提供前后各两段 OCR 原文，通过既有篇章证据通道送达提示词、隔离缓存并跳过摘要；受信漫画事务额外附加漫画语境标记并在回退逐段通道时将并发窗口提升至四路；Google 与免费池批次附加不可序列化的同图标记，Google 保留重复位置与同栏/同弹窗相邻标签位置由 adapter 进行有界邻文和严格回填，免费池在单条健康线路上保持整图术语一致；非原生批译服务改走有界并行池，避免误落单线程串行循环；兼容书写体系（含日文汉假名、韩文谚汉字及忽略单字母希腊单位符号）的图片在 auto 源语下固定可靠整图语言（含纯 ASCII 英文界面短语兜底），防止孤立短词误判语种。
- * 编号说明：图片中的有界全大写多词短语或首字母大写常用界面标签加独立序号整数不能仅因字形被认定为产品版本，交给已有服务判断；不改原文、编号或共享语言识别规则，明确技术形式仍沿用原过滤，原样响应仍保留原图。
- * 主要内容：按设置选择单图 OCR，标准字表之外的受支持源语走按需语言包，其他漫画走 PaddleOCR；包含消息解析、OCR 语言白名单、阶段通知和取消预算，待启动取消只保留尚未消费的有界 ID，避免旧历史误删重复 ID 的新取消；逐包下载排队、去重、部分成功保存和跨页状态查询；图片文本冻结目标语言，统一过滤同目标正文与无需翻译的标识，保留显式术语覆盖，附加内部策略将有效原样响应视为成功；去重批量、AI 有界多段和有界并发翻译同时保留原行映射、可信页面范围与术语版本。
- * 模块边界：可选漫画可见范围保留原值交给最终绘制端校验，不把异常空值降为缺省；本文件只负责协议入口与用例编排，不直接运行 Tesseract、Canvas、网络 fetch 或 Offscreen；图像读取和运算能力均由 Offscreen adapter 与 services 实现并由 app 注入。
+ * 文件职责：定义跨域图片读取、整图翻译、文本批译、阶段进度、取消和语言包下载后台消息，并编排各项后台 handler 的入口分发。
+ * 主要内容：组合任务取消登记表、OCR 语言包串行下载/移除队列及文本翻译流水线；按设置选择单图 OCR，标准字表之外的受支持源语走按需语言包，其他漫画走 PaddleOCR；将结构化错误与阶段进度转发给对应标签页。
+ * 模块边界：可选漫画可见范围保留原值交给最终绘制端校验，不把异常空值降为缺省；本文件只负责协议入口与用例编排，不直接运行 Tesseract、Canvas、网络 fetch 或 Offscreen；参数校验归 operationRegistry，文本批译流水线归 imageTextTranslator。
  */
 import {normalizeRemoteImageUrl} from '../services/remoteImage';
 import type {ImageViewport} from '@/src/shared/image/types';
-import {createImageTranslationFailure, imageTranslationFailureCode, imageTranslationFailureResponse} from '../failure';
-import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
-import {identifyTextLanguage} from '@/src/core/language/identify';
-import {FUNCTION_WORDS} from '@/src/core/language/lexicon';
-import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
-import {segmentScriptWords, type ScriptWord} from '@/src/core/language/scripts';
-import {hasTranslatableText} from '@/src/core/translation/resultValidation';
-import {buildGlossaryRevision, resolveGlossaryEntries, type GlossaryLibrary} from '@/src/core/glossary';
+import {imageTranslationFailureCode, imageTranslationFailureResponse} from '../failure';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, normalizeImageProgress, type ImageTranslationStage} from '../progress';
 import {
-    IMAGE_OCR_LANGUAGE_PACKS,
     getImageOcrEngine,
-    normalizeImageOcrLanguageCodes,
     type ImageOcrLanguageCode,
     type ImageOcrDownloadState,
 } from '@/src/features/image-translation/ocrLanguages';
 import {
-    attachTranslationRequestControl,
-    attachTranslationGlossaryContext,
-    getTranslationGlossaryContext,
-    markTranslationRemainingBudget,
-    allowUnchangedTranslationResult,
-    markImageTextBatch,
-} from '@/src/services/translation/requestSnapshot';
+    IMAGE_OPERATION_TIMEOUT_MS,
+    createImageOperationRegistry,
+    imageAbortError,
+    parseDataImage,
+    parseObjectResult,
+    parseOcrLanguages,
+    parseOptionalTitle,
+    parseRequestId,
+    parseRequiredString,
+    parseTexts,
+    type ImageOperationMessage,
+    type ImageOperationOptions,
+    type ImageOperationRegistry,
+} from './operationRegistry';
+import {
+    IMAGE_TEXT_TRANSLATION_TIMEOUT_MS,
+    IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,
+    translateImageTexts,
+    type ImageTextTranslationDependencies,
+    type ImageTranslateTextsMessage,
+} from './imageTextTranslator';
+
+export {
+    IMAGE_OPERATION_TIMEOUT_MS,
+    IMAGE_TEXT_TRANSLATION_TIMEOUT_MS,
+    IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,
+    createImageOperationRegistry,
+    type ImageOperationMessage,
+    type ImageOperationOptions,
+    type ImageOperationRegistry,
+    type ImageTranslateTextsMessage,
+};
 
 export const IMAGE_TRANSLATE_MESSAGE_TYPE = 'fluentReadImageTranslate' as const;
-export const IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE = 'fluentReadImageTranslateTexts' as const;
 export const IMAGE_OCR_DOWNLOAD_MESSAGE_TYPE = 'fluentReadImageOcrDownload' as const;
 export const IMAGE_CANCEL_MESSAGE_TYPE = 'fluentReadImageCancel' as const;
 export const IMAGE_FETCH_MESSAGE_TYPE = 'fluentReadImageFetch' as const;
-export const IMAGE_OPERATION_TIMEOUT_MS = 180_000;
 
 export interface ImageTranslateMessage {
     manga?: unknown;
@@ -55,20 +67,6 @@ export interface ImageTranslateMessage {
 export interface ImageCancelMessage {
     type: typeof IMAGE_CANCEL_MESSAGE_TYPE;
     requestId?: unknown;
-}
-
-export interface ImageTranslateTextsMessage {
-    type: typeof IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE;
-    texts?: unknown;
-    /** 仅接收组合根验证过的 Offscreen 同栏标签位置。 */
-    imageLabelSlots?: unknown;
-    title?: unknown;
-    requestId?: unknown;
-    timeoutMs?: unknown;
-    /** 仅在组合根附加的内部术语上下文存在时读取，普通 runtime 字段本身不构成信任。 */
-    glossaryRevision?: unknown;
-    sourceLanguage?: unknown;
-    manga?: unknown;
 }
 
 export interface ImageOcrDownloadMessage {
@@ -96,28 +94,7 @@ export type ImageTranslationBackgroundMessage =
     | ImageFetchMessage
     | ImageCancelMessage;
 
-type ImageTextTranslationRequestBase = {
-    context: string;
-    pageContext: string;
-    useCache: true;
-    serviceOverride: string;
-    requestTimeoutMs: number;
-    sourceLanguageDetectionText?: string;
-    glossaryRevision?: string;
-    sourceLanguage?: string;
-    targetLanguage?: string;
-    discourseContext?: string;
-    enableAIContext?: true;
-    aiMultiSegment?: true;
-    mangaContext?: true;
-};
-
-type ImageTextTranslationRequest = ImageTextTranslationRequestBase & (
-    | {origin: string}
-    | {origin: string[]}
-);
-
-export interface ImageTranslationBackgroundDependencies {
+export interface ImageTranslationBackgroundDependencies extends ImageTextTranslationDependencies {
     readonly getImageOcrEngine?: () => 'tesseract' | 'paddle';
     readonly getImageInferenceBackend?: () => 'auto' | 'cpu';
     readonly getMangaModelStatus?: () => Promise<{ready: boolean; bytes: number; inpaintingReady: boolean; segmentationReady?: boolean}>;
@@ -131,526 +108,18 @@ export interface ImageTranslationBackgroundDependencies {
     ) => Promise<unknown>;
     readonly fetchImage: (url: string, options: ImageOperationOptions) => Promise<unknown>;
     readonly assertImageSource?: (url: string, options: ImageOperationOptions, context: ImageProgressContext) => Promise<void>;
-    readonly getTranslationService: () => string;
-    readonly supportsBatchTranslation: (service: string) => boolean;
-    /** 真正的原生多文本批译或免费池批译；未提供时回退 supportsBatchTranslation 以兼容旧测试桩。 */
-    readonly supportsNativeBatch?: (service: string) => boolean;
-    /** 提示词型 AI 服务支持单次有序多段协议，兼顾速度、上下文与术语一致性。 */
-    readonly supportsAIMultiSegment?: (service: string) => boolean;
-    /** 组合根冻结用户上下文开关和所选模型的提示词能力；不能由消息体自报开启。 */
-    readonly isTextContextEnabled?: (service: string) => boolean;
-    /** 明确的用户固定译名优先于标识跳过策略；组合根只提供当前配置。 */
-    readonly getGlossaryConfig?: () => {glossaryEnabled: boolean; glossaryLibraries: GlossaryLibrary[]; from: string; to: string};
-    readonly translateTexts: (request: ImageTextTranslationRequest) => Promise<string | string[]>;
     readonly removeLanguages?: (languages: ImageOcrLanguageCode[]) => Promise<void>;
     readonly markLanguagesRemoved?: (languages: ImageOcrLanguageCode[]) => Promise<ImageOcrLanguageCode[]>;
     readonly getDownloadedLanguages?: () => Promise<ImageOcrLanguageCode[]>;
     readonly downloadLanguages: (languages: ImageOcrLanguageCode[]) => Promise<void>;
     readonly markLanguagesDownloaded: (languages: ImageOcrLanguageCode[]) => Promise<ImageOcrLanguageCode[]>;
-    readonly now?: () => number;
     readonly sendProgress?: (context: ImageProgressContext, message: {type: typeof IMAGE_PROGRESS_MESSAGE_TYPE; requestId: string; stage: ImageTranslationStage; progress?: number}) => Promise<void>;
     readonly isOffscreenSender?: (context: ImageProgressContext) => boolean;
-}
-
-export interface ImageOperationOptions {
-    readonly ocrEngine?: 'paddle';
-    readonly inferenceBackend?: 'auto' | 'cpu';
-    /** 仅由已复核的消息 sender 提供，不接受消息体自报来源。 */
-    readonly documentUrl?: string;
-    readonly manga?: true;
-    readonly mangaViewport?: ImageViewport;
-    readonly requestId: string;
-    readonly signal: AbortSignal;
-    readonly timeoutMs: number;
-}
-
-export interface ImageOperationMessage {
-    readonly requestId?: unknown;
-    readonly timeoutMs?: unknown;
-}
-
-export interface ImageOperationRegistry {
-    run<T>(message: ImageOperationMessage, operation: (options: ImageOperationOptions) => Promise<T>): Promise<T>;
-    cancel(requestId: unknown): {success: true; cancelled: boolean; requestId: string};
 }
 
 export interface ImageTranslationBackgroundHandler<TMessage extends ImageTranslationBackgroundMessage> {
     readonly type: TMessage['type'];
     handle(message: TMessage, context?: ImageProgressContext): Promise<unknown>;
-}
-
-const SUPPORTED_OCR_LANGUAGES = new Set(IMAGE_OCR_LANGUAGE_PACKS.map((pack) => pack.code));
-const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/u;
-const MAX_IMAGE_OPERATION_TIMEOUT_MS = 300_000;
-export const IMAGE_TEXT_TRANSLATION_TIMEOUT_MS = 120_000;
-
-function parseDataImage(value: unknown): string {
-    if (typeof value !== 'string' || !value.startsWith('data:image/')) {
-        throw new TypeError('图片数据无效');
-    }
-    return value;
-}
-
-function parseRequiredString(value: unknown, field: string): string {
-    if (typeof value !== 'string' || !value.trim()) {
-        throw new TypeError(`图片翻译 ${field} 必须是非空字符串`);
-    }
-    return value;
-}
-
-function parseOptionalTitle(value: unknown): string {
-    if (value === undefined) return '';
-    if (typeof value !== 'string') throw new TypeError('图片翻译 title 必须是字符串');
-    return value;
-}
-
-function parseRequestId(value: unknown): string {
-    const requestId = parseRequiredString(value, 'requestId');
-    if (!REQUEST_ID_PATTERN.test(requestId)) throw new TypeError('图片翻译 requestId 格式无效');
-    return requestId;
-}
-
-function parseTimeoutMs(value: unknown): number {
-    if (value === undefined) return IMAGE_OPERATION_TIMEOUT_MS;
-    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-        throw new TypeError('图片翻译 timeoutMs 必须是正数');
-    }
-    return Math.min(MAX_IMAGE_OPERATION_TIMEOUT_MS, Math.floor(value));
-}
-
-function imageAbortError(timedOut: boolean): Error {
-    const error = new Error(timedOut ? '图片 OCR 请求超时' : '图片 OCR 请求已取消');
-    error.name = timedOut ? 'TimeoutError' : 'AbortError';
-    return error;
-}
-
-/** 图片与圈选 feature 共用的后台取消所有权，确保它们不会各自遗漏共享 OCR 队列。 */
-export function createImageOperationRegistry(legacyPrefix = 'image'): ImageOperationRegistry {
-    const activeOperations = new Map<string, AbortController>();
-    const cancelledBeforeStart = new Set<string>();
-    let legacyRequestSequence = 0;
-
-    const rememberCancellation = (requestId: string) => {
-        if (cancelledBeforeStart.has(requestId)) return;
-        cancelledBeforeStart.add(requestId);
-        // Set 只保留未消费的取消及其插入顺序，避免已消费 ID 的旧队列项误删后续取消。
-        if (cancelledBeforeStart.size > 512) {
-            cancelledBeforeStart.delete(cancelledBeforeStart.values().next().value!);
-        }
-    };
-
-    return {
-        async run<T>(
-            message: ImageOperationMessage,
-            operation: (options: ImageOperationOptions) => Promise<T>,
-        ): Promise<T> {
-            const requestId = message.requestId === undefined
-                ? `legacy-${legacyPrefix}-${++legacyRequestSequence}`
-                : parseRequestId(message.requestId);
-            if (cancelledBeforeStart.delete(requestId)) throw imageAbortError(false);
-            if (activeOperations.has(requestId)) throw new Error('图片 OCR requestId 正在执行');
-            const timeoutMs = parseTimeoutMs(message.timeoutMs);
-            const controller = new AbortController();
-            activeOperations.set(requestId, controller);
-            let timedOut = false;
-            const timer = setTimeout(() => {
-                timedOut = true;
-                controller.abort();
-            }, timeoutMs);
-
-            try {
-                const pending = Promise.resolve().then(() => operation({
-                    requestId,
-                    signal: controller.signal,
-                    timeoutMs,
-                }));
-                return await new Promise<T>((resolve, reject) => {
-                    let settled = false;
-                    const cleanup = () => controller.signal.removeEventListener('abort', handleAbort);
-                    const finish = (callback: () => void) => {
-                        if (settled) return;
-                        settled = true;
-                        cleanup();
-                        callback();
-                    };
-                    const handleAbort = () => finish(() => reject(imageAbortError(timedOut)));
-                    controller.signal.addEventListener('abort', handleAbort, {once: true});
-                    void pending.then(
-                        result => finish(() => resolve(result)),
-                        error => finish(() => reject(error)),
-                    );
-                });
-            } finally {
-                clearTimeout(timer);
-                // 重复身份在准入时拒绝；取消只abort，本次run退出并释放身份后，重试才能成为新的owner。
-                activeOperations.delete(requestId);
-            }
-        },
-        cancel(requestIdValue) {
-            const requestId = parseRequestId(requestIdValue);
-            const controller = activeOperations.get(requestId);
-            if (controller) controller.abort();
-            else rememberCancellation(requestId);
-            return {success: true, cancelled: Boolean(controller), requestId};
-        },
-    };
-}
-
-function parseTexts(value: unknown): string[] {
-    if (!Array.isArray(value) || value.length === 0) throw new TypeError('图片中没有可翻译文字');
-    if (!value.every((text): text is string => typeof text === 'string' && text.trim().length > 0)) {
-        throw new TypeError('图片翻译 texts 只能包含非空字符串');
-    }
-    return [...value];
-}
-
-function parseOcrLanguages(value: unknown): ImageOcrLanguageCode[] {
-    if (!Array.isArray(value) || value.length === 0) throw new TypeError('OCR 语言包列表不能为空');
-    if (!value.every((language): language is ImageOcrLanguageCode =>
-        typeof language === 'string' && SUPPORTED_OCR_LANGUAGES.has(language as ImageOcrLanguageCode))) {
-        throw new TypeError('OCR 语言包列表包含不支持的语言');
-    }
-    return normalizeImageOcrLanguageCodes(value);
-}
-
-function parseObjectResult(value: unknown, operation: string): Record<string, unknown> {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        throw new Error(`${operation}结果无效`);
-    }
-    return value as Record<string, unknown>;
-}
-
-function getErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
-}
-
-/** 单段供应商保留同图相邻段落作为有界参考；不拼入待译正文，也不触发额外摘要请求。 */
-function imageTextContext(texts: string[], index: number, title: string): string {
-    const start = Math.max(0, index - 2);
-    const nearby = texts.slice(start, index + 3)
-        .filter((_value, offset) => start + offset !== index).map(value => value.slice(0, 480));
-    if (!nearby.length) return title;
-    return [title.slice(0, 320), 'Other text from the same image (reference only):', ...nearby].filter(Boolean).join('\n');
-}
-
-/** 每个邻段同时限制原文长度和 JSON 编码长度，保留完整 Unicode 码点。 */
-function imageContextSnippet(text: string): string {
-    let value = '', encodedLength = 0;
-    for (const character of text) {
-        const encoded = JSON.stringify(character).length - 2;
-        if (value.length + character.length > 240 || encodedLength + encoded > 384) break;
-        value += character;
-        encodedLength += encoded;
-    }
-    return value;
-}
-
-/** 使用原图位置选邻文；同一句话在不同气泡出现时不得复用第一次出现处的语境。 */
-function imageTextDiscourse(texts: string[], sourceIndex: number, manga = false): string {
-    const neighbors = [];
-    for (let index = Math.max(0, sourceIndex - 2); index <= Math.min(texts.length - 1, sourceIndex + 2); index++) {
-        if (index !== sourceIndex) neighbors.push({region: index + 1, text: imageContextSnippet(texts[index])});
-    }
-    return neighbors.length
-        ? JSON.stringify({source: manga ? 'neighboring manga OCR' : 'neighboring image OCR', currentRegion: sourceIndex + 1, neighbors})
-        : '';
-}
-
-const NUMBERED_UPPERCASE_LABEL_PATTERN = /^[A-Z]{4,40}(?:[ \t]{1,8}[A-Z]{4,40}){1,5}[ \t]{1,8}\d{1,4}$/u;
-const NUMBERED_TITLE_LABEL_PATTERN = /^[A-Z][a-z]{2,19}[ \t]{1,4}\d{1,3}$/u;
-const IMAGE_PAGE_CONTEXT_PREFIX = 'Page title: ';
-const IMAGE_PAGE_CONTEXT_LIMIT = 240;
-const AI_MULTI_SEGMENT_MAX_REGIONS = 24;
-const AI_MULTI_SEGMENT_MAX_CHARS = 3500;
-const AI_MULTI_SEGMENT_FALLBACK_CODES = new Set([
-    'AI_MULTI_SEGMENT_RESPONSE_INVALID',
-    'AI_MULTI_SEGMENT_REPAIR_FAILED',
-    'TRANSLATION_SLOT_RESPONSE_INVALID',
-]);
-
-/** 两至六个较长全大写词和独立编号，或首字母大写常用标签加独立序号整数也可能是界面/文档说明；语法不能证明它是型号。
- * 保留短缩写、连写/带连接符或小数版本的原过滤，仅放行这一有界歧义；不猜词义或改写源文字。
- */
-function hasImageTranslationText(text: string): boolean {
-    const trimmed = text.trim();
-    return hasTranslatableText(text)
-        || NUMBERED_UPPERCASE_LABEL_PATTERN.test(trimmed)
-        || NUMBERED_TITLE_LABEL_PATTERN.test(trimmed);
-}
-
-/** 构造严格不超过 broker 直接透传上限（240 字符）的页面标题语境，不触发额外页面摘要请求。 */
-function formatImagePageContext(title: string): string {
-    const normalized = title.replace(/[\r\n\t]+/gu, ' ').replace(/\s{2,}/gu, ' ').trim();
-    if (!normalized) return '';
-    let value = IMAGE_PAGE_CONTEXT_PREFIX;
-    for (const character of normalized) {
-        if (value.length + character.length > IMAGE_PAGE_CONTEXT_LIMIT) break;
-        value += character;
-    }
-    return value;
-}
-
-/** 将有序图片区域切分为有界的 AI 多段批次，使常见对话框在单次连贯调用中完成。 */
-function chunkImageMultiSegmentRegions(texts: readonly string[]): Array<{start: number; texts: string[]}> {
-    const chunks: Array<{start: number; texts: string[]}> = [];
-    let current: {start: number; texts: string[]; chars: number} | undefined;
-    for (let index = 0; index < texts.length; index++) {
-        const text = texts[index]!;
-        if (!current || current.texts.length >= AI_MULTI_SEGMENT_MAX_REGIONS
-            || current.chars + text.length > AI_MULTI_SEGMENT_MAX_CHARS) {
-            current = {start: index, texts: [], chars: 0};
-            chunks.push(current);
-        }
-        current.texts.push(text);
-        current.chars += text.length;
-    }
-    return chunks;
-}
-
-function isAIMultiSegmentFallbackError(error: unknown): boolean {
-    if (!error || typeof error !== 'object') return false;
-    const candidate = error as {name?: unknown; code?: unknown};
-    return candidate.name === 'AIMultiSegmentResponseError'
-        || (typeof candidate.code === 'string' && AI_MULTI_SEGMENT_FALLBACK_CODES.has(candidate.code));
-}
-
-const NON_ENGLISH_LATIN_LEXICONS = Object.entries(FUNCTION_WORDS.Latin)
-    .filter(([language]) => language !== 'en')
-    .map(([, lexicon]) => lexicon);
-
-function isCompatibleImageWritingFamily(words: readonly ScriptWord[]): boolean {
-    const scripts = new Set(words.map(word => word.script));
-    if (scripts.size === 1) return true;
-    return scripts.size === 2 && scripts.has('Han') && (scripts.has('Kana') || scripts.has('Hangul'));
-}
-
-function isConservativeEnglishUiFallback(words: readonly ScriptWord[]): boolean {
-    if (words.length < 4 || words.some(word => /[^A-Za-z']/u.test(word.text))) return false;
-    const asciiLetters = words.reduce((sum, word) => sum + word.letters, 0);
-    if (asciiLetters < 20) return false;
-    const lowered = new Set(words.map(word => word.text.toLowerCase()));
-    let enHits = 0;
-    for (const word of lowered) {
-        if (FUNCTION_WORDS.Latin.en.has(word)) enHits += 1;
-    }
-    return !NON_ENGLISH_LATIN_LEXICONS.some(lexicon => {
-        let nonEnHits = 0;
-        for (const word of lowered) {
-            if (!FUNCTION_WORDS.Latin.en.has(word) && lexicon.has(word)) nonEnHits += 1;
-        }
-        return nonEnHits > enHits;
-    });
-}
-
-/** 识别兼容书写体系的整图源语；auto 模式下为所有服务固定可靠源语（含纯 ASCII 英文界面短语兜底），防止孤立短词被误判。 */
-function detectImageSourceLanguage(
-    imageDetectionText: string,
-    configuredSourceLanguage: string | undefined,
-    targetLanguage: string | undefined,
-): {identified: boolean; pinned?: string} {
-    const words = segmentScriptWords(imageDetectionText)
-        .filter(word => !(word.script === 'Greek' && word.text.length === 1));
-    if (!isCompatibleImageWritingFamily(words)) return {identified: false};
-    const imageLanguage = identifyTextLanguage(imageDetectionText);
-    const identified = imageLanguage.status === 'identified';
-    if (configuredSourceLanguage !== 'auto') return {identified};
-    const normalizedTarget = targetLanguage ? normalizeChineseLanguageCode(targetLanguage) : undefined;
-    if (identified) {
-        const pinned = !normalizedTarget || !imageLanguage.languages.includes(normalizedTarget)
-            ? imageLanguage.languages[0] : undefined;
-        return {identified: true, pinned};
-    }
-    const pinned = imageLanguage.status === 'unknown'
-        && imageLanguage.bestGuess === 'en'
-        && normalizedTarget !== 'en'
-        && isConservativeEnglishUiFallback(words)
-        ? 'en' : undefined;
-    return {identified: false, pinned};
-}
-
-async function translateImageTexts(
-    texts: string[],
-    title: string,
-    dependencies: ImageTranslationBackgroundDependencies,
-    options: ImageOperationOptions,
-    message: ImageTranslateTextsMessage,
-): Promise<{translations: string[]; targetLanguage?: string}> {
-    if (options.signal.aborted) throw imageAbortError(false);
-    const glossaryContext = getTranslationGlossaryContext(message);
-    const isManga = Boolean(glossaryContext) && message.manga === true;
-    const sourceLanguage = glossaryContext ? parseRequiredString(message.sourceLanguage, 'sourceLanguage') : undefined;
-    const glossaryConfig = dependencies.getGlossaryConfig?.();
-    const targetLanguage = glossaryConfig?.to;
-    // 返回用于这次翻译的目标语言。排版阶段不再读取可能已被修改的设置。
-    const language = targetLanguage ? {targetLanguage} : {};
-    const glossaryRevision = glossaryContext ? parseRequiredString(message.glossaryRevision, 'glossaryRevision') : undefined;
-    // OCR 事务冻结的词库版本仍须经过 broker 校验；期间关闭或删除词库不能被同目标早退吞掉。
-    const glossaryChanged = glossaryRevision !== undefined && glossaryConfig !== undefined
-        && glossaryRevision !== buildGlossaryRevision(glossaryConfig.glossaryLibraries, glossaryConfig.glossaryEnabled);
-    const uniqueTexts = [...new Set(texts)].filter(text => {
-        const hasExplicitGlossary = glossaryConfig?.glossaryEnabled && resolveGlossaryEntries(glossaryConfig.glossaryLibraries, {
-            text, sourceLanguage: sourceLanguage ?? glossaryConfig.from, targetLanguage: glossaryConfig.to,
-            pageUrl: glossaryContext?.pageUrl,
-        }).terms.length > 0;
-        if (hasExplicitGlossary) return true;
-        return hasImageTranslationText(text)
-            && (!targetLanguage || glossaryChanged || !shouldSkipTranslationForTarget(text, targetLanguage));
-    });
-    // 不删 OCR 行，阅读面板与图片坐标仍以原行对齐；纯标识整图无需外发请求。
-    if (uniqueTexts.length === 0) return {translations: [...texts], ...language};
-    const service = dependencies.getTranslationService();
-    const useImageContext = dependencies.isTextContextEnabled?.(service) === true;
-    const useAIMultiSegment = dependencies.supportsAIMultiSegment?.(service) === true;
-    const useNativeBatch = dependencies.supportsNativeBatch
-        ? dependencies.supportsNativeBatch(service)
-        : dependencies.supportsBatchTranslation(service);
-    const batchTranslation = !useAIMultiSegment && useNativeBatch && !useImageContext;
-    const orderedRegions = useAIMultiSegment || useImageContext || (service === 'google' && batchTranslation);
-    const workerConcurrency = dependencies.supportsNativeBatch || dependencies.supportsAIMultiSegment
-        ? 6
-        : (isManga && useImageContext ? 4 : 3);
-    const imagePageContext = useImageContext && dependencies.supportsAIMultiSegment !== undefined
-        ? formatImagePageContext(title)
-        : '';
-    const translatedSources = new Set(uniqueTexts);
-    const sourceIndexes = orderedRegions ? texts.flatMap((text, index) => translatedSources.has(text) ? [index] : []) : [];
-    const requestTexts = orderedRegions ? sourceIndexes.map(index => texts[index]) : uniqueTexts;
-    const slots = message.imageLabelSlots;
-    const candidates = service === 'google' && Array.isArray(slots) && slots.length <= texts.length ? new Set(slots) : undefined;
-    const imageLabelSlots = candidates && sourceIndexes.flatMap((index, position) => {
-        if (!candidates.has(index)) return [];
-        const hasPrev = sourceIndexes[position - 1] === index - 1;
-        const hasNext = sourceIndexes[position + 1] === index + 1;
-        return (hasPrev && hasNext) || (hasPrev && candidates.has(index - 1)) || (hasNext && candidates.has(index + 1))
-            ? [position] : [];
-    });
-    const imageDetectionText = uniqueTexts.join('\n');
-    // 只借用可靠、单一文字体系的同图上下文；混合语种不能把短外语词误判成目标语言而漏译。
-    const imageSourceLanguage = detectImageSourceLanguage(imageDetectionText, sourceLanguage ?? glossaryConfig?.from, targetLanguage);
-    const useImageDetectionText = service === 'localTranslation' && imageSourceLanguage.identified;
-    const effectiveSourceLanguage = imageSourceLanguage.pinned ?? sourceLanguage;
-    const now = dependencies.now ?? (() => performance.now());
-    const deadline = now() + Math.min(options.timeoutMs, IMAGE_TEXT_TRANSLATION_TIMEOUT_MS);
-    const baseRequest = {
-        context: title,
-        pageContext: '',
-        useCache: true as const,
-        serviceOverride: service,
-        ...language,
-        ...(effectiveSourceLanguage ? {sourceLanguage: effectiveSourceLanguage} : {}),
-        ...(glossaryContext ? {glossaryRevision} : {}),
-    };
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    if (options.signal.aborted) abort();
-    options.signal.addEventListener('abort', abort, {once: true});
-    const remainingBudget = () => {
-        if (controller.signal.aborted) throw imageAbortError(false);
-        const remaining = Math.floor(deadline - now());
-        if (remaining <= 0) throw new Error('图片文字翻译总时间已耗尽');
-        return remaining;
-    };
-    const controlledRequest = <T extends ImageTextTranslationRequest>(request: T) => {
-        if ((service === 'google' || service === 'freeTranslation') && Array.isArray(request.origin)) {
-            markImageTextBatch(request, service === 'google' ? imageLabelSlots : undefined);
-        }
-        const controlled = attachTranslationRequestControl(allowUnchangedTranslationResult(markTranslationRemainingBudget(request)), {
-            signal: controller.signal, ownershipKey: `image:${options.requestId}`,
-        });
-        return glossaryContext ? attachTranslationGlossaryContext(controlled, glossaryContext) : controlled;
-    };
-    const translateRegionsWithWorkers = async (
-        regionIndexes: readonly number[], target: string[], withDiscourseContext: boolean,
-    ) => {
-        let cursor = 0;
-        let failed = false;
-        // 并发窗口受限于 workerConcurrency，实际供应商并发仍由共享 broker 限流；有语境的重复文本按位置处理。
-        const worker = async () => {
-            while (cursor < regionIndexes.length && !failed) {
-                const index = regionIndexes[cursor++]!;
-                const sourceIndex = orderedRegions ? sourceIndexes[index] : texts.indexOf(requestTexts[index]);
-                try {
-                    const translation = await dependencies.translateTexts(controlledRequest({
-                        ...baseRequest, origin: requestTexts[index], requestTimeoutMs: remainingBudget(),
-                        context: imageTextContext(texts, sourceIndex, title),
-                        ...(withDiscourseContext ? {
-                            pageContext: imagePageContext,
-                            enableAIContext: true as const,
-                            discourseContext: imageTextDiscourse(texts, sourceIndex, isManga),
-                            ...(isManga ? {mangaContext: true as const} : {}),
-                        } : {}),
-                        ...(useImageDetectionText && identifyTextLanguage(requestTexts[index]).status === 'unknown'
-                            ? {sourceLanguageDetectionText: imageDetectionText} : {}),
-                    }));
-                    if (typeof translation !== 'string') throw new Error('provider 未返回字符串译文');
-                    if (!translation.trim()) throw new Error('provider 返回空白译文');
-                    target[index] = translation;
-                } catch (error) {
-                    failed = true;
-                    controller.abort();
-                    throw createImageTranslationFailure(`图片第 ${sourceIndex + 1} 段文字翻译失败：${getErrorMessage(error)}`, error);
-                }
-            }
-        };
-        await Promise.all(Array.from({length: Math.min(workerConcurrency, regionIndexes.length)}, worker));
-    };
-    try {
-        let translations: string[];
-        if (useAIMultiSegment) {
-            translations = new Array<string>(requestTexts.length);
-            for (const chunk of chunkImageMultiSegmentRegions(requestTexts)) {
-                try {
-                    const result = await dependencies.translateTexts(controlledRequest({
-                        ...baseRequest,
-                        origin: chunk.texts,
-                        pageContext: imagePageContext,
-                        aiMultiSegment: true as const,
-                        ...(useImageContext ? {enableAIContext: true as const, ...(isManga ? {mangaContext: true as const} : {})} : {}),
-                        requestTimeoutMs: remainingBudget(),
-                    }));
-                    if (!Array.isArray(result) || result.length !== chunk.texts.length
-                        || !result.every(value => typeof value === 'string' && value.trim())) {
-                        throw Object.assign(new Error('provider 未返回等长非空字符串数组'), {code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID'});
-                    }
-                    result.forEach((value, offset) => {translations[chunk.start + offset] = value;});
-                } catch (error) {
-                    if (!controller.signal.aborted && isAIMultiSegmentFallbackError(error)) {
-                        const chunkIndexes = Array.from({length: chunk.texts.length}, (_, offset) => chunk.start + offset);
-                        await translateRegionsWithWorkers(chunkIndexes, translations, useImageContext);
-                        continue;
-                    }
-                    throw createImageTranslationFailure(`图片文字批量翻译失败：${getErrorMessage(error)}`, error);
-                }
-            }
-        } else if (batchTranslation) {
-            try {
-                const result = await dependencies.translateTexts(controlledRequest({
-                    ...baseRequest, origin: requestTexts, requestTimeoutMs: remainingBudget(),
-                }));
-                if (!Array.isArray(result) || result.length !== requestTexts.length
-                    || !result.every(value => typeof value === 'string' && value.trim())) {
-                    throw new Error('provider 未返回等长非空字符串数组');
-                }
-                translations = result;
-            } catch (error) {
-                throw createImageTranslationFailure(`图片文字批量翻译失败：${getErrorMessage(error)}`, error);
-            }
-        } else {
-            translations = new Array<string>(requestTexts.length);
-            const allIndexes = Array.from({length: requestTexts.length}, (_, index) => index);
-            await translateRegionsWithWorkers(allIndexes, translations, useImageContext);
-        }
-        if (controller.signal.aborted) throw imageAbortError(false);
-        if (orderedRegions) {
-            const result = [...texts];
-            sourceIndexes.forEach((sourceIndex, index) => {result[sourceIndex] = translations[index];});
-            return {translations: result, ...language};
-        }
-        const byText = new Map(uniqueTexts.map((text, index) => [text, translations[index]]));
-        return {translations: texts.map(text => byText.get(text) ?? text), ...language};
-    } finally {
-        options.signal.removeEventListener('abort', abort);
-    }
 }
 
 /** 创建图片 OCR/翻译/取消/语言包下载 handlers。 */
@@ -702,14 +171,15 @@ export function createImageTranslationBackgroundHandlers(
             type: 'fluentReadMangaModelStatus',
             async handle() {
                 if (!dependencies.getMangaModelStatus) throw new Error('漫画识别模型管理不可用');
-                return {success:true, ...await dependencies.getMangaModelStatus()};
+                return {success: true, ...await dependencies.getMangaModelStatus()};
             },
         },
         {
             type: 'fluentReadMangaModelRemove',
             async handle() {
                 if (!dependencies.removeMangaModels) throw new Error('漫画识别模型管理不可用');
-                await dependencies.removeMangaModels();return {success:true};
+                await dependencies.removeMangaModels();
+                return {success: true};
             },
         },
         {
@@ -749,11 +219,11 @@ export function createImageTranslationBackgroundHandlers(
                             };
                             options.signal.addEventListener('abort', clearProgressOwner, {once: true});
                             try {
-                                const scopedOptions=message.manga ? {...options, manga: true as const} : paddle ? {...options, ocrEngine: 'paddle' as const} : options;
+                                const scopedOptions = message.manga ? {...options, manga: true as const} : paddle ? {...options, ocrEngine: 'paddle' as const} : options;
                                 const inferenceBackend = dependencies.getImageInferenceBackend?.();
                                 return await dependencies.translateImage(image, sourceLanguage, title,
                                     {...scopedOptions, ...(inferenceBackend ? {inferenceBackend} : {}),
-                                        ...(message.mangaViewport !== undefined ? {mangaViewport:message.mangaViewport} : {})});
+                                        ...(message.mangaViewport !== undefined ? {mangaViewport: message.mangaViewport} : {})});
                             } finally {
                                 clearProgressOwner();
                                 options.signal.removeEventListener('abort', clearProgressOwner);
@@ -777,7 +247,7 @@ export function createImageTranslationBackgroundHandlers(
                     if (!dependencies.assertImageSource) throw new Error('图片来源未授权');
                     await dependencies.assertImageSource(source, options, context);
                     if (options.signal.aborted) throw Object.assign(new Error('图片读取已取消'), {name: 'AbortError'});
-                    return dependencies.fetchImage(url, {...options, ...(context.sender?.url ? {documentUrl:context.sender.url} : {})});
+                    return dependencies.fetchImage(url, {...options, ...(context.sender?.url ? {documentUrl: context.sender.url} : {})});
                 });
                 if (typeof image !== 'string' || !image.startsWith('data:image/')) {
                     throw new Error('远程图片结果无效');

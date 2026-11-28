@@ -290,7 +290,12 @@ async function confirmDeletion() {
     } finally {if (alive) deleteVisible.value = false;}
   }, true);
 }
-async function cancelDeletion() {await perform(async () => {await client.cancel(deletion.value?.id); deleteVisible.value = false;});}
+async function cancelDeletion() {
+  await perform(async () => {
+    try {await client.cancel(deletion.value?.id);}
+    finally {if (alive) deleteVisible.value = false;}
+  });
+}
 function toggleSensitive(value: boolean | string | number) {
   if (busy.value || previewVisible.value || deleteVisible.value) return;
   if (value === true) {riskAcknowledged.value = false; consentVisible.value = true;}
@@ -334,7 +339,12 @@ async function commit() {
     } finally {if (alive) previewVisible.value = false;}
   });
 }
-async function cancelPreview() {await perform(async () => {await client.cancel(preview.value?.id); previewVisible.value = false;});}
+async function cancelPreview() {
+  await perform(async () => {
+    try {await client.cancel(preview.value?.id);}
+    finally {if (alive) previewVisible.value = false;}
+  });
+}
 function clearPreview() {preview.value = null; choices.value = {}; direction.value = '';}
 function endSession() {if (preview.value || deletion.value || busy.value) void client.cancel(preview.value?.id ?? deletion.value?.id).catch(() => undefined);}
 async function refreshStatus() {await perform(async () => {

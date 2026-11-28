@@ -219,17 +219,37 @@ export function findActiveRichOutlineIndex(frame: PreviewFrame | null | undefine
     const doc = frame?.contentDocument;
     const body = doc?.body;
     if (!body) return -1;
-    const outline = collectRichOutline(frame);
-    if (outline.length === 0) return -1;
-    const headings = body.querySelectorAll(HEADINGS);
+    const headings = Array.from(body.querySelectorAll(HEADINGS));
+    if (headings.length === 0) return -1;
     const scrollTop = doc.scrollingElement?.scrollTop ?? 0;
-    let activeIndex = outline[0].index;
-    for (const item of outline) {
-        const heading = headings[item.index];
-        if (headingViewportTop(heading, scrollTop) <= offset) activeIndex = item.index;
+    let previous: Element | undefined;
+    let lastHadTranslation = false;
+    let activeIndex = -1;
+    for (let index = 0; index < headings.length; index += 1) {
+        const heading = headings[index]!;
+        const isSiblingTranslation = activeIndex >= 0 && !lastHadTranslation
+            && heading.matches(TRANSLATION) && heading.previousElementSibling === previous;
+        previous = heading;
+        if (isSiblingTranslation) {
+            lastHadTranslation = true;
+            continue;
+        }
+        const hasSource = hasNonTranslationText(heading);
+        if (!hasSource) continue;
+        lastHadTranslation = Boolean(heading.querySelector(TRANSLATION));
+        if (activeIndex < 0) activeIndex = index;
+        if (headingViewportTop(heading, scrollTop) <= offset) activeIndex = index;
         else break;
     }
     return activeIndex;
+}
+
+function hasNonTranslationText(heading: Element): boolean {
+    for (const child of Array.from(heading.childNodes)) {
+        if (child.nodeType === 1 && (child as Element).matches(TRANSLATION)) continue;
+        if (child.textContent && /\S/u.test(child.textContent)) return true;
+    }
+    return false;
 }
 
 /** 返回当前视口活跃标题的 DOM id，无显式 id 时返回 `h${index}`，供侧栏目录高亮。 */

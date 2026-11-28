@@ -59,10 +59,11 @@ function candidateStructureSignature(
 ): string {
     const segment = document.createElement('span');
     nodes.forEach((node) => segment.appendChild(node.cloneNode(true)));
-    const options = protectionOptions(segment, state.allowTopLevelApplicationShell === true);
+    const core = getCurrentTranslationCore(state.scope);
+    const options = core.textOptions(protectionOptions(segment, state.allowTopLevelApplicationShell === true));
     const textNodes = collectLiveTranslationTextSlots(
         segment,
-        getCurrentTranslationCore(state.scope).shouldStayOriginal,
+        core.shouldStayOriginal,
         segment,
         options,
     ).map((slot) => slot.node);
@@ -90,7 +91,7 @@ function equivalentInlineCandidate(host: HTMLElement, state: TranslationState): 
         }
     });
     const matches = Array.from(candidates.values()).filter((candidate) => {
-        const options = protectionOptions(host, state.allowTopLevelApplicationShell === true);
+        const options = core.textOptions(protectionOptions(host, state.allowTopLevelApplicationShell === true));
         return normalizeComparableText(extractTranslationTextFromNodes(
             candidate.nodes!,
             core.shouldStayOriginal,
@@ -189,11 +190,12 @@ export function transferEquivalentSyntheticBilingualSegments(
                 host.insertBefore(owner, sourceNodes[0]!);
                 sourceNodes.forEach((node) => owner.insertBefore(node, state.bilingualBeforeSource ? null : content));
                 state.syntheticHost = host;
+                const core = getCurrentTranslationCore(state.scope);
                 state.sourceTextNodes = collectLiveTranslationTextSlots(
                     owner,
-                    getCurrentTranslationCore(state.scope).shouldStayOriginal,
+                    core.shouldStayOriginal,
                     owner,
-                    protectionOptions(owner, state.allowTopLevelApplicationShell === true),
+                    core.textOptions(protectionOptions(owner, state.allowTopLevelApplicationShell === true)),
                 ).map((slot) => slot.node);
                 setBilingualContent(owner, content, state.bilingualReplay, template);
                 setRenderedStyleAttribute(owner);

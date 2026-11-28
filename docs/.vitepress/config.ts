@@ -9,23 +9,23 @@ const guide = (en = false): DefaultTheme.SidebarItem[] => {
   })
   return [
     {
-      text: en ? 'Start here' : '快速开始',
+      text: en ? 'Getting started' : '入门与安装',
       items: [
-        item('文档首页', 'Documentation', '/docs/'),
+        item('文档首页', 'Documentation hub', '/docs/'),
         item('快速开始', 'Quick start', '/guide/getting-started'),
+        item('功能全景', 'Feature overview', '/guide/features'),
         item('离线下载与安装', 'Offline download & installation', '/guide/offline-install'),
-        item('功能概览', 'Feature overview', '/guide/features'),
       ],
     },
     {
-      collapsed: true,
-      text: en ? 'Webpage translation' : '网页翻译',
+      collapsed: false,
+      text: en ? 'Webpage & daily reading' : '网页与日常翻译',
       items: [
         item('全文与局部翻译', 'Page & section translation', '/guide/webpage-translation'),
         item('划词翻译', 'Selection translation', '/guide/deepseek-harness'),
         item('悬浮段落翻译', 'Hover translation', '/guide/hover-translation'),
         item('输入框翻译', 'Input translation', '/guide/input-translation'),
-        item('翻译中心', 'Translation Center', '/guide/translation-center'),
+        item('翻译中心与侧边栏', 'Translation Center & sidebar', '/guide/translation-center'),
         item('智能高亮', 'Smart Highlighting', '/guide/information-highlight'),
       ],
     },
@@ -33,71 +33,79 @@ const guide = (en = false): DefaultTheme.SidebarItem[] => {
       collapsed: true,
       text: en ? 'Images, documents & video' : '图片、文档与视频',
       items: [
-        item('图片与漫画翻译', 'Image & comic translation', '/guide/image-translation'),
+        item('图片与漫画翻译', 'Image & manga translation', '/guide/image-translation'),
         item('圈选翻译', 'Area translation', '/guide/area-translation'),
-        item('文档翻译', 'Document translation', '/guide/document-translation'),
-        item('视频与会议翻译', 'Video & meeting translation', '/guide/video-subtitles'),
+        item('文档翻译（PDF / EPUB / Office）', 'Document translation', '/guide/document-translation'),
+        item('视频与会议字幕', 'Video & meeting captions', '/guide/video-subtitles'),
       ],
     },
     {
       collapsed: true,
       text: en ? 'Learning & expression' : '学习与表达',
       items: [
-        item('学习中心', 'Learning center', '/guide/vocabulary-book'),
-        item('词典与学习卡', 'Dictionaries and study cards', '/guide/dictionaries'),
+        item('学习中心与词书', 'Learning center', '/guide/vocabulary-book'),
+        item('词典与学习卡', 'Dictionaries & study cards', '/guide/dictionaries'),
         item('词性与句法', 'Sentence structure', '/guide/sentence-analysis'),
-        item('双语分享卡片', 'Share cards', '/guide/share-cards'),
+        item('双语分享卡片', 'Bilingual share cards', '/guide/share-cards'),
         item('写作助手', 'Writing assistant', '/guide/writing-assistant'),
       ],
     },
     {
-      text: en ? 'Providers & settings' : '服务与设置',
       collapsed: true,
+      text: en ? 'Providers & privacy' : '翻译服务与隐私',
       items: [
-        item('设置概览', 'Settings overview', '/config/'),
-        item('翻译隐私防护', 'Translation privacy', '/config/privacy-protection'),
-        item('翻译服务', 'Translation providers', '/config/translation-engines'),
+        item('翻译服务与模型配置', 'Translation providers', '/config/translation-engines'),
+        item('浏览器内置翻译', 'Built-in browser translation', '/guide/chrome-translator'),
+        item('翻译隐私防护', 'Translation privacy shield', '/config/privacy-protection'),
         item('ChatGPT 套餐接入状态', 'ChatGPT plan availability', '/config/chatgpt-plan'),
-        item('译文外观与阅读辅助', 'Appearance & reading aids', '/config/appearance'),
-        item('术语库', 'Glossaries', '/guide/glossary'),
-        item('快捷键与触发方式', 'Shortcuts & triggers', '/guide/custom-hotkey'),
-        item('网站规则与阅读范围', 'Site rules & reading area', '/config/site-adaptation'),
-        item('备份与同步', 'Backup & sync', '/config/backup-sync'),
-        item('WebDAV 云备份', 'WebDAV cloud backup', '/guide/webdav'),
-        item('翻译统计', 'Translation statistics', '/guide/translation-stats'),
-        item('模型用量', 'AI usage', '/guide/model-usage'),
       ],
     },
     {
-      text: en ? 'More platforms' : '更多平台',
       collapsed: true,
+      text: en ? 'Customization & rules' : '个性化与网站规则',
       items: [
-        item('浏览器内置翻译', 'Built-in browser translation', '/guide/chrome-translator'),
-        item('油猴脚本', 'Userscript', '/guide/userscript'),
+        item('设置中心概览', 'Settings overview', '/config/'),
+        item('译文外观与阅读辅助', 'Appearance & reading aids', '/config/appearance'),
+        item('快捷键与触发方式', 'Shortcuts & triggers', '/guide/custom-hotkey'),
+        item('术语库', 'Glossaries', '/guide/glossary'),
+        item('网站阅读范围与偏好', 'Site rules & reading area', '/config/site-adaptation'),
+        item('自定义网站正文规则', 'Custom site rules', '/guide/custom-site-rules'),
+      ],
+    },
+    {
+      collapsed: true,
+      text: en ? 'Data, sync & analytics' : '备份、同步与统计',
+      items: [
+        item('备份与同步', 'Backup & sync', '/config/backup-sync'),
+        item('WebDAV 云备份', 'WebDAV cloud backup', '/guide/webdav'),
+        item('翻译统计', 'Translation statistics', '/guide/translation-stats'),
+        item('模型用量', 'AI model usage', '/guide/model-usage'),
+      ],
+    },
+    {
+      collapsed: true,
+      text: en ? 'More platforms' : '更多平台与集成',
+      items: [
         item('移动端与 Safari', 'Mobile & Safari', '/guide/mobile-safari'),
+        item('油猴脚本', 'Userscript', '/guide/userscript'),
         item('Thunderbird 邮件翻译', 'Thunderbird email translation', '/guide/thunderbird'),
         item('Zotero 文献翻译', 'Zotero literature translation', '/guide/zotero'),
       ],
     },
     {
       collapsed: true,
-      text: en ? 'Design & contribution' : '设计与贡献',
+      text: en ? 'Help & community' : '帮助与参与',
       items: [
-        item('设计系统与组件预览', 'Design system & component previews', '/guide/design-system'),
-        item('维护者申请 ChatGPT 接入', 'Maintainers: ChatGPT application', '/guide/chatgpt-application'),
-      ],
-    },
-    {
-      collapsed: true,
-      text: en ? 'Help' : '帮助',
-      items: [
-        item('常见问题', 'Troubleshooting', '/guide/faq'),
+        item('常见问题与排查', 'Troubleshooting & FAQ', '/guide/faq'),
         item('隐私政策', 'Privacy policy', '/guide/privacy'),
+        item('设计系统与组件预览', 'Design system & components', '/guide/design-system'),
+        item('维护者：ChatGPT 接入申请', 'Maintainers: ChatGPT application', '/guide/chatgpt-application'),
         item('赞助与支持', 'Sponsorship & support', '/guide/support'),
       ],
     },
   ]
 }
+
 const theme = (en = false): DefaultTheme.Config => ({
   siteTitle: false,
   nav: [
@@ -107,7 +115,8 @@ const theme = (en = false): DefaultTheme.Config => ({
       link: en ? '/en/docs/' : '/docs/',
       activeMatch: '^/(en/)?(docs|guide|config)/',
     },
-    { text: en ? 'Help' : '帮助', link: en ? '/en/guide/faq' : '/guide/faq' },
+    { text: en ? 'Providers' : '翻译服务', link: en ? '/en/config/translation-engines' : '/config/translation-engines' },
+    { text: en ? 'Help' : '常见问题', link: en ? '/en/guide/faq' : '/guide/faq' },
     {
       text: en ? 'Install' : '安装',
       link: en ? '/en/guide/getting-started#install' : '/guide/getting-started#安装',
@@ -135,6 +144,7 @@ const theme = (en = false): DefaultTheme.Config => ({
     copyright: '© FluentRead · GPL-3.0',
   },
 })
+
 export default defineConfig({
   title: '流畅阅读',
   description: `${brandTaglines['zh-CN']} 一款开源的浏览器双语翻译插件。`,

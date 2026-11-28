@@ -42,7 +42,7 @@ describe('FluentRead Design System tokens & editorial guardrails', () => {
   const light = blockTokens(tokensCss, ':root {\n  /* 品牌与核心操作色')
   const dark = blockTokens(tokensCss, ':root.dark {\n  --fr-color-brand:')
   const feedbackLight = blockTokens(tokensCss, ':root {\n  --fr-success:')
-  const feedbackDark = blockTokens(tokensCss, ':root.dark,\n:root[data-interface-skin="xuanqing"]')
+  const feedbackDark = blockTokens(tokensCss, ':root.dark {\n  --fr-menu-shadow:')
 
   it('declares complete semantic token scales for spacing, radius, typography, elevation, and motion', () => {
     for (const token of [

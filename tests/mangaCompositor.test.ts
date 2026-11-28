@@ -49,14 +49,57 @@ describe('直接合成漫画画布的生命周期',()=>{
         expect(atDeadline).toBe('译图加载超时'); expect(initial.close).toHaveBeenCalledOnce(); expect(late.close).toHaveBeenCalledOnce();
         expect(canvas).toMatchObject({width: 0, height: 0}); expect(vi.getTimerCount()).toBe(0);
     });
-    it.each(['source', 'patch'] as const)('%s 绘制耗尽整页预算后不成功交付，也不启动后续图块', async stage => {
-        const bitmap = {width: 50, height: 30, close: vi.fn()}; decode.mockResolvedValue(bitmap);
+    it.each(['source', 'patch'] as const)('%s 绘制耗尽整页预算后不成功交付，也不启动超出并发窗的后续图块', async stage => {
+        const bitmaps = Array.from({length: 5}, () => ({width: 50, height: 30, close: vi.fn()}));
+        let next = 0;
+        decode.mockImplementation(() => Promise.resolve(bitmaps[next++]));
         if (stage === 'source') draw.mockImplementationOnce(() => {vi.advanceTimersByTime(15000);});
         else draw.mockImplementationOnce(() => undefined).mockImplementationOnce(() => {vi.advanceTimersByTime(15000);});
-        await expect(composeMangaPage(source, {...page, patches: [page.patches[0], page.patches[0]]}, new AbortController().signal)).rejects.toThrow('译图加载超时');
-        expect(decode).toHaveBeenCalledTimes(stage === 'source' ? 0 : 1);
-        if (stage === 'patch') expect(bitmap.close).toHaveBeenCalledOnce();
+        await expect(composeMangaPage(source, {...page, patches: Array(5).fill(page.patches[0])}, new AbortController().signal)).rejects.toThrow('译图加载超时');
+        expect(decode).toHaveBeenCalledTimes(stage === 'source' ? 0 : 4);
+        if (stage === 'patch') {
+            for (let i = 0; i < 4; i++) expect(bitmaps[i].close).toHaveBeenCalledOnce();
+            expect(bitmaps[4].close).not.toHaveBeenCalled();
+        }
         expect(canvas).toMatchObject({width: 0, height: 0}); expect(vi.getTimerCount()).toBe(0);
+    });
+    it('按最多 4 路并发预解码图块并严格保持确定绘制顺序，靠前块失败关闭同窗已解码和迟到位图', async () => {
+        const patches = Array.from({length: 6}, (_, index) => ({x: index * 10, y: 0, width: 50, height: 30, bytes: new Uint8Array([index + 1])}));
+        const resolvers: Array<(value: unknown) => void> = [];
+        decode.mockImplementation(() => new Promise(resolve => { resolvers.push(resolve); }));
+        const task = composeMangaPage(source, {...page, patches}, new AbortController().signal);
+        await flush();
+        expect(decode).toHaveBeenCalledTimes(4);
+        const bitmaps = patches.map((_, index) => ({id: index, width: 50, height: 30, close: vi.fn()}));
+        // 故意乱序完成解码：3 -> 1 -> 0 -> 2，绘制顺序仍必须严格为 0, 1, 2, 3, 4, 5。
+        resolvers[3](bitmaps[3]); resolvers[1](bitmaps[1]); await flush();
+        expect(draw).toHaveBeenCalledTimes(1);
+        resolvers[0](bitmaps[0]); await flush();
+        // 0 与已预解码就绪的 1 连续绘制完成，滑动窗口立即补充解码第 4、5 块。
+        expect(draw).toHaveBeenCalledTimes(3);
+        expect(decode).toHaveBeenCalledTimes(6);
+        resolvers[2](bitmaps[2]); resolvers[4](bitmaps[4]); resolvers[5](bitmaps[5]);
+        await expect(task).resolves.toBe(canvas);
+        expect(draw.mock.calls.slice(1).map(([bmp]) => (bmp as {id: number}).id)).toEqual([0, 1, 2, 3, 4, 5]);
+        for (const bmp of bitmaps) expect(bmp.close).toHaveBeenCalledOnce();
+
+        // 第 0 块尺寸错误时，已先解码完成的第 1 块与迟到的第 2 块均须关闭。
+        decode.mockReset(); draw.mockReset(); clear.mockReset();
+        const failResolvers: Array<(value: unknown) => void> = [];
+        decode.mockImplementation(() => new Promise(resolve => { failResolvers.push(resolve); }));
+        const failed = composeMangaPage(source, {...page, patches: patches.slice(0, 3)}, new AbortController().signal);
+        const checked = expect(failed).rejects.toThrow('漫画译图数据无效');
+        await flush();
+        const bad0 = {width: 1, height: 30, close: vi.fn()};
+        const ready1 = {width: 50, height: 30, close: vi.fn()};
+        const late2 = {width: 50, height: 30, close: vi.fn()};
+        failResolvers[1](ready1); await flush();
+        failResolvers[0](bad0); await checked;
+        failResolvers[2](late2); await flush();
+        expect(bad0.close).toHaveBeenCalledOnce();
+        expect(ready1.close).toHaveBeenCalledOnce();
+        expect(late2.close).toHaveBeenCalledOnce();
+        expect(vi.getTimerCount()).toBe(0);
     });
     it.each(['source-only', 'last-patch'] as const)('最后的 %s 绘制耗尽预算也不能交付', async stage => {
         const bitmap = {width: 50, height: 30, close: vi.fn()}; decode.mockResolvedValue(bitmap);

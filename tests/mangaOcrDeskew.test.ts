@@ -70,7 +70,7 @@ describe('纯像素漫画斜行几何',()=>{
         for(let x=20;x<70;x++)for(let y=45;y<53;y++)image.data.set([...shade,255],(y*400+x)*4);
         expect(trimMangaOcrDeskew(image.data,400,100,100)).toEqual({x:18,y:43,width:364,height:12});
     });
-    it.each([[245,245,245],[255,250,245],[255,255,254]])('旋转后的黑前缀不能遮盖%s浅色尾字的完整像素支撑',(...shade)=>{
+    it.each([[239,239,239],[255,239,235],[235,235,239]])('旋转后的黑前缀不能遮盖%s浅色尾字的完整像素支撑',(...shade)=>{
         const image=pixels();
         for(let y=45;y<53;y++){
             for(let x=20;x<160;x++)image.data.set([0,0,0,255],(y*400+x)*4);
@@ -80,27 +80,40 @@ describe('纯像素漫画斜行几何',()=>{
         expect(trim).toEqual({x:18,y:43,width:364,height:12});
         for(let y=0;y<100;y++)for(let x=0;x<400;x++){
             const index=(y*400+x)*4;
-            if(image.data[index]===255&&image.data[index+1]===255&&image.data[index+2]===255)continue;
+            if(image.data[index]>=240&&image.data[index+1]>=240&&image.data[index+2]>=240&&image.data[index+3]===255)continue;
             expect(x>=trim.x&&x<trim.x+trim.width&&y>=trim.y&&y<trim.y+trim.height).toBe(true);
         }
         expect(image.data).toEqual(before);
     });
-    it('近白噪点触及上下边使字高改善不足时保守回原框，不裁去噪点来制造重试',()=>{
-        const image=pixels();
+    it.each([[240,240,240],[245,245,245],[255,250,245],[254,254,254]])('不透明近白 JPEG 底噪%s会被裁除，使压缩漫画斜行成功复识别',(...shade)=>{
+        const image=pixels(400,100,shade);
         for(let x=20;x<380;x++)for(let y=45;y<53;y++)image.data.set([0,0,0,255],(y*400+x)*4);
-        image.data.set([254,254,254,255],20*4);
-        image.data.set([255,250,245,255],(99*400+379)*4);
         const before=image.data.slice();
-        expect(trimMangaOcrDeskew(image.data,400,100,100)).toBeUndefined();
+        expect(trimMangaOcrDeskew(image.data,400,100,100)).toEqual({x:18,y:43,width:364,height:12});
         expect(image.data).toEqual(before);
     });
-    it('短黑前缀不足最小裁宽时，完整近白尾字仍按真实整行宽度保留',()=>{
+    it('半透明近白像素与非近白边缘噪点仍作为前景保留，字高改善不足时保守回原框',()=>{
+        const semi=pixels();
+        for(let y=45;y<53;y++){
+            for(let x=20;x<70;x++)semi.data.set([0,0,0,255],(y*400+x)*4);
+            for(let x=200;x<380;x++)semi.data.set([250,250,250,200],(y*400+x)*4);
+        }
+        expect(trimMangaOcrDeskew(semi.data,400,100,100)).toEqual({x:18,y:43,width:364,height:12});
+        const noisy=pixels();
+        for(let x=20;x<380;x++)for(let y=45;y<53;y++)noisy.data.set([0,0,0,255],(y*400+x)*4);
+        noisy.data.set([239,239,239,255],20*4);
+        noisy.data.set([230,235,239,255],(99*400+379)*4);
+        const before=noisy.data.slice();
+        expect(trimMangaOcrDeskew(noisy.data,400,100,100)).toBeUndefined();
+        expect(noisy.data).toEqual(before);
+    });
+    it('短黑前缀不足最小裁宽时，完整浅灰尾字仍按真实整行宽度保留',()=>{
         const image=pixels();
         for(let y=45;y<53;y++){
             for(let x=20;x<70;x++)image.data.set([0,0,0,255],(y*400+x)*4);
-            for(let x=200;x<380;x++)image.data.set([245,245,245,255],(y*400+x)*4);
+            for(let x=200;x<380;x++)image.data.set([235,235,235,255],(y*400+x)*4);
         }
-        // 原来只看到窄黑前缀会跳过裁切；完整浅色支撑可使同一行满足既有最小宽度。
+        // 阈值以下的浅灰前景支撑可使同一行满足既有最小宽度。
         expect(trimMangaOcrDeskew(image.data,400,100,100)).toEqual({x:18,y:43,width:364,height:12});
     });
     it('支持直接从整图 RGBA 缓冲按 (pageWidth, x0, y0, width, height) 零画布估角',()=>{

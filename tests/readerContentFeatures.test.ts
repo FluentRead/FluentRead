@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     mountMangaEntry: vi.fn(),
     mountSelectionTranslator: vi.fn(),
     mountTranslationProgressPanel: vi.fn(),
+    setMangaPeekOriginal: vi.fn(),
     startAreaTranslationFromContextMenu: vi.fn(),
     unmountAreaTranslator: vi.fn(),
     unmountFloatingBall: vi.fn(),
@@ -48,7 +49,7 @@ describe('reading UI registry bindings', () => {
         expect(mocks.mountSelectionTranslator).toHaveBeenCalledWith(ctx);
         expect(mocks.mountAreaTranslator).toHaveBeenCalledWith(ctx);
         expect(mocks.mountImageTranslator).toHaveBeenCalledWith();
-        expect(mocks.mountMangaEntry).toHaveBeenCalledWith(ctx, {startAreaTranslation: mocks.startAreaTranslationFromContextMenu});
+        expect(mocks.mountMangaEntry).toHaveBeenCalledWith(ctx, {startAreaTranslation: mocks.startAreaTranslationFromContextMenu, onPeekOriginal: mocks.setMangaPeekOriginal});
         expect(mocks.mountTranslationProgressPanel).toHaveBeenCalledWith(ctx);
         for (const unmount of [mocks.unmountFloatingBall, mocks.unmountSelectionTranslator, mocks.unmountAreaTranslator,
             mocks.unmountImageTranslator, mocks.unmountMangaEntry, mocks.unmountTranslationProgressPanel]) {

@@ -2,6 +2,7 @@
  * @file src/services/translation/broker.ts
  * 隐私防护：provider 前统一处理正文、上下文与提示词，逐槽校验后本地恢复；开启时跳过持久翻译缓存并隔离 pending 身份，失败不得降级发送明文。
  * 字幕参考：只向文档中的提示词 AI 传递有界 cue，独立于网页摘要开关并进入缓存身份；上下文异常回退会移除字幕参考并继续复验。
+ * 漫画语境：启用 AI 上下文时先对不可信网页摘要与篇章证据转义保留协议标签，再仅为受信漫画请求追加独立漫画语境标记并参与缓存隔离，剥离原始布尔字段，异常回退时一并移除。
  * 用量控制：短参考直接复用；完整 AI 批次中的少数空槽或原文回显只恢复对应槽，整包回显仍触发原有降级。
  * 同图 Google：可信且启用原生合批的图片请求保留重复位置，以整组有序指纹隔离缓存；部分缺失重算完整邻文，逐条回退仍受原截止时间和取消所有权约束。
  * 网页术语：独立的常用词槽在本地原位保留，正文沿用用户词条优先的占位回填，摘要、字幕和图像请求保持各自的保护范围。
@@ -52,6 +53,7 @@ import {
 import {shouldKeepCommonWebTermLabel} from './glossaryProtection';
 import {preparePrivacyRequest} from './privacyProtection';
 import {hasTranslationContent} from '@/src/core/translation/result';
+import {escapePageContextDelimiters} from '@/src/core/translation/prompts';
 import {SUBTITLE_CONTEXT_LIMIT} from '@/src/core/translation/subtitleContext';
 import {buildPageSummaryReference} from '@/src/core/translation/pageSummaryReference';
 import {buildGlossaryRevision, resolveGlossary} from '@/src/core/glossary';
@@ -742,15 +744,21 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         // 篇章证据不进入摘要缓存：每段只复用原有页面摘要，且总参考预算保持 4,000。
         const discourse = !imageInput && isAIContextEnabled(execution, message.modelOverride)
             && typeof message.discourseContext === 'string' ? message.discourseContext.slice(0, 2400) : '';
+        // 先转义不可信网页上下文、篇章证据与字幕参考中的保留协议标签，再追加受信漫画标记，杜绝伪造和原样泄漏。
+        const safePageContext = escapePageContextDelimiters(summarizedPageContext);
+        const safeDiscourse = escapePageContextDelimiters(discourse);
+        const safeSubtitleContext = escapePageContextDelimiters(subtitleContext);
+        const mangaContext = !imageInput && isAIContextEnabled(execution, message.modelOverride) && message.mangaContext === true;
         const references = [
-            discourse ? `<discourse_evidence>\n${discourse}\n</discourse_evidence>` : '',
-            subtitleContext ? `<subtitle_context>\n${subtitleContext}\n</subtitle_context>` : '',
+            safeDiscourse ? `<discourse_evidence>\n${safeDiscourse}\n</discourse_evidence>` : '',
+            mangaContext ? '<manga_context />' : '',
+            safeSubtitleContext ? `<subtitle_context>\n${safeSubtitleContext}\n</subtitle_context>` : '',
         ].filter(Boolean).join('\n');
-        const pageContext = !subtitleContext && discourse
-            ? `${summarizedPageContext.slice(0, Math.max(0, 4000 - discourse.length - 48))}\n<discourse_evidence>\n${discourse}\n</discourse_evidence>`.slice(0, 4000)
-            : references ? [summarizedPageContext.slice(0, Math.max(0, 4000 - references.length - 1)), references]
+        const pageContext = !safeSubtitleContext && !mangaContext && safeDiscourse
+            ? `${safePageContext.slice(0, Math.max(0, 4000 - safeDiscourse.length - 48))}\n<discourse_evidence>\n${safeDiscourse}\n</discourse_evidence>`.slice(0, 4000)
+            : references ? [safePageContext.slice(0, Math.max(0, 4000 - references.length - 1)), references]
                 .filter(Boolean).join('\n').slice(0, 4000)
-            : summarizedPageContext;
+            : safePageContext;
         const remainingProviderBudget = getRemainingDeadlineMs(providerDeadline, now);
 
         // 步骤 3：检测样本只属于本地翻译 auto；即使其他扩展页面手工构造该字段，
@@ -758,7 +766,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         const shouldCarryDetectionText = (selectedService === 'chromeTranslator' || selectedService === 'localTranslation')
             && sourceLanguage === 'auto'
             && Boolean(message.sourceLanguageDetectionText?.trim());
-        const {discourseContext: _rawDiscourse, subtitleContext: _rawSubtitle, ...withoutDiscourse} = message;
+        const {discourseContext: _rawDiscourse, subtitleContext: _rawSubtitle, mangaContext: _rawMangaContext, ...withoutDiscourse} = message;
         const providerInput = shouldCarryDetectionText
             ? withoutDiscourse as TranslationRequestMessage
             : (() => {

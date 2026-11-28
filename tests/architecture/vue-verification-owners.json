@@ -655,6 +655,13 @@
         "tests/dictionaryUi.test.ts"
       ],
       "scenario": "模板预览、显式网页加载、卡片导出与本地 Anki 反馈"
+    },
+    "src/ui/components/PopupBrandIcon.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/interfaceSettingsLifecycle.test.ts"
+      ],
+      "scenario": "保留原始官方品牌图标不变，为 11 套工艺 Popup 皮肤叠加专属外缘趣味装饰并隔离渐变 ID"
     }
   }
 }

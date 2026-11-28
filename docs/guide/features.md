@@ -1,12 +1,8 @@
----
-outline: false
----
+# 功能全景
 
-# 功能概览
+按阅读与工作场景浏览流畅阅读的全部核心能力。如果是第一次使用，建议先阅读[快速开始](/guide/getting-started)。
 
-按你想做的事找到功能入口。首次使用流畅阅读，请先看[快速开始](/guide/getting-started)。
-
-<GuideVisual kind="webpage" />
+<DocDiagram kind="ecosystem-map" />
 
 <span id="页面悬浮球"></span>
 <span id="按钮和操作文字只显示译文"></span>
@@ -15,81 +11,52 @@ outline: false
 <span id="调整段落处理方式"></span>
 <span id="右键翻译"></span>
 
-## 页面翻译
+## 网页与日常翻译
 
-在原文下方显示译文，或只显示译文。 [查看操作指南](/guide/webpage-translation)
+<GuideVisual kind="webpage" />
 
-## 局部翻译
+| 功能 | 一句话说明 | 操作指南 |
+| --- | --- | --- |
+| **页面翻译** | 在原文下方逐段展示译文，或一键切换为「仅译文」，支持学术论文快捷入口 | [全文与局部翻译](/guide/webpage-translation) |
+| **局部翻译** | 点击菜单中的**局部**或按 `Alt+R`，点选/划选指定区域并可记住常用区域 | [局部翻译步骤](/guide/webpage-translation#局部翻译) |
+| **划词翻译** | 选中词句打开翻译卡片：查英文词典、多源语音朗读、AI 深入讲解与收藏 | [划词翻译](/guide/deepseek-harness) |
+| **悬浮段落翻译** | 鼠标停在段落上按 `Control` 即时翻译当前段，再按一次恢复原文 | [悬浮段落翻译](/guide/hover-translation) |
+| **输入框翻译** | 在聊天、邮件等输入框用三连按或快捷键翻译草稿，绝不自动发送 | [输入框翻译](/guide/input-translation) |
+| **翻译中心与侧边栏** | 同一段文字同时对照多个翻译服务，或打开浏览器侧边栏随贴随译 | [翻译中心](/guide/translation-center) |
+| **智能高亮** | 本机分析关键词或预测意外度，在正文中柔和标色辅助长文扫读 | [智能高亮](/guide/information-highlight) |
 
-从菜单点击局部，选择网页中的一块区域，确认后翻译。 [查看操作指南](/guide/webpage-translation)
+<span id="局部翻译"></span>
 
-## 选中即译
+## 图片、文档与视频
 
-选中词句，点击附近的流畅阅读图标，查看译文。卡片显示在选区上方或下方；空间不足时保留滚动，内容和页面缩放变化后会重新避让。拖动或调整尺寸后保留手动位置。 [查看操作指南](/guide/deepseek-harness)
+| 功能 | 一句话说明 | 操作指南 |
+| --- | --- | --- |
+| **图片与漫画翻译** | 本地 PaddleOCR 识别与 LaMa 背景修补，支持单图译图、漫画连续预译与文字面板 | [图片与漫画翻译](/guide/image-translation) |
+| **圈选翻译** | 按 `Shift+Z` 框选截图、图表或暂停的视频画面，支持模型识图或本地 OCR | [圈选翻译](/guide/area-translation) |
+| **文档翻译** | 支持 PDF、EPUB、Word、Markdown、CSV、字幕等 14 种格式，提供原版/重排双视图、扫描 OCR 与批注 | [文档翻译](/guide/document-translation) |
+| **视频与会议字幕** | 适配 YouTube、B 站、X、课程站、Google Meet/Teams/Zoom 及普通 HTML 音视频，支持本地 Whisper 转写 | [视频与会议字幕](/guide/video-subtitles) |
 
-## 悬浮翻译
+## 学习与表达
 
-鼠标停在段落上，按 Control 翻译，再按一次恢复。 [查看操作指南](/guide/hover-translation)
+| 功能 | 一句话说明 | 操作指南 |
+| --- | --- | --- |
+| **学习中心与词书** | 收藏词句与阅读材料、间隔回忆复习、导出 Anki，并在新网页自动标记「再次遇见」 | [学习中心](/guide/vocabulary-book) |
+| **词典与学习卡** | 导入 MDict、StarDict、DSL、Yomitan 离线词典，自定义 JSON API 与 AnkiConnect 卡片模板 | [词典与学习卡](/guide/dictionaries) |
+| **词性与句法** | 可视化拆解长难句的主干成分与词性，支持键盘切换解释 | [词性与句法](/guide/sentence-analysis) |
+| **双语分享卡片** | 在本机将划词原文、译文与来源排成多套精美样式的图片分享 | [双语分享卡片](/guide/share-cards) |
+| **写作助手** | 在 Gmail 与 GitHub 编辑器旁起草或润色单语/双语回复，确认后插入 | [写作助手](/guide/writing-assistant) |
 
-## 输入框翻译
+## 服务、隐私与个性化
 
-输入自己的文字，再用设置中的触发方式翻译，不会自动发送。 [查看操作指南](/guide/input-translation)
+| 功能 | 一句话说明 | 操作指南 |
+| --- | --- | --- |
+| **多种翻译服务** | 免费池开箱即用，可按功能分别配置云厂商、AI 大模型、组合回退、Ollama 或本地模型 | [翻译服务与模型配置](/config/translation-engines) |
+| **翻译隐私防护** | 本机自动识别邮箱/电话/密钥/自定义词，脱敏后翻译还原或直接阻止发送 | [翻译隐私防护](/config/privacy-protection) |
+| **译文外观与逐句高亮** | 丰富译文样式预设、自定义 CSS、界面皮肤与双语逐句同步高亮 | [译文外观与阅读辅助](/config/appearance) |
+| **术语库** | 锁定专有名词译法或保持原文拼写，支持从论文自动提取候选术语 | [术语库](/guide/glossary) |
+| **网站规则与阅读范围** | 按主域名设置始终翻译、仅译文、禁用扩展，或自定义 CSS 正文范围 | [网站阅读范围](/config/site-adaptation) |
+| **备份、同步与统计** | 本地完整备份、自动设置快照、Google Drive / WebDAV 云备份、请求耗时与 Token 统计 | [备份与同步](/config/backup-sync) |
 
-## 图片、文件与字幕
+### 请求限制 {#请求限制}
 
-- [图片与漫画](/guide/image-translation)：在图片上读译文，或随滚动连续翻译漫画。
-- [圈选翻译](/guide/area-translation)：框住截图、图表或视频画面中的文字。
-- [文档翻译](/guide/document-translation)：导入、翻译、校订并下载文件。
-- [视频与会议字幕](/guide/video-subtitles)：对照阅读支持平台提供的字幕。
-
-## 翻译中心：多服务对比
-
-输入同一段文字，对照多个翻译服务的结果。 [查看操作指南](/guide/translation-center)
-
-## 英文单词查词
-
-在划词卡片中查看英文词典释义或朗读。 [查看操作指南](/guide/deepseek-harness)
-
-## 划词学习与学习中心
-
-按需请求 AI 讲解，或收藏词句，在学习中心查找、朗读和复习。 [查看操作指南](/guide/vocabulary-book)
-
-## 双语分享卡片
-
-把原文、译文和来源排成图片，保存后分享。 [查看操作指南](/guide/share-cards)
-
-## 译文样式
-
-选择译文颜色、字号和显示方式。 [查看操作指南](/config/appearance)
-
-## 双语逐句高亮
-
-开启后指向一句话，同步强调原文和译文中的对应句。 [查看操作指南](/config/appearance)
-
-## 智能高亮
-
-在正文中标出关键词或较难预测的词，辅助扫读。 [查看操作指南](/guide/information-highlight)
-
-## 写作助手
-
-在 Gmail、GitHub 中起草或完善回复，检查后插入，由你手动发送。 [查看操作指南](/guide/writing-assistant)
-
-## 多种翻译服务
-
-直接使用免费翻译，或配置自己的服务和模型。 [查看操作指南](/config/translation-engines)
-
-## 自动翻译与网站规则
-
-为常用网站设置自动翻译、目标语言或禁用规则。 [查看操作指南](/config/site-adaptation)
-
-## 恢复、样式和主题
-
-调整[界面与阅读效果](/config/appearance)，或[导出备份、在其他设备恢复配置](/config/backup-sync)。
-
-## 更多翻译语言
-
-在菜单中选择原语言和目标语言，不必改变界面语言。 [查看操作指南](/guide/webpage-translation)
-
-### 请求限制
-
-服务提示请求过于频繁时，在[请求限制](/config/#请求限制)中降低并发或请求速率。
+服务提示请求过于频繁或限流时，可在设置中心的[请求限制](/config/#请求限制)降低全局或单个服务/模型的并发与速率。

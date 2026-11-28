@@ -3087,3 +3087,100 @@ it('routes quick PDF marks to the current reader and refuses disabled, unavailab
     state.config.on = true; state.materialPdfReader = null; expect(state.markDocumentSelection(range, 'highlight')).toBe(false);
     expect(markSelection).toHaveBeenCalledOnce();
 });
+
+it('syncs config.theme to :root.dark and handles Cmd/Ctrl+B and Alt+1/2/3 workbench shortcuts', async () => {
+    const classList = {toggle: vi.fn(), remove: vi.fn()};
+    win.document.documentElement = {classList};
+    state.config.theme = 'dark'; await flush();
+    expect(state.isDark).toBe(true);
+    expect(classList.toggle).toHaveBeenCalledWith('dark', true);
+    state.config.theme = 'light'; await flush();
+    expect(state.isDark).toBe(false);
+    expect(classList.toggle).toHaveBeenCalledWith('dark', false);
+    state.config.theme = 'auto'; await flush();
+
+    await state.loadFiles([file('shortcuts.txt', 'First paragraph.\n\nSecond paragraph.')]);
+    state.editSegment(0, '第一段。'); await flush();
+    const beforeSidebar = state.sidebarOpen;
+    const preventDefault = vi.fn();
+    state.leaveFocusOnEscape({key: 'b', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false, preventDefault});
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(state.sidebarOpen).toBe(!beforeSidebar);
+    state.leaveFocusOnEscape({key: '1', code: 'Digit1', ctrlKey: false, metaKey: false, altKey: true, shiftKey: false, preventDefault});
+    expect(state.previewMode).toBe('source');
+    // macOS Option+3 produces '£' as event.key while event.code stays 'Digit3'.
+    state.leaveFocusOnEscape({key: '£', code: 'Digit3', ctrlKey: false, metaKey: false, altKey: true, shiftKey: false, preventDefault});
+    expect(state.previewMode).toBe('translated');
+    state.leaveFocusOnEscape({key: '2', code: 'Digit2', ctrlKey: false, metaKey: false, altKey: true, shiftKey: false, preventDefault});
+    expect(state.previewMode).toBe('bilingual');
+    // Respect defaultPrevented, open modals, and ARIA textbox focus.
+    state.leaveFocusOnEscape({key: '1', code: 'Digit1', ctrlKey: false, metaKey: false, altKey: true, shiftKey: false, defaultPrevented: true, preventDefault});
+    expect(state.previewMode).toBe('bilingual');
+    win.document.querySelector = (selector: string) => selector === 'dialog[open]' ? {} : null;
+    state.leaveFocusOnEscape({key: '1', code: 'Digit1', ctrlKey: false, metaKey: false, altKey: true, shiftKey: false, preventDefault});
+    expect(state.previewMode).toBe('bilingual');
+    win.document.querySelector = undefined;
+    win.document.activeElement = {tagName: 'DIV', getAttribute: (name: string) => name === 'role' ? 'textbox' : null};
+    state.leaveFocusOnEscape({key: '1', code: 'Digit1', ctrlKey: false, metaKey: false, altKey: true, shiftKey: false, preventDefault});
+    expect(state.previewMode).toBe('bilingual');
+    win.document.activeElement = null;
+});
+
+it('renders rich appearance controls, CSV spreadsheet grid, JSON outline/tree, LRC subtitles and bidirectional proofread navigation', async () => {
+    await state.loadFiles([file('article.md', '# Heading\n\nBody text.')]); await flush();
+    state.isDark = true; await flush();
+    const darkFrame = walkHost(root).find(entry => entry.type === 'iframe')!;
+    expect(darkFrame.props.srcdoc).toContain('--reader-surface: #272f3d');
+    expect(darkFrame.props.srcdoc).toContain('.reader-unit.is-pending::after');
+    state.isDark = false;
+    state.richBilingualLayout = 'stacked';
+    state.richReadingTheme = 'sepia';
+    state.richFontFamily = 'serif';
+    await flush();
+    const frame = walkHost(root).find(entry => entry.type === 'iframe')!;
+    expect(frame.props.srcdoc).toContain('#f6f0e4');
+    expect(frame.props.srcdoc).toContain('Georgia');
+
+    const manyCsvRows = ['Reference,Description', ...Array.from({length: 55}, (_, idx) => `Ref${idx + 1},Desc ${idx + 1}`)].join('\n');
+    await state.loadFiles([file('data.csv', manyCsvRows)]); await flush();
+    state.updateDelimitedColumns([1]); await flush();
+    expect(state.delimitedViewMode).toBe('grid');
+    state.readerPage = 2; await flush();
+    expect(state.readerPage).toBe(2);
+    state.delimitedViewMode = 'list'; await flush();
+    // Switching from 50-row grid (2 pages) to 80-segment single-column list (1 page) clamps readerPage back to 1.
+    expect(state.readerPage).toBe(1);
+    state.delimitedViewMode = 'grid'; await flush();
+
+    await state.loadFiles([file('small.csv', 'Reference,Description,Amount\nPrivate,Read instructions,12.50\nSpare,Ship order,42\n')]); await flush();
+    state.updateDelimitedColumns([1]); await flush();
+    const coords = walkHost(root)
+        .filter(entry => entry.type === 'tr' && String(entry.props.class).includes('json-table-row'))
+        .flatMap(row => walkHost(row).filter(entry => entry.type === 'code').map(hostText));
+    expect(coords).toEqual(['R1C2', 'R2C2', 'R3C2']);
+    state.editSegmentInProofread(1); await flush();
+    expect(state.readerTab).toBe('edit');
+    // DocumentSegmentEditor consumes focusSegmentId and emits focus-handled, resetting it to null.
+    expect(state.editorFocusSegmentId).toBeNull();
+    await state.locateSegmentInReader(1); await flush();
+    expect(state.readerTab).toBe('read');
+
+    await state.loadFiles([file('locale.json', '{"nav":{"deep":{"leaf":"Home {name}"}},"settings":{"title":"Settings"}}')]); await flush();
+    expect(state.outlineRows.map((row: any) => row.label)).toEqual(['nav', 'settings']);
+    state.jsonViewMode = 'tree';
+    state.jsonExpandedPaths = new Set(['$']);
+    await flush();
+    expect(state.jsonTreeNodes.some((node: any) => node.key === 'leaf')).toBe(false);
+    await state.locateSegmentInReader(0); await flush();
+    expect(state.jsonExpandedPaths.has('$.nav.deep')).toBe(true);
+    expect(state.jsonTreeNodes.some((node: any) => node.key === 'leaf' && node.translatable)).toBe(true);
+
+    await state.loadFiles([file('song.lrc', '[ti:Starlight]\n[ar:Muse]\n[00:01.00]Hold you in my arms\n[06:10.00]Far away\n')]); await flush();
+    expect(state.subtitleLrcMeta).toMatchObject({title: 'Starlight', artist: 'Muse'});
+    expect(state.outlineRows).toHaveLength(2);
+    expect(state.outlineRows.filter((row: any) => row.current)).toHaveLength(1);
+    const lrcTable = walkHost(root).find(entry => entry.props['aria-label'] === '字幕时间轴翻译表格')!;
+    expect(hostText(lrcTable)).not.toContain('→ —');
+    state.subtitleViewMode = 'stacked'; await flush();
+    expect(walkHost(root).some(entry => String(entry.props.class).includes('subtitle-cue-card'))).toBe(true);
+});

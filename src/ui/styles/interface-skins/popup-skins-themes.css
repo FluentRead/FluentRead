@@ -1,0 +1,867 @@
+/**
+ * @file src/ui/styles/interface-skins/popup-skins-themes.css
+ * 文件职责：定义 11 套风格迥异的 Popup 专属工艺皮肤（液态玻璃、极光幻彩、拟物硬件、新粗野波普、赛博霓虹、经典复古桌面、极客终端、典藏画报、樱雾物语、宇治手账、黑金典藏）的令牌与材质特化规则。
+ * 主要内容：每套皮肤拥有独立的画布氛围、几何圆角、边框/投影物理、字体气质与浅深色板，所有基础语义色保持纯 hex 以保证 WCAG AA 可读性校验，光学纹理与渐变通过独立图层令牌叠加。
+ * 模块边界：所有选择器严格限定在 :root[data-popup-root] 与 .popup-skin-scope 内，绝不影响 Options 设置页、内容脚本及网页翻译；绝不对品牌图标施加滤镜。
+ */
+
+/* ==========================================================================
+   1. 液态玻璃 (liquid-glass) — 冰蓝弥散折射 + 半透明磨砂 + 顶部镜面高光
+   ========================================================================== */
+:root[data-popup-root]:not(.dark)[data-interface-skin="liquid-glass"],
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="liquid-glass"] {
+  --skin-page: #e8f1fb;
+  --skin-page-bg:
+    radial-gradient(circle at 12% 10%, #bae6fd 0%, transparent 48%),
+    radial-gradient(circle at 88% 18%, #ddd6fe 0%, transparent 48%),
+    radial-gradient(circle at 50% 94%, #a5f3fc 0%, transparent 52%),
+    #e8f1fb;
+  --skin-surface: #f4f9ff;
+  --skin-panel-bg: rgba(255, 255, 255, 0.64);
+  --skin-control-bg: rgba(255, 255, 255, 0.72);
+  --skin-input-bg: rgba(255, 255, 255, 0.56);
+  --skin-surface-soft: #eaf3fd;
+  --skin-surface-hover: #dfeeff;
+  --skin-ink: #0b192c;
+  --skin-muted: #3b506b;
+  --skin-line: #c7dcf5;
+  --skin-line-strong: #8db9ee;
+  --skin-brand: #1466e6;
+  --skin-brand-strong: #0e4fb8;
+  --skin-brand-soft: #dbeafe;
+  --skin-action-bg: linear-gradient(180deg, #1466e6 0%, #0b4cc2 100%);
+  --skin-action-hover: linear-gradient(180deg, #0f5bd4 0%, #0840ab 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 18px;
+  --skin-preview-radius: 18px;
+  --skin-control-radius: 12px;
+  --skin-action-radius: 999px;
+  --skin-feature-radius: 15px;
+  --skin-icon-radius: 50%;
+  --skin-panel-border: 1px solid rgba(255, 255, 255, 0.84);
+  --skin-control-border: 1px solid rgba(255, 255, 255, 0.80);
+  --skin-input-border: 1px solid rgba(255, 255, 255, 0.76);
+  --skin-feature-border: 1px solid rgba(255, 255, 255, 0.80);
+  --skin-panel-backdrop: blur(12px) saturate(160%);
+  --skin-panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 -1px 0 rgba(125, 180, 255, 0.28), 0 8px 24px rgba(15, 45, 95, 0.11);
+  --skin-feature-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.90), 0 4px 12px rgba(15, 45, 95, 0.07);
+  --skin-action-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.44), 0 6px 16px rgba(14, 79, 184, 0.30);
+  --skin-icon-bg: rgba(255, 255, 255, 0.82);
+  --skin-icon-border: 1px solid rgba(255, 255, 255, 0.95);
+  --skin-icon-fg: #0e4fb8;
+  --skin-switch-on-bg: #1466e6;
+  --skin-switch-knob: #ffffff;
+}
+
+:root[data-popup-root][data-interface-skin="liquid-glass"] .feature-card .feature-icon,
+.popup-skin-scope[data-interface-skin="liquid-glass"] .preview-feature-icon {
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.95), 0 3px 8px rgba(20, 102, 230, 0.16);
+}
+
+:root.dark[data-popup-root][data-interface-skin="liquid-glass"],
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="liquid-glass"] {
+  --skin-page: #09111f;
+  --skin-page-bg:
+    radial-gradient(circle at 14% 12%, rgba(56, 189, 248, 0.30) 0%, transparent 48%),
+    radial-gradient(circle at 88% 20%, rgba(129, 140, 248, 0.28) 0%, transparent 48%),
+    radial-gradient(circle at 50% 92%, rgba(14, 165, 233, 0.24) 0%, transparent 52%),
+    #09111f;
+  --skin-surface: #142036;
+  --skin-panel-bg: rgba(20, 32, 54, 0.66);
+  --skin-control-bg: rgba(26, 41, 68, 0.72);
+  --skin-input-bg: rgba(18, 29, 49, 0.64);
+  --skin-surface-soft: #1b2b47;
+  --skin-surface-hover: #253b61;
+  --skin-ink: #f0f7ff;
+  --skin-muted: #9ec0e0;
+  --skin-line: #2a4066;
+  --skin-line-strong: #4d78b5;
+  --skin-brand: #60b8ff;
+  --skin-brand-strong: #85ccff;
+  --skin-brand-soft: #162d4d;
+  --skin-action-bg: linear-gradient(180deg, #1b6ce8 0%, #0f52c4 100%);
+  --skin-action-hover: linear-gradient(180deg, #1662dc 0%, #0c47b0 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 18px;
+  --skin-preview-radius: 18px;
+  --skin-control-radius: 12px;
+  --skin-action-radius: 999px;
+  --skin-feature-radius: 15px;
+  --skin-icon-radius: 50%;
+  --skin-panel-border: 1px solid rgba(186, 224, 255, 0.22);
+  --skin-control-border: 1px solid rgba(186, 224, 255, 0.20);
+  --skin-input-border: 1px solid rgba(186, 224, 255, 0.18);
+  --skin-feature-border: 1px solid rgba(186, 224, 255, 0.20);
+  --skin-panel-backdrop: blur(12px) saturate(160%);
+  --skin-panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 10px 28px rgba(0, 0, 0, 0.44);
+  --skin-feature-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 4px 14px rgba(0, 0, 0, 0.28);
+  --skin-action-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 6px 18px rgba(15, 82, 196, 0.40);
+  --skin-icon-bg: rgba(96, 184, 255, 0.14);
+  --skin-icon-border: 1px solid rgba(133, 204, 255, 0.30);
+  --skin-icon-fg: #85ccff;
+  --skin-switch-on-bg: #1b6ce8;
+  --skin-switch-knob: #ffffff;
+}
+
+/* ==========================================================================
+   2. 极光幻彩 (aurora) — 晨霞/北极光全画布渐变 + 珠光浮卡 + 三段虹彩按钮
+   ========================================================================== */
+:root[data-popup-root]:not(.dark)[data-interface-skin="aurora"],
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="aurora"] {
+  --skin-page: #f8eefc;
+  --skin-page-bg:
+    radial-gradient(circle at 10% 8%, #fecdd3 0%, transparent 50%),
+    radial-gradient(circle at 90% 14%, #c7d2fe 0%, transparent 50%),
+    radial-gradient(circle at 55% 96%, #fde68a 0%, transparent 52%),
+    #f8eefc;
+  --skin-surface: #fdfaff;
+  --skin-panel-bg: rgba(255, 255, 255, 0.82);
+  --skin-control-bg: rgba(255, 255, 255, 0.84);
+  --skin-input-bg: rgba(255, 255, 255, 0.72);
+  --skin-surface-soft: #f5ebfc;
+  --skin-surface-hover: #efe0fa;
+  --skin-ink: #1e1330;
+  --skin-muted: #54446b;
+  --skin-line: #decbf7;
+  --skin-line-strong: #b995ed;
+  --skin-brand: #7c3aed;
+  --skin-brand-strong: #6b21a8;
+  --skin-brand-soft: #f3e8ff;
+  --skin-action-bg: linear-gradient(120deg, #b8209a 0%, #7328d4 52%, #2554d4 100%);
+  --skin-action-hover: linear-gradient(120deg, #a31888 0%, #621ec0 52%, #1d46bd 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 14px;
+  --skin-preview-radius: 14px;
+  --skin-control-radius: 10px;
+  --skin-feature-radius: 12px;
+  --skin-icon-radius: 9px;
+  --skin-panel-backdrop: blur(10px);
+  --skin-panel-shadow: 0 8px 22px rgba(107, 33, 168, 0.10);
+  --skin-feature-shadow: 0 4px 12px rgba(107, 33, 168, 0.06);
+  --skin-action-shadow: 0 6px 18px rgba(124, 58, 237, 0.34);
+  --skin-switch-on-bg: #7328d4;
+  --skin-switch-knob: #ffffff;
+}
+
+:root[data-popup-root]:not(.dark)[data-interface-skin="aurora"] .feature-card:nth-child(4n + 1) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="aurora"] .preview-feature:nth-child(4n + 1) .preview-feature-icon { background: #e0f2fe; color: #0369a1; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="aurora"] .feature-card:nth-child(4n + 2) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="aurora"] .preview-feature:nth-child(4n + 2) .preview-feature-icon { background: #fce7f3; color: #be185d; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="aurora"] .feature-card:nth-child(4n + 3) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="aurora"] .preview-feature:nth-child(4n + 3) .preview-feature-icon { background: #ede9fe; color: #6d28d9; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="aurora"] .feature-card:nth-child(4n + 4) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="aurora"] .preview-feature:nth-child(4n + 4) .preview-feature-icon { background: #fef3c7; color: #b45309; }
+
+:root.dark[data-popup-root][data-interface-skin="aurora"],
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="aurora"] {
+  --skin-page: #0b0e1e;
+  --skin-page-bg:
+    radial-gradient(circle at 12% 10%, rgba(20, 184, 166, 0.36) 0%, transparent 48%),
+    radial-gradient(circle at 88% 18%, rgba(217, 70, 239, 0.32) 0%, transparent 48%),
+    radial-gradient(circle at 45% 96%, rgba(99, 102, 241, 0.32) 0%, transparent 52%),
+    #0b0e1e;
+  --skin-surface: #13172c;
+  --skin-panel-bg: rgba(19, 23, 44, 0.78);
+  --skin-control-bg: rgba(25, 31, 58, 0.84);
+  --skin-input-bg: rgba(24, 29, 54, 0.78);
+  --skin-surface-soft: #1e2442;
+  --skin-surface-hover: #2a325c;
+  --skin-ink: #f4f3ff;
+  --skin-muted: #a7b0d6;
+  --skin-line: #342b5c;
+  --skin-line-strong: #6247a8;
+  --skin-brand: #c084fc;
+  --skin-brand-strong: #d8b4fe;
+  --skin-brand-soft: #2c1d4a;
+  --skin-action-bg: linear-gradient(120deg, #b8209a 0%, #6d28d9 52%, #0e7490 100%);
+  --skin-action-hover: linear-gradient(120deg, #a61b8b 0%, #5e20c4 52%, #0b657d 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 14px;
+  --skin-preview-radius: 14px;
+  --skin-control-radius: 10px;
+  --skin-feature-radius: 12px;
+  --skin-icon-radius: 9px;
+  --skin-panel-backdrop: blur(10px);
+  --skin-panel-shadow: 0 10px 26px rgba(0, 0, 0, 0.44);
+  --skin-action-shadow: 0 6px 20px rgba(184, 32, 154, 0.38);
+  --skin-switch-on-bg: #6d28d9;
+  --skin-switch-knob: #ffffff;
+}
+
+/* ==========================================================================
+   3. 拟物硬件 (tactile) — 哑光石瓷 + 3D 凸起键帽 + 内凹控件槽 + 发光 LED
+   ========================================================================== */
+:root[data-popup-root]:not(.dark)[data-interface-skin="tactile"],
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="tactile"] {
+  --skin-page: #e4e0d8;
+  --skin-surface: #f1eee8;
+  --skin-surface-soft: #ddd8ce;
+  --skin-surface-hover: #e8e4dc;
+  --skin-ink: #1a1917;
+  --skin-muted: #524f49;
+  --skin-line: #c7c2b7;
+  --skin-line-strong: #a6a094;
+  --skin-brand: #cc3f10;
+  --skin-brand-strong: #a8320a;
+  --skin-brand-soft: #f7e4dc;
+  --skin-action-bg: linear-gradient(180deg, #d14415 0%, #b03209 100%);
+  --skin-action-hover: linear-gradient(180deg, #be3a0e 0%, #9c2b06 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 12px;
+  --skin-control-radius: 8px;
+  --skin-feature-radius: 10px;
+  --skin-icon-radius: 7px;
+  --skin-panel-shadow: 0 3px 0 #c7c2b7, 0 6px 14px rgba(26, 25, 23, 0.08), inset 0 1px 0 #ffffff;
+  --skin-control-shadow: 0 2px 0 #c7c2b7, inset 0 1px 0 #ffffff;
+  --skin-input-shadow: inset 0 2px 4px rgba(26, 25, 23, 0.12), inset 0 1px 0 rgba(26, 25, 23, 0.06), 0 1px 0 rgba(255, 255, 255, 0.78);
+  --skin-feature-shadow: 0 2px 0 #c7c2b7, inset 0 1px 0 #ffffff;
+  --skin-action-shadow: 0 3px 0 #822205, 0 5px 10px rgba(176, 50, 9, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.30);
+  --skin-action-active-transform: translateY(2px);
+  --skin-action-active-shadow: 0 1px 0 #822205, inset 0 1px 2px rgba(0, 0, 0, 0.20);
+  --skin-feature-active-transform: translateY(1px);
+  --skin-status-active: #16a34a;
+  --skin-status-ring: 0 0 6px rgba(22, 163, 74, 0.72), 0 0 0 2px rgba(22, 163, 74, 0.22);
+  --skin-icon-bg: #e5e0d7;
+  --skin-icon-border: 1px solid #d0cbc0;
+  --skin-icon-fg: #a8320a;
+  --skin-switch-on-bg: #cc3f10;
+  --skin-switch-knob: #ffffff;
+}
+
+:root[data-popup-root]:not(.dark)[data-interface-skin="tactile"] .feature-card .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="tactile"] .preview-feature-icon {
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+:root.dark[data-popup-root][data-interface-skin="tactile"],
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="tactile"] {
+  --skin-page: #18191c;
+  --skin-surface: #23252a;
+  --skin-surface-soft: #141518;
+  --skin-surface-hover: #2d3036;
+  --skin-ink: #f2f0eb;
+  --skin-muted: #a6a49d;
+  --skin-line: #353840;
+  --skin-line-strong: #4d515c;
+  --skin-brand: #f26d3d;
+  --skin-brand-strong: #ff946b;
+  --skin-brand-soft: #3a2117;
+  --skin-action-bg: linear-gradient(180deg, #cc3f10 0%, #ab3008 100%);
+  --skin-action-hover: linear-gradient(180deg, #bd380c 0%, #962805 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 12px;
+  --skin-control-radius: 8px;
+  --skin-feature-radius: 10px;
+  --skin-icon-radius: 7px;
+  --skin-panel-shadow: 0 3px 0 #0c0d0f, 0 8px 18px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --skin-control-shadow: 0 2px 0 #0c0d0f, inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --skin-input-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.50), 0 1px 0 rgba(255, 255, 255, 0.06);
+  --skin-feature-shadow: 0 2px 0 #0c0d0f, inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --skin-action-shadow: 0 3px 0 #6e1c04, inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  --skin-action-active-transform: translateY(2px);
+  --skin-action-active-shadow: 0 1px 0 #6e1c04, inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  --skin-feature-active-transform: translateY(1px);
+  --skin-status-active: #22c55e;
+  --skin-status-ring: 0 0 8px rgba(34, 197, 94, 0.85), 0 0 0 2px rgba(34, 197, 94, 0.24);
+  --skin-icon-bg: #181a1f;
+  --skin-icon-border: 1px solid #353840;
+  --skin-icon-fg: #ff946b;
+  --skin-switch-on-bg: #cc3f10;
+  --skin-switch-knob: #ffffff;
+}
+
+:root.dark[data-popup-root][data-interface-skin="tactile"] .feature-card .feature-icon,
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="tactile"] .preview-feature-icon {
+  box-shadow: 0 2px 0 #090a0c, inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* ==========================================================================
+   4. 新粗野波普 (brutalist) — 奶油黄波点底 + 2px 纯黑粗框 + 硬投影 + 四色撞色磁贴
+   ========================================================================== */
+:root[data-popup-root]:not(.dark)[data-interface-skin="brutalist"],
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="brutalist"] {
+  --skin-page: #fff5cc;
+  --skin-page-bg: radial-gradient(rgba(17, 17, 17, 0.16) 1px, transparent 1px) 0 0 / 10px 10px, #fff5cc;
+  --skin-surface: #ffffff;
+  --skin-surface-soft: #fff9e0;
+  --skin-surface-hover: #ffefad;
+  --skin-ink: #111111;
+  --skin-muted: #3f3c32;
+  --skin-line: #111111;
+  --skin-line-strong: #111111;
+  --skin-brand: #d91b60;
+  --skin-brand-strong: #ad1049;
+  --skin-brand-soft: #ffe4ef;
+  --skin-action-bg: #ffde38;
+  --skin-action-hover: #ffd014;
+  --skin-action-text: #111111;
+  --skin-panel-radius: 6px;
+  --skin-preview-radius: 6px;
+  --skin-control-radius: 4px;
+  --skin-feature-radius: 6px;
+  --skin-icon-radius: 4px;
+  --skin-panel-border: 2px solid #111111;
+  --skin-preview-border: 2px solid #111111;
+  --skin-control-border: 2px solid #111111;
+  --skin-input-border: 2px solid #111111;
+  --skin-feature-border: 2px solid #111111;
+  --skin-action-border: 2px solid #111111;
+  --skin-tag-border: 1.5px solid #111111;
+  --skin-panel-shadow: 3px 3px 0 #111111;
+  --skin-control-shadow: 2px 2px 0 #111111;
+  --skin-feature-shadow: 2px 2px 0 #111111;
+  --skin-action-shadow: 3px 3px 0 #111111;
+  --skin-action-active-transform: translate(2px, 2px);
+  --skin-action-active-shadow: 1px 1px 0 #111111;
+  --skin-feature-active-transform: translate(1px, 1px);
+  --skin-icon-bg: #ffffff;
+  --skin-icon-border: 1.5px solid #111111;
+  --skin-icon-fg: #111111;
+  --skin-switch-on-bg: #ffde38;
+  --skin-switch-knob: #111111;
+}
+
+:root[data-popup-root]:not(.dark)[data-interface-skin="brutalist"] .feature-card:nth-child(4n + 1),
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="brutalist"] .preview-feature:nth-child(4n + 1) { background: #d3f9e2; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="brutalist"] .feature-card:nth-child(4n + 2),
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="brutalist"] .preview-feature:nth-child(4n + 2) { background: #d6f0ff; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="brutalist"] .feature-card:nth-child(4n + 3),
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="brutalist"] .preview-feature:nth-child(4n + 3) { background: #ffe0d6; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="brutalist"] .feature-card:nth-child(4n + 4),
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="brutalist"] .preview-feature:nth-child(4n + 4) { background: #eadcff; }
+
+:root[data-popup-root][data-interface-skin="brutalist"] .feature-card .feature-icon,
+.popup-skin-scope[data-interface-skin="brutalist"] .preview-feature-icon {
+  box-shadow: 1.5px 1.5px 0 var(--skin-line);
+  transform: rotate(-4deg);
+  transition: transform 140ms var(--fr-ease-out, ease);
+}
+:root[data-popup-root][data-interface-skin="brutalist"] .feature-card:nth-child(even) .feature-icon,
+.popup-skin-scope[data-interface-skin="brutalist"] .preview-feature:nth-child(even) .preview-feature-icon {
+  transform: rotate(4deg);
+}
+:root[data-popup-root][data-interface-skin="brutalist"] .feature-card:hover .feature-icon {
+  transform: rotate(0deg) scale(1.06);
+}
+
+:root.dark[data-popup-root][data-interface-skin="brutalist"],
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="brutalist"] {
+  --skin-page: #17161a;
+  --skin-page-bg: radial-gradient(rgba(255, 222, 56, 0.18) 1px, transparent 1px) 0 0 / 10px 10px, #17161a;
+  --skin-surface: #222028;
+  --skin-surface-soft: #2d2a36;
+  --skin-surface-hover: #383444;
+  --skin-ink: #ffffff;
+  --skin-muted: #d6d2c4;
+  --skin-line: #f5f2e6;
+  --skin-line-strong: #ffffff;
+  --skin-brand: #ffde38;
+  --skin-brand-strong: #ffeb7a;
+  --skin-brand-soft: #3b3314;
+  --skin-action-bg: #ffde38;
+  --skin-action-hover: #ffe970;
+  --skin-action-text: #111111;
+  --skin-panel-radius: 6px;
+  --skin-preview-radius: 6px;
+  --skin-control-radius: 4px;
+  --skin-feature-radius: 6px;
+  --skin-icon-radius: 4px;
+  --skin-panel-border: 2px solid #f5f2e6;
+  --skin-preview-border: 2px solid #f5f2e6;
+  --skin-control-border: 2px solid #f5f2e6;
+  --skin-input-border: 2px solid #f5f2e6;
+  --skin-feature-border: 2px solid #f5f2e6;
+  --skin-action-border: 2px solid #ffffff;
+  --skin-tag-border: 1.5px solid #f5f2e6;
+  --skin-panel-shadow: 3px 3px 0 #ffde38;
+  --skin-control-shadow: 2px 2px 0 #ffde38;
+  --skin-feature-shadow: 2px 2px 0 #f5f2e6;
+  --skin-action-shadow: 3px 3px 0 #ffffff;
+  --skin-action-active-transform: translate(2px, 2px);
+  --skin-action-active-shadow: 1px 1px 0 #ffffff;
+  --skin-feature-active-transform: translate(1px, 1px);
+  --skin-icon-bg: #17161a;
+  --skin-icon-border: 1.5px solid #f5f2e6;
+  --skin-icon-fg: #ffeb7a;
+  --skin-switch-on-bg: #ffde38;
+  --skin-switch-knob: #111111;
+}
+
+:root.dark[data-popup-root][data-interface-skin="brutalist"] .feature-card:nth-child(4n + 1),
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="brutalist"] .preview-feature:nth-child(4n + 1) { background: #133024; }
+:root.dark[data-popup-root][data-interface-skin="brutalist"] .feature-card:nth-child(4n + 2),
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="brutalist"] .preview-feature:nth-child(4n + 2) { background: #132a3d; }
+:root.dark[data-popup-root][data-interface-skin="brutalist"] .feature-card:nth-child(4n + 3),
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="brutalist"] .preview-feature:nth-child(4n + 3) { background: #381d18; }
+:root.dark[data-popup-root][data-interface-skin="brutalist"] .feature-card:nth-child(4n + 4),
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="brutalist"] .preview-feature:nth-child(4n + 4) { background: #291c3d; }
+
+/* ==========================================================================
+   5. 赛博霓虹 (cyber) — 常暗 HUD 正交网格 + 电光青/洋红双色霓虹光晕
+   ========================================================================== */
+:root[data-popup-root][data-interface-skin="cyber"],
+.popup-skin-scope[data-interface-skin="cyber"] {
+  --skin-page: #080616;
+  --skin-page-bg:
+    radial-gradient(circle at 12% 0%, rgba(0, 229, 255, 0.20) 0%, transparent 45%),
+    radial-gradient(circle at 90% 100%, rgba(201, 20, 108, 0.22) 0%, transparent 45%),
+    linear-gradient(rgba(0, 229, 255, 0.08) 1px, transparent 1px) 0 0 / 18px 18px,
+    linear-gradient(90deg, rgba(0, 229, 255, 0.08) 1px, transparent 1px) 0 0 / 18px 18px,
+    #080616;
+  --skin-surface: #0f0d24;
+  --skin-panel-bg: rgba(15, 13, 36, 0.92);
+  --skin-surface-soft: #171433;
+  --skin-surface-hover: #221d4a;
+  --skin-ink: #eef8ff;
+  --skin-muted: #93b4cc;
+  --skin-line: #1b4e6e;
+  --skin-line-strong: #00e5ff;
+  --skin-brand: #00e5ff;
+  --skin-brand-strong: #7af2ff;
+  --skin-brand-soft: #0c2c3d;
+  --skin-action-bg: linear-gradient(135deg, #c9146c 0%, #7c1fd9 100%);
+  --skin-action-hover: linear-gradient(135deg, #db1d79 0%, #8c2be8 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 3px;
+  --skin-preview-radius: 4px;
+  --skin-control-radius: 2px;
+  --skin-feature-radius: 3px;
+  --skin-icon-radius: 2px;
+  --skin-pill-radius: 3px;
+  --skin-panel-border: 1px solid rgba(0, 229, 255, 0.42);
+  --skin-feature-border: 1px solid rgba(0, 229, 255, 0.30);
+  --skin-panel-shadow: 0 0 18px rgba(0, 229, 255, 0.14), inset 0 2px 0 #ff2a85;
+  --skin-action-shadow: 0 0 16px rgba(201, 20, 108, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  --skin-icon-bg: rgba(0, 229, 255, 0.10);
+  --skin-icon-border: 1px solid rgba(0, 229, 255, 0.44);
+  --skin-icon-fg: #7af2ff;
+  --skin-status-active: #00e5ff;
+  --skin-status-ring: 0 0 8px rgba(0, 229, 255, 0.85);
+  --skin-switch-on-bg: #00e5ff;
+  --skin-switch-knob: #080616;
+}
+
+:root[data-popup-root][data-interface-skin="cyber"] .feature-card:nth-child(even),
+.popup-skin-scope[data-interface-skin="cyber"] .preview-feature:nth-child(even) {
+  border-color: rgba(255, 42, 133, 0.36);
+}
+
+:root[data-popup-root][data-interface-skin="cyber"] .feature-card:nth-child(even) .feature-icon,
+.popup-skin-scope[data-interface-skin="cyber"] .preview-feature:nth-child(even) .preview-feature-icon {
+  border-color: rgba(255, 42, 133, 0.48);
+  color: #ff8dc4;
+  background: rgba(255, 42, 133, 0.12);
+  box-shadow: 0 0 8px rgba(255, 42, 133, 0.28);
+}
+
+:root[data-popup-root][data-interface-skin="cyber"] .feature-card:nth-child(odd) .feature-icon,
+.popup-skin-scope[data-interface-skin="cyber"] .preview-feature:nth-child(odd) .preview-feature-icon {
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.26);
+}
+
+/* ==========================================================================
+   6. 经典复古桌面 (retro-os) — 0px 锐角 + 3D 凿刻凸凹窗框 + 经典条纹顶栏
+   ========================================================================== */
+:root[data-popup-root]:not(.dark)[data-interface-skin="retro-os"],
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="retro-os"] {
+  --skin-page: #d4d2c8;
+  --skin-surface: #dfded6;
+  --skin-surface-soft: #ffffff;
+  --skin-surface-hover: #ecebe4;
+  --skin-ink: #111111;
+  --skin-muted: #42423d;
+  --skin-line: #8c8b83;
+  --skin-line-strong: #5c5b55;
+  --skin-brand: #0b3d91;
+  --skin-brand-strong: #0a3580;
+  --skin-brand-soft: #dbe6fa;
+  --skin-action-bg: #0b3d91;
+  --skin-action-hover: #124eb3;
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 0px;
+  --skin-preview-radius: 2px;
+  --skin-control-radius: 0px;
+  --skin-feature-radius: 0px;
+  --skin-icon-radius: 0px;
+  --skin-pill-radius: 0px;
+  --skin-tag-radius: 0px;
+  --skin-panel-border: 0;
+  --skin-control-border: 0;
+  --skin-input-border: 0;
+  --skin-feature-border: 0;
+  --skin-action-border: 0;
+  --skin-panel-shadow: inset 1.5px 1.5px 0 #ffffff, inset -1.5px -1.5px 0 #5c5b55, inset 2.5px 2.5px 0 #eeede7, inset -2.5px -2.5px 0 #94938b;
+  --skin-control-shadow: inset 1.5px 1.5px 0 #ffffff, inset -1.5px -1.5px 0 #5c5b55, inset 2.5px 2.5px 0 #eeede7, inset -2.5px -2.5px 0 #94938b;
+  --skin-feature-shadow: inset 1.5px 1.5px 0 #ffffff, inset -1.5px -1.5px 0 #5c5b55, inset 2.5px 2.5px 0 #eeede7, inset -2.5px -2.5px 0 #94938b;
+  --skin-input-shadow: inset 1.5px 1.5px 0 #5c5b55, inset -1.5px -1.5px 0 #ffffff, inset 2.5px 2.5px 0 #94938b;
+  --skin-action-shadow: inset 1.5px 1.5px 0 #5e8ce6, inset -1.5px -1.5px 0 #051c47;
+  --skin-action-active-transform: translateY(1px);
+  --skin-action-active-shadow: inset 1.5px 1.5px 0 #051c47, inset -1.5px -1.5px 0 #5e8ce6;
+  --skin-icon-bg: #ffffff;
+  --skin-icon-border: 1px solid #8c8b83;
+  --skin-icon-fg: #0a3580;
+  --skin-switch-on-bg: #0b3d91;
+  --skin-switch-knob: #ffffff;
+}
+
+:root[data-popup-root][data-interface-skin="retro-os"] .popup-header,
+.popup-skin-scope[data-interface-skin="retro-os"] .preview-header {
+  padding: 5px 7px;
+  border-bottom: 1px solid var(--skin-line);
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0, 0, 0, 0.08) 2px 3px);
+}
+
+:root.dark[data-popup-root][data-interface-skin="retro-os"],
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="retro-os"] {
+  --skin-page: #23252c;
+  --skin-surface: #2b2e37;
+  --skin-surface-soft: #17191f;
+  --skin-surface-hover: #333742;
+  --skin-ink: #f6f6f2;
+  --skin-muted: #b5b7bf;
+  --skin-line: #555a69;
+  --skin-line-strong: #767c8f;
+  --skin-brand: #68a0ff;
+  --skin-brand-strong: #8cb8ff;
+  --skin-brand-soft: #1c2d4a;
+  --skin-action-bg: #1f56b8;
+  --skin-action-hover: #2a66cf;
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 0px;
+  --skin-preview-radius: 2px;
+  --skin-control-radius: 0px;
+  --skin-feature-radius: 0px;
+  --skin-icon-radius: 0px;
+  --skin-pill-radius: 0px;
+  --skin-tag-radius: 0px;
+  --skin-panel-border: 0;
+  --skin-control-border: 0;
+  --skin-input-border: 0;
+  --skin-feature-border: 0;
+  --skin-action-border: 0;
+  --skin-panel-shadow: inset 1.5px 1.5px 0 #555a69, inset -1.5px -1.5px 0 #0e1014;
+  --skin-control-shadow: inset 1.5px 1.5px 0 #555a69, inset -1.5px -1.5px 0 #0e1014;
+  --skin-feature-shadow: inset 1.5px 1.5px 0 #555a69, inset -1.5px -1.5px 0 #0e1014;
+  --skin-input-shadow: inset 1.5px 1.5px 0 #0e1014, inset -1.5px -1.5px 0 #555a69;
+  --skin-action-shadow: inset 1.5px 1.5px 0 #68a0ff, inset -1.5px -1.5px 0 #0c224a;
+  --skin-action-active-transform: translateY(1px);
+  --skin-icon-bg: #17191f;
+  --skin-icon-border: 1px solid #555a69;
+  --skin-icon-fg: #8cb8ff;
+  --skin-switch-on-bg: #1f56b8;
+  --skin-switch-knob: #ffffff;
+}
+
+:root.dark[data-popup-root][data-interface-skin="retro-os"] .popup-header,
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="retro-os"] .preview-header {
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(255, 255, 255, 0.06) 2px 3px);
+}
+
+/* ==========================================================================
+   7. 极客终端 (terminal) — 常暗 CRT 扫描线 + 全局等宽字体 + 荧光绿虚线框
+   ========================================================================== */
+:root[data-popup-root][data-interface-skin="terminal"],
+.popup-skin-scope[data-interface-skin="terminal"] {
+  --skin-page: #060b08;
+  --skin-page-bg: repeating-linear-gradient(0deg, rgba(74, 222, 128, 0.04) 0 1px, transparent 1px 3px), #060b08;
+  --skin-surface: #0a140e;
+  --skin-surface-soft: #0f1f16;
+  --skin-surface-hover: #162c20;
+  --skin-ink: #d9ffe6;
+  --skin-muted: #6ecb8f;
+  --skin-line: #1c472d;
+  --skin-line-strong: #2ea860;
+  --skin-brand: #4ade80;
+  --skin-brand-strong: #86efac;
+  --skin-brand-soft: #10301d;
+  --skin-action-bg: #34d36e;
+  --skin-action-hover: #4ade80;
+  --skin-action-text: #04140a;
+  --skin-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --skin-panel-radius: 2px;
+  --skin-preview-radius: 2px;
+  --skin-control-radius: 2px;
+  --skin-feature-radius: 2px;
+  --skin-icon-radius: 2px;
+  --skin-pill-radius: 2px;
+  --skin-tag-radius: 2px;
+  --skin-panel-border: 1px solid #2ea860;
+  --skin-feature-border: 1px dashed #22663c;
+  --skin-action-shadow: 0 0 14px rgba(52, 211, 110, 0.34);
+  --skin-icon-bg: #10301d;
+  --skin-icon-border: 1px solid #22663c;
+  --skin-icon-fg: #86efac;
+  --skin-status-active: #4ade80;
+  --skin-status-ring: 0 0 8px rgba(74, 222, 128, 0.85);
+  --skin-switch-on-bg: #34d36e;
+  --skin-switch-knob: #04140a;
+}
+
+/* ==========================================================================
+   8. 典藏画报 (editorial) — 暖米报刊纸 + 衬线排版 + 无盒化双细线分割
+   ========================================================================== */
+:root[data-popup-root]:not(.dark)[data-interface-skin="editorial"],
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="editorial"] {
+  --skin-page: #f5efe4;
+  --skin-surface: #faf6ee;
+  --skin-surface-soft: #efe8da;
+  --skin-surface-hover: #e5dccb;
+  --skin-ink: #1c1917;
+  --skin-muted: #5c544b;
+  --skin-line: #d4cab8;
+  --skin-line-strong: #1c1917;
+  --skin-brand: #881c28;
+  --skin-brand-strong: #73141f;
+  --skin-brand-soft: #f5e4e6;
+  --skin-action-bg: #7f1d28;
+  --skin-action-hover: #63141d;
+  --skin-action-text: #faf6ee;
+  --skin-action-tracking: 0.05em;
+  --skin-heading-font: "Iowan Old Style", "New York", Georgia, "Noto Serif SC", "Songti SC", serif;
+  --skin-panel-radius: 0px;
+  --skin-preview-radius: 2px;
+  --skin-control-radius: 2px;
+  --skin-feature-radius: 0px;
+  --skin-icon-radius: 2px;
+  --skin-pill-radius: 2px;
+  --skin-tag-radius: 2px;
+  --skin-icon-bg: transparent;
+  --skin-icon-border: 1px solid #1c1917;
+  --skin-icon-fg: #1c1917;
+  --skin-switch-on-bg: #7f1d28;
+  --skin-switch-knob: #faf6ee;
+}
+
+:root[data-popup-root][data-interface-skin="editorial"] .hero-card,
+.popup-skin-scope[data-interface-skin="editorial"] .preview-hero {
+  padding: 10px 0;
+  border: 0;
+  border-top: 3px double var(--skin-line-strong);
+  border-bottom: 1px solid var(--skin-line-strong);
+  background: transparent;
+  box-shadow: none;
+}
+
+:root.dark[data-popup-root][data-interface-skin="editorial"],
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="editorial"] {
+  --skin-page: #151311;
+  --skin-surface: #1e1b18;
+  --skin-surface-soft: #28241f;
+  --skin-surface-hover: #332d27;
+  --skin-ink: #f2ece1;
+  --skin-muted: #b0a697;
+  --skin-line: #3d362e;
+  --skin-line-strong: #c4b8a6;
+  --skin-brand: #e07884;
+  --skin-brand-strong: #f29ca6;
+  --skin-brand-soft: #3b1c20;
+  --skin-action-bg: #9e2433;
+  --skin-action-hover: #821c29;
+  --skin-action-text: #faf6ee;
+  --skin-action-tracking: 0.05em;
+  --skin-heading-font: "Iowan Old Style", "New York", Georgia, "Noto Serif SC", "Songti SC", serif;
+  --skin-panel-radius: 0px;
+  --skin-preview-radius: 2px;
+  --skin-control-radius: 2px;
+  --skin-feature-radius: 0px;
+  --skin-icon-radius: 2px;
+  --skin-pill-radius: 2px;
+  --skin-tag-radius: 2px;
+  --skin-icon-bg: transparent;
+  --skin-icon-border: 1px solid #c4b8a6;
+  --skin-icon-fg: #f2ece1;
+  --skin-switch-on-bg: #9e2433;
+  --skin-switch-knob: #faf6ee;
+}
+
+/* ==========================================================================
+   9. 樱雾物语 (sakura) — 柔粉霞光画布 + 棉花糖大圆角 + 四色马卡龙图标
+   ========================================================================== */
+:root[data-popup-root]:not(.dark)[data-interface-skin="sakura"],
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="sakura"] {
+  --skin-page: #fff0f6;
+  --skin-page-bg:
+    radial-gradient(circle at 15% 10%, #ffd4e5 0%, transparent 50%),
+    radial-gradient(circle at 88% 85%, #e8dcff 0%, transparent 52%),
+    linear-gradient(160deg, #ffe8f0 0%, #fff4f8 55%, #f5eeff 100%);
+  --skin-surface: #ffffff;
+  --skin-panel-bg: rgba(255, 255, 255, 0.88);
+  --skin-surface-soft: #fff2f7;
+  --skin-surface-hover: #ffe3ee;
+  --skin-ink: #331826;
+  --skin-muted: #754d60;
+  --skin-line: #f2c6d8;
+  --skin-line-strong: #e39cb9;
+  --skin-brand: #d4356f;
+  --skin-brand-strong: #b01e56;
+  --skin-brand-soft: #ffe4ef;
+  --skin-action-bg: linear-gradient(135deg, #cf2e6a 0%, #ad1d55 100%);
+  --skin-action-hover: linear-gradient(135deg, #bd255e 0%, #991649 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 18px;
+  --skin-preview-radius: 18px;
+  --skin-control-radius: 12px;
+  --skin-action-radius: 999px;
+  --skin-feature-radius: 15px;
+  --skin-icon-radius: 50%;
+  --skin-panel-shadow: 0 6px 20px rgba(212, 53, 111, 0.10);
+  --skin-action-shadow: 0 6px 16px rgba(173, 29, 85, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  --skin-switch-on-bg: #cf2e6a;
+  --skin-switch-knob: #ffffff;
+}
+
+:root[data-popup-root]:not(.dark)[data-interface-skin="sakura"] .feature-card:nth-child(4n + 1) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="sakura"] .preview-feature:nth-child(4n + 1) .preview-feature-icon { background: #ffe0ec; color: #a81d52; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="sakura"] .feature-card:nth-child(4n + 2) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="sakura"] .preview-feature:nth-child(4n + 2) .preview-feature-icon { background: #ffe8d9; color: #9c4110; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="sakura"] .feature-card:nth-child(4n + 3) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="sakura"] .preview-feature:nth-child(4n + 3) .preview-feature-icon { background: #eee3ff; color: #5c30b5; }
+:root[data-popup-root]:not(.dark)[data-interface-skin="sakura"] .feature-card:nth-child(4n + 4) .feature-icon,
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="sakura"] .preview-feature:nth-child(4n + 4) .preview-feature-icon { background: #dcf5ea; color: #0f6647; }
+
+:root.dark[data-popup-root][data-interface-skin="sakura"],
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="sakura"] {
+  --skin-page: #181016;
+  --skin-page-bg:
+    radial-gradient(circle at 15% 12%, rgba(236, 72, 153, 0.22) 0%, transparent 48%),
+    radial-gradient(circle at 85% 88%, rgba(168, 85, 247, 0.20) 0%, transparent 50%),
+    #181016;
+  --skin-surface: #231720;
+  --skin-panel-bg: rgba(35, 23, 32, 0.90);
+  --skin-surface-soft: #2e1f2a;
+  --skin-surface-hover: #3b2836;
+  --skin-ink: #fcf0f5;
+  --skin-muted: #c9a3b6;
+  --skin-line: #452e3e;
+  --skin-line-strong: #69445e;
+  --skin-brand: #f472b6;
+  --skin-brand-strong: #ffa3c7;
+  --skin-brand-soft: #3d1f2e;
+  --skin-action-bg: linear-gradient(135deg, #cf2e6a 0%, #ad1d55 100%);
+  --skin-action-hover: linear-gradient(135deg, #bd255e 0%, #991649 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 18px;
+  --skin-preview-radius: 18px;
+  --skin-control-radius: 12px;
+  --skin-action-radius: 999px;
+  --skin-feature-radius: 15px;
+  --skin-icon-radius: 50%;
+  --skin-panel-shadow: 0 8px 22px rgba(0, 0, 0, 0.40);
+  --skin-action-shadow: 0 6px 16px rgba(173, 29, 85, 0.34);
+  --skin-switch-on-bg: #cf2e6a;
+  --skin-switch-knob: #ffffff;
+}
+
+:root.dark[data-popup-root][data-interface-skin="sakura"] .feature-card:nth-child(4n + 1) .feature-icon,
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="sakura"] .preview-feature:nth-child(4n + 1) .preview-feature-icon { background: #401c2d; color: #ffa3c7; }
+:root.dark[data-popup-root][data-interface-skin="sakura"] .feature-card:nth-child(4n + 2) .feature-icon,
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="sakura"] .preview-feature:nth-child(4n + 2) .preview-feature-icon { background: #3d2519; color: #ffba94; }
+:root.dark[data-popup-root][data-interface-skin="sakura"] .feature-card:nth-child(4n + 3) .feature-icon,
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="sakura"] .preview-feature:nth-child(4n + 3) .preview-feature-icon { background: #2d2045; color: #d2b5ff; }
+:root.dark[data-popup-root][data-interface-skin="sakura"] .feature-card:nth-child(4n + 4) .feature-icon,
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="sakura"] .preview-feature:nth-child(4n + 4) .preview-feature-icon { background: #17362b; color: #8ce5c0; }
+
+/* ==========================================================================
+   10. 宇治手账 (matcha) — 青岚抹茶色底 + 暖白宣纸强对比 + 茶金图标点缀
+   ========================================================================== */
+:root[data-popup-root]:not(.dark)[data-interface-skin="matcha"],
+.popup-skin-scope:not([data-popup-theme="dark"])[data-interface-skin="matcha"] {
+  --skin-page: #d7e7d6;
+  --skin-page-bg: linear-gradient(165deg, #d2e4d0 0%, #e4efe0 100%);
+  --skin-surface: #fbf8f0;
+  --skin-surface-soft: #f0ece0;
+  --skin-surface-hover: #e6e0cf;
+  --skin-ink: #1c2b21;
+  --skin-muted: #4c6152;
+  --skin-line: #c4d6c0;
+  --skin-line-strong: #94b290;
+  --skin-brand: #2b6946;
+  --skin-brand-strong: #1f5436;
+  --skin-brand-soft: #e4f2e8;
+  --skin-action-bg: linear-gradient(180deg, #2b6b47 0%, #1e5235 100%);
+  --skin-action-hover: linear-gradient(180deg, #235c3c 0%, #17432a 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 16px;
+  --skin-preview-radius: 16px;
+  --skin-control-radius: 10px;
+  --skin-feature-radius: 13px;
+  --skin-icon-radius: 10px;
+  --skin-panel-shadow: 0 5px 16px rgba(28, 43, 33, 0.08);
+  --skin-feature-shadow: inset 3px 0 0 #2b6b47, 0 2px 6px rgba(28, 43, 33, 0.05);
+  --skin-action-shadow: 0 4px 12px rgba(30, 82, 53, 0.26);
+  --skin-icon-bg: #f5eed6;
+  --skin-icon-border: 1px solid #e3d6ad;
+  --skin-icon-fg: #7c520d;
+  --skin-switch-on-bg: #2b6b47;
+  --skin-switch-knob: #ffffff;
+}
+
+:root.dark[data-popup-root][data-interface-skin="matcha"],
+.popup-skin-scope[data-popup-theme="dark"][data-interface-skin="matcha"] {
+  --skin-page: #101913;
+  --skin-page-bg: linear-gradient(165deg, #0e1811 0%, #16241b 100%);
+  --skin-surface: #18241c;
+  --skin-surface-soft: #213026;
+  --skin-surface-hover: #2b3d31;
+  --skin-ink: #edf5ed;
+  --skin-muted: #9bb5a2;
+  --skin-line: #2c4032;
+  --skin-line-strong: #45634e;
+  --skin-brand: #57c98a;
+  --skin-brand-strong: #8ce0ac;
+  --skin-brand-soft: #1b3626;
+  --skin-action-bg: linear-gradient(180deg, #276944 0%, #1c5234 100%);
+  --skin-action-hover: linear-gradient(180deg, #2f7a50 0%, #22613e 100%);
+  --skin-action-text: #ffffff;
+  --skin-panel-radius: 16px;
+  --skin-preview-radius: 16px;
+  --skin-control-radius: 10px;
+  --skin-feature-radius: 13px;
+  --skin-icon-radius: 10px;
+  --skin-feature-shadow: inset 3px 0 0 #57c98a;
+  --skin-action-shadow: 0 4px 12px rgba(0, 0, 0, 0.34);
+  --skin-icon-bg: #332b18;
+  --skin-icon-border: 1px solid #594b28;
+  --skin-icon-fg: #ebd08a;
+  --skin-switch-on-bg: #276944;
+  --skin-switch-knob: #ffffff;
+}
+
+/* ==========================================================================
+   11. 黑金典藏 (midnight-gold) — 常暗丝绒墨黑 + 香槟金聚光 + 拉丝渐变金按钮
+   ========================================================================== */
+:root[data-popup-root][data-interface-skin="midnight-gold"],
+.popup-skin-scope[data-interface-skin="midnight-gold"] {
+  --skin-page: #0a090d;
+  --skin-page-bg: radial-gradient(95% 50% at 50% 0%, rgba(218, 178, 96, 0.22) 0%, transparent 65%), #0a090d;
+  --skin-surface: #131218;
+  --skin-surface-soft: #1c1a22;
+  --skin-surface-hover: #26232e;
+  --skin-ink: #f7f1e3;
+  --skin-muted: #b8ae99;
+  --skin-line: #3b3220;
+  --skin-line-strong: #c7a455;
+  --skin-brand: #dfc076;
+  --skin-brand-strong: #f0d99e;
+  --skin-brand-soft: #2b2415;
+  --skin-action-bg: linear-gradient(135deg, #f0d797 0%, #d6b15c 52%, #bd9038 100%);
+  --skin-action-hover: linear-gradient(135deg, #f7e2ab 0%, #e0bd6b 52%, #c99b42 100%);
+  --skin-action-text: #140f05;
+  --skin-heading-font: "Iowan Old Style", Georgia, "Noto Serif SC", "Songti SC", serif;
+  --skin-panel-radius: 6px;
+  --skin-preview-radius: 6px;
+  --skin-control-radius: 4px;
+  --skin-feature-radius: 5px;
+  --skin-icon-radius: 4px;
+  --skin-panel-border: 1px solid rgba(218, 178, 96, 0.34);
+  --skin-feature-border: 1px solid rgba(218, 178, 96, 0.26);
+  --skin-panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.50), inset 0 1px 0 rgba(240, 215, 151, 0.26);
+  --skin-action-shadow: 0 4px 16px rgba(214, 177, 92, 0.28), inset 0 1px 0 rgba(255, 250, 232, 0.58);
+  --skin-icon-bg: #1c1914;
+  --skin-icon-border: 1px solid rgba(218, 178, 96, 0.42);
+  --skin-icon-fg: #f0d99e;
+  --skin-status-active: #e5c372;
+  --skin-status-ring: 0 0 6px rgba(229, 195, 114, 0.72);
+  --skin-switch-on-bg: #d6b15c;
+  --skin-switch-knob: #140f05;
+}

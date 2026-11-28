@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/ui/pdfOcrTextLayer.ts
  * 文件职责：在已识别扫描页的原图上提供透明 OCR 文字层，使原文可以选择、复制并沿用文档划词能力。
- * 主要内容：消费现有版面行及阅读顺序，按原页坐标定位、以实际字体测量匹配行宽；列表前缀按独立原框保留并与正文以空格相连；扫描内容已摆正，因此清除原生文字层的旋转变换；只在文字或几何改变时更新节点，缩放、翻译和其他页检查点保留原有 Range 与画布。未知、空白或越界行不进入选择层，测量画布在使用后释放。
+ * 主要内容：消费现有版面行及阅读顺序，按原页坐标定位、以实际字体测量匹配行宽；列表前缀按独立原框保留并与正文以空格相连；扫描内容已摆正，因此清除原生文字层的旋转变换；用轻量分隔指纹替代整页 JSON 序列化，只在文字或几何改变时更新节点，缩放、翻译和其他页检查点保留原有 Range 与画布。未知、空白或越界行不进入选择层，测量画布在使用后释放。
  * 模块边界：只更新阅读器已经拥有的文字层节点，不识别文字、不修改源 PDF 或文档模型；挂载、选择交互、离屏回收与文档切换继续使用现有阅读器生命周期。
  */
 import type {PdfDocumentPage} from '@/src/features/document-translation/core/document';
@@ -24,7 +24,10 @@ export function updatePdfOcrTextLayer(element: HTMLElement, page: PdfDocumentPag
         });
     });
     if (!lines.length) return;
-    const identity = JSON.stringify([page.pageNumber, page.width, page.height, lines]);
+    let identity = `${page.pageNumber}|${page.width}|${page.height}`;
+    for (const line of lines) {
+        identity += `\x1f${line.text}\0${line.x},${line.y},${line.width},${line.height},${line.size},${line.family},${line.weight},${line.breakAfter ? 1 : 0}`;
+    }
     if (installed.get(element) === identity) return;
     const document = element.ownerDocument, fragment = document.createDocumentFragment();
     const canvas = document.createElement('canvas');

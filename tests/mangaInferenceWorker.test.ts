@@ -95,14 +95,14 @@ describe('漫画推理 Worker 消息处理器', () => {
         const bits=new Uint8Array([1,2]),originalProbability=new Float32Array([.9,.1]);
         ocr.recognize.mockResolvedValue({results:[],imageDetectionFrames:[{pageWidth:4,pageHeight:4,x:0,y:0,width:4,height:4,bits}]});
         const result=await send({requestId:44,type:'recognize',image:'image',profile:'image',imageDetectionEvidence:true});
-        expect(ocr.recognize).toHaveBeenCalledWith('image',{flatten:true,noCache:true,strategy:'per-box',profile:'image',imageDetectionEvidence:true});
+        expect(ocr.recognize).toHaveBeenCalledWith('image',{flatten:true,noCache:true,strategy:'per-box',signal:expect.any(AbortSignal),profile:'image',imageDetectionEvidence:true});
         const [,transfer]=scope.postMessage.mock.calls.find(([message])=>message===result)!;
         expect(transfer).toEqual([bits.buffer]);expect(transfer).not.toContain(originalProbability.buffer);
     });
     it('漫画可请求像素段落证据且不生成检测帧传输',async()=>{
         ocr.recognize.mockResolvedValue({results:[],imageParagraphGapProofs:[]});
         const result=await send({requestId:47,type:'recognize',image:'manga',mangaParagraphGapEvidence:true});
-        expect(ocr.recognize).toHaveBeenCalledWith('manga',{flatten:true,noCache:true,strategy:'per-box',mangaParagraphGapEvidence:true});
+        expect(ocr.recognize).toHaveBeenCalledWith('manga',{flatten:true,noCache:true,strategy:'per-box',signal:expect.any(AbortSignal),mangaParagraphGapEvidence:true});
         expect(result).toMatchObject({requestId:47,success:true,result:{results:[],imageParagraphGapProofs:[]}});
         expect(scope.postMessage.mock.calls.find(([message])=>message===result)![1]).toEqual([]);
     });
@@ -111,7 +111,7 @@ describe('漫画推理 Worker 消息处理器', () => {
         const geometry={pageWidth:1,pageHeight:1,x:0,y:0,width:1,height:1};
         ocr.recognize.mockResolvedValue({results:[],imageDetectionFrames:[{...geometry,bits},{...geometry,bits},{...geometry,bits:shared}]});
         const result=await send({requestId:45,type:'recognize',image:'image'});
-        expect(ocr.recognize).toHaveBeenCalledWith('image',{flatten:true,noCache:true,strategy:'per-box'});
+        expect(ocr.recognize).toHaveBeenCalledWith('image',{flatten:true,noCache:true,strategy:'per-box',signal:expect.any(AbortSignal)});
         expect(scope.postMessage.mock.calls.find(([message])=>message===result)![1]).toEqual([bits.buffer]);
     });
     it('不同侧车view共享同一ArrayBuffer时保留各自内容与边界，并且只转移底层buffer一次',async()=>{
@@ -149,11 +149,11 @@ describe('漫画推理 Worker 消息处理器', () => {
             [{requestId: 1, stage: 'preparing', percent: 0}, []],
             [{requestId: 1, stage: 'initializing', percent: undefined}, []],
         ]);
-        expect(mocks.createOcr).toHaveBeenCalledWith(undefined, expect.any(Function));
+        expect(mocks.createOcr).toHaveBeenCalledWith(undefined, expect.any(Function), expect.any(Function));
         const page = {results: [{text: 'hello', score: 0.9, box: {x: 0, y: 0, width: 10, height: 10}}]};
         ocr.recognize.mockResolvedValue(page);
         await send({requestId: 2, type: 'recognize', image: 'data:image/png;base64,AA=='});
-        expect(ocr.recognize.mock.calls).toEqual([['data:image/png;base64,AA==', {flatten: true, noCache: true, strategy: 'per-box'}]]);
+        expect(ocr.recognize.mock.calls).toEqual([['data:image/png;base64,AA==', {flatten: true, noCache: true, strategy: 'per-box', signal: expect.any(AbortSignal)}]]);
         expect(scope.postMessage).toHaveBeenCalledWith({requestId: 2, stage: 'recognizing', percent: undefined}, []);
         expect(scope.postMessage).toHaveBeenLastCalledWith({requestId: 2, success: true, result: page}, []);
         await send({requestId: 3, type: 'prepare-ocr'});
@@ -177,7 +177,7 @@ describe('漫画推理 Worker 消息处理器', () => {
         const output = new Float32Array([0.5, 0.25, 0]);
         painter.run.mockResolvedValue(output);
         await send({requestId: 7, type: 'inpaint', patch});
-        expect(painter.run.mock.calls).toEqual([[patch]]);
+        expect(painter.run.mock.calls).toEqual([[patch, expect.any(AbortSignal)]]);
         expect(scope.postMessage.mock.calls.slice(0, 3)).toEqual([
             [{requestId: 7, stage: 'preparing', percent: 0}, []],
             [{requestId: 7, stage: 'initializing', percent: 90}, []],
@@ -570,4 +570,184 @@ it('缺失元数据必须协议拒绝；清理多故障也保留首个undefined�
     expect(await send({type:'prepare-seg',requestId:99})).toMatchObject({errorKind:'protocol'});expect(unknown.release).toHaveBeenCalledOnce();
     const session=await prepareSeg(),output=segOutput();output.blk.dispose.mockImplementationOnce(()=>{throw undefined;});output.seg.dispose.mockImplementationOnce(()=>{throw new Error('secondary');});session.run.mockResolvedValue(output);
     expect(await send({type:'segment',requestId:101,source:segSource()})).toMatchObject({errorKind:'execution',error:'undefined'});expect(output.det.dispose).toHaveBeenCalledOnce();
+});
+
+describe('Worker 协作取消消息协议', () => {
+    it('cancel 消息立即中止在途 recognize 与 inpaint 并回报 aborted，保留已加载会话', async () => {
+        const recPending = deferred<{results: []}>();
+        let recSignal: AbortSignal | undefined;
+        ocr.recognize.mockImplementationOnce((_img: string, options: {signal: AbortSignal}) => {
+            recSignal = options.signal;
+            options.signal.addEventListener('abort', () => recPending.reject(new DOMException('已取消', 'AbortError')), {once: true});
+            return recPending.promise;
+        });
+        await send({requestId: 201, type: 'recognize', image: 'page'});
+        expect(recSignal?.aborted).toBe(false);
+        scope.onmessage!({data: {type: 'cancel', requestId: 201, cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        await flush();
+        expect(recSignal?.aborted).toBe(true);
+        expect(terminal().find(m => m.requestId === 201)).toMatchObject({requestId: 201, success: false, aborted: true});
+        // 取消未知 requestId 安全忽略，不影响后续任务。
+        scope.onmessage!({data: {type: 'cancel', requestId: 9999, cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        const inpaintPending = deferred<Float32Array>();
+        painter.run.mockImplementationOnce((_patch: unknown, signal: AbortSignal) => {
+            signal.addEventListener('abort', () => inpaintPending.reject(new DOMException('已取消', 'AbortError')), {once: true});
+            return inpaintPending.promise;
+        });
+        await send({requestId: 202, type: 'inpaint', patch: {image: new Float32Array(3), mask: new Float32Array(1), width: 1, height: 1}});
+        scope.onmessage!({data: {type: 'cancel', requestId: 202, cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        await flush();
+        expect(terminal().find(m => m.requestId === 202)).toMatchObject({requestId: 202, success: false, aborted: true});
+        // 协作取消后同一模型会话仍可直接服务下一请求，不重新创建。
+        expect(await send({requestId: 203, type: 'recognize', image: 'next'})).toMatchObject({requestId: 203, success: true});
+        expect(mocks.createOcr).toHaveBeenCalledOnce();
+    });
+
+    it('排队期间收到 cancel 跳过识别、修补与分割执行，算子执行中取消也释放全部张量且不发布结果', async () => {
+        const blocker = deferred<{results: []}>();
+        ocr.recognize.mockReturnValueOnce(blocker.promise);
+        await send({requestId: 301, type: 'recognize', image: 'busy'});
+        scope.onmessage!({data: {requestId: 302, type: 'recognize', image: 'queued', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        scope.onmessage!({data: {requestId: 303, type: 'inpaint', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        scope.onmessage!({data: {requestId: 304, type: 'segment', source: segSource(), cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        scope.onmessage!({data: {requestId: 302, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        scope.onmessage!({data: {requestId: 303, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        scope.onmessage!({data: {requestId: 304, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        // 模拟 301 在完成后但尚未发送前被取消，不转移已废弃结果。
+        scope.onmessage!({data: {requestId: 301, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        blocker.resolve({results: []});
+        await flush();
+        for (const id of [301, 302, 303, 304]) {
+            expect(terminal().find(m => m.requestId === id)).toMatchObject({requestId: id, success: false, aborted: true});
+        }
+        expect(ocr.recognize).toHaveBeenCalledOnce();
+        expect(painter.run).not.toHaveBeenCalled();
+
+        // CTD segment 在 session.run 返回前取消，应释放所有输出与输入张量并回报 aborted。
+        const session = await prepareSeg();
+        const segRun = deferred<ReturnType<typeof segOutput>>();
+        const output = segOutput();
+        session.run.mockReturnValueOnce(segRun.promise);
+        await send({requestId: 305, type: 'segment', source: segSource()});
+        scope.onmessage!({data: {requestId: 305, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        segRun.resolve(output);
+        await flush();
+        expect(terminal().find(m => m.requestId === 305)).toMatchObject({requestId: 305, success: false, aborted: true, errorKind: 'execution'});
+        for (const value of Object.values(output)) expect(value.dispose).toHaveBeenCalledOnce();
+
+        // 若取消期间发生非 AbortError 的真实故障，仍报告 aborted 为 undefined 以便客户端重建。
+        const crashPending = deferred<{results: []}>();
+        ocr.recognize.mockReturnValueOnce(crashPending.promise);
+        await send({requestId: 306, type: 'recognize', image: 'crash'});
+        scope.onmessage!({data: {requestId: 306, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        crashPending.reject(new Error('GPU device lost'));
+        await flush();
+        expect(terminal().find(m => m.requestId === 306)).toEqual({requestId: 306, success: false, error: 'GPU device lost'});
+    });
+
+    it('排队取消在懒加载模型前即刻退出，创建中取消与 pace 等待取消不进入推理，回退损毁自动清理并可重建', async () => {
+        // 1. 尚未加载任何模型时，排队期间取消 recognize / inpaint / segment 不应触发任何模型创建。
+        const gate = deferred<typeof ocr>();
+        mocks.createOcr.mockReturnValueOnce(gate.promise);
+        await send({requestId: 401, type: 'prepare-ocr'});
+        scope.onmessage!({data: {requestId: 402, type: 'recognize', image: 'q', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        scope.onmessage!({data: {requestId: 403, type: 'inpaint', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        scope.onmessage!({data: {requestId: 404, type: 'segment', source: segSource(), cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        for (const id of [402, 403, 404]) {
+            scope.onmessage!({data: {requestId: id, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        }
+        gate.resolve(ocr);
+        await flush();
+        expect(mocks.createOcr).toHaveBeenCalledOnce();
+        expect(mocks.createPainter).not.toHaveBeenCalled();
+        expect(mocks.loadSeg).not.toHaveBeenCalled();
+        for (const id of [402, 403, 404]) {
+            expect(terminal().find(m => m.requestId === id)).toMatchObject({requestId: id, success: false, aborted: true});
+        }
+
+        // 2. 创建期间收到 cancel 跳过推理（覆盖 post-create 中止检查）。
+        await send({requestId: 405, type: 'dispose-ocr'});
+        const slowOcr = deferred<typeof ocr>(), slowPainter = deferred<typeof painter>(), slowSeg = deferred<ArrayBuffer>();
+        mocks.createOcr.mockReturnValueOnce(slowOcr.promise);
+        await send({requestId: 406, type: 'recognize', image: 'mid-create'});
+        scope.onmessage!({data: {requestId: 406, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        slowOcr.resolve(ocr); await flush();
+        expect(terminal().find(m => m.requestId === 406)).toMatchObject({success: false, aborted: true});
+        expect(ocr.recognize).not.toHaveBeenCalled();
+
+        mocks.createPainter.mockReturnValueOnce(slowPainter.promise);
+        await send({requestId: 407, type: 'inpaint'});
+        scope.onmessage!({data: {requestId: 407, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        slowPainter.resolve(painter); await flush();
+        expect(terminal().find(m => m.requestId === 407)).toMatchObject({success: false, aborted: true});
+        expect(painter.run).not.toHaveBeenCalled();
+
+        mocks.loadSeg.mockReturnValueOnce(slowSeg.promise);
+        const segSess = segSession();
+        mocks.create.mockResolvedValueOnce(segSess);
+        await send({requestId: 408, type: 'segment', source: segSource()});
+        scope.onmessage!({data: {requestId: 408, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        slowSeg.resolve(new ArrayBuffer(3)); await flush();
+        expect(terminal().find(m => m.requestId === 408)).toMatchObject({success: false, aborted: true, errorKind: 'execution'});
+        expect(segSess.run).not.toHaveBeenCalled();
+
+        // 3. segment 在 paceLocalInference 排队期间取消，不调用 session.run 且释放输入张量。
+        const resources = await import('@/src/shared/onnx/resources');
+        const paceBlocker = deferred<void>();
+        const hold = resources.paceLocalInference(() => paceBlocker.promise);
+        const inputsBefore = mocks.inputs.length;
+        await send({requestId: 409, type: 'segment', source: segSource()});
+        scope.onmessage!({data: {requestId: 409, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        paceBlocker.resolve(); await hold; await flush();
+        expect(segSess.run).not.toHaveBeenCalled();
+        expect(mocks.inputs[inputsBefore].dispose).toHaveBeenCalledOnce();
+        expect(terminal().find(m => m.requestId === 409)).toMatchObject({success: false, aborted: true, errorKind: 'execution'});
+
+        // 4. OCR 与 inpaint 回退中途损毁时通过 onBroken 清理对应端口，下一请求自动重建（即使 destroy/release 抛错）。
+        await send({requestId: 410, type: 'dispose-ocr'});
+        await send({requestId: 411, type: 'dispose-inpaint'});
+        let triggerOcrBroken!: () => void, triggerPainterBroken!: () => void;
+        const ocrCallsBefore = mocks.createOcr.mock.calls.length;
+        const recPending = deferred<{results: []}>();
+        mocks.createOcr.mockImplementationOnce(async (_s, _p, onBroken: () => void) => {
+            triggerOcrBroken = onBroken;
+            return ocr;
+        });
+        ocr.recognize.mockImplementationOnce((_img: string, options: {signal: AbortSignal}) => {
+            options.signal.addEventListener('abort', () => {
+                triggerOcrBroken();
+                recPending.reject(new DOMException('已取消', 'AbortError'));
+            }, {once: true});
+            return recPending.promise;
+        });
+        ocr.destroy.mockRejectedValueOnce(new Error('broken destroy'));
+        await send({requestId: 413, type: 'recognize', image: 'mid-fallback-abort'});
+        scope.onmessage!({data: {requestId: 413, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        await flush();
+        expect(terminal().find(m => m.requestId === 413)).toMatchObject({success: false, aborted: true});
+        // ocr 已被清空，下一请求重新调用 createOcr。
+        expect(await send({requestId: 414, type: 'recognize', image: 'fresh'})).toMatchObject({success: true});
+        expect(mocks.createOcr.mock.calls.length).toBe(ocrCallsBefore + 2);
+
+        const paintPending = deferred<Float32Array>();
+        const painterCallsBefore = mocks.createPainter.mock.calls.length;
+        mocks.createPainter.mockImplementationOnce(async (_s, _p, onBroken: () => void) => {
+            triggerPainterBroken = onBroken;
+            return painter;
+        });
+        painter.run.mockImplementationOnce((_patch: unknown, signal: AbortSignal) => {
+            signal.addEventListener('abort', () => {
+                triggerPainterBroken();
+                paintPending.reject(new DOMException('已取消', 'AbortError'));
+            }, {once: true});
+            return paintPending.promise;
+        });
+        painter.release.mockRejectedValueOnce(new Error('broken release'));
+        await send({requestId: 415, type: 'inpaint'});
+        scope.onmessage!({data: {requestId: 415, type: 'cancel', cpu: false}} as MessageEvent<MangaInferenceMessage>);
+        await flush();
+        expect(terminal().find(m => m.requestId === 415)).toMatchObject({success: false, aborted: true});
+        expect(await send({requestId: 416, type: 'inpaint'})).toMatchObject({success: true});
+        expect(mocks.createPainter.mock.calls.length).toBe(painterCallsBefore + 2);
+    });
 });

@@ -503,6 +503,7 @@
       "tests/pdfReadingRegions.test.ts",
       "tests/pdfBlockFit.test.ts",
       "tests/documentHistory.test.ts",
+      "tests/documentFormatReaders.test.ts",
       "tests/richPreviewSync.test.ts",
       "tests/pdfOcr.test.ts",
       "tests/pdfSourceEdits.test.ts",

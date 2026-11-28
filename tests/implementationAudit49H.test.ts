@@ -330,7 +330,7 @@ describe('public docs client lifecycle', () => {
   it('real home wrappers and registered docs components render their public navigation', async () => {
     expect(theme.Layout).toBe(GuideLayout); const registered = new Map<string, Component>();
     theme.enhanceApp({app: {component: (name: string, value: Component) => registered.set(name, value)}} as any);
-    expect([...registered.keys()]).toEqual(['ProductHome', 'ProductHomeEn', 'DocsHome', 'TranslationDemo', 'GrammarDemo', 'GuideVisual', 'BrandReader', 'BrowserInstall']);
+    expect([...registered.keys()]).toEqual(['ProductHome', 'ProductHomeEn', 'DocsHome', 'TranslationDemo', 'GrammarDemo', 'GuideVisual', 'BrandReader', 'BrowserInstall', 'DocDiagram']);
     for (const [component, english] of [[ProductHome, false], [ProductHomeEn, true], [DocsHome, true], [SupportOptions, false], [TranslationDemo, true]] as const) {
       site.lang.value = english ? 'en-US' : 'zh-CN';
       const view = await mount(component, {en: english});

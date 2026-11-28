@@ -121,10 +121,10 @@ describe('wxt.config extracted helpers', () => {
     it('resolveExtensionBuildBudget 与拆分前生产/开发各平台字节上限严格一致', () => {
         expect(assetHelpers.resolveExtensionBuildBudget('chrome', true, false)).toBe(70_000_000);
         expect(assetHelpers.resolveExtensionBuildBudget('chrome', true, true)).toBe(170_000_000);
-        expect(assetHelpers.resolveExtensionBuildBudget('chrome', false)).toBe(52_809_250);
-        expect(assetHelpers.resolveExtensionBuildBudget('edge', false)).toBe(52_804_250);
-        expect(assetHelpers.resolveExtensionBuildBudget('firefox', false)).toBe(61_414_250);
-        expect(assetHelpers.resolveExtensionBuildBudget('safari', false)).toBe(61_420_250);
+        expect(assetHelpers.resolveExtensionBuildBudget('chrome', false)).toBe(52_949_250);
+        expect(assetHelpers.resolveExtensionBuildBudget('edge', false)).toBe(52_944_250);
+        expect(assetHelpers.resolveExtensionBuildBudget('firefox', false)).toBe(61_554_250);
+        expect(assetHelpers.resolveExtensionBuildBudget('safari', false)).toBe(61_560_250);
     });
 
     it('finalizeExtensionZip 验证 Chrome ZIP 固定身份并清理旧 store 包', async () => {

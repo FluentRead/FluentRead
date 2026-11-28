@@ -1,41 +1,29 @@
 /**
  * @file src/ui/styles/interface-skins.css
- * 文件职责：集中装配 FluentRead 的可选界面皮肤 CSS 模块，让 Popup 和 Options 使用同一套可插拔样式入口。
- * 主要内容：先引入配色皮肤共享适配层，再按注册表 ID 装配独立皮肤模块；默认风格不覆盖 CSS，直接沿用现有界面。
- * 模块边界：本文件只负责样式模块装配，不定义配置、不修改 DOM，也不承载 Popup 或 Options 的业务布局逻辑。
+ * 文件职责：集中装配 FluentRead 的 Popup 专属可插拔皮肤样式与界面字体规则，供 Popup 页面以及 Options 内的局部 `.popup-skin-scope` 预览容器共享同一份样式源。
+ * 主要内容：引入界面字体规则、Popup 皮肤共享适配层与 `.popup-skin-scope` 主题隔离防火墙（popup-skins-base.css）以及 11 套全新 craft 皮肤变量定义（popup-skins-themes.css）；默认经典皮肤不覆盖任何皮肤变量，直接沿用 tokens.css 与 popup.css 原生视觉。
+ * 模块边界：所有皮肤选择器均严格限定在 Popup 根节点（:root[data-popup-root]）与局部预览容器（.popup-skin-scope）内，绝不修改 Options 页面自身样式。
  */
 
 @import './interface-font.css';
-@import './interface-skins/palette.css';
-@import './interface-skins/minimal.css';
-@import './interface-skins/compact.css';
-@import './interface-skins/contrast.css';
-@import './interface-skins/qinghua.css';
-@import './interface-skins/zhusha.css';
-@import './interface-skins/shuimo.css';
-@import './interface-skins/zhuqing.css';
-@import './interface-skins/ouhe.css';
-@import './interface-skins/xiangse.css';
-@import './interface-skins/qinglv.css';
-@import './interface-skins/yuebai.css';
-@import './interface-skins/xuanqing.css';
-@import './interface-skins/wujin.css';
+@import './interface-skins/popup-skins-base.css';
+@import './interface-skins/popup-skins-themes.css';
 
-/* 所有内置皮肤（含完整默认布局）均使用内容高度，栏目显隐或文字换行后自然收缩与伸展。 */
-:root[data-popup-height="content"] {
+/* 所有内置 Popup 皮肤均使用内容高度，栏目显隐或文字换行后自然收缩与伸展。 */
+:root[data-popup-root][data-popup-height="content"] {
   min-height: 0;
   height: auto;
 }
 
-:root[data-popup-height="content"] body.popup-page,
-:root[data-popup-height="content"] body.popup-page #app,
-:root[data-popup-height="content"] body.popup-page .popup-shell {
+:root[data-popup-root][data-popup-height="content"] body.popup-page,
+:root[data-popup-root][data-popup-height="content"] body.popup-page #app,
+:root[data-popup-root][data-popup-height="content"] body.popup-page .popup-shell {
   min-height: 0;
   height: auto;
 }
 
-/* 所有皮肤共享多语言安全边界；正常短文案外观不变，长文案可以自然换行。 */
-:root .popup-shell .translate-label {
+/* 所有 Popup 皮肤共享多语言安全边界；正常短文案外观不变，长文案可自然换行。 */
+:root[data-popup-root] .popup-shell .translate-label {
   min-width: 0;
   overflow-wrap: anywhere;
   line-height: 1.25;
@@ -43,10 +31,10 @@
   white-space: normal;
 }
 
-:root .popup-shell .feature-card > span:nth-child(2) {
+:root[data-popup-root] .popup-shell .feature-card > span:nth-child(2) {
   min-width: 0;
 }
 
-:root .popup-shell .feature-card strong {
+:root[data-popup-root] .popup-shell .feature-card strong {
   overflow-wrap: anywhere;
 }

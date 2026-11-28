@@ -6,7 +6,7 @@ import {
   getTranslationArtifacts, type TranslationArtifact,
   matchTranslationArtifact,
 } from '@/src/features/local-translation/offscreen/artifactStore';
-import {LOCAL_TRANSLATION_MODEL_IDS} from '@/src/core/config/localTranslation';
+import {LOCAL_TRANSLATION_MODELS, LOCAL_TRANSLATION_MODEL_IDS} from '@/src/core/config/localTranslation';
 import {createLocalTranslationDownloadManager} from '@/src/features/local-translation/offscreen/downloads';
 
 function fileFor(bytes: Uint8Array): TranslationArtifact {
@@ -281,10 +281,89 @@ describe('verified resumable model downloads', () => {
   });
 
   it('pins the real lightweight and Hunyuan artifacts with content hashes', () => {
+    const nonLegacy = LOCAL_TRANSLATION_MODELS.filter((model) => !model.legacy);
+    expect(nonLegacy.map((model) => model.value)).toEqual([
+      LOCAL_TRANSLATION_MODEL_IDS.opusZhEn,
+      LOCAL_TRANSLATION_MODEL_IDS.hunyuan3,
+      LOCAL_TRANSLATION_MODEL_IDS.opusJaEn,
+      LOCAL_TRANSLATION_MODEL_IDS.opusFrEn,
+      LOCAL_TRANSLATION_MODEL_IDS.opusDeEn,
+      LOCAL_TRANSLATION_MODEL_IDS.opusEsEn,
+      LOCAL_TRANSLATION_MODEL_IDS.opusRuEn,
+      LOCAL_TRANSLATION_MODEL_IDS.hunyuan,
+    ]);
+    for (const model of nonLegacy) {
+      const files = getTranslationArtifacts(model.value);
+      expect(files.length).toBeGreaterThan(0);
+      expect(files.every((file) => /^[a-f0-9]{40}$/u.test(file.revision) && /^[a-f0-9]{64}$/u.test(file.sha256) && file.size > 0)).toBe(true);
+      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+      expect(model.downloadSizeMb).toBe(Math.round(totalBytes / 1_000_000));
+    }
     const light = getTranslationArtifacts(LOCAL_TRANSLATION_MODEL_IDS.opusZhEn);
     const hy = getTranslationArtifacts(LOCAL_TRANSLATION_MODEL_IDS.hunyuan);
     expect(light.reduce((sum, file) => sum + file.size, 0)).toBe(238991573);
     expect(hy[0]).toMatchObject({repo: 'tencent/Hy-MT2-1.8B-GGUF', path: 'Hy-MT2-1.8B-Q4_K_M.gguf', size: 1133080448});
-    expect([...light, ...hy].every((file) => /^[a-f0-9]{40}$/u.test(file.revision) && /^[a-f0-9]{64}$/u.test(file.sha256))).toBe(true);
+  });
+
+  it('cancels fulfilled sibling unread response bodies when a cache.match batch partially rejects', async () => {
+    const file: TranslationArtifact = {repo: 'test/batch', revision: 'pinned', path: 'weights.bin', size: MODEL_CHUNK_SIZE * 3, sha256: '0'.repeat(64)};
+    const url = artifactUrl(file);
+    for (let index = 0; index < 3; index++) {
+      entries.set(`${url}?fluent-read-part=${index}`, new Response('', {headers: {'Content-Length': String(MODEL_CHUNK_SIZE)}}));
+    }
+    const cancel = vi.fn(async () => undefined);
+    const body = new ReadableStream<Uint8Array>({cancel});
+    const matched = new Response(body, {headers: {'Content-Length': String(MODEL_CHUNK_SIZE)}});
+    cache.match
+      .mockResolvedValueOnce(matched)
+      .mockRejectedValueOnce(new Error('first batch read failure'))
+      .mockRejectedValueOnce(new Error('second batch read failure'));
+    await expect(artifactDownloadedBytes(file)).rejects.toThrow('first batch read failure');
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it('counts downloaded bytes via keys first, batches validation across >16 chunks, and handles races or mismatches', async () => {
+    const file: TranslationArtifact = {repo: 'test/large', revision: 'pinned', path: 'model.bin', size: MODEL_CHUNK_SIZE * 17 + 123, sha256: '0'.repeat(64)};
+    expect(await artifactDownloadedBytes(file)).toBe(0);
+    expect(cache.match).not.toHaveBeenCalled();
+
+    const url = artifactUrl(file);
+    for (let index = 0; index < 18; index++) {
+      const size = index < 17 ? MODEL_CHUNK_SIZE : 123;
+      entries.set(`${url}?fluent-read-part=${index}`, new Response('', {headers: {'Content-Length': String(size)}}));
+    }
+    expect(await artifactDownloadedBytes(file)).toBe(file.size);
+
+    entries.set(`${url}?fluent-read-part=2`, new Response('', {headers: {'Content-Length': '99'}}));
+    expect(await artifactDownloadedBytes(file)).toBe(MODEL_CHUNK_SIZE * 2);
+
+    cache.match.mockResolvedValueOnce(undefined);
+    expect(await artifactDownloadedBytes(file)).toBe(0);
+  });
+
+  it('reconstructs multi-chunk blobs in exact index order and verifies streaming downloads without re-reading parts', async () => {
+    const bytes = new Uint8Array(MODEL_CHUNK_SIZE + 5);
+    bytes.fill(1, 0, MODEL_CHUNK_SIZE);
+    bytes.set([10, 20, 30, 40, 50], MODEL_CHUNK_SIZE);
+    const file = fileFor(bytes);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(bytes)));
+    cache.match.mockClear();
+    await downloadTranslationArtifact(file, new AbortController().signal, () => undefined);
+    expect(cache.match.mock.calls.some(([key]) => String(key).includes('fluent-read-part='))).toBe(false);
+    const reconstructed = new Uint8Array(await (await translationArtifactBlob(file)).arrayBuffer());
+    expect(reconstructed.length).toBe(bytes.length);
+    expect(reconstructed[0]).toBe(1);
+    expect(Array.from(reconstructed.subarray(MODEL_CHUNK_SIZE))).toEqual([10, 20, 30, 40, 50]);
+  });
+
+  it('fails disk verification if a chunk vanishes before reading during pre-downloaded verification', async () => {
+    const bytes = new Uint8Array([4, 5, 6]);
+    const file = fileFor(bytes);
+    entries.set(`${artifactUrl(file)}?fluent-read-part=0`, new Response(bytes, {headers: {'Content-Length': String(bytes.length)}}));
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('should not fetch'); }));
+    await expect(downloadTranslationArtifact(file, new AbortController().signal, (_bytes, verifying) => {
+      if (verifying) entries.delete(`${artifactUrl(file)}?fluent-read-part=0`);
+    })).rejects.toThrow();
+    expect(await artifactComplete(file)).toBe(false);
   });
 });

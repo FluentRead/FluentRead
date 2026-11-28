@@ -11,7 +11,7 @@ import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {createUiI18nPlugin} from '@/src/ui/i18n'
 import {config, configReady, getConfigHydrationStatus} from '@/src/services/config/store'
 import {ensureUiLanguageBundle} from '@/src/platform/i18n/uiLanguageBundles'
-import {prepareInterfaceFont} from '@/src/ui/interfaceAppearance'
+import {applyInterfaceSkin, applyInterfaceTheme, prepareInterfaceFont} from '@/src/ui/interfaceAppearance'
 
 /** Popup 的唯一组装入口：配置就绪后才创建界面，避免默认布局先绘制。 */
 export async function mountPreparedPopupApp(selector: string): Promise<void> {
@@ -111,6 +111,11 @@ export async function mountPreparedPopupApp(selector: string): Promise<void> {
     await configReady;
     if (exited) return;
     if (getConfigHydrationStatus() !== 'ready') throw new Error('Popup configuration is not ready');
+    const applyPreMountAppearance = () => {
+      applyInterfaceSkin(config.interfaceSkin);
+      if (config.theme === 'dark' || config.theme === 'light') applyInterfaceTheme(config.theme === 'dark');
+    };
+    applyPreMountAppearance();
     let preparedLanguage: typeof config.uiLanguage | undefined;
     let preparedFont: typeof config.interfaceFont | undefined;
     let onboarding: boolean;
@@ -132,6 +137,7 @@ export async function mountPreparedPopupApp(selector: string): Promise<void> {
     } while (onboarding !== !config.uiLanguageSetupCompleted
       || (!onboarding && preparedLanguage !== config.uiLanguage)
       || preparedFont !== config.interfaceFont);
+    applyPreMountAppearance();
     const app = createApp(App)
     app.use(createUiI18nPlugin({documentRoot: document.body, documentTitleKey: 'metadata.popupTitle'}))
     app.component('Coffee', Coffee);

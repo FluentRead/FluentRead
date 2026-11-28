@@ -287,7 +287,7 @@ onBeforeUnmount(() => {disposed = true; generation += 1; clearUrls(); globalThis
 .pdf-menu.pdf-annotations {position: static; flex: none; justify-self: start;}
 .pdf-annotations > .pdf-menu-button {display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: auto; height: 30px; padding: 0 7px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; white-space: nowrap; cursor: pointer;}
 .pdf-menu-button:hover, .open > .pdf-menu-button {color: var(--brand-strong); background: var(--brand-soft);}
-.pdf-menu-panel {position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 12; width: min(320px, 100%); box-sizing: border-box; max-height: min(600px, 60dvh); overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--surface); box-shadow: 0 12px 36px #10182824; font: 12px/1.5 system-ui, sans-serif;}
+.pdf-menu-panel {position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 12; width: min(320px, calc(100vw - 16px)); max-width: calc(100vw - 16px); box-sizing: border-box; max-height: min(600px, 60dvh); overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--surface); box-shadow: 0 12px 36px #10182824; font: 12px/1.5 system-ui, sans-serif;}
 .pdf-annotation-hint, .pdf-annotation-error {margin: 6px 0; color: var(--muted);}
 .pdf-annotation-error {color: var(--brand-strong);}
 blockquote {margin: 0 0 6px; padding: 4px 8px; border-inline-start: 2px solid var(--brand); max-height: 56px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;}

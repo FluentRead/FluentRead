@@ -802,6 +802,17 @@ describe('真实服务父组件与返回组件的修复焦点', () => {
     const h = await mountServiceClient('openai', false, {href: 'chrome-extension://fixture/options.html?returnTabId=7&service=openai', disabled: true})
     expect(h.clientErrors).toEqual([]);expect(h.fallbackHeading?.focus).toHaveBeenCalledOnce();expect(h.fallbackHeading?.getAttribute('tabindex')).toBe('-1');expect(h.repairDocument?.activeElement).toBe(h.fallbackHeading);expect(h.allNodes().find(n => Object.hasOwn(n.props, 'data-service-configuration-service'))?.props.tabindex).toBe('-1');expect(send).not.toHaveBeenCalled();await h.finish()
   })
+  it('本地翻译不渲染顶部连接检查按钮与状态，修复链接回落到当前标题', async () => {
+    const h = await mountServiceClient('localTranslation', false, {href: 'chrome-extension://fixture/options.html?returnTabId=7&service=localTranslation'})
+    try {
+      expect(h.clientErrors).toEqual([])
+      expect(h.allNodes().some(n => Object.hasOwn(n.props, 'data-connection-test-button'))).toBe(false)
+      expect(h.allNodes().some(n => Object.hasOwn(n.props, 'data-connection-test-status'))).toBe(false)
+      expect(h.fallbackHeading?.focus).toHaveBeenCalledOnce()
+      expect(h.repairDocument?.activeElement).toBe(h.fallbackHeading)
+      expect(send).not.toHaveBeenCalled()
+    } finally {await h.finish()}
+  })
   it.each(['ordinary', 'mismatch', 'pointer', 'focus', 'hidden', 'context', 'service', 'inactive', 'unmount'])('%s 不执行旧修复焦点', async reason => {
     const h = await mountServiceClient('freeTranslation', false, {
       href: reason === 'ordinary' ? 'chrome-extension://fixture/options.html' : reason === 'mismatch' ? 'chrome-extension://fixture/options.html?returnTabId=7&service=openai' : undefined,

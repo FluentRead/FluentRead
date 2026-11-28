@@ -2,7 +2,7 @@
  * @file src/features/document-translation/services/translation.ts
  * 字幕参考：仅为提示词 AI 的带时间轴片段构建相邻 cue 参考；按 cue 隔离复用，普通文档继续章节内去重，输出不改变片段或时间戳。
  * 文件职责：编排文档片段的批量翻译流程，在固定语言和服务快照下按数量及字符预算拆批，并向调用方持续报告确定性进度。
- * 主要内容：定义进度、逐段提交和实际请求依据回调契约，在本次文档调用中默认启用机器批量或 AI 多段槽请求而不改变全局设置，固定缓存策略并透传至批量和降级请求；在单批请求与重试总预算内尊重 Retry-After，暂时限频时由本任务冻结服务共享冷却派发闸门，自身退避与同伴尚余冷却都计入等待预算；禁用客户端叠加重试，冻结服务单次超时，绝对期限中止请求与等待并拒收迟到结果。按阅读位置变化重排待译片段并复用批次游标，以章节内去重避免重复原文挤占批量预算；构建有界篇章参考并区分人工确认译文，移除服务凭空加入的表情符号，报告真实等待数量。原样返回的专名与短词保留原文，复用已有译文续译，固定文件级上下文；不可恢复故障停止派发但收齐在途成功，显式取消覆盖运行时就绪等待、立即移除监听并禁止迟到提交。
+ * 主要内容：定义进度、逐段提交和实际请求依据回调契约，在本次文档调用中默认启用机器批量或 AI 多段槽请求而不改变全局设置，固定缓存策略并透传至批量和降级请求；已验证支持多段协议的 AI 服务遇到偶发槽格式异常时保留有界恢复，仅在无成功批次或连续多次协议异常后永久降级为逐段；批次携带部分译文遇原样回显错误时优先保留已译槽位并仅补译缺失段；在单批请求与重试总预算内尊重 Retry-After，暂时限频时由本任务冻结服务共享冷却派发闸门，自身退避与同伴尚余冷却都计入等待预算；禁用客户端叠加重试，冻结服务单次超时，绝对期限中止请求与等待并拒收迟到结果。按阅读位置变化重排待译片段并复用批次游标，空队列与未变序短路且单 Set 校验避免重复拷贝，以章节内去重避免重复原文挤占批量预算；构建有界篇章参考并区分人工确认译文，移除服务凭空加入的表情符号，报告真实等待数量。原样返回的专名与短词保留原文，复用已有译文续译，固定文件级上下文；不可恢复故障停止派发但收齐在途成功，显式取消覆盖运行时就绪等待、立即移除监听并禁止迟到提交。
  * 模块边界：该层不解析文件、不持久化配置，也不直接绑定具体 provider；上层负责冻结用户设置并注入 gateway，文档结构由 core 提供，网络和缓存语义由应用翻译客户端承担。
  */
 import {serializeTranslationError, TranslationRequestError} from '@/src/services/translation/errors';
@@ -138,6 +138,7 @@ export type TranslateDocumentSegments = (
 const BATCH_ITEM_LIMIT = 16;
 const BATCH_CHARACTER_LIMIT = 3_500;
 const BATCH_CONCURRENCY = 3;
+const AI_INVALID_FALLBACK_THRESHOLD = 3;
 
 function getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
@@ -166,9 +167,15 @@ function takeBatch(queue: readonly DocumentSegment[], start: number, itemLimit: 
 function prioritized(queue: DocumentSegment[], prioritize: NonNullable<DocumentTranslationOptions['prioritize']>): DocumentSegment[] {
     const ordered = prioritize(queue);
     if (!ordered || ordered.length !== queue.length) return queue;
+    if (ordered === queue) return queue;
     const known = new Set(queue);
-    const unique = new Set(ordered);
-    return unique.size === queue.length && ordered.every(segment => known.has(segment)) ? [...ordered] : queue;
+    const result = new Array<DocumentSegment>(queue.length);
+    for (let index = 0; index < ordered.length; index += 1) {
+        const segment = ordered[index];
+        if (!known.delete(segment)) return queue;
+        result[index] = segment;
+    }
+    return result;
 }
 
 /**
@@ -182,6 +189,13 @@ function untranslatedEcho(error: unknown): boolean {
 /** 多段槽格式不兼容时才降级；限流、认证与传输错误继续原请求的退避或停止策略。 */
 function invalidAIMultiSegment(error: unknown): boolean {
     return (error as {code?: unknown} | null)?.code === 'AI_MULTI_SEGMENT_RESPONSE_INVALID';
+}
+
+/** 批次异常若携带与本批等长的部分有效译文，则保留已译槽位，只重试未译或异常槽位。 */
+function extractPartialBatchTranslations(error: unknown, expectedLength: number): ReadonlyArray<string | undefined> | undefined {
+    const partial = (error as {partialTranslations?: unknown} | null)?.partialTranslations;
+    if (!Array.isArray(partial) || partial.length !== expectedLength) return undefined;
+    return partial.map(value => typeof value === 'string' && value.trim() ? value : undefined);
 }
 
 function abortableSleep(milliseconds: number, signal?: AbortSignal): Promise<void> {
@@ -511,19 +525,28 @@ export function createDocumentSegmentTranslator(
             let priorityInitialized = false;
             let previousPriorityKey: unknown;
             const nextBatch = (items: number, characters: number): DocumentSegment[] => {
+                if (!queuedSources.size) return [];
                 const priorityKey = options.prioritize ? options.priorityKey?.() : undefined;
                 if (options.prioritize && (!priorityInitialized || !options.priorityKey || !Object.is(priorityKey, previousPriorityKey))) {
                     // 阅读位置未变时只移动游标，避免长文档每批重新扫描、校验和排序所有剩余片段。
                     // 同一原文可能同时出现在首尾页：把所有尚未认领的位置交给阅读优先级，再只发送最先选中的代表。
-                    const remaining = [...queuedSources].flatMap(source => twins.get(source)!);
+                    const remaining: DocumentSegment[] = [];
+                    for (const source of queuedSources) {
+                        const group = twins.get(source)!;
+                        for (let index = 0; index < group.length; index += 1) remaining.push(group[index]);
+                    }
                     const ordered = prioritized(remaining, options.prioritize);
-                    const seen = new Set<string>();
-                    queue = ordered.filter(segment => {
-                        const key = reuseKey(segment);
-                        if (seen.has(key)) return false;
-                        seen.add(key);
-                        return true;
-                    });
+                    if (remaining.length === queuedSources.size) {
+                        queue = ordered;
+                    } else {
+                        const seen = new Set<string>();
+                        queue = ordered.filter(segment => {
+                            const key = reuseKey(segment);
+                            if (seen.has(key)) return false;
+                            seen.add(key);
+                            return true;
+                        });
+                    }
                     cursor = 0;
                     previousPriorityKey = priorityKey;
                     priorityInitialized = true;
@@ -572,8 +595,10 @@ export function createDocumentSegmentTranslator(
                 const itemLimit = boundedLimit(options.batchLimits?.items, BATCH_ITEM_LIMIT);
                 const characterLimit = boundedLimit(options.batchLimits?.characters, BATCH_CHARACTER_LIMIT);
                 // 同时发出几批请求：先出结果的那一批先显示，整篇的等待时间按并发数缩短；任何一批失败后其余批次不再认领新片段。
-                // 一个服务不理解多段槽协议时，本次任务后面的新请求直接逐段，避免每一批都先发送一次注定失败的槽包。
+                // 从未成功过的服务不理解多段槽协议时立即降级逐段；已验证支持多段的服务允许偶发槽异常，连续失败达上限后再永久降级。
                 let singleFallback = false;
+                let hadBatchSuccess = false;
+                let consecutiveInvalidBatches = 0;
                 const batchWorker = async () => {
                 while (cursor < queue.length && !stopped) {
                     throwIfAborted(options.signal);
@@ -615,6 +640,10 @@ export function createDocumentSegmentTranslator(
                         }
                         return result;
                         }, options, () => stopped, retryStop.signal, reportRetryWaiting, cooldown, 1, 0, deadlineAt, requestTimeout);
+                        if (!single) {
+                            hadBatchSuccess = true;
+                            consecutiveInvalidBatches = 0;
+                        }
                         result.forEach((translation, index) => commit(batch[index].id, translation));
                         reportProgress();
                     } catch (error) {
@@ -626,9 +655,22 @@ export function createDocumentSegmentTranslator(
                         }
                         if (stopped) return;
                         if (untranslatedEcho(error) || (aiMultiSegment && invalidAIMultiSegment(error))) {
-                            if (invalidAIMultiSegment(error)) singleFallback = true;
-                            // 整批里只要有一段被原样返回就会整批报错；逐段重译，仍被原样返回的那几段保留原文。
-                            for (const segment of batch) {
+                            if (invalidAIMultiSegment(error)) {
+                                consecutiveInvalidBatches += 1;
+                                if (!hadBatchSuccess || consecutiveInvalidBatches >= AI_INVALID_FALLBACK_THRESHOLD) {
+                                    singleFallback = true;
+                                }
+                            }
+                            // 优先保留已译槽位，仅对缺失或原样回显的片段逐段补译，仍原样返回则保留原文。
+                            const partial = extractPartialBatchTranslations(error, batch.length);
+                            const remaining = partial ? batch.filter((segment, index) => {
+                                const preserved = partial[index];
+                                if (preserved === undefined) return true;
+                                commit(segment.id, preserved);
+                                return false;
+                            }) : batch;
+                            if (partial && remaining.length < batch.length) reportProgress();
+                            for (const segment of remaining) {
                                 throwIfAborted(options.signal);
                                 if (stopped) return;
                                 let translation = segment.source;

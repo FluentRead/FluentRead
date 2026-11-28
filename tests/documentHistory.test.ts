@@ -7,7 +7,7 @@
 import {IDBFactory, IDBObjectStore} from 'fake-indexeddb';
 import {describe, expect, it, vi} from 'vitest';
 import {parseDocument, type ParsedDocument, type PdfDocumentBlock, type PdfDocumentLine} from '@/src/features/document-translation/core/document';
-import {createDocumentHistory, documentHistoryId, documentHistoryVersion, restoreDocumentHistoryPdfOcr, restoreDocumentHistoryRevisions, DOCUMENT_HISTORY_MAX_BYTES, DOCUMENT_HISTORY_MAX_ENTRIES, type DocumentHistoryRecord} from '@/src/features/document-translation/services/history';
+import {bytesEqual, createDocumentHistory, documentHistoryId, documentHistoryVersion, restoreDocumentHistoryPdfOcr, restoreDocumentHistoryRevisions, DOCUMENT_HISTORY_MAX_BYTES, DOCUMENT_HISTORY_MAX_ENTRIES, type DocumentHistoryRecord} from '@/src/features/document-translation/services/history';
 
 const record = (id: string, updatedAt: number, extra: Partial<DocumentHistoryRecord> = {}): DocumentHistoryRecord => ({id, name: `${id}.pdf`, format: 'pdf', size: 3, total: 4, completed: 2, updatedAt,
     bytes: new Uint8Array([1, 2, 3]), mimeType: 'application/pdf', translations: ['甲', '', '丙', ''], fingerprint: 'fp', ...extra});
@@ -1040,5 +1040,134 @@ describe('document history storage', () => {
         } finally {vi.useRealTimers();}
         const broken = createDocumentHistory({open: () => {throw new Error('unavailable');}} as unknown as IDBFactory);
         expect(await broken.list()).toEqual([]); expect(await broken.load('a')).toBeNull();
+    });
+
+    it('compares byte views via 32-bit word fast path, same-buffer views, unaligned offsets and trailing bytes', () => {
+        const buffer = new ArrayBuffer(12);
+        const view = new Uint8Array(buffer);
+        view.set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+        expect(bytesEqual(view, view)).toBe(true);
+        expect(bytesEqual(view, new Uint8Array(buffer, 0, 12))).toBe(true);
+        expect(bytesEqual(view, new Uint8Array(buffer, 0, 11))).toBe(false);
+        expect(bytesEqual(view, view.slice())).toBe(true);
+        const diffWord = view.slice(); diffWord[4] = 99;
+        expect(bytesEqual(view, diffWord)).toBe(false);
+        const tailBase = view.subarray(0, 10);
+        const tailCopy = tailBase.slice();
+        expect(bytesEqual(tailBase, tailCopy)).toBe(true);
+        tailCopy[9] = 99;
+        expect(bytesEqual(tailBase, tailCopy)).toBe(false);
+        const unaligned = view.subarray(1, 9);
+        const unalignedCopy = unaligned.slice();
+        expect(bytesEqual(unaligned, unalignedCopy)).toBe(true);
+        unalignedCopy[3] = 99;
+        expect(bytesEqual(unaligned, unalignedCopy)).toBe(false);
+        expect(bytesEqual(view.subarray(0, 4), view.subarray(4, 8))).toBe(false);
+    });
+
+    it('deduplicates matching parsed.binary.bytes in IndexedDB and reattaches record.bytes on load without mutating live snapshots', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const rawBytes = new Uint8Array([10, 20, 30, 40, 50, 60]);
+        const doc = pdf([['Page one']]);
+        doc.binary.bytes = rawBytes.slice();
+        const saved = record('dedup-pdf', 1, {bytes: rawBytes, parsed: doc, parsedVersion: 17});
+        expect(await history.save(saved)).toBe(true);
+        // Live caller snapshot must remain untouched.
+        expect(doc.binary.bytes.byteLength).toBe(6);
+        // Raw IDB entry must not store a second copy of the binary bytes.
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const req = factory.open('FluentReadDocumentHistory', 2);
+            req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+        });
+        const rawStored = await new Promise<any>((resolve, reject) => {
+            const req = db.transaction('documents', 'readonly').objectStore('documents').get('dedup-pdf');
+            req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+        });
+        expect(rawStored.parsedBinaryShared).toBe(true);
+        expect(rawStored.parsed.binary.bytes.byteLength).toBe(0);
+        // Loaded record reattaches record.bytes transparently and omits internal flag.
+        const loaded = (await history.load('dedup-pdf'))!;
+        expect('parsedBinaryShared' in loaded).toBe(false);
+        expect((loaded.parsed as ParsedDocument).binary?.bytes).toBe(loaded.bytes);
+        expect(Array.from(loaded.bytes)).toEqual([10, 20, 30, 40, 50, 60]);
+
+        // Mismatched parsed.binary.bytes is preserved and never retains a stale parsedBinaryShared flag.
+        const mismatched = pdf([['Mismatch']]);
+        mismatched.binary.bytes = new Uint8Array([99, 98, 97, 96, 95, 94]);
+        expect(await history.save({...record('mismatch-pdf', 2, {bytes: rawBytes, parsed: mismatched}), parsedBinaryShared: true} as DocumentHistoryRecord)).toBe(true);
+        const rawMismatch = await new Promise<any>((resolve, reject) => {
+            const req = db.transaction('documents', 'readonly').objectStore('documents').get('mismatch-pdf');
+            req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+        });
+        expect('parsedBinaryShared' in rawMismatch).toBe(false);
+        const loadedMismatch = (await history.load('mismatch-pdf'))!;
+        expect(Array.from((loadedMismatch.parsed as ParsedDocument).binary!.bytes)).toEqual([99, 98, 97, 96, 95, 94]);
+
+        // Corrupt shared flag without parsed/binary degrades gracefully on load.
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction('documents', 'readwrite');
+            tx.objectStore('documents').put({...record('corrupt-shared-1', 3), parsedBinaryShared: true, parsed: null});
+            tx.objectStore('documents').put({...record('corrupt-shared-2', 4), parsedBinaryShared: true, parsed: {binary: null}});
+            tx.oncomplete = () => resolve(); tx.onabort = () => reject(tx.error);
+        });
+        expect((await history.load('corrupt-shared-1'))?.parsed).toBeNull();
+        expect((await history.load('corrupt-shared-2'))?.parsed).toEqual({binary: null});
+        db.close();
+    });
+
+    it('skips full-store quota scan on in-place saveChecked autosaves whose bytes did not grow, and enforces limit when bytes grow or existing bytes are corrupt', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const half = Math.floor(DOCUMENT_HISTORY_MAX_BYTES / 2);
+        const firstLoad = await history.loadChecked('doc-a');
+        if (firstLoad.status !== 'ok') throw new Error('expected ok');
+        const created = await history.saveChecked(record('doc-a', 1, {bytes: new Uint8Array(100)}), firstLoad.version);
+        if (created.status !== 'saved') throw new Error('expected saved');
+
+        // Updating in place with same or smaller size skips openCursor completely.
+        const cursorSpy = vi.spyOn(IDBObjectStore.prototype, 'openCursor');
+        try {
+            const updated = await history.saveChecked(record('doc-a', 2, {bytes: new Uint8Array(100), translations: ['改']}), created.version);
+            expect(updated.status).toBe('saved');
+            expect(cursorSpy).not.toHaveBeenCalled();
+
+            // Growing bytes runs enforceLimit and evicts older entries if needed.
+            expect(await history.save(record('doc-b', 3, {bytes: new Uint8Array(half + 10)}))).toBe(true);
+            cursorSpy.mockClear();
+            const grown = await history.saveChecked(record('doc-a', 4, {bytes: new Uint8Array(half + 10)}), (updated as {status: 'saved'; version: string}).version);
+            expect(grown.status).toBe('saved');
+            expect(cursorSpy).toHaveBeenCalled();
+            expect(await history.load('doc-b')).toBeNull();
+        } finally {cursorSpy.mockRestore();}
+
+        // Corrupt existing record without Uint8Array bytes also triggers enforceLimit.
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const req = factory.open('FluentReadDocumentHistory', 2);
+            req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+        });
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction('documents', 'readwrite');
+            tx.objectStore('documents').put({...record('corrupt-bytes', 5), storageVersion: 'v:corrupt', bytes: null as any});
+            tx.oncomplete = () => resolve(); tx.onabort = () => reject(tx.error);
+        });
+        const repaired = await history.saveChecked(record('corrupt-bytes', 6, {bytes: new Uint8Array([1, 2])}), 'v:corrupt');
+        expect(repaired.status).toBe('saved');
+        db.close();
+    });
+
+    it('short-circuits identical parsed snapshots and normalizes non-string slots cleanly', () => {
+        const doc = parsed(['One', 'Two']);
+        const saved = record('same-ref', 1, {parsed: doc, translations: [undefined as any, '二']});
+        expect(restoreDocumentHistoryRevisions(saved, doc, 17)).toEqual({translations: ['', '二'], retainedRevisions: []});
+    });
+
+    it('validates article reading progress on save and clears article progress entries on clear', async () => {
+        const history = createDocumentHistory(new IDBFactory());
+        expect(await history.saveArticleProgress('missing', 0.5)).toBe(false);
+        expect(await history.saveArticleProgress('missing', -1)).toBe(false);
+        expect(await history.save(record('article', 1))).toBe(true);
+        expect(await history.saveArticleProgress('article', 0.42)).toBe(true);
+        expect(await history.loadArticleProgress('article')).toBe(0.42);
+        expect(await history.clear()).toBe(true);
+        expect(await history.loadArticleProgress('article')).toBeUndefined();
     });
 });

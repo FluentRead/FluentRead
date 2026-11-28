@@ -73,7 +73,7 @@ vi.mock('@/src/app/content/features', async () => {
         'autoTranslateEnglishPage', 'cancelPendingHoverTranslation', 'handleTranslation', 'noteBilingualHostGesture',
         'inputBoxTranslationConfigKey', 'isAreaTranslatorMounted', 'isFullPageTranslationActive',
         'mountAreaTranslator', 'startAreaTranslationFromContextMenu', 'mountFloatingBall', 'mountImageTranslator', 'mountSelectionTranslator',
-        'isImageTranslatorNeeded', 'isMangaReaderPage', 'mountMangaEntry', 'unmountMangaEntry',
+        'isImageTranslatorNeeded', 'isMangaReaderPage', 'mountMangaEntry', 'setMangaPeekOriginal', 'unmountMangaEntry',
         'mountTranslationProgressPanel', 'mountVideoSubtitleTranslation', 'isSupportedVideoPage',
         'mountParagraphCopyContentFeature', 'mountSectionTranslationContentFeature',
         'readVisibleTranslationRoot',
@@ -912,7 +912,7 @@ describe('content composition root 冷启动与暂停恢复', () => {
         const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
         const {startContentApp} = await import('@/src/app/content/runtime');const starting = startContentApp(context as never, resolveBrowserCapabilities({browser: 'chrome', manifestVersion: 3}));ready();await starting;
         expect(diagnostic).toHaveBeenCalledWith('[FluentRead] 内容功能 selection-translator mount 失败:', failure);
-        expect(features.mountFloatingBall).toHaveBeenCalledOnce();expect(features.mountAreaTranslator).toHaveBeenCalledOnce();expect(features.mountImageTranslator).toHaveBeenCalledOnce();expect(features.mountMangaEntry).toHaveBeenCalledWith(context, {startAreaTranslation: features.startAreaTranslationFromContextMenu});expect(features.mountTranslationProgressPanel).toHaveBeenCalledOnce();
+        expect(features.mountFloatingBall).toHaveBeenCalledOnce();expect(features.mountAreaTranslator).toHaveBeenCalledOnce();expect(features.mountImageTranslator).toHaveBeenCalledOnce();expect(features.mountMangaEntry).toHaveBeenCalledWith(context, {startAreaTranslation: features.startAreaTranslationFromContextMenu, onPeekOriginal: features.setMangaPeekOriginal});expect(features.mountTranslationProgressPanel).toHaveBeenCalledOnce();
         mocks.subscribeConfig.mock.calls[0][0](mocks.config);await vi.waitFor(() => expect(hosts.has('fluent-read-selection-translator-container')).toBe(true));
         expect(features.mountFloatingBall).toHaveBeenCalledOnce();expect(features.mountImageTranslator).toHaveBeenCalledOnce();
         Object.assign(mocks.config, {disableFloatingBall: true, disableSelectionTranslator: true, selectionAreaEnabled: false, translationProgressPanelEnabled: false, imageTranslationMangaEnabled: false});

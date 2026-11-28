@@ -4,9 +4,9 @@ import {parseDocument, renderDocument} from '../src/features/document-translatio
 import {createDocumentPreviewHtml} from '../src/features/document-translation/core/preview';
 
 describe('document preview protected inline content', () => {
-    it('does not mistake literal NUL numbers for its protected code token', () => {
+    it('does not mistake literal NUL numbers for its protected code token in Markdown', () => {
         const source = 'Keep \u00000\u0000 and `code`.';
-        const output = createDocumentPreviewHtml(parseDocument('source.txt', source), [], 'source');
+        const output = createDocumentPreviewHtml(parseDocument('source.md', source), [], 'source');
         expect(output).toContain('Keep \u00000\u0000 and <code>code</code>.');
         expect(output.match(/<code>code<\/code>/gu)).toHaveLength(1);
     });
@@ -14,18 +14,39 @@ describe('document preview protected inline content', () => {
         const source = 'Value \u0000999\u0000 stays literal.';
         expect(createDocumentPreviewHtml(parseDocument('source.txt', source), [], 'source')).toContain(source);
     });
-    it('keeps translated protected code, links, images, soft breaks and markup escaped', () => {
-        const parsed = parseDocument('source.txt', 'Source');
+    it('preserves plain text markdown-like characters verbatim in TXT previews', () => {
+        const source = 'Keep *asterisks*, _underscores_, `backticks`, and [text](https://example.com) literally.';
+        const output = createDocumentPreviewHtml(parseDocument('notes.txt', source), [], 'source');
+        const {document} = parseHTML(output);
+        expect(document.querySelector('.reader-source')?.textContent).toBe(source);
+        expect(document.querySelector('em, strong, code, a')).toBeNull();
+    });
+    it('keeps translated protected code, safe links, images, soft breaks and markup escaped in Markdown', () => {
+        const parsed = parseDocument('source.md', 'Source');
         const output = createDocumentPreviewHtml(parsed, ['\u00000\u0000 `safe <code>` [link](https://example.com) ![](image.png)\n<script>bad</script>'], 'translated');
-        expect(output).toContain('\u00000\u0000 <code>safe &lt;code&gt;</code> <span class="reader-link">link</span> <span class="reader-link">图片</span><br>&lt;script&gt;bad&lt;/script&gt;');
+        expect(output).toContain('\u00000\u0000 <code>safe &lt;code&gt;</code> <a class="reader-link" href="https://example.com" target="_blank" rel="noopener noreferrer">link</a> <span class="reader-link">[image]</span><br>&lt;script&gt;bad&lt;/script&gt;');
         expect(output).not.toContain('<script>');
     });
-    it('renders emphasis around protected code and plain text in order', () => {
-        const output = createDocumentPreviewHtml(parseDocument('source.txt', 'A **bold** `code` *em* __strong__'), [], 'source');
-        expect(output).toContain('A <strong>bold</strong> <code>code</code> <em>em</em> <strong>strong</strong>');
+    it('does not corrupt URLs or image alt text containing underscores, asterisks, or tildes', () => {
+        const md = '[init](https://github.com/org/repo/__init__.py) and [glob](https://x.com/a*b*c~d~) and ![__alt__](data:image/png;base64,AA__BB==)';
+        const output = createDocumentPreviewHtml(parseDocument('urls.md', md), [], 'source');
+        const {document} = parseHTML(output);
+        const links = Array.from(document.querySelectorAll('a.reader-link'));
+        expect(links.map((a) => a.getAttribute('href'))).toEqual([
+            'https://github.com/org/repo/__init__.py',
+            'https://x.com/a*b*c~d~',
+        ]);
+        const img = document.querySelector('img.reader-inline-image')!;
+        expect(img.getAttribute('src')).toBe('data:image/png;base64,AA__BB==');
+        expect(img.getAttribute('alt')).toBe('__alt__');
+        expect(document.querySelector('strong, em, del')).toBeNull();
+    });
+    it('renders emphasis around protected code and plain text in order in Markdown', () => {
+        const output = createDocumentPreviewHtml(parseDocument('source.md', 'A **bold** `code` *em* __strong__ _under_ ~~gone~~ snake_case'), [], 'source');
+        expect(output).toContain('A <strong>bold</strong> <code>code</code> <em>em</em> <strong>strong</strong> <em>under</em> <del>gone</del> snake_case');
     });
     it('preserves emphasis spanning a protected code or link without interpreting their markers', () => {
-        const output = createDocumentPreviewHtml(parseDocument('source.txt', '**A `*literal*` and [__label__](https://example.com)**'), [], 'source');
+        const output = createDocumentPreviewHtml(parseDocument('source.md', '**A `*literal*` and [__label__](https://example.com)**'), [], 'source');
         const {document} = parseHTML(output);
         const strong = document.querySelector('.reader-source > strong')!;
         expect(strong.textContent).toBe('A *literal* and __label__');
@@ -35,12 +56,16 @@ describe('document preview protected inline content', () => {
         expect(strong.querySelector('.reader-link strong')).toBeNull();
     });
     it('keeps a balanced parenthesized URL within its link rather than showing a stray closing marker', () => {
-        const output = createDocumentPreviewHtml(parseDocument('source.txt', '[entry](https://example.com/wiki/Some_(entry))'), [], 'source');
-        expect(output).toContain('<p class="reader-source"><span class="reader-link">entry</span></p>');
+        const output = createDocumentPreviewHtml(parseDocument('source.md', '[entry](https://example.com/wiki/Some_(entry))'), [], 'source');
+        const {document} = parseHTML(output);
+        const link = document.querySelector('.reader-source > a.reader-link')!;
+        expect(link.textContent).toBe('entry');
+        expect(link.getAttribute('href')).toBe('https://example.com/wiki/Some_(entry)');
+        expect(link.getAttribute('rel')).toBe('noopener noreferrer');
     });
     it.each(['![', '[a](https://', '[a](https://(', '[a](https://)'])('keeps repeated incomplete markers readable: %s', marker => {
         const source = marker.repeat(4000);
-        const output = createDocumentPreviewHtml(parseDocument('source.txt', source), [], 'source');
+        const output = createDocumentPreviewHtml(parseDocument('source.md', source), [], 'source');
         expect(output).toContain(source);
     });
     it.each(['source', 'bilingual', 'translated'] as const)('uses parser-owned quote and list code blocks in %s preview', mode => {

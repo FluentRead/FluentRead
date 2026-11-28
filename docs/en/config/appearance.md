@@ -4,6 +4,8 @@ Make translations easier to distinguish from the original with colors, font size
 
 <GuideVisual kind="appearance" en />
 
+<DocDiagram kind="appearance-styles" en />
+
 ## Adjust the translation style
 
 1. Open **Settings → Interface style → Translation style**.

@@ -1297,6 +1297,23 @@ describe('漫画本地神经 OCR 会话',()=>{
         expect((await port.recognize('accepted boundary',{flatten:true,noCache:true,strategy:'per-box'})).results[0].text).toBe('confident');
         expect(mocks.canvases.every(c=>c.width===0&&c.height===0)).toBe(true);await port.destroy();
     });
+    it('斜行复识别接受高增益恢复（>=0.94 且 +0.05），拒绝低置信或增益不足',async()=>{
+        prepareDeskew();const port=await createBrowserMangaOcr();
+        const cases=[
+            {source:.72,candidate:.96,accepted:true},
+            {source:.88,candidate:.94,accepted:true},
+            {source:.85,candidate:.939,accepted:false},
+            {source:.91,candidate:.95,accepted:false},
+        ];
+        for(const item of cases){
+            const original=slanted(item.source);
+            mocks.recognize.mockResolvedValueOnce({results:[original]});
+            mocks.retryRecognition.mockResolvedValueOnce([{text:'recovered line',confidence:item.candidate,box:{x:0,y:0,width:150,height:20}}]);
+            const result=(await port.recognize('deskew-gain',{flatten:true,noCache:true,strategy:'per-box'})).results[0];
+            expect(result.text).toBe(item.accepted?'recovered line':'original line');
+        }
+        await port.destroy();
+    });
     it('非法、图外、短小和竖排框不分配deskew画布',async()=>{
         const changes=[{x:NaN},{x:-1},{y:-1},{x:100},{y:180},{width:119},{height:19},{width:120,height:60}];
         mocks.recognize.mockResolvedValueOnce({results:changes.map((change,i)=>({...slanted(.91+i/1000),box:{...slanted().box,...change}}))});
@@ -2460,4 +2477,38 @@ describe('普通图片跳过气泡复识、水平拆分与 Worker 性能优化',
         expect(mocks.canvases.every(c=>c.width===0&&c.height===0)).toBe(true);
         await port.destroy();
     });
+});
+
+it('beginMangaPage 清除上页残留的会话失败锁存，且 GPU 回退创建 CPU 中止时透传 onBroken', async () => {
+    mocks.gpu.mockResolvedValue({available: true});
+    const gpuRun = vi.fn().mockRejectedValueOnce(new Error('GPU lost')).mockResolvedValue({out: {dims: [1, 1, 2], data: new Float32Array(2)}});
+    const gpuSession = {run: gpuRun, release: vi.fn(async () => undefined), outputNames: ['out']};
+    mocks.sessions = [gpuSession, undefined];
+    const onBroken = vi.fn();
+    const controller = new AbortController();
+    mocks.cpuCreate.mockImplementationOnce(async () => {
+        controller.abort();
+        throw new DOMException('已取消', 'AbortError');
+    });
+    const port = await createBrowserMangaOcr(undefined, undefined, onBroken);
+    // 第 1 页在 GPU 回退创建 CPU 时被取消，触发 onBroken 并在 protectMangaSession 锁存失败。
+    mocks.recognize.mockImplementationOnce(async function (this: any) {
+        await expect(this.detectionSession.run({x: {dims: [1, 3, 224, 224]}})).rejects.toMatchObject({name: 'AbortError'});
+        return {results: []};
+    });
+    await expect(port.recognize('page-1', {flatten: true, noCache: true, strategy: 'per-box', signal: controller.signal})).rejects.toMatchObject({name: 'AbortError'});
+    expect(onBroken).toHaveBeenCalledOnce();
+    // 若直接向同一底层保护会话手动制造一次被吞的残留锁存，下一页 beginMangaPage 必须将其清除而不污染新页。
+    mocks.gpu.mockResolvedValue({available: true});
+    const session2 = {run: vi.fn().mockRejectedValueOnce(new Error('transient')), release: vi.fn(async () => undefined), outputNames: ['out']};
+    const cpuSession2 = {run: vi.fn().mockRejectedValueOnce(new Error('stale latch')).mockResolvedValue({out: {dims: [1, 1, 2], data: new Float32Array(2)}}), release: vi.fn(async () => undefined)};
+    mocks.cpuCreate.mockResolvedValueOnce(cpuSession2);
+    mocks.sessions = [session2, undefined];
+    const port2 = await createBrowserMangaOcr();
+    // 触发一次失败但不经过 recognizeManga finally（直接在 session2.run 上产生锁存）。
+    await expect(session2.run({x: {dims: [1, 3, 224, 224]}})).rejects.toThrow('stale latch');
+    mocks.recognize.mockResolvedValueOnce({results: []});
+    await expect(port2.recognize('page-2', {flatten: true, noCache: true, strategy: 'per-box'})).resolves.toMatchObject({results: []});
+    await port.destroy();
+    await port2.destroy();
 });

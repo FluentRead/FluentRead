@@ -132,7 +132,6 @@ function configureSectionPorts(data: Record<string, any>, {template = false, req
             writing: '@/src/features/settings/ui/WritingSettings.vue',
             selection: '@/src/features/settings/ui/SelectionSettings.vue',
             adaptation: '@/src/features/settings/ui/SiteAdaptationSettings.vue',
-            reading: '@/src/features/settings/ui/ReadingAssistanceSettings.vue',
             profiles: '@/src/features/settings/ui/QuickTranslationProfiles.vue',
             excluded: '@/src/features/settings/ui/ExcludedLanguageSettings.vue',
             excludedTags: '@/src/features/settings/ui/ExcludedTagSettings.vue',

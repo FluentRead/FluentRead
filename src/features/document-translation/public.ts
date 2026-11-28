@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/public.ts
  * 文件职责：汇总文档翻译 feature 的稳定公共 API，供文档页面一次性取得格式模型、预览、二进制读写、分段翻译和展示辅助能力。
- * 主要内容：再导出 document 与 preview 纯函数、文件解析入口、translation 网关、PDF 页面预览及资源释放、可取消归档编码、文档历史与按原文恢复译文的迁移函数，presentation 中的格式标签和阅读器辅助函数，富文本预览的原位同步、共用文档缩放手势，以及扫描版 PDF 的逐页识别；通过独立导入、识别与导出控制器统一异步操作所有权和资源清理。
+ * 主要内容：再导出 document 与 preview 纯函数、文件解析入口、translation 网关、PDF 页面预览及资源释放、可取消归档编码、文档历史与按原文恢复译文的迁移函数，presentation 中的格式标签和阅读器辅助函数，formatReaders/epubPreviewAssets/docxPreviewAssets 多格式阅读与资源解析助手，富文本预览的原位同步、共用文档缩放手势，以及扫描版 PDF 的逐页识别；通过独立导入、识别与导出控制器统一异步操作所有权和资源清理。
  * 模块边界：本文件不执行解析或翻译，也不暴露内部实现私有函数；调用方应通过这些公共契约注入翻译和 PDF rasterizer，避免绕过 services 层直接耦合 JSZip、pdf-lib 或 pdfjs。
  */
 import {defineAsyncComponent} from 'vue';
@@ -37,13 +37,43 @@ export {
     releasePdfDocument,
 } from './ui/pdfPreview';
 export * from './ui/presentation';
+export * from './ui/formatReaders';
+export type {EpubTocItem, ResolvedEpubChapterAssets} from './ui/epubPreviewAssets';
+export type {DocxPartMetadata} from './ui/docxPreviewAssets';
+export async function resolveEpubChapterAssets(
+    bytes: Uint8Array,
+    chapterPath: string,
+    chapterHtml: string,
+): Promise<import('./ui/epubPreviewAssets').ResolvedEpubChapterAssets> {
+    const module = await import('./ui/epubPreviewAssets');
+    return module.resolveEpubChapterAssets(bytes, chapterPath, chapterHtml);
+}
+export async function loadEpubNestedToc(
+    bytes: Uint8Array,
+    chapters: readonly import('./core/document').EpubDocumentChapter[],
+): Promise<import('./ui/epubPreviewAssets').EpubTocItem[]> {
+    const module = await import('./ui/epubPreviewAssets');
+    return module.loadEpubNestedToc(bytes, chapters);
+}
+export async function loadDocxPartMetadata(
+    bytes: Uint8Array,
+    partPath: string,
+): Promise<import('./ui/docxPreviewAssets').DocxPartMetadata> {
+    const module = await import('./ui/docxPreviewAssets');
+    return module.loadDocxPartMetadata(bytes, partPath);
+}
 export * from './ui/richPreviewSync';
 export {trackWebArticleReading} from './ui/webArticleReading';
 export {normalizeWebArticleUrl, WEB_ARTICLE_PARAMETER} from './core/webArticle';
 export {installDocumentZoomGestures} from './ui/documentZoom';
 export type {DocumentZoomOptions, DocumentZoomPoint} from './ui/documentZoom';
-export {createDocumentTaskState, useDocumentTasks} from './ui/useDocumentTasks';
-export type {DocumentQueueItem} from './ui/useDocumentTasks';
+export {
+    applyDocumentTranslations,
+    countCompletedTranslations,
+    createDocumentTaskState,
+    useDocumentTasks,
+} from './ui/useDocumentTasks';
+export type {DocumentQueueItem, DocumentTranslationUpdate} from './ui/useDocumentTasks';
 
 export {createDocumentImportWorkflow} from './services/importWorkflow';
 export {createDocumentRecognitionWorkflow} from './services/recognitionWorkflow';

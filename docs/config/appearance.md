@@ -4,6 +4,8 @@
 
 <GuideVisual kind="appearance" />
 
+<DocDiagram kind="appearance-styles" />
+
 ## 调整译文外观
 
 1. 打开**设置 → 界面风格 → 译文样式**。

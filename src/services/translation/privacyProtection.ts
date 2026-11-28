@@ -1,20 +1,54 @@
 /**
  * @file src/services/translation/privacyProtection.ts
  * 文件职责：将本地隐私防护接入统一翻译 provider 边界，覆盖正文、批次、上下文、摘要与自定义提示词。
- * 主要内容：每次调用使用独立会话，文本槽分别校验，敏感词不传递给 provider；图片输入明确拒绝，异常与重试不能绕过脱敏。
+ * 主要内容：每次调用使用独立会话，文本槽分别校验，敏感词不传递给 provider；图片输入明确拒绝，异常与重试不能绕过脱敏；向可选旁路回调交付仅含不可逆星号摘要与类别计数的防护活动事件。
  * 模块边界：只转换冻结的请求和配置，不调用网络、不写缓存；broker 负责调度、截止时间、统计及 finally 清理，术语保护在脱敏之后继续执行。
  */
 import {createPrivacySession} from '@/src/core/privacy/session';
+import type {PrivacyActivityAction, PrivacyActivityInput} from '@/src/core/privacy/activity';
 import {normalizePrivacyPolicy, PrivacyProtectionError} from '@/src/core/privacy/policy';
 import {isSensitiveConfigKey} from '@/src/core/config/sensitiveKeys';
 import {parseTranslationSlots, serializeTranslationSlots} from '@/src/core/translation/slotProtocol';
 import {attachTranslationProviderConfig, getTranslationGlossarySourceSlots, getTranslationImageInput} from './requestSnapshot';
 import type {TranslationProviderConfigSnapshot, TranslationRequestMessage} from './types';
 
-export function preparePrivacyRequest<T extends TranslationRequestMessage>(message: T, current: TranslationProviderConfigSnapshot) {
+export type PrivacyActivityObserver = (event: PrivacyActivityInput) => void;
+
+function emitSafely(observer: PrivacyActivityObserver | undefined, event: PrivacyActivityInput): void {
+    if (!observer) return;
+    try {
+        observer(event);
+    } catch {
+        // 旁路观测异常不能影响隐私防护与翻译主流程。
+    }
+}
+
+export function preparePrivacyRequest<T extends TranslationRequestMessage>(
+    message: T,
+    current: TranslationProviderConfigSnapshot,
+    onActivity?: PrivacyActivityObserver,
+) {
     if (!current.privacyProtection?.enabled) return {message, config: current, restore: (result: unknown) => result, dispose() {}};
-    if (getTranslationImageInput(message)) throw new PrivacyProtectionError('PRIVACY_IMAGE_BLOCKED');
+    const service = message.serviceOverride || current.service;
+    if (getTranslationImageInput(message)) {
+        emitSafely(onActivity, {action: 'image-blocked', serviceId: service, hitCount: 1});
+        throw new PrivacyProtectionError('PRIVACY_IMAGE_BLOCKED');
+    }
     const session = createPrivacySession(normalizePrivacyPolicy(current.privacyProtection), current.privacyProtectionSecretTerms);
+    let reported = false;
+    function reportSession(action: PrivacyActivityAction): void {
+        if (reported) return;
+        const summary = session.summary;
+        if (action === 'masked' && summary.hitCount === 0) return;
+        reported = true;
+        emitSafely(onActivity, {
+            action,
+            serviceId: service,
+            hitCount: summary.hitCount,
+            categoryCounts: summary.categoryCounts,
+            samples: summary.samples,
+        });
+    }
     try {
         const summary = 'summaryPrompt' in message && typeof message.summaryPrompt === 'string' && Boolean(message.summaryPrompt.trim());
         const slots = typeof message.origin === 'string' ? getTranslationGlossarySourceSlots(message.origin) : undefined;
@@ -30,7 +64,6 @@ export function preparePrivacyRequest<T extends TranslationRequestMessage>(messa
             const value = (message as unknown as Record<string, unknown>)[key];
             if (typeof value === 'string') (sanitized as unknown as Record<string, unknown>)[key] = session.mask(value).text;
         }
-        const service = message.serviceOverride || current.service;
         // 只处理实际服务的模板。其他服务的私密提示词既不需要扫描，也不能触发本次阻止模式。
         const maskMap = (mapping: Record<string, string>, transform = (value: string) => session.mask(value).text) =>
             Object.freeze({[service]: mapping[service] ? transform(mapping[service]) : ''});
@@ -54,16 +87,39 @@ export function preparePrivacyRequest<T extends TranslationRequestMessage>(messa
         return {
             message: attachTranslationProviderConfig(sanitized, config), config,
             restore(result: unknown): unknown {
-                if (slots) {
-                    const outputs = typeof result === 'string' ? parseTranslationSlots(slots.packet, result) : null;
-                    if (!outputs) throw new PrivacyProtectionError('PRIVACY_RESTORE_FAILED');
-                    return serializeTranslationSlots(outputs.map((text, index) => session.restore(text, packets[index])), nonce).payload;
+                try {
+                    let restored: unknown;
+                    if (slots) {
+                        const outputs = typeof result === 'string' ? parseTranslationSlots(slots.packet, result) : null;
+                        if (!outputs) throw new PrivacyProtectionError('PRIVACY_RESTORE_FAILED');
+                        restored = serializeTranslationSlots(outputs.map((text, index) => session.restore(text, packets[index])), nonce).payload;
+                    } else if (!Array.isArray(message.origin)) {
+                        restored = session.restore(result, packets[0], summary);
+                    } else {
+                        if (!Array.isArray(result) || result.length !== packets.length) throw new PrivacyProtectionError('PRIVACY_RESTORE_FAILED');
+                        restored = result.map((text, index) => session.restore(text, packets[index]));
+                    }
+                    reportSession('masked');
+                    return restored;
+                } catch (error) {
+                    if (error instanceof PrivacyProtectionError && error.code === 'PRIVACY_RESTORE_FAILED') {
+                        reportSession('restore-failed');
+                    }
+                    throw error;
                 }
-                if (!Array.isArray(message.origin)) return session.restore(result, packets[0], summary);
-                if (!Array.isArray(result) || result.length !== packets.length) throw new PrivacyProtectionError('PRIVACY_RESTORE_FAILED');
-                return result.map((text, index) => session.restore(text, packets[index]));
             },
-            dispose: session.dispose,
+            dispose() {
+                reportSession('masked');
+                session.dispose();
+            },
         };
-    } catch (error) {session.dispose(); throw error;}
+    } catch (error) {
+        if (error instanceof PrivacyProtectionError && error.code === 'PRIVACY_CONTENT_BLOCKED') {
+            reportSession('blocked');
+        } else if (error instanceof PrivacyProtectionError && error.code === 'PRIVACY_CAPACITY_EXCEEDED') {
+            reportSession('capacity-exceeded');
+        }
+        session.dispose();
+        throw error;
+    }
 }

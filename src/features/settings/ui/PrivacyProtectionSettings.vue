@@ -1,8 +1,8 @@
 <!--
  * @file src/features/settings/ui/PrivacyProtectionSettings.vue
- * 文件职责：以现有设置行、分段控件与选项按钮呈现翻译隐私防护，不占用主页面展示调试表单。
- * 主要内容：标题行直接启停，集中编辑处理方式与保护类别；固定示例随规则变化，仅作效果预览；自定义词在紧凑弹窗中编辑，取消、离页和卸载清空草稿，旧回调不能修改新会话。
- * 模块边界：配置仍由父级编辑器统一保存；预览复用纯本地检测规则，不接受测试输入、不调用翻译服务，也不读写 storage。
+ * 文件职责：以现有设置行、分段控件与选项按钮呈现翻译隐私防护，并通过 activity 插槽挂载扩展侧默认折叠的脱敏记录抽屉。
+ * 主要内容：标题行直接启停，集中编辑处理方式与保护类别，空规则时给出内联提示；自定义词在紧凑弹窗中编辑并展示已填数量与快捷清空，取消、离页和卸载清空草稿，旧回调不能修改新会话；固定示例实时展示不可逆的 *** 脱敏形态。
+ * 模块边界：配置仍由父级编辑器统一保存；预览复用纯本地检测与不可逆星号格式化，不接受测试输入、不调用翻译服务，也不读写 storage；脱敏记录抽屉由父级按宿主能力经插槽注入。
  -->
 <template>
   <SettingsGroup :title="t('privacy.title')" data-privacy-settings>
@@ -20,14 +20,17 @@
           :disabled="!context.active.value" :onUpdate:modelValue="actions.mode" />
       </SettingsItem>
       <SettingsItem :label="t('privacy.categories')" class="privacy-category-row">
-        <div class="privacy-categories" role="group" :aria-label="t('privacy.categories')">
-          <button v-for="category in PRIVACY_CATEGORIES" :key="category" type="button" class="privacy-category"
-            :class="{'is-selected': config.privacyProtection.categories.includes(category)}"
-            :aria-pressed="config.privacyProtection.categories.includes(category)" :data-privacy-category="category"
-            :disabled="!context.active.value" :onClick="actions.category[category]">
-            <span>{{ t(`privacy.category.${category}`) }}</span>
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8 3 3 7-7" /></svg>
-          </button>
+        <div class="privacy-categories-wrap">
+          <div class="privacy-categories" role="group" :aria-label="t('privacy.categories')">
+            <button v-for="category in PRIVACY_CATEGORIES" :key="category" type="button" class="privacy-category"
+              :class="{'is-selected': config.privacyProtection.categories.includes(category)}"
+              :aria-pressed="config.privacyProtection.categories.includes(category)" :data-privacy-category="category"
+              :disabled="!context.active.value" :onClick="actions.category[category]">
+              <span>{{ t(`privacy.category.${category}`) }}</span>
+              <svg v-if="config.privacyProtection.categories.includes(category)" viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8 3 3 7-7" /></svg>
+            </button>
+          </div>
+          <p v-if="noActiveRules" class="privacy-empty-rules" role="status" data-privacy-empty-rules>{{ t('privacy.emptyRulesHint') }}</p>
         </div>
       </SettingsItem>
       <SettingsItem :label="t('privacy.custom')" :description="t('privacy.customHelp')">
@@ -40,9 +43,18 @@
           <span class="privacy-preview-source">{{ sample }}</span>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h12M9 3l5 5-5 5" /></svg>
           <span v-if="preview.blocked" class="privacy-preview-blocked" data-privacy-preview>{{ t('privacy.previewBlocked') }}</span>
-          <span v-else class="privacy-preview-result" data-privacy-preview><span v-for="(part, index) in preview.parts" :key="index" :class="{'privacy-masked': part.hidden}">{{ part.text }}</span></span>
+          <span v-else class="privacy-preview-result" data-privacy-preview>
+            <template v-for="(part, index) in preview.parts" :key="index">
+              <span v-if="part.hidden" class="privacy-masked">
+                <span class="privacy-masked-cat">{{ part.categoryLabel }}</span>
+                <code class="privacy-masked-val">{{ part.text }}</code>
+              </span>
+              <template v-else>{{ part.text }}</template>
+            </template>
+          </span>
         </div>
       </div>
+      <slot name="activity" />
     </template>
     <el-dialog v-if="termsOpen" :model-value="true" :title="t('privacy.custom')" width="min(480px, calc(100vw - 32px))"
       align-center destroy-on-close :close-on-click-modal="false" :onUpdate:modelValue="actions.dialog" data-privacy-terms-dialog>
@@ -50,12 +62,20 @@
       <el-input :model-value="termsDraft" type="textarea" :autosize="{minRows: 4, maxRows: 8}"
         :maxlength="MAX_PRIVACY_TERMS * (MAX_PRIVACY_TERM_LENGTH + 1)" :aria-label="t('privacy.custom')"
         autocomplete="off" spellcheck="false" :disabled="!context.active.value" :onUpdate:modelValue="actions.draft" />
-      <p class="privacy-editor-limit" :class="{'is-invalid': !termsValid}" :role="!termsValid ? 'alert' : undefined">
-        {{ t(termsValid ? 'privacy.customLimits' : 'privacy.invalidTerms', {count: MAX_PRIVACY_TERMS, length: MAX_PRIVACY_TERM_LENGTH}) }}
-      </p>
+      <div class="privacy-editor-meta">
+        <p class="privacy-editor-limit" :class="{'is-invalid': !termsValid}" :role="!termsValid ? 'alert' : undefined">
+          {{ t(termsValid ? 'privacy.customLimits' : 'privacy.invalidTerms', {count: MAX_PRIVACY_TERMS, length: MAX_PRIVACY_TERM_LENGTH}) }}
+        </p>
+        <span class="privacy-editor-usage" data-privacy-terms-usage>{{ t('privacy.customUsage', {used: terms.length, max: MAX_PRIVACY_TERMS}) }}</span>
+      </div>
       <template #footer>
-        <el-button size="small" :onClick="actions.cancel">{{ t('common.cancel') }}</el-button>
-        <el-button size="small" type="primary" :disabled="!context.active.value || !termsChanged || !termsValid" :onClick="actions.terms">{{ t('common.save') }}</el-button>
+        <div class="privacy-editor-footer">
+          <el-button v-if="termsDraft.trim().length > 0" size="small" :disabled="!context.active.value"
+            data-privacy-terms-clear :onClick="actions.clearDraft">{{ t('privacy.customClear') }}</el-button>
+          <span class="privacy-editor-footer-spacer" />
+          <el-button size="small" :onClick="actions.cancel">{{ t('common.cancel') }}</el-button>
+          <el-button size="small" type="primary" :disabled="!context.active.value || !termsChanged || !termsValid" :onClick="actions.terms">{{ t('common.save') }}</el-button>
+        </div>
       </template>
     </el-dialog>
   </SettingsGroup>
@@ -65,6 +85,7 @@
 import {computed, onBeforeUnmount, ref, watch} from 'vue';
 import type {Config} from '@/src/core/config/model';
 import {createPrivacyDetector} from '@/src/core/privacy/detect';
+import {formatPrivacyMaskedDisplay} from '@/src/core/privacy/maskDisplay';
 import {MAX_PRIVACY_TERMS, MAX_PRIVACY_TERM_LENGTH, normalizePrivacyTerms, PRIVACY_CATEGORIES, type PrivacyCategory} from '@/src/core/privacy/policy';
 import {useSettingsActionContext} from '../model/useSettingsActionContext';
 import {useUiI18n} from '@/src/ui/i18n';
@@ -81,14 +102,22 @@ const termsDraft = ref('');
 const terms = computed(() => termsDraft.value.split('\n').map(term => term.trim()).filter(Boolean));
 const termsValid = computed(() => terms.value.length <= MAX_PRIVACY_TERMS && terms.value.every(term => term.length <= MAX_PRIVACY_TERM_LENGTH));
 const termsChanged = computed(() => JSON.stringify(normalizePrivacyTerms(terms.value)) !== JSON.stringify(props.config.privacyProtectionSecretTerms));
+const noActiveRules = computed(() => props.config.privacyProtection.categories.length === 0 && props.config.privacyProtectionSecretTerms.length === 0);
 const sample = computed(() => t('privacy.sampleText'));
 const preview = computed(() => {
   const input = sample.value;
   const spans = createPrivacyDetector(props.config.privacyProtection, props.config.privacyProtectionSecretTerms)(input);
-  const parts: Array<{text: string; hidden: boolean}> = [];
+  const parts: Array<{text: string; hidden: boolean; categoryLabel?: string}> = [];
   let offset = 0;
   for (const span of spans) {
-    parts.push({text: input.slice(offset, span.start), hidden: false}, {text: t(`privacy.category.${span.category}`), hidden: true});
+    parts.push(
+      {text: input.slice(offset, span.start), hidden: false},
+      {
+        text: formatPrivacyMaskedDisplay(input.slice(span.start, span.end), span.category),
+        hidden: true,
+        categoryLabel: t(`privacy.category.${span.category}`),
+      },
+    );
     offset = span.end;
   }
   parts.push({text: input.slice(offset), hidden: false});
@@ -111,6 +140,7 @@ const actions = computed(() => {
     }])) as Record<PrivacyCategory, () => void>,
     manage() {if (owns()) {termsDraft.value = props.config.privacyProtectionSecretTerms.join('\n'); termsOpen.value = true;}},
     draft(value: unknown) {if (owns() && termsOpen.value && typeof value === 'string') termsDraft.value = value;},
+    clearDraft() {if (owns() && termsOpen.value) termsDraft.value = '';},
     dialog(value: unknown) {if (owns() && value === false) closeTerms();},
     cancel() {if (owns()) closeTerms();},
     terms() {
@@ -126,24 +156,44 @@ const actions = computed(() => {
 .privacy-heading-actions { display: inline-flex; align-items: center; flex: none; gap: 8px; }
 .privacy-mode { max-width: 280px; }
 .privacy-category-row { grid-template-columns: 150px minmax(0, 1fr); }
+.privacy-categories-wrap { display: grid; gap: 6px; justify-items: end; width: 100%; }
 .privacy-categories { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.privacy-category { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--surface); font: inherit; font-size: 12px; cursor: pointer; }
-.privacy-category svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; opacity: 0; }
+.privacy-category { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--surface); font: inherit; font-size: 12px; cursor: pointer; transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease; }
+.privacy-category:hover:not(:disabled) { border-color: color-mix(in srgb, var(--brand) 30%, var(--line)); color: var(--ink); }
+.privacy-category svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; }
 .privacy-category.is-selected { border-color: color-mix(in srgb, var(--brand) 28%, var(--line)); color: var(--brand-strong); background: var(--brand-soft); }
-.privacy-category.is-selected svg { opacity: 1; }
 .privacy-category:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .privacy-category:disabled { opacity: .55; cursor: default; }
-.privacy-term-count, .privacy-preview-label, .privacy-editor-limit { color: var(--muted); font-size: 12px; }
-.privacy-preview { display: grid; gap: 9px; padding: 12px var(--fr-card-padding-inline, 20px) 14px; border-top: 1px solid var(--line); background: var(--surface-soft); }
-.privacy-preview-pair { display: grid; grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr); align-items: center; gap: 12px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.privacy-empty-rules { margin: 0; color: var(--fr-warning, #94651c); font-size: 12px; line-height: 1.5; text-align: end; }
+.privacy-term-count, .privacy-preview-label, .privacy-editor-limit, .privacy-editor-usage { color: var(--muted); font-size: 12px; }
+.privacy-preview { display: grid; gap: 8px; padding: 12px var(--fr-card-padding-inline, 20px) 14px; border-top: 1px solid var(--line); background: var(--surface-soft); }
+.privacy-preview-pair { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 .privacy-preview-source { color: var(--muted); }
-.privacy-preview-pair > svg { width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 1.4; }
-.privacy-preview-result { color: var(--ink); }
-.privacy-masked { padding: 1px 4px; border-radius: 4px; color: var(--brand-strong); background: var(--brand-soft); }
-.privacy-preview-blocked { color: var(--brand-strong); }
+.privacy-preview-pair > svg { flex: none; width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.privacy-preview-result { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; color: var(--ink); }
+.privacy-masked { display: inline-flex; align-items: center; gap: 4px; margin: 0 2px; padding: 1px 6px; border-radius: 5px; color: var(--brand-strong); background: var(--brand-soft); }
+.privacy-masked-cat { font-size: 11px; opacity: .82; }
+.privacy-masked-val { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11.5px; }
+.privacy-preview-blocked { padding: 1px 7px; border-radius: 5px; color: var(--brand-strong); background: var(--brand-soft); font-weight: 500; }
 .privacy-editor-help { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.7; }
-.privacy-editor-limit { margin: 8px 0 0; line-height: 1.6; }
+.privacy-editor-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.privacy-editor-limit { margin: 0; line-height: 1.6; }
 .privacy-editor-limit.is-invalid { color: var(--el-color-danger); }
-@media (max-width: 700px) { .privacy-category-row { grid-template-columns: minmax(0, 1fr); gap: 10px; } .privacy-categories { justify-content: flex-start; } }
-@media (max-width: 480px) { .privacy-mode { max-width: none; } .privacy-preview-pair { grid-template-columns: minmax(0, 1fr); gap: 5px; } .privacy-preview-pair > svg { display: none; } }
+.privacy-editor-usage { flex: none; font-variant-numeric: tabular-nums; }
+.privacy-editor-footer { display: flex; align-items: center; gap: 8px; width: 100%; }
+.privacy-editor-footer-spacer { flex: 1; }
+@media (max-width: 700px) {
+  .privacy-category-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .privacy-categories-wrap { justify-items: start; }
+  .privacy-categories { justify-content: flex-start; }
+  .privacy-empty-rules { text-align: start; }
+}
+@media (max-width: 480px) {
+  .privacy-mode { max-width: none; }
+  .privacy-preview-pair { flex-direction: column; align-items: flex-start; gap: 5px; }
+  .privacy-preview-pair > svg { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .privacy-category { transition: none; }
+}
 </style>

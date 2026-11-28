@@ -45,7 +45,8 @@ export function userscriptMessages<T extends Record<string, string>>(messages: T
         && !key.startsWith('document.retainedRevisions.') && !key.startsWith('document.translationProgress.')
         && !key.startsWith('settings.cloud.e2ee.')
         && !key.startsWith('settings.cloud.learning.')
-        && !key.startsWith('settings.cloud.autoSync.'))) as T;
+        && !key.startsWith('settings.cloud.autoSync.')
+        && !key.startsWith('privacy.log.'))) as T;
 }
 export const zhCNMessages = userscriptMessages(extensionChinese);
 

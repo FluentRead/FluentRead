@@ -6,6 +6,7 @@
  */
 import {localModelIdleMs} from '@/src/shared/onnx/modelResidency';
 import {createLocalInferenceBudget,withLocalInferenceBudget} from '@/src/shared/onnx/resources';
+import {createOcrAbortError} from './sharedOcrTasks';
 
 /**
  * OCR Worker 的最小能力边界。
@@ -41,12 +42,6 @@ export type OcrWorkerRuntime<TResult> = {
     ensureLanguages: (languages: string[], signal?: AbortSignal) => Promise<void>;
     dispose: () => void;
 };
-
-function createOcrAbortError(): Error {
-    const error = new Error('图片 OCR 请求已取消');
-    error.name = 'AbortError';
-    return error;
-}
 
 /**
  * 串行化所有 Worker 操作，避免语言切换终止仍在识别的 Worker，也避免同一

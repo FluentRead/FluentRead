@@ -1,7 +1,8 @@
 import {describe,expect,it,vi} from 'vitest';
 import {createMaterialPageBridge,type MaterialPagePort} from '@/src/features/vocabulary/materialPageBridge';
 import {MATERIAL_PAGE_MAX_LINE_BYTES,MATERIAL_PAGE_PORT_NAME,type MaterialPageMessage} from '@/src/features/vocabulary/materialPageProtocol';
-import {receiveMaterialRead,type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
+import {startMaterialRead,type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
+const receiveMaterialRead = async (...args: Parameters<typeof startMaterialRead>) => startMaterialRead(...args).result;
 import {MaterialError} from '@/src/features/vocabulary/materialModel';
 import * as sessions from '@/src/features/vocabulary/materialPageSession';
 import type {MaterialRecord} from '@/src/features/vocabulary/materialProtocol';

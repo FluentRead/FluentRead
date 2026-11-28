@@ -307,6 +307,194 @@ describe('课程字幕请求生命周期', () => {
         f.source.sync(f.request, 'media'); await settled(f.source); expect(f.source.status).toBe('empty'); expect(f.fetch).toHaveBeenCalledTimes(2);
         const empty = sourceFixture(edx, [{start: [], text: []}]); empty.source.sync(empty.request, 'm'); await settled(empty.source); expect(empty.source.status).toBe('empty');
     });
+
+    it('支持动态 base 回调以适配 SPA 路由迁移', async () => {
+        let currentBase = new URL('https://company-a.udemy.com/course/programming/learn/lecture/123/');
+        const fetch = vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes('/courses/')) return json({id: 77, locale: {locale: 'en_US'}});
+            if (url.includes('/subscribed-courses/')) return json({asset: {captions: [caption()]}});
+            return new Response(vtt);
+        });
+        const source = new CourseCaptionSource({
+            base: () => currentBase,
+            fetch,
+            manifest: vi.fn(async () => 456),
+            resources: () => [],
+            changed: vi.fn(),
+        });
+        currentBase = new URL('https://company-b.udemy.com/course/programming/learn/lecture/124/');
+        source.sync({platform: 'udemy', key: 'programming/124', id: 'programming/124', language: '', url: ''}, 'spa');
+        await settled(source);
+        expect(source.status).toBe('ready');
+        expect(fetch.mock.calls[0][0]).toContain('https://company-b.udemy.com/api-2.0/courses/programming/');
+    });
+
+    it('对瞬态网络/5xx/超时执行有界重试并在取消或耗尽后收敛', async () => {
+        vi.useFakeTimers();
+        // 1) TypeError + 503 -> 第三次成功
+        const responses: Array<Response | Error> = [
+            new TypeError('Failed to fetch'),
+            new Response('', {status: 503}),
+            json(transcript),
+        ];
+        const fetch = vi.fn(async () => {
+            const next = responses.shift()!;
+            if (next instanceof Error) throw next;
+            return next;
+        });
+        const changed = vi.fn();
+        const source = new CourseCaptionSource({base: edx, fetch, manifest: vi.fn(async () => 456), resources: () => [], changed});
+        const request: CourseCaptionRequest = {platform: 'edx', key: 'block:en', id: 'block', language: 'en', url: new URL('/transcript/en', edx).href};
+        source.sync(request, 'retry-ok');
+        await vi.advanceTimersByTimeAsync(0);
+        expect(source.status).toBe('loading'); expect(fetch).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(800);
+        expect(source.status).toBe('loading'); expect(fetch).toHaveBeenCalledTimes(2);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(source.status).toBe('ready'); expect(fetch).toHaveBeenCalledTimes(3); expect(source.cues).toEqual([cue]);
+
+        // 2) TimeoutError 耗尽 2 次自动重试后进入 error
+        const timeoutFetch = vi.fn(async () => { throw new DOMException('timeout', 'TimeoutError'); });
+        const exhausted = new CourseCaptionSource({base: edx, fetch: timeoutFetch, manifest: vi.fn(async () => 456), resources: () => [], changed: vi.fn()});
+        exhausted.sync(request, 'exhausted');
+        await vi.advanceTimersByTimeAsync(800);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(exhausted.status).toBe('error'); expect(timeoutFetch).toHaveBeenCalledTimes(3);
+
+        // 3) 退避期间 clear() 取消重试并释放定时器
+        const abortFetch = vi.fn(async () => { throw new Error('字幕播放器身份读取超时'); });
+        const aborted = new CourseCaptionSource({base: edx, fetch: abortFetch, manifest: vi.fn(async () => 456), resources: () => [], changed: vi.fn()});
+        aborted.sync(request, 'abort-backoff');
+        await vi.advanceTimersByTimeAsync(100);
+        expect(abortFetch).toHaveBeenCalledTimes(1);
+        aborted.clear();
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(abortFetch).toHaveBeenCalledTimes(1); expect(aborted.status).toBe('idle');
+
+        // 4) 非 Error 异常不重试，但跨 realm 的 TimeoutError 与数值 statusCode 429/5xx 会重试，非 429/5xx 不重试
+        const nonErrorFetch = vi.fn(async () => { throw 'raw-failure'; });
+        const nonError = new CourseCaptionSource({base: edx, fetch: nonErrorFetch, manifest: vi.fn(async () => 456), resources: () => [], changed: vi.fn()});
+        nonError.sync(request, 'non-error');
+        await vi.advanceTimersByTimeAsync(0);
+        expect(nonError.status).toBe('error'); expect(nonErrorFetch).toHaveBeenCalledTimes(1);
+
+        const crossRealmErrors: Array<unknown> = [
+            {name: 'TimeoutError'},
+            {statusCode: 429},
+            json(transcript),
+        ];
+        const crossRealmFetch = vi.fn(async () => {
+            const next = crossRealmErrors.shift()!;
+            if (next instanceof Response) return next;
+            throw next;
+        });
+        const crossRealm = new CourseCaptionSource({base: edx, fetch: crossRealmFetch, manifest: vi.fn(async () => 456), resources: () => [], changed: vi.fn()});
+        crossRealm.sync(request, 'cross-realm');
+        await vi.advanceTimersByTimeAsync(800);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(crossRealm.status).toBe('ready'); expect(crossRealmFetch).toHaveBeenCalledTimes(3);
+
+        const status5xxErrors: Array<unknown> = [{statusCode: 502}, json(transcript)];
+        const status5xxFetch = vi.fn(async () => {
+            const next = status5xxErrors.shift()!;
+            if (next instanceof Response) return next;
+            throw next;
+        });
+        const status5xx = new CourseCaptionSource({base: edx, fetch: status5xxFetch, manifest: vi.fn(async () => 456), resources: () => [], changed: vi.fn()});
+        status5xx.sync(request, 'status-5xx');
+        await vi.advanceTimersByTimeAsync(800);
+        expect(status5xx.status).toBe('ready'); expect(status5xxFetch).toHaveBeenCalledTimes(2);
+
+        const status404Fetch = vi.fn(async () => { throw {statusCode: 404}; });
+        const status404 = new CourseCaptionSource({base: edx, fetch: status404Fetch, manifest: vi.fn(async () => 456), resources: () => [], changed: vi.fn()});
+        status404.sync(request, 'status-404');
+        await vi.advanceTimersByTimeAsync(0);
+        expect(status404.status).toBe('error'); expect(status404Fetch).toHaveBeenCalledTimes(1);
+
+        // 5) 在瞬态错误抛出前信号已中止时，waitWithAbort 立即拒绝而不调度重试定时器
+        let preAbortedSource!: CourseCaptionSource;
+        const preAbortManifest = vi.fn(async () => {
+            preAbortedSource.clear();
+            throw new TypeError('aborted manifest');
+        });
+        preAbortedSource = new CourseCaptionSource({base: bili, fetch: vi.fn(), manifest: preAbortManifest, resources: () => [], changed: vi.fn()});
+        preAbortedSource.sync({platform: 'bilibili', key: 'BV1xx411c7mD:2', id: 'BV1xx411c7mD:2', language: '', url: ''}, 'pre-aborted');
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(preAbortManifest).toHaveBeenCalledTimes(1);
+        expect(preAbortedSource.status).toBe('idle');
+    });
+
+    it('B 站无签名空列表在 1500ms 后复查迟到 wbi/v2 资源，忽略无签名 /x/player/v2 避免冗余重抓', async () => {
+        vi.useFakeTimers();
+        let resourceList: string[] = [];
+        const fetch = vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes('wbi/v2')) return json({code: 0, data: {cid: 456, subtitle: {subtitles: [biliTrack()]}}});
+            if (url.includes('hdslb.com')) return json(biliBody);
+            return json({code: 0, data: {cid: 456, subtitle: {subtitles: []}}});
+        });
+        const changed = vi.fn();
+        const source = new CourseCaptionSource({base: bili, fetch, manifest: vi.fn(async () => 456), resources: () => resourceList, changed});
+        const request: CourseCaptionRequest = {platform: 'bilibili', key: 'BV1xx411c7mD:2', id: 'BV1xx411c7mD:2', language: '', url: ''};
+        source.sync(request, 'late-wbi');
+        await vi.advanceTimersByTimeAsync(0);
+        expect(source.status).toBe('empty'); expect(changed).toHaveBeenCalledTimes(1);
+        resourceList = ['https://api.bilibili.com/x/player/wbi/v2?cid=456&w_rid=late'];
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(source.status).toBe('ready'); expect(source.cues).toEqual([cue]); expect(changed).toHaveBeenCalledTimes(2);
+
+        // 1500ms 后仅有我们自己发起的无签名 /x/player/v2 时，不能误当签名接口触发冗余重抓
+        resourceList = ['https://api.bilibili.com/x/player/v2?cid=456&bvid=BV1xx411c7mD'];
+        source.clear();
+        source.sync(request, 'unsigned-only');
+        await vi.advanceTimersByTimeAsync(0);
+        const beforeCount = fetch.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(fetch).toHaveBeenCalledTimes(beforeCount); expect(source.status).toBe('empty');
+
+        // 复查发现签名接口仍为空列表时保留 empty 不触发额外通知
+        const emptyWbiFetch = vi.fn(async () => json({code: 0, data: {cid: 456, subtitle: {subtitles: []}}}));
+        let emptyWbiResources: string[] = [];
+        const emptyWbiChanged = vi.fn();
+        const emptyWbiSource = new CourseCaptionSource({base: bili, fetch: emptyWbiFetch, manifest: vi.fn(async () => 456), resources: () => emptyWbiResources, changed: emptyWbiChanged});
+        emptyWbiSource.sync(request, 'empty-wbi');
+        await vi.advanceTimersByTimeAsync(0);
+        emptyWbiResources = ['https://api.bilibili.com/x/player/wbi/v2?cid=456&w_rid=empty'];
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(emptyWbiSource.status).toBe('empty');
+        expect(emptyWbiChanged).toHaveBeenCalledTimes(1);
+
+        // 复查发现签名接口但读取失败时保留 empty
+        const failFetch = vi.fn(async (input: RequestInfo | URL) => {
+            if (String(input).includes('wbi/v2')) throw new Error('wbi failed');
+            return json({code: 0, data: {cid: 456, subtitle: {subtitles: []}}});
+        });
+        let failResources: string[] = [];
+        const failSource = new CourseCaptionSource({base: bili, fetch: failFetch, manifest: vi.fn(async () => 456), resources: () => failResources, changed: vi.fn()});
+        failSource.sync(request, 'fail-wbi');
+        await vi.advanceTimersByTimeAsync(0);
+        failResources = ['https://api.bilibili.com/x/player/wbi/v2?cid=456&w_rid=fail'];
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(failSource.status).toBe('empty');
+
+        // 复查中清理由 abort 保护，不覆盖已清理状态
+        let resolveLate!: (response: Response) => void;
+        const slowFetch = vi.fn(async (input: RequestInfo | URL) => {
+            if (String(input).includes('wbi/v2')) return new Promise<Response>(resolve => { resolveLate = resolve; });
+            return json({code: 0, data: {cid: 456, subtitle: {subtitles: []}}});
+        });
+        let slowResources: string[] = [];
+        const slowSource = new CourseCaptionSource({base: bili, fetch: slowFetch, manifest: vi.fn(async () => 456), resources: () => slowResources, changed: vi.fn()});
+        slowSource.sync(request, 'slow-wbi');
+        await vi.advanceTimersByTimeAsync(0);
+        slowResources = ['https://api.bilibili.com/x/player/wbi/v2?cid=456&w_rid=slow'];
+        await vi.advanceTimersByTimeAsync(1500);
+        slowSource.clear();
+        resolveLate(json({code: 0, data: {cid: 456, subtitle: {subtitles: []}}}));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(slowSource.status).toBe('idle');
+    });
 });
 
 function bridgePage() {
@@ -339,6 +527,17 @@ describe('只读 B 站播放器桥', () => {
         f.page.dispatchEvent(new Event('pageshow'));
         f.page.player = {getManifest: () => ({bvid: 'BV1xx411c7mD', p: 2, cid: 456})}; f.message(request); expect(f.post).toHaveBeenCalledTimes(7);
         f.page.dispatchEvent(Object.assign(new Event('pagehide'), {persisted: false})); f.message(request); expect(f.post).toHaveBeenCalledTimes(7); dispose();
+    });
+    it('manifest.p 缺失或非法时默认按第 1P 匹配单 P 与播单播放器', () => {
+        const f = bridgePage();
+        const dispose = installBilibiliCaptionBridge(f.page);
+        for (const p of [undefined, null, 0, -2, 'bad']) {
+            f.page.player = {getManifest: () => ({bvid: 'BV1xx411c7mD', aid: 123, p, cid: 789})};
+            f.post.mockClear();
+            f.message({type: 'fluent-read:bilibili-caption-manifest:request', requestId: 'p1', part: 'BV1xx411c7mD:1'});
+            expect(f.post).toHaveBeenCalledWith({type: 'fluent-read:bilibili-caption-manifest:response', requestId: 'p1', part: 'BV1xx411c7mD:1', cid: 789}, bili.origin);
+        }
+        dispose();
     });
     it('客户端拒绝错误编号、分 P、来源和 CID，成功后不再轮询', async () => {
         vi.useFakeTimers(); const f = bridgePage(), controller = new AbortController();

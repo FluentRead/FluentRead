@@ -320,7 +320,7 @@ describe('selection TTS Offscreen adapter', () => {
             audio: new Uint8Array([1, 2, 3]).buffer,
             contentType: 'audio/ogg',
         });
-        expect(transport).toHaveBeenCalledWith('https://example.test/audio', {signal: controller.signal});
+        expect(transport).toHaveBeenCalledWith('https://example.test/audio', expect.objectContaining({signal: expect.any(AbortSignal)}));
     });
 
     it.each([

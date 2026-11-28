@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/sentenceTimeline.ts
  * 文件职责：把已有视频字幕的原文 cue 聚合为带可靠音频范围的句子学习材料。
- * 主要内容：仅在原始 cue 边界识别多语言句末标点，以时间、长度、数量和静音间隔限制连续段；保留语境和源索引，并提供重叠安全的播放查句快照。
+ * 主要内容：聚合前去重连续完全重复的 cue，仅在原始 cue 边界识别多语言句末标点与常见闭合括号，先判完整句末再判超限以避免完整长句误标片段，优化无空格脚本及中日文标点数字衔接，以时间、长度、数量和静音间隔限制连续段；保留语境和源索引，并提供重叠安全的播放查句快照。
  * 模块边界：不生成译文或 cue 子时间，不调用播放器、网络或存储；快照仅在字幕材料改变时重建，公开数组查询仍反映调用时的内容。
  */
 import type {VideoSubtitleCue} from './youtubeSubtitleData';
@@ -45,12 +45,18 @@ function normalizedLimit(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+const UNSPACED_SCRIPTS = '\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\u30FC\\u30FB\\u3005\\p{Script=Thai}\\p{Script=Lao}\\p{Script=Khmer}\\p{Script=Myanmar}';
+const UNSPACED_END = new RegExp(`[${UNSPACED_SCRIPTS}]$`, 'u');
+const UNSPACED_START = new RegExp(`^[${UNSPACED_SCRIPTS}]`, 'u');
+const CJK_PUNCTUATION_END = /[、。！？，；：（）《》【】「」『』]$/u;
+const CJK_PUNCTUATION_START = /^[、。！？，；：（）《》【】「」『』]/u;
+
 function hasSentenceEnd(text: string): boolean {
-  const withoutClosingQuotes = text.replace(/[\s"'”’»」』）)\]]+$/u, '');
+  const withoutClosingQuotes = text.replace(/[\s"'”’»」』）)\]】》〉〕}›]+$/u, '');
   // 字幕只给出了整 cue 时间；一个 cue 即使包含多句也不能杜撰词级时间。
-  if (!/[.!?。！？؟۔।॥]$/u.test(withoutClosingQuotes)) return false;
+  if (!/[.!?。！？؟۔।॥…⁉⁈‼⁇]$/u.test(withoutClosingQuotes)) return false;
   // 常见称谓/缩写和孤立首字母的点不能证明完整句，等后续 cue 再闭合。
-  return !/(?:\b(?:mr|mrs|ms|dr|prof|sr|jr|vs|etc|e\.g|i\.e)|\b[A-Za-z])\.$/iu.test(withoutClosingQuotes);
+  return !/(?:\b(?:mr|mrs|ms|dr|prof|sr|jr|vs|etc|e\.g|i\.e)|(?<!['’&])\b[A-Za-z])\.$/iu.test(withoutClosingQuotes);
 }
 
 export function normalizeVideoSentenceCueText(text: string): string {
@@ -58,10 +64,12 @@ export function normalizeVideoSentenceCueText(text: string): string {
 }
 
 export function joinVideoSentenceCueText(left: string, right: string): string {
-  // 无空格文字保留正常连写；其余文字用空格接回字幕换行。
-  const separator = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]$/u.test(left)
-    && /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(right) ? '' : ' ';
-  return left + separator + right;
+  // 无空格文字、中日文标点及无空格文字与数字相邻时直接衔接；其余文字用空格接回字幕换行。
+  const noSpace = (UNSPACED_END.test(left) && (UNSPACED_START.test(right) || /^\d/u.test(right)))
+    || (/\d$/u.test(left) && UNSPACED_START.test(right))
+    || CJK_PUNCTUATION_END.test(left)
+    || CJK_PUNCTUATION_START.test(right);
+  return left + (noSpace ? '' : ' ') + right;
 }
 
 /** 保守聚合原字幕；超长单 cue 保持原子材料，不伪造它的内部时间点。 */
@@ -75,10 +83,15 @@ export function buildVideoSentenceTimeline(
     maxCues: normalizedLimit(options.maxCues, DEFAULT_LIMITS.maxCues),
     maxGapMs: normalizedLimit(options.maxGapMs, DEFAULT_LIMITS.maxGapMs),
   };
-  const ordered = cues.map((cue, index) => ({...cue, index, text: normalizeVideoSentenceCueText(cue.text)}))
+  const sorted = cues.map((cue, index) => ({...cue, index, text: normalizeVideoSentenceCueText(cue.text)}))
     .filter(cue => cue.text && Number.isFinite(cue.startMs) && cue.startMs >= 0
       && Number.isFinite(cue.durationMs) && cue.durationMs > 0 && Number.isFinite(cue.startMs + cue.durationMs))
     .sort((left, right) => left.startMs - right.startMs || left.index - right.index);
+  const ordered = sorted.filter((cue, index) => {
+    if (index === 0) return true;
+    const previous = sorted[index - 1];
+    return !(cue.startMs === previous.startMs && cue.durationMs === previous.durationMs && cue.text === previous.text);
+  });
   const result: VideoSentence[] = [];
   let current: VideoSentence | null = null;
   const flush = (boundary: VideoSentenceBoundary): void => {
@@ -117,9 +130,9 @@ export function buildVideoSentenceTimeline(
       current.endMs = Math.max(current.endMs, endMs);
       current.cueIndices.push(cue.index);
     }
-    if (current.endMs - current.startMs > limits.maxDurationMs || current.text.length > limits.maxCharacters
+    if (hasSentenceEnd(cue.text)) flush('punctuation');
+    else if (current.endMs - current.startMs > limits.maxDurationMs || current.text.length > limits.maxCharacters
       || current.cueIndices.length > limits.maxCues) flush('limit');
-    else if (hasSentenceEnd(cue.text)) flush('punctuation');
   }
   flush('end');
   result.forEach((sentence, index) => {

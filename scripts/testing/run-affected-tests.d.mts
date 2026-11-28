@@ -37,9 +37,14 @@ export function selectAffected(input: {
     coverageRuntimeChanged?: boolean;
     inertGlobalInputs?: string[];
     allArchitecture?: boolean;
+    analysis?: DependencyGraphAnalysis | null;
 }): AffectedPlan;
 export function loadWorkspaceFiles(root: string, extraPaths?: string[]): Record<string, string>;
-export function createPlan(root: string, base: string, options?: {explicitFiles?: string[] | null; allArchitecture?: boolean}): AffectedPlan;
+export function createPlan(
+    root: string,
+    base: string,
+    options?: {explicitFiles?: string[] | null; allArchitecture?: boolean; noCache?: boolean},
+): AffectedPlan;
 export function scopedCoverageConfig(plan: AffectedPlan, baseConfigUrl: string): string;
 export function testInvocation(plan: Pick<AffectedPlan, 'testFiles' | 'coverageFiles'>, configPath: string, options?: {reporter?: string | null}): string[] | null;
 export function executePlan(

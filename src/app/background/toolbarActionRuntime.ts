@@ -14,7 +14,7 @@ import {withContextMenuDeadline} from './contextMenuDelivery';
 import {isBrowserTabId, type TabTranslationStateStore} from './tabTranslationState';
 import type {FullPageStateResponse} from './tabTranslationQuery';
 
-export const TOOLBAR_QUICK_PANEL_MENU_ID = 'fluentread-toolbar-quick-panel';
+const TOOLBAR_QUICK_PANEL_MENU_ID = 'fluentread-toolbar-quick-panel';
 
 /** 单独打开面板时绑定原网页，避免面板新标签页成为翻译目标。 */
 export async function openToolbarQuickPanel(tabId: number): Promise<void> {

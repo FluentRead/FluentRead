@@ -9,7 +9,6 @@ import {auditVueOwners, isDeclarativeVue, sourceHash, type VueOwner} from '../he
 const PROJECT_ROOT = resolve(__dirname, '../..');
 const AUDITED_EXTENSIONS = /\.(?:cjs|css|html|js|mjs|ts|vue)$/u;
 const PRODUCT_ROOTS = [
-    'assets/styles',
     'docs/.vitepress',
     'entrypoints',
     'scripts',
@@ -120,7 +119,6 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
     if (path.startsWith('components/')
         || path.startsWith('entrypoints/')
         || path.startsWith('src/')
-        || path.startsWith('assets/styles/')
         || path === 'wxt.config.ts') {
         owners.add('chrome-firefox-build');
     }
@@ -246,7 +244,7 @@ const BUILD_ONLY_SRC_ALLOWLIST = new Set([
     'src/core/i18n/messages/ru-RU.ts',
     'src/core/i18n/messages/zh-CN.ts',
     'src/core/i18n/messages/zh-TW.ts',
-    'src/ui/i18n.ts',
+    'src/ui/i18n/runtime.ts',
     // WXT ShadowRootUi/Vue 挂载适配器绑定真实 DOM 与组件生命周期；由 shadowUi 单测和双浏览器构建验证。
     'src/platform/shadow-ui/vue.ts',
     // 内容脚本构建专用的纯远程配置端口，只调用严格覆盖的 createRemoteConfigStorage；替换规则由 manifest/构建契约测试验证。

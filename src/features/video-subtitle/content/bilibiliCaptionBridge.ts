@@ -19,7 +19,9 @@ export function installBilibiliCaptionBridge(page: Window): () => void {
         try {
             const player = host.player as {getManifest?(): unknown} | undefined;
             const manifest = captionRecord(player?.getManifest?.());
-            const candidates = [`${manifest.bvid}:${manifest.p}`, `av${manifest.aid}:${manifest.p}`];
+            const pageNumber = Number(manifest.p);
+            const p = Number.isSafeInteger(pageNumber) && pageNumber > 0 ? pageNumber : 1;
+            const candidates = [`${manifest.bvid}:${p}`, `av${manifest.aid}:${p}`];
             const epId = Number(manifest.epId ?? manifest.epid);
             if (Number.isSafeInteger(epId) && epId > 0) candidates.push(`ep${epId}`);
             const seasonId = Number(manifest.seasonId ?? manifest.ssid);

@@ -19,9 +19,10 @@ vi.mock('@/src/services/config/store', () => ({
 
 import {config} from '@/src/services/config/store';
 import {DEFAULT_VIDEO_SUBTITLE_APPEARANCE} from '@/src/core/config/videoSubtitleAppearance';
-import {getYoutubeSubtitleControlsScope} from '@/src/features/video-subtitle/content/youtubeControlsScope';
+import {getYoutubeSubtitleControlsScope, YOUTUBE_SUBTITLE_CONTROLS_SELECTOR} from '@/src/features/video-subtitle/content/youtubeControlsScope';
 import {
   applyVideoDisplayState,
+  createVideoSubtitleStyle,
   getOrCreateTranslationOverlay,
   getOrCreateNormalizedCaptionOverlay,
   getOrCreateVideoSubtitleLayer,
@@ -31,14 +32,21 @@ import {
   installVideoSubtitleStyle,
   markVideoUi,
   removeTranslationOverlay,
+  setStyleIfChanged,
+  removeStyleIfPresent,
+  setAttrIfChanged,
+  setDataIfChanged,
   syncTranslationOverlayPosition,
   VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS,
   VIDEO_PLAYER_HOST_CLASS,
+  VIDEO_PLAYER_STATUS_ATTRIBUTE,
   VIDEO_SUBTITLE_PANEL_ID,
   VIDEO_TRANSLATION_LAYER_ID,
   VIDEO_TRANSLATION_OVERLAY_ID,
 } from '@/src/features/video-subtitle/content/ui';
-import {findOwnedSubtitlePanel, getVisibleYoutubeSubtitleControls, VIDEO_SUBTITLE_SCROLL_HOST_ID} from '@/src/features/video-subtitle/content/subtitleControlLayout';
+import {findOwnedSubtitlePanel, getVisibleYoutubeSubtitleControls, positionMobileYoutubeSubtitle, syncSubtitleScrollHostState, VIDEO_SUBTITLE_SCROLL_HOST_ID} from '@/src/features/video-subtitle/content/subtitleControlLayout';
+import {createSubtitleLayoutObserver} from '@/src/features/video-subtitle/content/subtitleLayoutObserver';
+import {fitVideoSubtitleFontSize} from '@/src/features/video-subtitle/content/subtitleLayout';
 import {createVideoPlayerMenu} from '@/src/features/video-subtitle/content/playerMenu';
 import {createVideoSentenceLearningHost} from '@/src/features/video-subtitle/content/sentenceLearningHost';
 
@@ -239,6 +247,9 @@ describe('mobile YouTube readable control avoidance', () => {
     expect(f.panel.style.getPropertyValue('--fluent-read-video-subtitle-bottom')).toBe('12px');
     expect(f.panel.style.getPropertyValue('--fluent-read-video-subtitle-padding')).toBeUndefined();
     expect(f.panel.style.getPropertyValue('--fluent-read-video-subtitle-gap')).toBeUndefined();
+    // 直接 5 参调用兼容路径（不传预测量控件和 layerRect）仍正确完成碰撞避让。
+    f.controls.hidden = false;
+    expect(positionMobileYoutubeSubtitle(f.panel, f.player, f.layer, {left: 50, top: 0, width: 301.5, height: 226}, 277)).toBe(true);
   });
 
   it('仅内部可见控件、隐藏或画面外的外部控件不会提升普通字幕，同矩形的外部可见控件仍被识别', () => {
@@ -787,6 +798,229 @@ describe('X video subtitle viewport', () => {
     lines = 2; overlay.textContent = 'Short'; syncTranslationOverlayPosition(container);
     expect(panel.style.getPropertyValue('--fluent-read-video-subtitle-font-size')).toBe(`${requested}px`);
     expect(config.videoSubtitleAppearance.fontScale).toBe(500);
+  });
+
+  it('相同快照下重复定位跳过重排与样式写入，滚动窗口原生片段只测一次且兼容 Safari webkitFullscreenElement', () => {
+    const {document, window, player, layer} = fixture({intrinsic: [1000, 600]});
+    Object.defineProperty(window, 'location', {configurable: true, value: new URL('https://www.youtube.com/watch?v=memo')});
+    const overlay = getOrCreateTranslationOverlay(player);
+    const original = getOrCreateNormalizedCaptionOverlay(player);
+    expect(overlay.getAttribute('dir')).toBe('auto');
+    expect(original.getAttribute('dir')).toBe('auto');
+    expect(overlay.hasAttribute('aria-live')).toBe(false);
+    expect(original.hasAttribute('aria-live')).toBe(false);
+    overlay.textContent = '稳定译文';
+    original.textContent = 'Stable caption';
+    layer.classList.add(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS);
+    const panel = overlay.parentElement!;
+    const panelRect = vi.fn(() => rect(400, 400, 200, 45));
+    const scrollHeight = vi.fn(() => 45);
+    Object.defineProperties(panel, {
+      getBoundingClientRect: {configurable: true, value: panelRect},
+      scrollHeight: {configurable: true, get: scrollHeight},
+    });
+    const caption = document.createElement('div'); player.appendChild(caption);
+    syncTranslationOverlayPosition(caption);
+    expect(panelRect).toHaveBeenCalledOnce();
+    const setProperty = vi.spyOn(panel.style, 'setProperty');
+    panelRect.mockClear(); scrollHeight.mockClear();
+    syncTranslationOverlayPosition(caption);
+    expect(panelRect).not.toHaveBeenCalled();
+    expect(scrollHeight).not.toHaveBeenCalled();
+    expect(setProperty).not.toHaveBeenCalled();
+    setProperty.mockRestore();
+
+    // Safari webkitFullscreenElement 触发全屏约束，且 max-height 不重复减去双倍安全区。
+    Object.defineProperty(document, 'webkitFullscreenElement', {configurable: true, value: player});
+    syncTranslationOverlayPosition(caption);
+    expect(panel.style.maxHeight).toContain('calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px)');
+    expect(panel.style.maxHeight).not.toContain('max(env(safe-area-inset-top');
+
+    // 桌面双语原生滚动窗口避让只对每个原生片段调用一次 getBoundingClientRect。
+    Object.defineProperty(document, 'webkitFullscreenElement', {configurable: true, value: null});
+    layer.classList.remove(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS);
+    caption.innerHTML = '<div class="ytp-caption-window-rollup"><span class="ytp-caption-segment">Rollup line</span></div>';
+    const rollup = caption.querySelector<HTMLElement>('.ytp-caption-window-rollup')!;
+    const seg = caption.querySelector<HTMLElement>('.ytp-caption-segment')!;
+    const segRect = vi.fn(() => rect(400, 520, 200, 30));
+    Object.defineProperty(rollup, 'getBoundingClientRect', {value: () => rect(380, 500, 240, 60)});
+    Object.defineProperty(seg, 'getBoundingClientRect', {value: segRect});
+    syncTranslationOverlayPosition(caption);
+    expect(segRect).toHaveBeenCalledOnce();
+  });
+
+  it('受守卫的 DOM 写入辅助识别浏览器优先级、无变化跳过，且样式包含 containment、GPU 进度条与高对比回退', () => {
+    const {document} = fixture();
+    const element = document.createElement('div');
+    let storedValue = '';
+    let storedPriority = '';
+    Object.defineProperty(element, 'style', {
+      value: {
+        getPropertyValue: () => storedValue,
+        getPropertyPriority: () => storedPriority,
+        setProperty: vi.fn((_prop: string, value: string, priority = '') => {storedValue = value; storedPriority = priority;}),
+        removeProperty: vi.fn(() => {storedValue = ''; storedPriority = ''; return '';}),
+      },
+    });
+    expect(setStyleIfChanged(element, 'left', '10px')).toBe(true);
+    expect(setStyleIfChanged(element, 'left', '10px')).toBe(false);
+    expect(setStyleIfChanged(element, 'left', '10px', 'important')).toBe(true);
+    expect(setStyleIfChanged(element, 'left', '10px', 'important')).toBe(false);
+    expect(removeStyleIfPresent(element, 'left')).toBe(true);
+    expect(removeStyleIfPresent(element, 'left')).toBe(false);
+    const plain = document.createElement('div');
+    expect(setAttrIfChanged(plain, 'data-x', '1')).toBe(true);
+    expect(setAttrIfChanged(plain, 'data-x', '1')).toBe(false);
+    expect(setDataIfChanged(plain, 'state', 'ready')).toBe(true);
+    expect(setDataIfChanged(plain, 'state', 'ready')).toBe(false);
+    // 滚动宿主在原 layer 没有 clip-path 时安全移除残留 clip-path。
+    const layer = document.createElement('div'); layer.className = 'layer-cls';
+    const host = document.createElement('div'); host.id = VIDEO_SUBTITLE_SCROLL_HOST_ID;
+    host.style.setProperty('clip-path', 'inset(10px)', 'important');
+    document.body.append(layer, host);
+    syncSubtitleScrollHostState(layer);
+    expect(host.className).toBe('layer-cls');
+    expect(host.style.getPropertyValue('clip-path')).toBeUndefined();
+    syncSubtitleScrollHostState(layer);
+
+    const css = createVideoSubtitleStyle(document).textContent || '';
+    expect(css).not.toContain('contain: layout style paint');
+    expect(css).toContain('contain: layout style !important;');
+    expect(css).toContain('transform: scaleX(var(--fluent-read-video-ai-progress-scale, 0)) !important;');
+    expect(css).toContain('text-wrap: balance !important;');
+    expect(css).toContain('-webkit-font-smoothing: antialiased !important;');
+    expect(css).toContain('.fluent-read-video-menu-format-select');
+    expect(css).toContain('@media (forced-colors: active)');
+    expect(css).toContain(VIDEO_PLAYER_STATUS_ATTRIBUTE);
+  });
+
+  it('字幕布局观察器过滤高频进度条属性变更，并在纯属性变更时复用已缓存控件列表', () => {
+    const f = mobileControlFixture();
+    vi.stubGlobal('Element', f.window.Element);
+    const callbacks: MutationCallback[] = [];
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('MutationObserver', class {
+      constructor(callback: MutationCallback) {callbacks.push(callback);}
+      observe() {}
+      disconnect() {}
+    });
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {frames.push(cb); return frames.length;});
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const scrubber = f.document.createElement('div');
+    scrubber.className = 'ytp-play-progress';
+    f.player.appendChild(scrubber);
+    const timeCurrent = f.document.createElement('span');
+    timeCurrent.className = 'ytp-time-current';
+    f.player.appendChild(timeCurrent);
+    const layout = vi.fn();
+    const observer = createSubtitleLayoutObserver(layout, () => true);
+    observer.observe(f.player, f.video);
+    frames.shift()?.(0);
+    expect(layout).toHaveBeenCalledOnce();
+    const querySpy = vi.spyOn(f.scope, 'querySelectorAll');
+    // 60Hz 进度条与当前时间节点属性变更完全过滤，既不查询控件也不调度重排。
+    callbacks[0]([
+      {type: 'attributes', target: scrubber, addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+      {type: 'attributes', target: timeCurrent, addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+    ], {} as MutationObserver);
+    expect(querySpy).not.toHaveBeenCalled();
+    expect(frames).toHaveLength(0);
+    // 同视频控件祖先的属性变更直接复用缓存控件列表，不触发控件选择器重查。
+    callbacks[0]([
+      {type: 'attributes', target: f.controls, addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+    ], {} as MutationObserver);
+    expect(querySpy).not.toHaveBeenCalledWith(YOUTUBE_SUBTITLE_CONTROLS_SELECTOR);
+    expect(frames).toHaveLength(1);
+    frames.shift()?.(16);
+    expect(layout).toHaveBeenCalledTimes(2);
+    // childList 结构变更时重新查询并更新缓存。
+    const extra = f.document.createElement('div'); extra.className = 'player-controls-bottom';
+    f.controls.appendChild(extra);
+    callbacks[0]([
+      {type: 'childList', target: f.controls, addedNodes: [extra], removedNodes: []} as unknown as MutationRecord,
+    ], {} as MutationObserver);
+    expect(querySpy).toHaveBeenCalledWith(YOUTUBE_SUBTITLE_CONTROLS_SELECTOR);
+    expect(frames).toHaveLength(1);
+    frames.shift()?.(32);
+
+    // 控件通过 class/id 属性动态加入或移出选择器时必须刷新缓存并重排；无关元素 class/id 变更不重查。
+    querySpy.mockClear();
+    const dynamicNode = f.document.createElement('div');
+    f.controls.appendChild(dynamicNode);
+    const unrelated = f.document.createElement('div');
+    f.scope.appendChild(unrelated);
+    const textNode = f.document.createTextNode('plain');
+    f.scope.appendChild(textNode);
+    callbacks[0]([
+      {type: 'attributes', attributeName: 'class', target: unrelated, addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+      {type: 'attributes', attributeName: 'id', target: textNode, addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+    ], {} as MutationObserver);
+    expect(querySpy).not.toHaveBeenCalledWith(YOUTUBE_SUBTITLE_CONTROLS_SELECTOR);
+    expect(frames).toHaveLength(0);
+
+    dynamicNode.className = 'player-controls-bottom';
+    callbacks[0]([
+      {type: 'attributes', attributeName: 'class', target: dynamicNode, addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+    ], {} as MutationObserver);
+    expect(querySpy).toHaveBeenCalledWith(YOUTUBE_SUBTITLE_CONTROLS_SELECTOR);
+    expect(frames).toHaveLength(1);
+    frames.shift()?.(48);
+
+    querySpy.mockClear();
+    dynamicNode.className = 'plain-box';
+    callbacks[0]([
+      {type: 'attributes', attributeName: 'id', target: dynamicNode, addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+    ], {} as MutationObserver);
+    expect(querySpy).toHaveBeenCalledWith(YOUTUBE_SUBTITLE_CONTROLS_SELECTOR);
+    expect(frames).toHaveLength(1);
+    observer.destroy();
+  });
+
+  it('字号适配缓存区分显示模式与逐字高亮开关，且 0 高度测量不污染缓存', () => {
+    const {document, window, player, layer} = fixture({intrinsic: [1080, 1920], objectFit: 'contain'});
+    Object.defineProperty(window, 'location', {configurable: true, value: new URL('https://www.youtube.com/watch?v=fontfit')});
+    config.videoSubtitleAppearance = {...DEFAULT_VIDEO_SUBTITLE_APPEARANCE, fontScale: 500, karaoke: false};
+    const overlay = getOrCreateTranslationOverlay(player);
+    const original = getOrCreateNormalizedCaptionOverlay(player);
+    overlay.textContent = '较长译文字幕';
+    original.textContent = 'Long original caption';
+    layer.classList.add(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS);
+    const panel = overlay.parentElement!;
+    let factor = 20;
+    const scrollHeight = vi.fn(() => Number.parseFloat(panel.style.getPropertyValue('--fluent-read-video-subtitle-font-size')) * factor + 16);
+    Object.defineProperty(panel, 'scrollHeight', {configurable: true, get: scrollHeight});
+    const caption = document.createElement('div');
+    player.appendChild(caption);
+
+    syncTranslationOverlayPosition(caption);
+    const bilingualSize = Number.parseFloat(panel.style.getPropertyValue('--fluent-read-video-subtitle-font-size'));
+    expect(bilingualSize).toBeLessThan(80);
+
+    // 切换为仅译文模式后行数变少，fontFitKey 必须失效并重新适配字号。
+    factor = 2;
+    config.videoSubtitleDisplayMode = 'translation-only';
+    syncTranslationOverlayPosition(caption);
+    const translationOnlySize = Number.parseFloat(panel.style.getPropertyValue('--fluent-read-video-subtitle-font-size'));
+    expect(translationOnlySize).toBeGreaterThan(bilingualSize);
+
+    // 切换 karaoke 开关同样必须重新测量。
+    factor = 18;
+    config.videoSubtitleAppearance = {...config.videoSubtitleAppearance, karaoke: true};
+    syncTranslationOverlayPosition(caption);
+    const karaokeSize = Number.parseFloat(panel.style.getPropertyValue('--fluent-read-video-subtitle-font-size'));
+    expect(karaokeSize).toBeLessThan(translationOnlySize);
+
+    // 0 高度（如 display: none）不应写入缓存，恢复可见测量后可重新计算并缓存。
+    const cacheTarget = {};
+    let applied = 0;
+    const apply = (size: number) => {applied = size;};
+    const zeroMeasure = vi.fn(() => 0);
+    expect(fitVideoSubtitleFontSize(100, 120, apply, zeroMeasure, 8, {target: cacheTarget, key: 'hidden-key'})).toBe(100);
+    const visibleMeasure = vi.fn(() => applied * 4 + 16);
+    const fitted = fitVideoSubtitleFontSize(100, 120, apply, visibleMeasure, 8, {target: cacheTarget, key: 'hidden-key'});
+    expect(fitted).toBeLessThan(30);
+    expect(visibleMeasure).toHaveBeenCalled();
   });
 
 });

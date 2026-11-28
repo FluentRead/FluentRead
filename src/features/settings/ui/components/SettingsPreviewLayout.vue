@@ -8,7 +8,7 @@
   <div class="settings-preview-layout">
     <section class="settings-preview-example" :class="{'sticky-preview': stickyPreview}" :aria-label="label">
       <div class="settings-preview-content">
-        <div class="settings-preview-caption"><strong>效果预览</strong><small>示例，不发送请求</small></div>
+        <div class="settings-preview-caption"><strong>效果预览</strong></div>
         <slot name="preview" />
       </div>
     </section>

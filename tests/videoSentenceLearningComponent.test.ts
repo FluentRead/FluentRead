@@ -9,6 +9,7 @@ import {parseHTML} from 'linkedom';
 import * as vue from 'vue';
 import {Config} from '@/src/core/config/model';
 import {translateLegacyText, type UiLanguage} from '@/src/core/i18n';
+import {VideoReadingAnnotationSession} from '@/src/features/video-subtitle/content/readingAnnotationSession';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 
 registerAllUiLanguageBundles();
@@ -31,6 +32,10 @@ vi.mock('@/src/features/video-subtitle/content/readingAnnotationClient', () => (
 const first = 'First sentence.';
 const second = 'Second sentence.';
 const third = 'Third sentence.';
+const jaFirst = '今日はいい天気です。';
+const jaSecond = '明日も晴れます。';
+const jaThird = 'おはようございます。';
+const jaCues = () => [jaFirst, jaSecond, jaThird].map((text, i) => ({text, startMs: i * 2000, durationMs: 1000}));
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
   let reject!: (cause: unknown) => void;
@@ -157,7 +162,7 @@ describe('完整句学习组件的调度与异步归属回归', () => {
     const host = await mountRendered();
     sendRuntimeMessage.mockRejectedValueOnce(new Error('Options unavailable'));
     state.openAppearance(); await flush();
-    expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-interface', target: 'video-sentence-learning-appearance'});
+    expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-video', target: 'video-sentence-learning-appearance'});
     sendRuntimeMessage.mockRejectedValueOnce(new Error('Library unavailable'));
     state.openLibrary(); await flush();
     expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-vocabulary'});
@@ -243,10 +248,16 @@ describe('完整句学习组件的调度与异步归属回归', () => {
     expect(host.querySelector('[data-learning-translation-display]')?.textContent).toBe(source);
   });
 
-  it.each(['ja', ''])('读音无来源语言时回退配置 %s，空结果不显示错误，换句后的归顶任务可安全卸载', async source => {
+  it.each(['ja', ''])('读音无来源语言时回退配置 %s，空结果不显示错误，不支持的语言不请求，换句后的归顶任务可安全卸载', async source => {
+    props.cues = jaCues();
     props.sourceLanguage = ''; config.from = source; config.videoSubtitleAppearance.readingAnnotation = true;
     annotateVideoReading.mockResolvedValue(null); await mount(); await advance(0);
-    expect(annotateVideoReading).toHaveBeenCalledWith(first, source || 'auto', expect.any(AbortSignal));
+    expect(annotateVideoReading).toHaveBeenCalledWith(jaFirst, 'ja', expect.any(AbortSignal));
+    expect(state.readingText).toBe(''); expect(state.readingError).toBe(false);
+    // 英语文本无法解析为支持的读音语言，直接清空并不调用读音引擎。
+    annotateVideoReading.mockClear();
+    props.cues = [{text: first, startMs: 0, durationMs: 1000}]; props.sourceLanguage = 'en'; await flush();
+    expect(annotateVideoReading).not.toHaveBeenCalled();
     expect(state.readingText).toBe(''); expect(state.readingError).toBe(false);
     props.cues = []; await vue.nextTick(); close(); await flush();
     expect(state.body).toBeNull();
@@ -327,7 +338,7 @@ describe('完整句学习组件的调度与异步归属回归', () => {
     const host = await mountRendered();
     const click = async (action: string) => {const button = host.querySelector(`[data-learning-action="${action}"]`) as HTMLButtonElement; expect(button).toBeTruthy(); expect(button.hasAttribute('disabled')).toBe(false); button.dispatchEvent(new document.defaultView!.Event('click', {bubbles: true})); await flush();};
     await click('help'); expect(host.querySelector('[data-learning-help]')).toBeTruthy();
-    await click('appearance'); expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-interface', target: 'video-sentence-learning-appearance'});
+    await click('appearance'); expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-video', target: 'video-sentence-learning-appearance'});
     await click('collapse'); expect(host.querySelector('[data-learning-peek]')?.textContent).toBe(first);
     host.querySelector('[data-learning-peek]')!.dispatchEvent(new document.defaultView!.Event('click', {bubbles: true})); await flush(); expect(state.expanded).toBe(true);
     await click('next'); await advance(120); expect(state.sentence.text).toBe(second);
@@ -354,15 +365,16 @@ describe('完整句学习组件的调度与异步归属回归', () => {
   });
 
   it('读音默认关闭，单独开关不打断人工草稿、固定句和循环，面板原句不跟播放器模式隐藏', async () => {
+    props.cues = jaCues();
     props.sourceLanguage = 'ja'; await mount();
     expect(annotateVideoReading).not.toHaveBeenCalled();
     state.translation = '人工译文'; state.onTranslationInput(); state.toggleMode('loop');
     const requests = translate.mock.calls.length;
     config.videoSubtitleDisplayMode = 'translation-only'; config.videoSubtitleAppearance.readingAnnotation = true; subscription();
     await advance(0);
-    expect(state.readingText).toBe(`Reading: ${first}`);
+    expect(state.readingText).toBe(`Reading: ${jaFirst}`);
     expect(state.readingLanguage).toBe('ja');
-    expect(annotateVideoReading).toHaveBeenCalledWith(first, 'ja', expect.any(AbortSignal));
+    expect(annotateVideoReading).toHaveBeenCalledWith(jaFirst, 'ja', expect.any(AbortSignal));
     expect(state.translation).toBe('人工译文'); expect(state.pinned).toBe(true); expect(state.mode).toBe('loop');
     expect(translate).toHaveBeenCalledTimes(requests);
     config.videoSubtitleAppearance.readingAnnotation = false; subscription(); await flush();
@@ -370,6 +382,7 @@ describe('完整句学习组件的调度与异步归属回归', () => {
   });
 
   it('实际模板显示紧凑读音错误与可点击重试，成功后移除错误且保留原句', async () => {
+    props.cues = jaCues();
     annotateVideoReading.mockRejectedValueOnce(new Error('dictionary unavailable'));
     config.videoSubtitleAppearance.readingAnnotation = true; props.sourceLanguage = 'ja';
     const host = await mountRendered(); await advance(0);
@@ -378,31 +391,33 @@ describe('完整句学习组件的调度与异步归属回归', () => {
     const retry = error.querySelector('button')!; expect(retry.textContent).toBe('video.readingAnnotation.retry');
     retry.dispatchEvent(new document.defaultView!.Event('click', {bubbles: true})); await advance(0);
     expect(host.querySelector('[data-learning-reading-error]')).toBeNull();
-    expect(host.querySelector('[data-learning-reading]')?.textContent).toBe(`Reading: ${first}`);
-    expect(host.querySelector('[data-learning-original]')?.textContent).toBe(first);
+    expect(host.querySelector('[data-learning-reading]')?.textContent).toBe(`Reading: ${jaFirst}`);
+    expect(host.querySelector('[data-learning-original]')?.textContent).toBe(jaFirst);
     expect(annotateVideoReading).toHaveBeenCalledTimes(2);
   });
 
   it('读音失败独立重试，不改变人工译文、已保存快照、固定状态或循环', async () => {
+    props.cues = jaCues();
     annotateVideoReading.mockRejectedValueOnce(new Error('dictionary unavailable'));
     config.videoSubtitleAppearance.readingAnnotation = true; props.sourceLanguage = 'ja';
     await mount(); await advance(0); expect(state.readingError).toBe(true);
     state.translation = '人工译文'; state.onTranslationInput(); state.toggleMode('loop'); await state.save();
     const saved = state.savedSnapshot, translationRequests = translate.mock.calls.length, savedRequests = sendRuntimeMessage.mock.calls.length;
     expect(state.saved).toBe(true); state.loadReadingAnnotation(); await advance(0);
-    expect(state.readingError).toBe(false); expect(state.readingText).toBe(`Reading: ${first}`);
+    expect(state.readingError).toBe(false); expect(state.readingText).toBe(`Reading: ${jaFirst}`);
     expect(state.translation).toBe('人工译文'); expect(state.saved).toBe(true); expect(state.savedSnapshot).toBe(saved);
     expect(state.pinned).toBe(true); expect(state.mode).toBe('loop');
     expect(translate).toHaveBeenCalledTimes(translationRequests); expect(sendRuntimeMessage).toHaveBeenCalledTimes(savedRequests);
   });
 
   it('换句、收起、停用与关闭清除读音错误，旧代次AbortError不能误报当前句', async () => {
+    props.cues = jaCues();
     const late = deferred<{text: string; language: string; scheme: string}>();
     annotateVideoReading.mockReturnValueOnce(late.promise);
     config.videoSubtitleAppearance.readingAnnotation = true; props.sourceLanguage = 'ja';
     await mount(); await step(1); await advance(0);
     late.reject(new DOMException('old sentence cancelled', 'AbortError')); await advance(0);
-    expect(state.readingError).toBe(false); expect(state.readingText).toBe(`Reading: ${second}`);
+    expect(state.readingError).toBe(false); expect(state.readingText).toBe(`Reading: ${jaSecond}`);
     annotateVideoReading.mockRejectedValueOnce(new Error('failed'));
     await step(1); await advance(0); expect(state.readingError).toBe(true);
     await step(-1); await advance(0); expect(state.readingError).toBe(false);
@@ -418,15 +433,16 @@ describe('完整句学习组件的调度与异步归属回归', () => {
   });
 
   it('读音跟随当前固定或历史句，快速换句与关闭拒绝迟到响应', async () => {
+    props.cues = jaCues();
     const late = deferred<{text: string; language: string; scheme: string}>();
     annotateVideoReading.mockReturnValueOnce(late.promise);
     config.videoSubtitleAppearance.readingAnnotation = true; props.sourceLanguage = 'ja';
     await mount(); const signal = annotateVideoReading.mock.calls[0][2] as AbortSignal;
     await step(1); await advance(0);
-    expect(signal.aborted).toBe(true); expect(state.readingText).toBe(`Reading: ${second}`);
+    expect(signal.aborted).toBe(true); expect(state.readingText).toBe(`Reading: ${jaSecond}`);
     late.resolve({text: '古い読み', language: 'ja', scheme: 'fixture'}); await advance(0);
-    expect(state.readingText).toBe(`Reading: ${second}`);
-    await step(-1); await advance(0); expect(state.readingText).toBe(`Reading: ${first}`);
+    expect(state.readingText).toBe(`Reading: ${jaSecond}`);
+    await step(-1); await advance(0); expect(state.readingText).toBe(`Reading: ${jaFirst}`);
     const afterClose = deferred<{text: string; language: string; scheme: string}>();
     annotateVideoReading.mockReturnValueOnce(afterClose.promise);
     await step(1); await step(1); await flush();
@@ -437,6 +453,7 @@ describe('完整句学习组件的调度与异步归属回归', () => {
   });
 
   it('收起面板取消读音，隐藏换句不发请求，展开当前句再读取；换媒体不复用旧会话缓存', async () => {
+    props.cues = jaCues();
     const late = deferred<{text: string; language: string; scheme: string}>();
     annotateVideoReading.mockReturnValueOnce(late.promise);
     config.videoSubtitleAppearance.readingAnnotation = true; props.sourceLanguage = 'ja';
@@ -445,7 +462,7 @@ describe('完整句学习组件的调度与异步归属回归', () => {
     await step(1); await advance(500); expect(annotateVideoReading).toHaveBeenCalledOnce();
     late.resolve({text: '已收起的读音', language: 'ja', scheme: 'fixture'}); await advance(0);
     expect(state.readingText).toBe('');
-    state.expanded = true; await advance(0); expect(state.readingText).toBe(`Reading: ${second}`);
+    state.expanded = true; await advance(0); expect(state.readingText).toBe(`Reading: ${jaSecond}`);
     const count = annotateVideoReading.mock.calls.length;
     props.sourceUrl = 'https://www.youtube.com/watch?v=another-video'; await advance(0);
     expect(annotateVideoReading).toHaveBeenCalledTimes(count + 1);
@@ -624,12 +641,14 @@ describe('完整句学习组件的调度与异步归属回归', () => {
     expect(state.translation).toBe(`Translated: ${third}`);
   });
 
-  it('初次打开与自然播放跟句立即请求，并保留输入边界的浅身份', async () => {
+  it('初次打开立即请求，自然播放跟句合并 120ms 防抖并保留输入边界的浅身份', async () => {
     await mount(); expect(translate).toHaveBeenCalledOnce();
     expect(state.props.video).toBe(video); expect(state.props.cues).toBe(props.cues);
     const body = state.body as HTMLElement; body.scrollTop = 50;
     video.currentTime = 2.2; video.dispatchEvent(new Event('timeupdate'));
     await flush(); expect(state.sentence.text).toBe(second); expect(body.scrollTop).toBe(0);
+    expect(translate).toHaveBeenCalledOnce();
+    await advance(120);
     expect(translate.mock.calls.map(call => call[0])).toEqual([first, second]);
     expect(state.pinned).toBe(false);
   });
@@ -887,7 +906,10 @@ it('HTML transcript renders a bounded window and line clicks seek the original m
   state.onTranscriptToggle({target: {open: true}}); await flush();
   expect(host.querySelectorAll('.fr-video-learning-transcript-scroll button').length).toBeLessThanOrEqual(14);
   const list = host.querySelector<HTMLElement>('.fr-video-learning-transcript-scroll')!;
-  list.scrollTop = 5600; list.dispatchEvent(new list.ownerDocument.defaultView!.Event('scroll')); await flush();
+  list.scrollTop = 5600;
+  list.dispatchEvent(new list.ownerDocument.defaultView!.Event('scroll'));
+  list.dispatchEvent(new list.ownerDocument.defaultView!.Event('scroll'));
+  await advance(20);
   expect(state.visibleTranscript[0].text).toBe('Sentence 97.');
   const row = host.querySelectorAll('.fr-video-learning-transcript-scroll button')[3];
   row.dispatchEvent(new row.ownerDocument.defaultView!.Event('click', {bubbles: true})); await flush(); expect(video.currentTime).toBe(200);
@@ -938,4 +960,239 @@ it('HTML sentence saving retains its web source without claiming a platform-spec
   await state.save();
   const input = sendRuntimeMessage.mock.calls.find(([message]) => message.action === 'upsert')![0].input;
   expect(input.context).toMatchObject({sourceUrl: 'https://podcast.example/episode'}); expect(input.context.video).toBeUndefined();
+});
+
+describe('学习面板韧性、快捷键与共享读音会话', () => {
+  it('重新讲解失败保留原讲解并提供内联重试，45 秒停滞看门狗释放保存按钮', async () => {
+    const host = await mountRendered();
+    state.explain();
+    readingCallbacks.result({success: true, text: 'Initial valid explanation'});
+    await flush();
+    expect(state.explanation).toBe('Initial valid explanation');
+
+    // 重新讲解返回失败时，恢复旧讲解并展示内联重试按钮。
+    state.explain();
+    readingCallbacks.result({success: false, error: 'temporary explain error'});
+    await flush();
+    expect(state.explanation).toBe('Initial valid explanation');
+    expect(state.error).toBe('temporary explain error');
+    const retryBtn = host.querySelector<HTMLButtonElement>('[data-learning-action="retry-explanation"]')!;
+    expect(retryBtn).toBeTruthy();
+
+    // 点击重试后任意进度（包括非文本进度）均刷新看门狗；超时时 cancel 同步回调 error 不重复覆盖超时错误。
+    cancelReading.mockImplementationOnce(() => { readingCallbacks.error(new Error('sync abort from cancel')); });
+    retryBtn.dispatchEvent(new document.defaultView!.Event('click', {bubbles: true}));
+    await flush();
+    expect(state.explaining).toBe(true);
+    await advance(30_000);
+    readingCallbacks.progress({kind: 'status', text: 'thinking'});
+    expect(state.explanation).toBe('');
+    await advance(30_000);
+    expect(state.explaining).toBe(true);
+    readingCallbacks.progress({kind: 'text', text: 'Partial retry'});
+    await advance(30_000);
+    expect(state.explaining).toBe(true);
+    await advance(15_000);
+    expect(state.explaining).toBe(false);
+    expect(cancelReading).toHaveBeenCalled();
+    expect(state.explanation).toBe('Initial valid explanation');
+    expect(state.error).toBe('video.learning.explainFailed');
+    expect(host.querySelector('[data-learning-action="save"]')?.hasAttribute('disabled')).toBe(false);
+
+    // 已经排队的旧看门狗回调在停止讲解后触发时必须安全忽略。
+    state.explain();
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout').mockImplementationOnce(() => undefined);
+    state.stopExplanation();
+    clearSpy.mockRestore();
+    await advance(45_000);
+    expect(state.explanationFailed).toBe(false);
+    expect(state.error).toBe('');
+  });
+
+  it('翻译瞬态失败后自动重试一次并可恢复，鉴权失败不自动重试，收起取消重试计时器', async () => {
+    translate.mockRejectedValueOnce(new Error('503 service unavailable')).mockResolvedValueOnce('Recovered translation');
+    await mount();
+    expect(state.translationError).toBe('503 service unavailable');
+    await advance(1200);
+    expect(state.translation).toBe('Recovered translation');
+    expect(state.translationError).toBe('');
+    expect(translate).toHaveBeenCalledTimes(2);
+
+    // 连续瞬态失败仅自动重试一次，不无限循环。
+    translate.mockRejectedValueOnce(new Error('network timeout')).mockRejectedValueOnce(new Error('network timeout'));
+    await step(1);
+    await advance(120);
+    expect(state.translationError).toBe('network timeout');
+    await advance(1200);
+    await advance(3600);
+    expect(translate).toHaveBeenCalledTimes(4);
+
+    // 401 非瞬态错误不触发自动重试。
+    translate.mockRejectedValueOnce(new Error('401 unauthorized'));
+    await step(1);
+    await advance(120);
+    await advance(2400);
+    expect(translate).toHaveBeenCalledTimes(5);
+
+    // 收起面板取消排队的重试计时器。
+    translate.mockRejectedValueOnce(new Error('429 rate limit'));
+    await step(-1);
+    await advance(120);
+    state.expanded = false;
+    await advance(2400);
+    expect(translate).toHaveBeenCalledTimes(6);
+  });
+
+  it('查词翻译失败展示内联重试按钮并可重新查词，初次挂载位于中间句直接翻译', async () => {
+    props.platform = 'html';
+    video.currentTime = 2.2;
+    translate.mockResolvedValueOnce('Sentence translation').mockRejectedValueOnce(new Error('word failed')).mockResolvedValueOnce('Word ok');
+    const host = await mountRendered();
+    expect(state.sentence.text).toBe(second);
+    expect(state.translation).toBe('Sentence translation');
+    host.querySelector<HTMLButtonElement>('.fr-video-learning-word')!.dispatchEvent(new document.defaultView!.Event('click', {bubbles: true}));
+    await flush();
+    const retryWord = host.querySelector<HTMLButtonElement>('[data-learning-action="retry-word"]')!;
+    expect(retryWord).toBeTruthy();
+    retryWord.dispatchEvent(new document.defaultView!.Event('click', {bubbles: true}));
+    await flush();
+    expect(state.wordLookup).toMatchObject({word: 'Second', text: 'Word ok', failed: false});
+  });
+
+  it('快捷键跳过 slider，支持 s 重播、f 跟随与面板根部 Space 启停播放', async () => {
+    const f = portalKeyboardFixture();
+    await mount(f.panel.parentElement!);
+    placePanel(f);
+    const slider = f.document.createElement('div');
+    slider.setAttribute('role', 'slider');
+    f.player.appendChild(slider);
+    expect(f.key('ArrowRight', slider).defaultPrevented).toBe(false);
+    expect(state.index).toBe(0);
+
+    // s 键重播当前句；f 键仅在焦点位于学习面板内部时返回跟随，不劫持播放器原生全屏热键。
+    await step(1);
+    expect(state.pinned).toBe(true);
+    expect(f.key('s', video).defaultPrevented).toBe(true);
+    expect(video.play).toHaveBeenCalledOnce();
+    video.currentTime = 4.2;
+    expect(f.key('f', video).defaultPrevented).toBe(false);
+    expect(state.pinned).toBe(true);
+    expect(state.index).toBe(1);
+    expect(f.key('f', f.document.getElementById('panel-button')!).defaultPrevented).toBe(true);
+    await flush();
+    expect(state.pinned).toBe(false);
+    expect(state.index).toBe(2);
+
+    // Safari webkitFullscreenElement 同样在播放器全屏时支持 body 焦点学习键与 Escape 退出全屏。
+    Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: f.player});
+    expect(f.key('r', f.document.body).defaultPrevented).toBe(true);
+    expect(state.mode).toBe('loop');
+    const exitFullscreen = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(f.document, 'exitFullscreen', {configurable: true, value: exitFullscreen});
+    expect(f.key('Escape', f.document.body).defaultPrevented).toBe(false);
+    expect(exitFullscreen).toHaveBeenCalledOnce();
+    Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: null});
+
+    // Space 仅在焦点直接位于面板根部时切换播放/暂停，子按钮和播放器保留默认行为。
+    expect(f.key(' ', f.document.getElementById('panel-button')!).defaultPrevented).toBe(false);
+    expect(f.key(' ', video).defaultPrevented).toBe(false);
+    Object.assign(video, {paused: true});
+    expect(f.key(' ', state.panel).defaultPrevented).toBe(true);
+    expect(video.play).toHaveBeenCalledTimes(2);
+    Object.assign(video, {paused: false});
+    expect(f.key(' ', state.panel).defaultPrevented).toBe(true);
+    expect(video.pause).toHaveBeenCalledOnce();
+    Object.assign(video, {paused: true});
+    (video.play as Mock).mockRejectedValueOnce(new Error('blocked'));
+    expect(f.key(' ', state.panel).defaultPrevented).toBe(true);
+    await flush();
+    expect(state.error).toBe('video.learning.playFailed');
+    // 关闭面板后异步拒绝不写入错误。
+    const latePlay = deferred<void>();
+    (video.play as Mock).mockReturnValueOnce(latePlay.promise);
+    expect(f.key(' ', state.panel).defaultPrevented).toBe(true);
+    close();
+    latePlay.reject(new Error('closed'));
+    await flush();
+  });
+
+  it('注入共享 readingSession 复用规范化语言缓存且与面板本地请求互不取消', async () => {
+    const sharedPending = deferred<{text: string; language: string; scheme: string} | null>();
+    const sharedAnnotate = vi.fn(async (text: string, language: string) => {
+      if (text === jaSecond) return null;
+      if (text === jaThird) return sharedPending.promise;
+      return {text: `Shared: ${text}`, language, scheme: 'shared'};
+    });
+    const shared = new VideoReadingAnnotationSession(sharedAnnotate);
+    await shared.request(jaFirst, 'ja');
+    await shared.request(jaSecond, 'ja');
+    expect(sharedAnnotate).toHaveBeenCalledTimes(2);
+
+    config.videoSubtitleAppearance.readingAnnotation = true;
+    props.cues = jaCues();
+    props.sourceLanguage = 'ja-JP';
+    props.readingSession = shared;
+    await mount();
+    await flush();
+    expect(state.readingText).toBe(`Shared: ${jaFirst}`);
+    expect(state.readingLanguage).toBe('ja');
+    expect(annotateVideoReading).not.toHaveBeenCalled();
+
+    // 共享会话缓存 null（无适用读音）时直接跳过本地请求且不报错。
+    await step(1);
+    await flush();
+    expect(state.readingText).toBe('');
+    expect(state.readingError).toBe(false);
+    expect(annotateVideoReading).not.toHaveBeenCalled();
+
+    // 共享会话正在进行前台任务时，面板未命中缓存应使用本地会话，互不取消也不误报错误。
+    const playerJob = shared.request(jaThird, 'ja');
+    const localPending = deferred<{text: string; language: string; scheme: string}>();
+    annotateVideoReading.mockReturnValueOnce(localPending.promise);
+    await step(1);
+    await flush();
+    expect(annotateVideoReading).toHaveBeenCalledWith(jaThird, 'ja', expect.any(AbortSignal));
+    sharedPending.resolve({text: 'Player shared result', language: 'ja', scheme: 'shared'});
+    await expect(playerJob).resolves.toEqual({text: 'Player shared result', language: 'ja', scheme: 'shared'});
+    localPending.resolve({text: 'Local panel result', language: 'ja', scheme: 'local'});
+    await flush();
+    expect(state.readingText).toBe('Local panel result');
+    expect(state.readingError).toBe(false);
+
+    props.sourceUrl = 'https://www.youtube.com/watch?v=other';
+    await flush();
+    expect(shared.peek(jaFirst, 'ja')).toEqual({text: `Shared: ${jaFirst}`, language: 'ja', scheme: 'shared'});
+    close();
+    expect(shared.peek(jaFirst, 'ja')).toEqual({text: `Shared: ${jaFirst}`, language: 'ja', scheme: 'shared'});
+    shared.destroy();
+  });
+
+  it('关闭面板与空目标滚动安全清理待执行字幕滚动帧，同帧多次滚动合并', async () => {
+    const callbacks: Array<() => void> = [];
+    let nextFrameId = 0;
+    const cancel = vi.fn();
+    vi.stubGlobal('requestAnimationFrame', vi.fn((cb: () => void) => { callbacks.push(cb); return ++nextFrameId; }));
+    vi.stubGlobal('cancelAnimationFrame', cancel);
+    props.platform = 'html';
+    props.cues = Array.from({length: 30}, (_, n) => ({text: `Line ${n}.`, startMs: n * 1000, durationMs: 800}));
+    const host = await mountRendered();
+    state.onTranscriptScroll({target: null});
+    state.onTranscriptToggle({target: {open: true}});
+    await flush();
+    const list = host.querySelector<HTMLElement>('.fr-video-learning-transcript-scroll')!;
+    list.scrollTop = 280;
+    list.dispatchEvent(new list.ownerDocument.defaultView!.Event('scroll'));
+    list.scrollTop = 560;
+    list.dispatchEvent(new list.ownerDocument.defaultView!.Event('scroll'));
+    expect(callbacks).toHaveLength(1);
+    callbacks.shift()!();
+    await flush();
+    expect(state.transcriptScroll).toBe(560);
+
+    list.scrollTop = 840;
+    list.dispatchEvent(new list.ownerDocument.defaultView!.Event('scroll'));
+    expect(callbacks).toHaveLength(1);
+    close();
+    expect(cancel).toHaveBeenCalledWith(2);
+  });
 });

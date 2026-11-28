@@ -941,6 +941,8 @@ describe('userscript browser shim injection', () => {
         expect(safariPermissionKeys).toHaveLength(8);
         const browserPreparationKeys = Object.keys(extension).filter(key => key.startsWith('settings.services.chromePreparation.'));
         expect(browserPreparationKeys).toContain('settings.services.chromePreparation.action');
+        const localTranslationKeys = Object.keys(extension).filter(key => key.startsWith('settings.localTranslation.'));
+        expect(localTranslationKeys).toContain('settings.localTranslation.hunyuan3');
         const sidepanelKeys = ['title', 'openCenter', 'keyboardHint', 'openError', 'settingsError', 'startupError',
             'scope.label', 'scope.tab', 'scope.window', 'scope.description'].map(name => `sidepanel.${name}`);
         const toolbarKeys = ['click.label', 'click.description', 'click.popup', 'click.translate', 'openPopup'].map(name => `toolbar.${name}`);
@@ -954,7 +956,7 @@ describe('userscript browser shim injection', () => {
             'hint', 'loading', 'unavailable', 'readError', 'changeError', 'retry'].map(name => `popup.pageFont.${name}`);
         expect([...pageFontKeys].sort()).toEqual([...expectedPageFontKeys].sort());
         expect(Object.keys(projected).filter(key => key.startsWith('popup.pageFont.'))).toEqual([]);
-        for (const key of [...diagnosticKeys, ...readerDialogKeys, ...safariPermissionKeys, ...browserPreparationKeys,
+        for (const key of [...diagnosticKeys, ...readerDialogKeys, ...safariPermissionKeys, ...browserPreparationKeys, ...localTranslationKeys,
             ...sidepanelKeys, ...toolbarKeys, ...popupLayoutEditingKeys, ...pageFontKeys, ...popupOnlyKeys]) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
@@ -990,6 +992,7 @@ describe('userscript browser shim injection', () => {
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)
             && key !== 'video.nativeFullscreenHint'
             && !browserPreparationKeys.includes(key)
+            && !localTranslationKeys.includes(key)
             && !safariPermissionKeys.includes(key) && !sidepanelKeys.includes(key) && !toolbarKeys.includes(key) && !pageFontKeys.includes(key) && !popupOnlyKeys.includes(key)
             && !popupLayoutEditingKeys.includes(key)
             && key !== 'popup.donationButton' && key !== 'popup.donationDescription' && key !== 'popup.compact.translate' && key !== 'popup.compact.restore' && !key.startsWith('popup.displayMode.'));
@@ -2924,7 +2927,7 @@ describe('userscript appearance registry data owner', () => {
         expect(ordered(api.interfaceFontOptions)).toEqual(ordered(originalAppearance.interfaceFontOptions));
         expect(ordered(api.popupModuleOptions)).toEqual(ordered(originalAppearance.popupModuleOptions));
         expect(ordered(api.popupQuickFeatureOptions)).toEqual(ordered(originalAppearance.popupQuickFeatureOptions));
-        expect(api.interfaceSkinOptions).toHaveLength(14);expect(api.interfaceFontOptions).toHaveLength(10);
+        expect(api.interfaceSkinOptions).toHaveLength(12);expect(api.interfaceFontOptions).toHaveLength(10);
         for(const skin of api.interfaceSkinOptions){expect(api.getInterfaceSkinOption(skin.value)).toBe(skin);expect(api.normalizeInterfaceSkin(skin.value)).toBe(skin.value);expect(api.interfaceSkinUsesContentHeight(skin.value)).toBe(originalAppearance.interfaceSkinUsesContentHeight(skin.value));}
         for(const font of api.interfaceFontOptions){expect(api.getInterfaceFontOption(font.value)).toBe(font);expect(api.normalizeInterfaceFont(font.value)).toBe(font.value);}
         for(const value of ['cheese','ocean','matcha','sakura','emoji','midnight','paper','aurora','arcade','sunset','unknown',null,1]){
@@ -2994,7 +2997,9 @@ describe('userscript appearance registry data owner', () => {
 describe('standalone immutable glossary and UI catalogs', () => {
     const targets = [
         ['src/core/glossary/builtins.ts', ['BUILTIN_GLOSSARIES']],
-        ['src/core/config/catalog.ts', ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels', 'currentModelIds', 'cloudCredentialLabels']],
+        ['src/core/config/catalog/targetLanguageLabels.ts', ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels']],
+        ['src/core/config/catalog/models.ts', ['currentModelIds']],
+        ['src/core/config/catalog/services.ts', ['cloudCredentialLabels']],
         ['src/core/config/featureServices.ts', ['featureServiceDefinitions']],
         ['src/core/config/videoSubtitleAppearance.ts', ['VIDEO_SUBTITLE_SKINS']],
         ['src/features/settings/model/chromeTranslationPreparation.ts', ['TEST_SAMPLES']],

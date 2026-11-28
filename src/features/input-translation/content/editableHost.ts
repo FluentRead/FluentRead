@@ -237,15 +237,17 @@ export async function replaceEditableText(
     if (selectionMode === 'end') range.collapse(false);
     if (selectionMode === 'start') range.collapse(true);
     if (selectionMode === 'trigger') {
-        // 连按的前两次已经进入宿主，只删除本次光标前的两个符号，不重写原文格式。
+        // 连按的前两次（或 IME 已提交的三次）符号已经进入宿主，只删除本次光标前插入的触发符，不重写原文格式。
+        const expectedTrigger = triggerSymbol.length === 1 ? triggerSymbol.repeat(2) : triggerSymbol;
         const node = selection.focusNode;
         const offset = selection.focusOffset;
         if (!selection.isCollapsed || !node || node.nodeType !== 3 || !element.contains(node)
-            || !triggerSymbol || normalizeEditableText((node.textContent || '').slice(offset - 2, offset)) !== triggerSymbol.repeat(2)) {
+            || !expectedTrigger || offset < expectedTrigger.length
+            || normalizeEditableText((node.textContent || '').slice(offset - expectedTrigger.length, offset)) !== expectedTrigger) {
             return 'unsupported';
         }
         triggerCaret = readEditableCaretState(element)!.caret;
-        range.setStart(node, offset - 2);
+        range.setStart(node, offset - expectedTrigger.length);
         range.setEnd(node, offset);
     }
     const selectedText = normalizeEditableText(range.toString());

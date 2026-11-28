@@ -1,21 +1,59 @@
 /**
  * @file src/features/video-subtitle/content/subtitleControlLayout.ts
- * 文件职责：移动 YouTube 字幕在同视频可见控件之间选择可读空区，拥有外部控件遮罩之上的临时宿主与极长句滚动卡片的局部交互。
- * 主要内容：读取顶部、中部、底部和进度控件几何，保留字号并有限调整卡片宽度；普通避让字幕保持点击穿透，仅极长句在自有节点处理滚动，不添加全页输入监听。
+ * 文件职责：移动 YouTube 字幕在同视频可见控件之间选择可读空区，拥有外部控件遮罩之上的临时宿主与极长句滚动卡片的局部交互，并提供受守卫的 DOM 样式/属性写入与跨浏览器全屏读取辅助。
+ * 主要内容：读取或复用预测量的顶部、中部、底部和进度控件几何，保留字号并有限调整卡片宽度；仅在值实际变化时写入自有节点样式与属性；普通避让字幕保持点击穿透，仅极长句在自有节点处理滚动，不添加全页输入监听。
  * 模块边界：不读取或保存配置、不改变播放器/菜单/媒体/宿主样式；显示层通过显式调用更新、还原与清理，几何切分复用 subtitleLayout。
  */
 import {getVideoSubtitleFreeRegions, videoSubtitleRectsOverlap, type VideoSubtitleRect} from './subtitleLayout';
 import {getYoutubeSubtitleControlsScope, YOUTUBE_SUBTITLE_CONTROLS_SELECTOR} from './youtubeControlsScope';
+import {getFullscreenElement} from '@/src/platform/dom/fullscreen';
 
+export {getFullscreenElement};
 export const VIDEO_SUBTITLE_SCROLL_HOST_ID = 'fluent-read-video-subtitle-scroll-host';
 const scrollHosts = new WeakMap<HTMLElement, {host: HTMLElement; layer: HTMLElement}>();
+
+/** 仅在样式值或优先级变化时写入，避免重复触发样式重算与观察器。 */
+export function setStyleIfChanged(
+  element: HTMLElement,
+  property: string,
+  value: string,
+  priority: '' | 'important' = '',
+): boolean {
+  const current = element.style.getPropertyValue(property);
+  const currentPriority = typeof element.style.getPropertyPriority === 'function'
+    ? element.style.getPropertyPriority(property)
+    : priority;
+  if (current === value && currentPriority === priority) return false;
+  element.style.setProperty(property, value, priority);
+  return true;
+}
+
+export function removeStyleIfPresent(element: HTMLElement, property: string): boolean {
+  if (!element.style.getPropertyValue(property)) return false;
+  element.style.removeProperty(property);
+  return true;
+}
+
+export function setAttrIfChanged(element: Element, name: string, value: string): boolean {
+  if (element.getAttribute(name) === value) return false;
+  element.setAttribute(name, value);
+  return true;
+}
+
+export function setDataIfChanged(element: HTMLElement, key: string, value: string): boolean {
+  if (element.dataset[key] === value) return false;
+  element.dataset[key] = value;
+  return true;
+}
 
 /** 显示状态仍由原 layer 拥有，滚动宿主只镜像自有 class 与裁切，不另建字幕模式状态。 */
 export function syncSubtitleScrollHostState(layer: HTMLElement): void {
   const host = layer.ownerDocument.getElementById(VIDEO_SUBTITLE_SCROLL_HOST_ID);
   if (!host) return;
-  host.className = layer.className;
-  host.style.setProperty('clip-path', layer.style.getPropertyValue('clip-path'), 'important');
+  if (host.className !== layer.className) host.className = layer.className;
+  const clipPath = layer.style.getPropertyValue('clip-path');
+  if (clipPath) setStyleIfChanged(host, 'clip-path', clipPath, 'important');
+  else removeStyleIfPresent(host, 'clip-path');
 }
 
 export function findOwnedSubtitlePanel(layer: HTMLElement, panelId: string): HTMLElement | null {
@@ -48,7 +86,7 @@ function restoreScrollHost(panel: HTMLElement, destination?: HTMLElement): void 
 
 function alignScrollHost(panel: HTMLElement, layer: HTMLElement, player: HTMLElement): void {
   const scope = getYoutubeSubtitleControlsScope(player);
-  const fullscreen = layer.ownerDocument.fullscreenElement;
+  const fullscreen = getFullscreenElement(layer.ownerDocument);
   if (scope === player || (fullscreen && !fullscreen.contains(scope))) {restoreScrollHost(panel); return;}
   let owned = scrollHosts.get(panel);
   if (owned && (owned.layer !== layer || owned.host.parentElement !== scope)) {restoreScrollHost(panel, layer); owned = undefined;}
@@ -59,13 +97,13 @@ function alignScrollHost(panel: HTMLElement, layer: HTMLElement, player: HTMLEle
   }
   const {host} = owned, rect = layer.getBoundingClientRect();
   const width = layer.clientWidth || rect.width, height = layer.clientHeight || rect.height;
-  host.style.setProperty('width', `${width}px`, 'important'); host.style.setProperty('height', `${height}px`, 'important');
-  host.style.setProperty('transform', 'none', 'important');
+  setStyleIfChanged(host, 'width', `${width}px`, 'important'); setStyleIfChanged(host, 'height', `${height}px`, 'important');
+  setStyleIfChanged(host, 'transform', 'none', 'important');
   const base = host.getBoundingClientRect();
   if (base.width <= 0 || base.height <= 0 || width <= 0 || height <= 0) {restoreScrollHost(panel); return;}
   // 校准为原 layer 的轴向坐标；不要求 scope 是 offsetParent，也不修改其 position。
   const sx = base.width / width, sy = base.height / height;
-  host.style.setProperty('transform', `translate(${(rect.left - base.left) / sx}px, ${(rect.top - base.top) / sy}px) scale(${rect.width / base.width}, ${rect.height / base.height})`, 'important');
+  setStyleIfChanged(host, 'transform', `translate(${(rect.left - base.left) / sx}px, ${(rect.top - base.top) / sy}px) scale(${rect.width / base.width}, ${rect.height / base.height})`, 'important');
   syncSubtitleScrollHostState(layer);
   if (panel.parentElement !== host) moveSubtitlePanel(panel, host);
 }
@@ -73,8 +111,8 @@ function alignScrollHost(panel: HTMLElement, layer: HTMLElement, player: HTMLEle
 export function prepareSubtitlePanelLayout(panel: HTMLElement, layer: HTMLElement, player: HTMLElement): void {
   const scrolling = subtitleScrollOwners.get(panel);
   if (scrolling?.enabled) scrolling.savedScrollTop = panel.scrollTop;
-  delete panel.dataset.fluentReadSubtitleLayout;
-  panel.style.removeProperty('--fluent-read-video-subtitle-padding'); panel.style.removeProperty('--fluent-read-video-subtitle-gap');
+  if ('fluentReadSubtitleLayout' in panel.dataset) delete panel.dataset.fluentReadSubtitleLayout;
+  removeStyleIfPresent(panel, '--fluent-read-video-subtitle-padding'); removeStyleIfPresent(panel, '--fluent-read-video-subtitle-gap');
   if (scrollHosts.has(panel)) alignScrollHost(panel, layer, player);
 }
 
@@ -116,8 +154,12 @@ export function setSubtitlePanelScrollable(panel: HTMLElement, enabled: boolean)
     subtitleScrollOwners.set(panel, owner);
   }
   // 先恢复滚动样式（含子项不收缩），再消费保存位置，避免浏览器按旧滚动范围钳制。
-  if (enabled) {panel.dataset.fluentReadSubtitleScrollable = 'true'; panel.tabIndex = 0; panel.setAttribute('role', 'region');}
-  else {delete panel.dataset.fluentReadSubtitleScrollable; panel.removeAttribute('tabindex'); panel.removeAttribute('role');}
+  if (enabled) {setDataIfChanged(panel, 'fluentReadSubtitleScrollable', 'true'); if (panel.getAttribute('tabindex') !== '0') panel.tabIndex = 0; setAttrIfChanged(panel, 'role', 'region');}
+  else {
+    if ('fluentReadSubtitleScrollable' in panel.dataset) delete panel.dataset.fluentReadSubtitleScrollable;
+    if (panel.hasAttribute('tabindex')) panel.removeAttribute('tabindex');
+    if (panel.hasAttribute('role')) panel.removeAttribute('role');
+  }
   if (owner) {
     const source = panel.querySelector('.fluent-read-video-subtitle-original')?.textContent?.trim()
       || panel.querySelector('.fluent-read-video-subtitle')?.textContent?.trim() || '';
@@ -129,9 +171,9 @@ export function setSubtitlePanelScrollable(panel: HTMLElement, enabled: boolean)
 }
 
 export function resetSubtitlePanelLayout(panel: HTMLElement, dispose = false): void {
-  delete panel.dataset.fluentReadSubtitleLayout;
-  panel.style.removeProperty('--fluent-read-video-subtitle-padding');
-  panel.style.removeProperty('--fluent-read-video-subtitle-gap');
+  if ('fluentReadSubtitleLayout' in panel.dataset) delete panel.dataset.fluentReadSubtitleLayout;
+  removeStyleIfPresent(panel, '--fluent-read-video-subtitle-padding');
+  removeStyleIfPresent(panel, '--fluent-read-video-subtitle-gap');
   setSubtitlePanelScrollable(panel, false);
   restoreScrollHost(panel);
   if (dispose) {subtitleScrollOwners.get(panel)?.dispose(); subtitleScrollOwners.delete(panel);}
@@ -146,12 +188,12 @@ export function finishSubtitlePanelLayout(panel: HTMLElement, menuOpen = false):
   restoreScrollHost(panel);
 }
 
-type VisibleSubtitleControl = {element: HTMLElement; rect: DOMRect};
+export type VisibleSubtitleControl = {element: HTMLElement; rect: DOMRect};
 
 /** 同视频范围内读取实际可见控件与所属分支；不把覆盖整面的控制根节点当成障碍物。 */
-function getVisibleSubtitleControlEntries(player: HTMLElement): VisibleSubtitleControl[] {
+export function getVisibleSubtitleControlEntries(player: HTMLElement): VisibleSubtitleControl[] {
   const scope = getYoutubeSubtitleControlsScope(player);
-  const fullscreen = player.ownerDocument.fullscreenElement;
+  const fullscreen = getFullscreenElement(player.ownerDocument);
   const entries: VisibleSubtitleControl[] = [];
   for (const controls of scope.querySelectorAll<HTMLElement>(YOUTUBE_SUBTITLE_CONTROLS_SELECTOR)) {
     if (controls.closest('.fluent-read-video-ui')) continue;
@@ -180,13 +222,21 @@ export function getVisibleYoutubeSubtitleControls(player: HTMLElement): DOMRect[
 }
 
 /** 仅在移动自动贴底发生碰撞时选择少量空区；先保留字号和宽度，再限宽和压紧卡片内距。 */
-export function positionMobileYoutubeSubtitle(panel: HTMLElement, player: HTMLElement, layer: HTMLElement, viewport: VideoSubtitleRect, availableWidth: number): boolean {
-  const layerRect = layer.getBoundingClientRect();
+export function positionMobileYoutubeSubtitle(
+  panel: HTMLElement,
+  player: HTMLElement,
+  layer: HTMLElement,
+  viewport: VideoSubtitleRect,
+  availableWidth: number,
+  visibleControls?: readonly VisibleSubtitleControl[],
+  measuredLayerRect?: DOMRect,
+): boolean {
+  const layerRect = measuredLayerRect || layer.getBoundingClientRect();
   const scaleX = layer.clientWidth > 0 ? layerRect.width / layer.clientWidth : 1;
   const scaleY = layer.clientHeight > 0 ? layerRect.height / layer.clientHeight : 1;
   const toLocal = (rect: DOMRect): VideoSubtitleRect => ({left: (rect.left - layerRect.left) / scaleX, top: (rect.top - layerRect.top) / scaleY,
     width: rect.width / scaleX, height: rect.height / scaleY});
-  const controls = getVisibleSubtitleControlEntries(player).map(({element, rect}) => ({element, rect: toLocal(rect)}))
+  const controls = (visibleControls ?? getVisibleSubtitleControlEntries(player)).map(({element, rect}) => ({element, rect: toLocal(rect)}))
     .filter(({rect}) => videoSubtitleRectsOverlap(rect, viewport));
   const obstacles = controls.map(({rect}) => rect);
   if (!obstacles.length) return false;
@@ -195,11 +245,11 @@ export function positionMobileYoutubeSubtitle(panel: HTMLElement, player: HTMLEl
   const regions = getVideoSubtitleFreeRegions(viewport, obstacles);
   if (!regions.length) return false;
   const position = (region: VideoSubtitleRect, size: VideoSubtitleRect, scrolling: boolean) => {
-    panel.style.setProperty('left', `${Math.max(region.left, Math.min(preferred.left, region.left + region.width - size.width))}px`, 'important');
-    panel.style.setProperty('top', `${Math.max(region.top, Math.min(preferred.top, region.top + region.height - size.height))}px`, 'important');
-    panel.style.setProperty('bottom', 'auto', 'important');
-    panel.style.setProperty('max-height', `${region.height}px`, 'important');
-    panel.dataset.fluentReadSubtitleLayout = scrolling ? 'scroll' : 'free';
+    setStyleIfChanged(panel, 'left', `${Math.max(region.left, Math.min(preferred.left, region.left + region.width - size.width))}px`, 'important');
+    setStyleIfChanged(panel, 'top', `${Math.max(region.top, Math.min(preferred.top, region.top + region.height - size.height))}px`, 'important');
+    setStyleIfChanged(panel, 'bottom', 'auto', 'important');
+    setStyleIfChanged(panel, 'max-height', `${region.height}px`, 'important');
+    setDataIfChanged(panel, 'fluentReadSubtitleLayout', scrolling ? 'scroll' : 'free');
     // 普通避让字幕也需绘制在外部暗罩之上；是否滚动仍独立决定指针和键盘交互。
     if (scrolling || controls.some(({element}) => !player.contains(element))) alignScrollHost(panel, layer, player);
     else restoreScrollHost(panel);
@@ -213,18 +263,18 @@ export function positionMobileYoutubeSubtitle(panel: HTMLElement, player: HTMLEl
   const original = regions.find(area => area.width >= preferred.width && area.height >= Math.max(preferred.height, panel.scrollHeight));
   if (original) {position(original, preferred, false); return true;}
   for (const compact of [false, true]) {
-    if (compact) {panel.style.setProperty('--fluent-read-video-subtitle-padding', '3px 6px'); panel.style.setProperty('--fluent-read-video-subtitle-gap', '2px');}
+    if (compact) {setStyleIfChanged(panel, '--fluent-read-video-subtitle-padding', '3px 6px'); setStyleIfChanged(panel, '--fluent-read-video-subtitle-gap', '2px');}
     for (const area of regions) {
-      panel.style.setProperty('max-width', `${Math.min(availableWidth, area.width)}px`, 'important');
-      panel.style.setProperty('max-height', 'none', 'important');
+      setStyleIfChanged(panel, 'max-width', `${Math.min(availableWidth, area.width)}px`, 'important');
+      setStyleIfChanged(panel, 'max-height', 'none', 'important');
       const measured = toLocal(panel.getBoundingClientRect());
       if (measured.width <= area.width + .1 && measured.height <= area.height + .1) {position(area, measured, false); return true;}
     }
   }
   // 极长句保持用户字号；只让字幕卡本身滚动，不让其高度覆盖原生控件。
   const area = [...regions].sort((a, b) => b.width * b.height - a.width * a.height)[0];
-  panel.style.setProperty('max-width', `${Math.min(availableWidth, area.width)}px`, 'important');
-  panel.style.setProperty('max-height', `${area.height}px`, 'important');
+  setStyleIfChanged(panel, 'max-width', `${Math.min(availableWidth, area.width)}px`, 'important');
+  setStyleIfChanged(panel, 'max-height', `${area.height}px`, 'important');
   position(area, toLocal(panel.getBoundingClientRect()), true);
   return true;
 }

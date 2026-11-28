@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {groupMangaText, groupMangaOcrLines, mergeMangaParagraphContinuations, type MangaOcrItem} from '@/src/features/image-translation/services/mangaRegions';
+import {groupMangaText, groupMangaOcrLines, mergeMangaParagraphContinuations, sortMangaRegions, type MangaOcrItem, type MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
 import type {ImageParagraphContinuations} from '@/src/features/image-translation/paragraphs';
 import {drawMangaTranslations,mangaRegionBackground} from '@/src/features/image-translation/services/mangaRendering';
 import {layoutImageTranslationText} from '@/src/features/image-translation/services/rendering';
@@ -16,9 +16,9 @@ describe('漫画整段识别与噪声边界', () => {
             {text: 'Другой', bbox: {x0: 220, y0: 20, x1: 300, y1: 40}},
         ];
         const original = structuredClone(lines), regions = groupMangaOcrLines(lines, ' RU_ru ', 400, 300);
-        expect(regions.map(region => region.text)).toEqual(['Другой', 'Что-то забыл']);
-        expect(regions[1]).toMatchObject({fontSize: 20, bbox: {x0: 20, y0: 20, x1: 100, y1: 64}, sourceBoxes: [lines[0].bbox, lines[1].bbox]});
-        expect(lines).toEqual(original);regions[1].sourceBoxes![0].x0 = 0;expect(lines).toEqual(original);
+        expect(regions.map(region => region.text)).toEqual(['Что-то забыл', 'Другой']);
+        expect(regions[0]).toMatchObject({fontSize: 20, bbox: {x0: 20, y0: 20, x1: 100, y1: 64}, sourceBoxes: [lines[0].bbox, lines[1].bbox]});
+        expect(lines).toEqual(original);regions[0].sourceBoxes![0].x0 = 0;expect(lines).toEqual(original);
         expect(groupMangaOcrLines([{text: '시작했다고?', bbox: lines[0].bbox}], 'ko-KR', 400, 300)[0].fontSize).toBe(20);
     });
     it('通用漫画识别拒绝无效尺寸、越界框和短异文噪声，保留合法单字、长英文与竖排字号', () => {
@@ -243,8 +243,77 @@ describe('漫画整段识别与噪声边界', () => {
         expect(groupMangaText([item('  Hello\n world  ', -5, -5, 100, 30)], 'en', 80, 20)[0])
             .toMatchObject({text: 'Hello world', bbox: {x0: 0, y0: 0, x1: 80, y1: 20}});
     });
-    it('同高区域按右到左保留漫画阅读顺序', () => {
-        expect(groupMangaText([item('left'), item('right', 200)], 'en', 400, 300).map(line => line.text)).toEqual(['right', 'left']);
+    it('方向与行带感知的气泡阅读顺序：拉丁/韩/俄横排从左到右，中日/竖排从右到左，重叠不足按自上而下', () => {
+        for (const ltrLang of ['en', 'ko', 'ru', 'fr', 'es', 'de']) {
+            expect(groupMangaText([item('right', 200, 20), item('left', 20, 22)], ltrLang, 400, 300).map(line => line.text))
+                .toEqual(['left', 'right']);
+        }
+        // 同 X0 重叠时按 y0 稳定排序。
+        expect(groupMangaText([item('lower', 20, 24, 80, 20), item('upper', 20, 20, 80, 20)], 'en', 400, 300, 'page', true))
+            .toHaveLength(1);
+        for (const rtlLang of ['ja', 'zh', 'auto']) {
+            expect(groupMangaText([item('左段', 20, 20), item('右段', 200, 22)], rtlLang, 400, 300).map(line => line.text))
+                .toEqual(['右段', '左段']);
+        }
+        // 多数为竖排时即使源语为 ko 仍按右到左。
+        expect(groupMangaText([item('왼쪽', 20, 20, 20, 80), item('오른쪽', 200, 22, 20, 80)], 'ko', 400, 300).map(line => line.text))
+            .toEqual(['오른쪽', '왼쪽']);
+        // 纵向重叠不足较矮气泡 50% 时按自上而下。
+        expect(groupMangaText([item('lower', 20, 32, 80, 20), item('upper', 200, 20, 80, 20)], 'en', 400, 300).map(line => line.text))
+            .toEqual(['upper', 'lower']);
+        // 同中心 RTL 气泡按 y0 排序，且 guardOnly 不计入竖排比例。
+        const guard = {text: '', bbox: {x0: 0, y0: 0, x1: 10, y1: 80}, fontSize: 10, vertical: true as const, guardOnly: true as const};
+        const a = {text: 'top', bbox: {x0: 100, y0: 20, x1: 180, y1: 40}, fontSize: 20};
+        const b = {text: 'mid', bbox: {x0: 100, y0: 24, x1: 180, y1: 44}, fontSize: 20};
+        expect(groupMangaText([item('上段', 100, 20, 80, 20), item('下段', 100, 200, 80, 20)], 'ja', 400, 300).map(l => l.text)).toEqual(['上段', '下段']);
+        // 直接覆盖 sortMangaRegions 的 guardOnly 与同 x0/同中心 tie-break。
+        expect(mergeMangaParagraphContinuations([b, a, guard], {successor: () => undefined, permits: () => false}, 'en').map(l => l.text)).toEqual(['', 'top', 'mid']);
+        expect(mergeMangaParagraphContinuations([b, a, guard], {successor: () => undefined, permits: () => false}, 'ja').map(l => l.text)).toEqual(['top', 'mid', '']);
+    });
+    it('气泡排序与组内排序严格可传递，对阶梯气泡和漂移段落的所有排列输出完全一致', () => {
+        const permute = <T,>(items: readonly T[]): T[][] => items.length <= 1 ? [[...items]]
+            : items.flatMap((value, index) => permute([...items.slice(0, index), ...items.slice(index + 1)]).map(rest => [value, ...rest]));
+        const A: MangaRegion = {text: 'A', bbox: {x0: 0, y0: 0, x1: 50, y1: 100}, fontSize: 20};
+        const B: MangaRegion = {text: 'B', bbox: {x0: 100, y0: 40, x1: 150, y1: 140}, fontSize: 20};
+        const C: MangaRegion = {text: 'C', bbox: {x0: 200, y0: 80, x1: 250, y1: 180}, fontSize: 20};
+        const perms = permute([A, B, C]);
+        expect(perms).toHaveLength(6);
+        for (const order of perms) {
+            expect(sortMangaRegions([...order], 'en').map(r => r.text)).toEqual(['A', 'B', 'C']);
+            expect(sortMangaRegions([...order], 'ja').map(r => r.text)).toEqual(['B', 'A', 'C']);
+            expect(sortMangaRegions([...order], 'auto').map(r => r.text)).toEqual(['B', 'A', 'C']);
+        }
+        // 组内漂移横排和竖排成员在全部 6 种输入排列下也得到完全一致的合段结果。
+        const hDrift = [item('one', 20, 20, 30, 20), item('two', 55, 26, 30, 20), item('three', 90, 32, 30, 20)];
+        const hExpected = groupMangaText(hDrift, 'en', 400, 300).map(r => r.text);
+        for (const order of permute(hDrift)) expect(groupMangaText(order, 'en', 400, 300).map(r => r.text)).toEqual(hExpected);
+        const vDrift = [item('甲段', 120, 20, 20, 50), item('乙段', 114, 74, 20, 50), item('丙段', 108, 128, 20, 50)];
+        const vExpected = groupMangaText(vDrift, 'ja', 400, 300, 'bubble').map(r => r.text);
+        for (const order of permute(vDrift)) expect(groupMangaText(order, 'ja', 400, 300, 'bubble').map(r => r.text)).toEqual(vExpected);
+    });
+    it('中文与自动源语言清理汉字及中文标点前的多余空格，保留拉丁词界与数字', () => {
+        for (const lang of ['zh', 'zh-Hans', 'auto', 'ja']) {
+            expect(groupMangaText([item('你 好 世 界 ！')], lang, 400, 300).map(r => r.text)).toEqual(['你好世界！']);
+            expect(groupMangaText([item('中文 Hello World 测试 。')], lang, 400, 300).map(r => r.text)).toEqual(['中文 Hello World 测试。']);
+        }
+        expect(groupMangaText([item('안녕 하세요')], 'ko', 400, 300).map(r => r.text)).toEqual(['안녕 하세요']);
+        expect(groupMangaText([item('90 %')], 'zh', 400, 300, 'page', true).map(r => r.text)).toEqual(['90 %']);
+    });
+    it('竖列同列碎片按水平中心归列，气泡内竖列标点续行间距放宽至 1.25 倍字宽', () => {
+        // 较窄竖列碎片水平居中于同一竖列，x0 偏移较大但水平中心一致，应排在下方而非右侧新列。
+        const top = item('大変だ', 120, 20, 28, 90);
+        const cont = item('っ！', 126, 128, 16, 40);
+        expect(groupMangaText([cont, top], 'ja', 400, 400, 'bubble').map(r => r.text)).toEqual(['大変だっ！']);
+        // 整页竖列保持严格 0.8 倍同列续行上限，避免误合并。
+        expect(groupMangaText([cont, top], 'ja', 400, 400, 'page')).toHaveLength(2);
+    });
+    it('日文已定位气泡内保留高置信短大写拉丁感叹词，气泡外及低置信短噪声仍过滤', () => {
+        for (const term of ['OK', 'NO!', 'GO', 'SOS', 'HP', 'MP', 'LV']) {
+            expect(groupMangaText([item(term, 20, 20, 50, 20, 0.95)], 'ja', 400, 300, 'bubble').map(r => r.text)).toEqual([term]);
+            expect(groupMangaText([item(term, 20, 20, 50, 20, 0.85)], 'ja', 400, 300, 'bubble')).toEqual([]);
+            expect(groupMangaText([item(term, 20, 20, 50, 20, 0.95)], 'ja', 400, 300, 'page')).toEqual([]);
+        }
+        expect(groupMangaText([item('hu', 20, 20, 50, 20, 0.95)], 'ja', 400, 300, 'bubble')).toEqual([]);
     });
     it('只删除明确的行末软连字符，保留复合词的硬连字符与口吃前缀',()=>{
         expect(groupMangaText([item('UNDER\u00ad',20,20),item('STOOD...',20,44)],'en',400,300)[0].text).toBe('UNDERSTOOD...');

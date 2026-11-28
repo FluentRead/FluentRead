@@ -55,6 +55,7 @@ export {
 } from '@/src/features/area-translation/public';
 export {
     toggleContextMenuImage,
+    setMangaPeekOriginal,
     isImageTranslatorNeeded, isMangaReaderPage, mountMangaEntry, unmountMangaEntry,
     mountImageTranslator,
     unmountImageTranslator,

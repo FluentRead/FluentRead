@@ -41,7 +41,7 @@
         </div>
       </div>
       <div v-if="readingSelection" v-show="readingMode" class="fr-tooltip-content fr-reading-content">
-        <ReadingPanel ref="reading-panel-ref" :external-navigation="true" :tools-target="readingToolsTarget" @view-change="syncReadingView" :selection="readingSelection" :locate-evidence="locateReadingEvidence" :clear-evidence="clearReadingEvidence" :source-revision="readingSourceRevision" :check-evidence="checkReadingEvidence" :source-translation="{source: selectedText, text: translationResult, pending: isLoading, error}" :preferences="readingPreferences" :service="readingService" :active="readingMode" :initial-action="readingInitialAction" :history-only="readingHistoryOnly" :source-language="effectiveSourceLanguage" :target-language="effectiveTargetLanguage" :playing-source-text="isPlaying && currentAudioKind === 'source' ? currentAudioText : ''" :model-revision="readingModelRevision" :vocabulary-enabled="config.vocabularyBookEnabled" :private-context="isPrivateContext" :animations="config.animations" @play-source="toggleAudio($event, 'source')" @source-change="stopAudio()" @resize="schedulePositionUpdate" />
+        <ReadingPanel ref="reading-panel-ref" :external-navigation="true" :tools-target="readingToolsTarget" @view-change="syncReadingView" :selection="readingSelection" :locate-evidence="locateReadingEvidence" :clear-evidence="clearReadingEvidence" :source-revision="readingSourceRevision" :check-evidence="checkReadingEvidence" :source-translation="{source: selectedText, text: translationResult, pending: isLoading, error}" :preferences="readingPreferences" :service="readingService" :active="readingMode" :initial-action="readingInitialAction" :history-only="readingHistoryOnly" :source-language="effectiveSourceLanguage" :target-language="effectiveTargetLanguage" :playing-source-text="(isPlaying || isPreparingAudio) && currentAudioKind === 'source' ? currentAudioText : ''" :model-revision="readingModelRevision" :vocabulary-enabled="config.vocabularyBookEnabled" :private-context="isPrivateContext" :animations="config.animations" @play-source="toggleAudio($event, 'source')" @source-change="stopAudio()" @resize="schedulePositionUpdate" />
       </div>
       <div v-show="!readingMode" class="fr-tooltip-content" aria-live="polite">
         <div v-if="isLoading && !translationResult && !wordCard && !wordCardError && !isWordSelection" class="fr-loading-state"><span :class="['fr-loading-spinner', { 'fr-static': !config.animations }]" aria-hidden="true" /><span>正在查询…</span></div>
@@ -57,51 +57,61 @@
           <section v-if="isWordSelection && (wordCard || isWordCardLoading)" class="fr-word-learning-card" aria-label="单词学习卡">
             <div v-if="isWordCardLoading && !wordCard" class="fr-word-card-loading" role="status"><span :class="['fr-loading-spinner', { 'fr-static': !config.animations }]" aria-hidden="true" /><span>{{ hasDistinctTranslationResult ? '译文已显示，正在补充词典…' : '正在查询词典，译文会先显示…' }}</span></div>
             <template v-else-if="wordCard">
-              <div class="fr-word-heading">
-                <div>
-                  <h3><SpeechFollowText :text="selectedText" :offset="0" :progress="audioProgressFor('word')" /></h3>
-                  <span class="fr-word-normalized" v-if="selectedText.toLowerCase() !== wordCard.normalizedWord">词典词形：{{ wordCard.word }}</span>
+              <div class="fr-word-hero">
+                <div class="fr-word-heading">
+                  <div>
+                    <h3><SpeechFollowText :text="selectedText" :offset="0" :progress="audioProgressFor('word')" /></h3>
+                    <span class="fr-word-normalized" v-if="selectedText.toLowerCase() !== wordCard.normalizedWord">词典词形：{{ wordCard.word }}</span>
+                  </div>
+                  <div class="fr-word-heading-actions">
+                    <button class="fr-text-copy-btn" :class="{ 'fr-copied': isCopied('source') }" data-copy-kind="source" type="button" :title="copyButtonTitle('source')" :aria-label="copyButtonTitle('source')" @click="copyText(selectedText, 'source')">
+                      <svg v-if="isCopied('source')" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
+                      <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                      <span>{{ isCopied('source') ? '已复制' : '复制' }}</span>
+                    </button>
+                    <button v-if="wordCard.phonetics.length === 0" class="fr-text-audio-btn fr-word-heading-audio" :class="{ 'is-playing': isCurrentWordAudio({ text: wordCard.word }), 'is-loading': isPreparingWordAudio({ text: wordCard.word }) }" type="button" :aria-label="wordAudioLabel({ text: wordCard.word })" :title="wordAudioLabel({ text: wordCard.word })" :aria-pressed="isActiveOrPreparingAudio('word', wordAudioKey({ text: wordCard.word }))" :aria-busy="isPreparingWordAudio({ text: wordCard.word })" @click="toggleWordAudio({ text: wordCard.word })">
+                      <svg v-if="isPreparingWordAudio({ text: wordCard.word })" :class="['fr-audio-spinner', { 'fr-static': !config.animations }]" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="36 16" /></svg>
+                      <svg v-else-if="isCurrentWordAudio({ text: wordCard.word })" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" /></svg>
+                      <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" /><path d="M16 9.5a4.5 4.5 0 0 1 0 5M18.5 7a8 8 0 0 1 0 10" /></svg>
+                    </button>
+                  </div>
                 </div>
-                <div class="fr-word-heading-actions">
-                  <button class="fr-text-copy-btn" :class="{ 'fr-copied': isCopied('source') }" data-copy-kind="source" type="button" :title="copyButtonTitle('source')" :aria-label="copyButtonTitle('source')" @click="copyText(selectedText, 'source')">
-                    <svg v-if="isCopied('source')" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
-                    <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-                    <span>{{ isCopied('source') ? '已复制' : '复制' }}</span>
-                  </button>
-                  <button v-if="wordCard.phonetics.length === 0" class="fr-text-audio-btn fr-word-heading-audio" type="button" :aria-label="wordAudioLabel({ text: wordCard.word })" :title="wordAudioLabel({ text: wordCard.word })" @click="toggleWordAudio({ text: wordCard.word })">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" /><path d="M16 9.5a4.5 4.5 0 0 1 0 5M18.5 7a8 8 0 0 1 0 10" /></svg>
-                  </button>
+                <div v-if="wordCard.phonetics.length > 0" class="fr-word-pronunciations" aria-label="发音">
+                  <div v-for="(pronunciation, index) in wordCard.phonetics.slice(0, 4)" :key="`${pronunciation.text || ''}-${pronunciation.audio || ''}-${index}`" class="fr-word-pronunciation" :class="{ 'is-playing': isCurrentWordAudio(pronunciation), 'is-loading': isPreparingWordAudio(pronunciation) }" @click="toggleWordAudio(pronunciation)">
+                    <span class="fr-word-pronunciation-label">{{ pronunciation.label || (index === 0 ? '发音' : '变体') }}</span>
+                    <span class="fr-word-ipa">{{ pronunciation.text || '点击播放' }}</span>
+                    <button class="fr-text-audio-btn" :class="{ 'is-playing': isCurrentWordAudio(pronunciation), 'is-loading': isPreparingWordAudio(pronunciation) }" type="button" :aria-label="wordAudioLabel(pronunciation)" :title="wordAudioLabel(pronunciation)" :aria-pressed="isActiveOrPreparingAudio('word', wordAudioKey(pronunciation))" :aria-busy="isPreparingWordAudio(pronunciation)" @click.stop="toggleWordAudio(pronunciation)">
+                      <svg v-if="isPreparingWordAudio(pronunciation)" :class="['fr-audio-spinner', { 'fr-static': !config.animations }]" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="36 16" /></svg>
+                      <svg v-else-if="isCurrentWordAudio(pronunciation)" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" /></svg>
+                      <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" /><path d="M16 9.5a4.5 4.5 0 0 1 0 5M18.5 7a8 8 0 0 1 0 10" /></svg>
+                    </button>
+                  </div>
                 </div>
+                <div v-if="hasDistinctTranslationResult" class="fr-word-translation">
+                  <pre dir="auto"><template v-for="(part, index) in translatedTextParts" :key="index"><code v-if="part.kind === 'code'" class="fr-inline-code">{{ part.text }}</code><SpeechFollowText v-else :text="part.text" :offset="part.offset" :progress="translationAudioProgress" /></template></pre>
+                  <div class="fr-word-translation-header">
+                    <span class="fr-text-label">译文</span>
+                    <button class="fr-text-copy-btn" :class="{ 'fr-copied': isCopied('translation') }" data-copy-kind="translation" type="button" :title="copyButtonTitle('translation')" :aria-label="copyButtonTitle('translation')" @click="copyText(translationResult, 'translation')">
+                      <svg v-if="isCopied('translation')" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
+                      <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                      <span>{{ isCopied('translation') ? '已复制' : '复制' }}</span>
+                    </button>
+                    <button class="fr-text-audio-btn" :class="{ 'is-playing': isCurrentAudio('translation'), 'is-loading': isPreparingCurrentAudio('translation') }" type="button" :aria-label="audioLabel('translation')" :title="audioLabel('translation')" :aria-pressed="isActiveOrPreparingAudio('translation')" :aria-busy="isPreparingCurrentAudio('translation')" @click="toggleAudio(translationResult, 'translation')">
+                      <svg v-if="isPreparingCurrentAudio('translation')" :class="['fr-audio-spinner', { 'fr-static': !config.animations }]" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="36 16" /></svg>
+                      <svg v-else-if="isCurrentAudio('translation')" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" /></svg>
+                      <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" /><path d="M16 9.5a4.5 4.5 0 0 1 0 5M18.5 7a8 8 0 0 1 0 10" /></svg>
+                    </button>
+                  </div>
+                </div>
+                <div v-else-if="isLoading" class="fr-word-translation-loading">正在翻译释义…</div>
               </div>
-              <div v-if="wordCard.phonetics.length > 0" class="fr-word-pronunciations" aria-label="发音">
-                <div v-for="(pronunciation, index) in wordCard.phonetics.slice(0, 4)" :key="`${pronunciation.text || ''}-${pronunciation.audio || ''}-${index}`" class="fr-word-pronunciation">
-                  <span class="fr-word-pronunciation-label">{{ pronunciation.label || (index === 0 ? '发音' : '变体') }}</span>
-                  <span class="fr-word-ipa">{{ pronunciation.text || '点击播放' }}</span>
-                  <button class="fr-text-audio-btn" type="button" :aria-label="wordAudioLabel(pronunciation)" :title="wordAudioLabel(pronunciation)" @click="toggleWordAudio(pronunciation)">
-                    <svg v-if="isCurrentWordAudio(pronunciation)" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12M16 6v12" /></svg>
-                    <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" /><path d="M16 9.5a4.5 4.5 0 0 1 0 5M18.5 7a8 8 0 0 1 0 10" /></svg>
-                  </button>
-                </div>
-              </div>
-              <div v-if="hasDistinctTranslationResult" class="fr-word-translation">
-                <div class="fr-word-translation-header">
-                  <span class="fr-text-label">译文</span>
-                  <button class="fr-text-copy-btn" :class="{ 'fr-copied': isCopied('translation') }" data-copy-kind="translation" type="button" :title="copyButtonTitle('translation')" :aria-label="copyButtonTitle('translation')" @click="copyText(translationResult, 'translation')">
-                    <svg v-if="isCopied('translation')" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
-                    <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-                    <span>{{ isCopied('translation') ? '已复制' : '复制' }}</span>
-                  </button>
-                </div>
-                <pre dir="auto"><template v-for="(part, index) in translatedTextParts" :key="index"><code v-if="part.kind === 'code'" class="fr-inline-code">{{ part.text }}</code><SpeechFollowText v-else :text="part.text" :offset="part.offset" :progress="translationAudioProgress" /></template></pre>
-              </div>
-              <div v-else-if="isLoading" class="fr-word-translation-loading">正在翻译释义…</div>
-              <div v-if="wordCard.meanings.length > 0 && !wordCard.dictionaryEntry" class="fr-word-meaning-toolbar">
+              <div v-if="wordCard.meanings.length > 0 && hasWordChineseSupport && !wordCard.dictionaryEntry" class="fr-word-meaning-toolbar">
                 <span>英文释义 · 中文辅助</span>
                 <button type="button" @click="showChineseSupport = !showChineseSupport">{{ showChineseSupport ? '隐藏中文辅助' : '显示中文辅助' }}</button>
               </div>
               <div v-if="isWordCardSupportLoading" class="fr-word-support-loading" role="status">正在补充辅助释义…</div>
               <div v-if="wordCard.meanings.length > 0" class="fr-word-meanings">
-                <div v-for="meaning in wordCard.meanings.slice(0, 4)" :key="meaning.partOfSpeech" class="fr-word-meaning">
+                <div v-for="meaning in wordCard.meanings.slice(0, 4)" :key="meaning.partOfSpeech" class="fr-word-meaning" :class="{ 'fr-word-meaning--single': meaning.definitions.length === 1 }">
                   <strong v-if="meaning.partOfSpeech" class="fr-pos-label" :title="translateLegacy(describePartOfSpeech(meaning.partOfSpeech).description)">{{ translateLegacy(meaning.partOfSpeech) }}</strong>
                   <ol>
                     <li v-for="definition in meaning.definitions.slice(0, 4)" :key="`${meaning.partOfSpeech}-${definition.definition}`">
@@ -116,11 +126,13 @@
                 </div>
               </div>
               <div v-else class="fr-word-empty">暂未找到详细释义，可查看译文。</div>
-              <footer class="fr-word-card-footer">
-                <span v-if="!wordCard.dictionaryEntry">数据来自开放词典</span>
-                <template v-for="source in wordCard.sources" :key="source.id"><a v-if="source.url" :href="source.url" target="_blank" rel="noopener noreferrer">{{ source.label }}</a><span v-else>{{ source.label }}</span></template>
-              </footer>
-              <DictionaryCardTools v-if="extensionDictionaryWorkspace && dictionaryToolEntry && dictionaryWorkspace" :key="`${wordLookupRequestId}-${wordCard.normalizedWord}`" :entry="dictionaryToolEntry" :workspace="dictionaryWorkspace" :context="dictionaryContext" :explanation="readingPanelRef?.getCompletedAnswer?.() || ''" :dark="isDarkTheme" />
+              <div v-if="wordCard.sources.length > 0 || !wordCard.dictionaryEntry || (extensionDictionaryWorkspace && dictionaryToolEntry && dictionaryWorkspace)" class="fr-word-card-meta">
+                <footer v-if="wordCard.sources.length > 0 || !wordCard.dictionaryEntry" class="fr-word-card-footer">
+                  <span v-if="wordCard.sources.length === 0 && !wordCard.dictionaryEntry">数据来自开放词典</span>
+                  <template v-for="(source, index) in wordCard.sources" :key="source.id"><span v-if="index > 0" class="fr-word-source-sep" aria-hidden="true">·</span><a v-if="source.url" :href="source.url" target="_blank" rel="noopener noreferrer">{{ source.label }}</a><span v-else>{{ source.label }}</span></template>
+                </footer>
+                <DictionaryCardTools v-if="extensionDictionaryWorkspace && dictionaryToolEntry && dictionaryWorkspace" :key="`${wordLookupRequestId}-${wordCard.normalizedWord}`" :entry="dictionaryToolEntry" :workspace="dictionaryWorkspace" :context="dictionaryContext" :explanation="readingPanelRef?.getCompletedAnswer?.() || ''" :dark="isDarkTheme" />
+              </div>
             </template>
           </section>
           <div v-if="isWordSelection && wordCardError" class="fr-word-fallback-note" role="status"><span>{{ wordCardError }}</span><button type="button" @click="retryWordCard">重查词典</button></div>
@@ -133,8 +145,9 @@
                   <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
                   <span>{{ isCopied('source') ? '已复制' : '复制' }}</span>
                 </button>
-                <button class="fr-text-audio-btn" type="button" :aria-label="audioLabel('source')" :title="audioLabel('source')" @click="toggleAudio(selectedText, 'source')">
-                  <svg v-if="isCurrentAudio('source')" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12M16 6v12" /></svg>
+                <button class="fr-text-audio-btn" :class="{ 'is-playing': isCurrentAudio('source'), 'is-loading': isPreparingCurrentAudio('source') }" type="button" :aria-label="audioLabel('source')" :title="audioLabel('source')" :aria-pressed="isActiveOrPreparingAudio('source')" :aria-busy="isPreparingCurrentAudio('source')" @click="toggleAudio(selectedText, 'source')">
+                  <svg v-if="isPreparingCurrentAudio('source')" :class="['fr-audio-spinner', { 'fr-static': !config.animations }]" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="36 16" /></svg>
+                  <svg v-else-if="isCurrentAudio('source')" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" /></svg>
                   <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" /><path d="M16 9.5a4.5 4.5 0 0 1 0 5M18.5 7a8 8 0 0 1 0 10" /></svg>
                 </button>
               </div>
@@ -150,8 +163,9 @@
                   <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
                   <span>{{ isCopied('translation') ? '已复制' : '复制' }}</span>
                 </button>
-                <button class="fr-text-audio-btn" type="button" :aria-label="audioLabel('translation')" :title="audioLabel('translation')" @click="toggleAudio(translationResult, 'translation')">
-                  <svg v-if="isCurrentAudio('translation')" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12M16 6v12" /></svg>
+                <button class="fr-text-audio-btn" :class="{ 'is-playing': isCurrentAudio('translation'), 'is-loading': isPreparingCurrentAudio('translation') }" type="button" :aria-label="audioLabel('translation')" :title="audioLabel('translation')" :aria-pressed="isActiveOrPreparingAudio('translation')" :aria-busy="isPreparingCurrentAudio('translation')" @click="toggleAudio(translationResult, 'translation')">
+                  <svg v-if="isPreparingCurrentAudio('translation')" :class="['fr-audio-spinner', { 'fr-static': !config.animations }]" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="36 16" /></svg>
+                  <svg v-else-if="isCurrentAudio('translation')" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" /></svg>
                   <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" /><path d="M16 9.5a4.5 4.5 0 0 1 0 5M18.5 7a8 8 0 0 1 0 10" /></svg>
                 </button>
               </div>
@@ -198,13 +212,32 @@
           ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.7 2.86 5.8 6.4.93-4.63 4.51 1.09 6.38L12 17.3l-5.72 3.02 1.09-6.38-4.63-4.51 6.4-.93L12 2.7Z" /></svg></button>
         </div>
       </div>
-      <div class="fr-playing-status" :class="{'is-idle': !isPlaying && !isPreparingAudio}" :aria-hidden="!isPlaying && !isPreparingAudio" :aria-busy="isPreparingAudio" role="status">
+      <div class="fr-playing-status" :class="{'is-idle': !isPlaying && !isPreparingAudio, 'is-paused': isPaused}" :aria-hidden="!isPlaying && !isPreparingAudio" :aria-busy="isPreparingAudio" role="status">
         <template v-if="isPlaying || isPreparingAudio">
-          <span class="fr-playing-label"><template v-if="isPreparingAudio">正在生成语音…</template><template v-else>正在播放{{ currentAudioKind === 'source' ? '原文' : currentAudioKind === 'word' ? '单词' : '译文' }}</template></span>
+          <div v-if="audioPosition && !isPreparingAudio" class="fr-playback-progress-track" :class="{ 'is-seekable': Boolean(audio) }" role="progressbar" :aria-valuemin="0" :aria-valuemax="Math.round(audioPosition.duration)" :aria-valuenow="Math.round(audioPosition.currentTime)" @click="seekAudioToTrackClick">
+            <span class="fr-playback-progress-fill" :style="{ width: `${playbackProgressPercent}%` }" />
+          </div>
+          <div class="fr-playing-meta">
+            <span class="fr-playing-label">
+              <svg v-if="isPreparingAudio" :class="['fr-audio-spinner fr-status-spinner', { 'fr-static': !config.animations }]" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="36 16" /></svg>
+              <template v-if="isPreparingAudio">正在生成语音…</template>
+              <template v-else-if="isPaused">{{ t('selectionTts.paused') }}</template>
+              <template v-else>正在播放{{ currentAudioKind === 'source' ? '原文' : currentAudioKind === 'word' ? '单词' : '译文' }}</template>
+            </span>
+            <span v-if="isPlaying && !isPreparingAudio && activeAudioSourceLabel" class="fr-playback-source" :class="{ 'is-cached': currentAudioCached }" :title="activeAudioSourceTitle">
+              <span v-if="currentAudioCached" class="fr-playback-cached-dot" aria-hidden="true" />
+              <span>{{ activeAudioSourceLabel }}</span>
+            </span>
+          </div>
           <div class="fr-playback-controls">
             <span v-if="audioPosition && !isPreparingAudio" class="fr-playback-time" aria-hidden="true">{{ playbackTime(audioPosition.currentTime) }} / {{ playbackTime(audioPosition.duration) }}</span>
             <template v-if="isPlaying && !isPreparingAudio">
+              <button class="fr-pause-btn" type="button" :aria-label="isPaused ? t('selectionTts.resume') : t('selectionTts.pause')" :title="isPaused ? t('selectionTts.resume') : t('selectionTts.pause')" :aria-pressed="isPaused" @click="togglePauseAudio">
+                <svg v-if="isPaused" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5Z" fill="currentColor" stroke="none" /></svg>
+                <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12" /></svg>
+              </button>
               <button v-for="control in seekControls" :key="control.offset" class="fr-seek-btn" type="button" :aria-label="control.label" :title="audioPosition ? control.label : '当前语音不支持按秒跳转'" :disabled="!audioPosition || (control.offset < 0 ? audioPosition.currentTime <= 0 : audioPosition.currentTime >= audioPosition.duration)" @click="seekAudio(control.offset)"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="control.offset < 0 ? 'M4 9a8 8 0 1 1 0 7M4 4v5h5' : 'M20 9a8 8 0 1 0 0 7M20 4v5h-5'" /><text x="12" y="16">5</text></svg></button>
+              <button class="fr-rate-btn" type="button" :aria-label="t('selectionTts.speed', {rate: playbackRateLabel})" :title="t('selectionTts.speed', {rate: playbackRateLabel})" @click="cyclePlaybackRate">{{ playbackRateLabel }}x</button>
             </template>
             <button type="button" :aria-label="isPreparingAudio ? '停止生成语音' : '停止播放'" :title="isPreparingAudio ? '停止生成语音' : '停止播放'" @click="stopAudioFromUi">停止</button>
           </div>
@@ -271,7 +304,10 @@
 </template>
 
 <script setup lang="ts">
-import {audioSpeechProgress, boundarySpeechProgress, parseSpeechCues, parseSpeechProgress, parseSpeechPlaybackPosition, seekSpeechTime, type SpeechProgress, type SpeechPlaybackPosition, type SpeechCue} from '@/src/core/tts/speechProgress';
+import {audioSpeechProgress, boundarySpeechProgress, parseSpeechCues, parseSpeechProgress, parseSpeechPlaybackPosition, seekSpeechTime, speechTextTokens, type SpeechProgress, type SpeechPlaybackPosition, type SpeechCue} from '@/src/core/tts/speechProgress';
+import {nextSelectionTtsRatePreset, normalizeSelectionTtsRate} from '@/src/core/config/selectionTts';
+import type {TtsSourceId} from '@/src/core/tts/backoff';
+import {inferWordSpeechLanguage, loadBrowserSpeechVoices, selectBrowserSpeechVoice} from '@/src/features/selection-translation/speech/public';
 import SpeechFollowText from './SpeechFollowText.vue';
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {hypothesisSelectionAnchor} from '@/src/features/hypothesis/public';
@@ -452,8 +488,19 @@ watch(snapshot, current => {
 }, {flush: 'sync'});
 const isPlaying = ref(false);
 const isPreparingAudio = ref(false);
+const isPaused = ref(false);
+const playbackRate = ref(normalizeSelectionTtsRate(config.selectionTtsRate));
+const playbackRateLabel = computed(() => String(playbackRate.value));
+const currentAudioSource = ref<TtsSourceId | 'dictionary' | null>(null);
+const currentAudioVoice = ref('');
+const currentAudioCached = ref(false);
 const audioProgress = ref<SpeechProgress | null>(null);
 const audioPosition = ref<SpeechPlaybackPosition | null>(null);
+const playbackProgressPercent = computed(() => {
+  const position = audioPosition.value;
+  if (!position || position.duration <= 0) return 0;
+  return Math.min(100, Math.max(0, (position.currentTime / position.duration) * 100));
+});
 const seekControls = [{offset:-5, label:'后退 5 秒'}, {offset:5, label:'前进 5 秒'}] as const;
 const audioTextOffset = ref(0);
 // 一次遍历计算 UTF-16 偏移；音频每帧更新只复用这些片段，不重新切片累计。
@@ -528,7 +575,12 @@ let readingCardPan: {focus: NonNullable<typeof readingKeyboardFocus>; pointerId:
 let audio: HTMLAudioElement | null = null;
 let audioUrl = '';
 let pageAudioProgressTimer: ReturnType<typeof setInterval> | undefined;
+let pageAudioProgressTick: (() => void) | null = null;
 let utterance: SpeechSynthesisUtterance | null = null;
+let browserSpeechWatchdog: number | null = null;
+let activeAudioSynthesizedRate = 1;
+let pauseOpSeq = 0;
+let currentAudioLanguage = '';
 const ttsContentController = createSelectionTtsContentController({
   createClientRequestId: createSelectionTtsClientRequestId,
   stopRemote: (clientRequestId) => browser.runtime.sendMessage({
@@ -716,6 +768,12 @@ watch(filteredTargetOptions, options => {
 const isWordSelection = computed(() => Boolean(selectedWord.value) && (Boolean(selectionSettings.value.dictionaryRecipe) || effectiveTargetLanguage.value !== 'en'
   && (effectiveSourceLanguage.value === 'auto' || /^en(?:-|$)/i.test(effectiveSourceLanguage.value))));
 const isWordCardVisible = computed(() => isWordSelection.value && wordCard.value !== null);
+const hasWordChineseSupport = computed(() => Boolean(wordCard.value?.meanings.some(meaning =>
+  meaning.definitions.some(definition => (
+    Boolean(definition.translatedDefinition && definition.translatedDefinition !== definition.definition)
+    || Boolean(definition.translatedExample && definition.translatedExample !== definition.example)
+  )),
+)));
 const isPrivateContext = browser.extension.inIncognitoContext === true;
 const currentContentRequest = computed<SelectionContentRequest | null>(() => {
   const request = activeContentRequest.value;
@@ -1723,7 +1781,7 @@ async function saveVocabularyEntry(event: MouseEvent): Promise<void> {
     if (typeof entryId === 'string') await completeMaterialCapture(materialOperation, {kind: 'vocabulary', id: entryId, excerpt: contentRequest.text}, () => vocabularySaveGate.isCurrent(requestToken) && isContentRequestCurrent(contentRequest));
     if (!vocabularySaveGate.isCurrent(requestToken) || !isContentRequestCurrent(contentRequest)) return;
     isVocabularySaved.value = true;
-    showNotice(wasSaved ? '已更新当前阅读上下文' : t('reading.sourceSaved'), 'open-vocabulary');
+    showNotice(wasSaved ? '已更新当前阅读上下文' : t('reading.sourceSaved'), 'open-vocabulary', 6000);
   } catch (cause) {
     if (vocabularySaveGate.isCurrent(requestToken)) showNotice(cause instanceof Error ? `保存失败：${cause.message}` : '保存失败，未写入单词本');
   } finally {
@@ -1731,11 +1789,11 @@ async function saveVocabularyEntry(event: MouseEvent): Promise<void> {
   }
 }
 
-function showNotice(message: string, action: 'open-vocabulary' | 'open-local-tts' | null = null): void {
+function showNotice(message: string, action: 'open-vocabulary' | 'open-local-tts' | null = null, durationMs = 2600): void {
   noticeMessage.value = message;
   noticeAction.value = action;
   if (noticeTimer !== null) window.clearTimeout(noticeTimer);
-  noticeTimer = window.setTimeout(() => { noticeMessage.value = ''; noticeAction.value = null; }, 2600);
+  noticeTimer = window.setTimeout(() => { noticeMessage.value = ''; noticeAction.value = null; }, durationMs);
 }
 
 async function openNoticeSettings(): Promise<void> {
@@ -2047,45 +2105,87 @@ function sourceLanguage(text: string): string {
 function translationLanguage(): string { return normalizeSpeechLanguage(currentContentRequest.value?.targetLanguage ?? effectiveTargetLanguage.value, 'zh-CN'); }
 function speechLanguage(text: string, kind: AudioKind): string { return kind === 'translation' ? translationLanguage() : sourceLanguage(text); }
 
-function selectVoice(language: string): SpeechSynthesisVoice | undefined {
-  if (!('speechSynthesis' in window)) return undefined;
-  const voices = window.speechSynthesis.getVoices();
-  const normalized = language.toLowerCase();
-  const exact = voices.filter(voice => voice.lang.toLowerCase() === normalized);
-  const preferredNames = normalized.startsWith('en-')
-    ? ['ava', 'aria', 'jenny', 'samantha', 'google us english', 'zira']
-    : normalized.startsWith('zh-')
-      ? ['xiaoxiao', 'ting-ting', 'tingting', 'huihui']
-      : [];
-  const preferred = exact.find(voice => preferredNames.some(name => voice.name.toLowerCase().includes(name)));
-  if (preferred) return preferred;
-  if (exact.length > 0) return exact[0];
-  const base = language.split('-')[0]?.toLowerCase();
-  return voices.find(voice => voice.lang.toLowerCase().startsWith(`${base}-`) || voice.lang.toLowerCase() === base);
+watch(() => {
+  selectionConfigVersion.value;
+  return normalizeSelectionTtsRate(config.selectionTtsRate);
+}, nextRate => { playbackRate.value = nextRate; });
+
+function isKnownTtsSource(value: unknown): value is TtsSourceId {
+  return value === 'edge' || value === 'youdao' || value === 'google' || value === 'openai' || value === 'local' || value === 'browser';
 }
+
+function inferAudioSource(source: unknown, voice: unknown): TtsSourceId | null {
+  if (isKnownTtsSource(source)) return source;
+  if (typeof voice !== 'string' || !voice.trim()) return null;
+  if (/^(?:af|am|bf|bm|zf|zm)_/iu.test(voice)) return 'local';
+  if (/google/iu.test(voice)) return 'google';
+  if (/neural/iu.test(voice)) return 'edge';
+  return null;
+}
+
+function resolveSourceBadgeLabel(source: TtsSourceId | 'dictionary' | null): string {
+  switch (source) {
+    case 'edge': return 'Edge';
+    case 'youdao': return t('settings.tts.sourceYoudao');
+    case 'google': return 'Google';
+    case 'openai': return 'OpenAI';
+    case 'local': return 'Kokoro';
+    case 'browser': return t('settings.tts.sourceBrowser');
+    case 'dictionary': return t('selectionTts.sourceDictionary');
+    default: return '';
+  }
+}
+
+const activeAudioSourceLabel = computed(() => resolveSourceBadgeLabel(currentAudioSource.value));
+const activeAudioSourceTitle = computed(() => {
+  const parts = [activeAudioSourceLabel.value, currentAudioVoice.value];
+  if (currentAudioCached.value) parts.push(t('selectionTts.cachedBadge'));
+  return parts.filter(Boolean).join(' · ');
+});
 
 function isCurrentAudio(kind: AudioKind, key = currentAudioText.value): boolean {
   return isPlaying.value && currentAudioKind.value === kind && currentAudioKey.value === key;
 }
+function isPreparingCurrentAudio(kind: AudioKind, key?: string): boolean {
+  if (!isPreparingAudio.value || currentAudioKind.value !== kind) return false;
+  return key === undefined ? true : currentAudioKey.value === key;
+}
+function isActiveOrPreparingAudio(kind: AudioKind, key?: string): boolean {
+  return isPreparingCurrentAudio(kind, key) || isCurrentAudio(kind, key);
+}
 function audioLabel(kind: AudioKind): string {
   const label = kind === 'source' ? '原文' : kind === 'translation' ? '译文' : '单词';
-  return isPreparingAudio.value && currentAudioKind.value === kind ? '停止生成语音' : isCurrentAudio(kind) ? `停止播放${label}` : `播放${label}`;
+  return isPreparingCurrentAudio(kind) ? '停止生成语音' : isCurrentAudio(kind) ? `停止播放${label}` : `播放${label}`;
 }
 function wordAudioKey(pronunciation: WordPronunciation): string {
   return pronunciation.audio || pronunciation.text || wordCard.value?.word || selectedText.value;
 }
 function wordAudioLabel(pronunciation: WordPronunciation): string {
   const label = pronunciation.label || '单词发音';
-  if (isPreparingAudio.value && currentAudioKind.value === 'word' && currentAudioKey.value === wordAudioKey(pronunciation)) return '停止生成语音';
+  if (isPreparingWordAudio(pronunciation)) return '停止生成语音';
   return isCurrentWordAudio(pronunciation) ? `停止播放${label}` : `播放${label}`;
 }
 function isCurrentWordAudio(pronunciation: WordPronunciation): boolean {
   return isCurrentAudio('word', wordAudioKey(pronunciation));
 }
+function isPreparingWordAudio(pronunciation: WordPronunciation): boolean {
+  return isPreparingCurrentAudio('word', wordAudioKey(pronunciation));
+}
+
+function clearBrowserSpeechWatchdog(): void {
+  if (browserSpeechWatchdog !== null) window.clearTimeout(browserSpeechWatchdog);
+  browserSpeechWatchdog = null;
+}
+
+function computeRelativePlaybackRate(targetRate: number, bakedRate: number): number {
+  const safeBaked = Number.isFinite(bakedRate) && bakedRate > 0 ? bakedRate : 1;
+  return Math.round(Math.min(4, Math.max(0.25, targetRate / safeBaked)) * 100) / 100;
+}
 
 function releasePageAudio(): void {
   clearInterval(pageAudioProgressTimer);
   pageAudioProgressTimer = undefined;
+  pageAudioProgressTick = null;
   if (audio) { audio.onended = audio.onerror = audio.ontimeupdate = audio.onseeked = audio.onloadedmetadata = audio.ondurationchange = null; audio.pause(); audio.removeAttribute('src'); audio = null; }
   if (audioUrl) URL.revokeObjectURL(audioUrl);
   audioUrl = '';
@@ -2093,11 +2193,13 @@ function releasePageAudio(): void {
 }
 
 function followPageAudio(nextAudio: HTMLAudioElement, text: string, cues: readonly SpeechCue[] = []): void {
+  const tokens = speechTextTokens(text);
   const tick = () => {
     if (audio !== nextAudio) return;
     audioPosition.value = parseSpeechPlaybackPosition({currentTime: nextAudio.currentTime, duration: nextAudio.duration});
-    audioProgress.value = audioSpeechProgress(text, nextAudio.currentTime, nextAudio.duration, cues);
+    audioProgress.value = audioSpeechProgress(text, nextAudio.currentTime, nextAudio.duration, cues, tokens);
   };
+  pageAudioProgressTick = tick;
   nextAudio.ontimeupdate = nextAudio.onseeked = nextAudio.onloadedmetadata = nextAudio.ondurationchange = tick;
   clearInterval(pageAudioProgressTimer);
   pageAudioProgressTimer = setInterval(tick, 100);
@@ -2129,18 +2231,131 @@ async function seekAudio(offsetSeconds: -5 | 5): Promise<void> {
   }
 }
 
+function seekAudioToTrackClick(event: MouseEvent): void {
+  if (!audio || !audioPosition.value || isPreparingAudio.value) return;
+  const track = event.currentTarget as HTMLElement | null;
+  const rect = track?.getBoundingClientRect();
+  if (!rect || rect.width <= 0) return;
+  const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+  const targetTime = ratio * audioPosition.value.duration;
+  if (!Number.isFinite(targetTime)) return;
+  try { audio.currentTime = targetTime; audio.ontimeupdate?.(new Event('timeupdate')); }
+  catch { showNotice('语音跳转失败，请重试'); }
+}
+
+async function togglePauseAudio(): Promise<void> {
+  if (!isPlaying.value || isPreparingAudio.value) return;
+  const wantPause = !isPaused.value;
+  const op = ++pauseOpSeq;
+  const generation = ttsContentController.currentGeneration();
+  if (audio) {
+    const targetAudio = audio;
+    try {
+      if (wantPause) {
+        clearInterval(pageAudioProgressTimer);
+        pageAudioProgressTimer = undefined;
+        targetAudio.pause();
+        isPaused.value = true;
+      } else {
+        await targetAudio.play();
+        if (op !== pauseOpSeq || !ttsContentController.isCurrentGeneration(generation) || !isPlaying.value || audio !== targetAudio || targetAudio.paused) return;
+        isPaused.value = false;
+        if (pageAudioProgressTick) {
+          clearInterval(pageAudioProgressTimer);
+          pageAudioProgressTimer = setInterval(pageAudioProgressTick, 100);
+          pageAudioProgressTick();
+        }
+      }
+    } catch {
+      if (op === pauseOpSeq && ttsContentController.isCurrentGeneration(generation)) {
+        showNotice(wantPause ? t('selectionTts.pauseFailed') : t('selectionTts.resumeFailed'));
+      }
+    }
+    return;
+  }
+  if (utterance && 'speechSynthesis' in window) {
+    try {
+      if (wantPause) {
+        window.speechSynthesis.pause?.();
+        isPaused.value = true;
+      } else {
+        window.speechSynthesis.resume?.();
+        isPaused.value = false;
+      }
+    } catch {
+      showNotice(wantPause ? t('selectionTts.pauseFailed') : t('selectionTts.resumeFailed'));
+    }
+    return;
+  }
+  const clientRequestId = ttsContentController.getState().activeClientRequestId;
+  if (!clientRequestId) return;
+  try {
+    const response = await browser.runtime.sendMessage({
+      type: wantPause ? 'selectionTtsPause' : 'selectionTtsResume',
+      clientRequestId,
+    }) as {success?: boolean} | undefined;
+    if (op !== pauseOpSeq || !ttsContentController.isCurrentGeneration(generation)) return;
+    if (response?.success) isPaused.value = wantPause;
+    else showNotice(wantPause ? t('selectionTts.pauseFailed') : t('selectionTts.resumeFailed'));
+  } catch {
+    if (op === pauseOpSeq && ttsContentController.isCurrentGeneration(generation)) {
+      showNotice(wantPause ? t('selectionTts.pauseFailed') : t('selectionTts.resumeFailed'));
+    }
+  }
+}
+
+async function cyclePlaybackRate(): Promise<void> {
+  const previousRate = playbackRate.value;
+  const nextRate = nextSelectionTtsRatePreset(previousRate);
+  playbackRate.value = nextRate;
+  if (!isPlaying.value || isPreparingAudio.value) return;
+  const relativeRate = computeRelativePlaybackRate(nextRate, activeAudioSynthesizedRate);
+  if (audio) {
+    try { audio.playbackRate = relativeRate; } catch { /* ignore */ }
+    return;
+  }
+  const clientRequestId = ttsContentController.getState().activeClientRequestId;
+  if (!clientRequestId) return;
+  const generation = ttsContentController.currentGeneration();
+  try {
+    const response = await browser.runtime.sendMessage({
+      type: 'selectionTtsSetRate',
+      clientRequestId,
+      rate: relativeRate,
+    }) as {success?: boolean} | undefined;
+    if (!ttsContentController.isCurrentGeneration(generation)) return;
+    if (!response?.success) {
+      if (playbackRate.value === nextRate) playbackRate.value = previousRate;
+      showNotice(t('selectionTts.rateFailed'));
+    }
+  } catch {
+    if (ttsContentController.isCurrentGeneration(generation)) {
+      if (playbackRate.value === nextRate) playbackRate.value = previousRate;
+      showNotice(t('selectionTts.rateFailed'));
+    }
+  }
+}
+
 function stopAudio(notifyRemote = true): void {
+  pauseOpSeq += 1;
   ttsContentController.stop(notifyRemote);
+  clearBrowserSpeechWatchdog();
   releasePageAudio();
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   utterance = null;
+  activeAudioSynthesizedRate = 1;
+  currentAudioLanguage = '';
   isPlaying.value = false;
   isPreparingAudio.value = false;
+  isPaused.value = false;
   audioProgress.value = null;
   audioTextOffset.value = 0;
   currentAudioKind.value = null;
   currentAudioText.value = '';
   currentAudioKey.value = '';
+  currentAudioSource.value = null;
+  currentAudioVoice.value = '';
+  currentAudioCached.value = false;
 }
 
 function stopAudioFromUi(): void { stopAudio(); }
@@ -2167,6 +2382,7 @@ async function playEdgeSpeech(text: string, language: string, kind: AudioKind, r
       type: 'selectionTts',
       text,
       language,
+      rate: playbackRate.value,
       clientRequestId: remoteRequest.clientRequestId,
     }) as {
       success?: boolean;
@@ -2174,6 +2390,10 @@ async function playEdgeSpeech(text: string, language: string, kind: AudioKind, r
       contentType?: string;
       timings?: unknown;
       transport?: 'offscreen' | 'page';
+      source?: unknown;
+      voice?: unknown;
+      cached?: unknown;
+      synthesizedRate?: unknown;
       errorCode?: unknown;
       error?: string;
     };
@@ -2184,9 +2404,20 @@ async function playEdgeSpeech(text: string, language: string, kind: AudioKind, r
       error: response.error,
       errorCode: typeof response.errorCode === 'string' ? response.errorCode : undefined,
     };
+    const resolvedSource = inferAudioSource(response.source, response.voice);
+    const resolvedVoice = typeof response.voice === 'string' ? response.voice : '';
+    const resolvedCached = response.cached === true;
+    const bakedRate = typeof response.synthesizedRate === 'number' && Number.isFinite(response.synthesizedRate) && response.synthesizedRate > 0
+      ? response.synthesizedRate
+      : (response.source === 'youdao' || response.source === 'google' ? 1 : playbackRate.value);
+    activeAudioSynthesizedRate = bakedRate;
     if (remoteResult === 'offscreen') {
       currentAudioKind.value = kind;
       currentAudioText.value = text;
+      currentAudioSource.value = resolvedSource;
+      currentAudioVoice.value = resolvedVoice;
+      currentAudioCached.value = resolvedCached;
+      isPaused.value = false;
       isPlaying.value = true;
       return {handled: true};
     }
@@ -2197,13 +2428,11 @@ async function playEdgeSpeech(text: string, language: string, kind: AudioKind, r
     const nextAudioUrl = base64ToBlobUrl(response.audioBase64, response.contentType || 'audio/mpeg');
     const nextAudio = new Audio(nextAudioUrl);
     nextAudio.preload = 'auto';
+    nextAudio.playbackRate = computeRelativePlaybackRate(playbackRate.value, activeAudioSynthesizedRate);
     nextAudio.onended = () => { if (audio === nextAudio) { releasePageAudio(); stopAudio(); } };
     nextAudio.onerror = () => {
       if (audio !== nextAudio) return;
-      releasePageAudio();
-      isPlaying.value = false;
-      currentAudioKind.value = null;
-      currentAudioText.value = '';
+      stopAudio(false);
     };
     audio = nextAudio;
     followPageAudio(nextAudio, text, parseSpeechCues(response.timings));
@@ -2211,6 +2440,10 @@ async function playEdgeSpeech(text: string, language: string, kind: AudioKind, r
     currentAudioKind.value = kind;
     currentAudioText.value = text;
     if (kind !== 'word') currentAudioKey.value = text;
+    currentAudioSource.value = resolvedSource;
+    currentAudioVoice.value = resolvedVoice;
+    currentAudioCached.value = resolvedCached;
+    isPaused.value = false;
     isPlaying.value = true;
     try {
       await nextAudio.play();
@@ -2218,9 +2451,14 @@ async function playEdgeSpeech(text: string, language: string, kind: AudioKind, r
     } catch (cause) {
       if (audio === nextAudio) releasePageAudio();
       if (ttsContentController.isCurrentGeneration(requestId)) {
+        activeAudioSynthesizedRate = 1;
         isPlaying.value = false;
+        isPaused.value = false;
         currentAudioKind.value = null;
         currentAudioText.value = '';
+        currentAudioSource.value = null;
+        currentAudioVoice.value = '';
+        currentAudioCached.value = false;
       }
       if (ttsContentController.isCurrentGeneration(requestId)) console.warn('Page audio unavailable, trying browser speech:', cause);
       return {handled: false};
@@ -2232,24 +2470,76 @@ async function playEdgeSpeech(text: string, language: string, kind: AudioKind, r
   }
 }
 
-function playBrowserSpeech(text: string, language: string, kind: AudioKind): boolean {
-  if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return false;
+function speakBrowserUtterance(
+  text: string,
+  language: string,
+  kind: AudioKind,
+  voices: readonly SpeechSynthesisVoice[],
+  requestId: number,
+): boolean {
+  if (!ttsContentController.isCurrentGeneration(requestId)) return true;
   try {
     const nextUtterance = new SpeechSynthesisUtterance(text);
+    const tokens = speechTextTokens(text);
     nextUtterance.lang = language;
-    nextUtterance.voice = selectVoice(language) ?? null;
-    nextUtterance.onboundary = event => {if (utterance === nextUtterance && (!event.name || event.name === 'word')) audioProgress.value = boundarySpeechProgress(text,event.charIndex,event.charLength);};
+    nextUtterance.rate = playbackRate.value;
+    nextUtterance.voice = selectBrowserSpeechVoice(voices, language) ?? null;
+    nextUtterance.onstart = () => { if (utterance === nextUtterance) clearBrowserSpeechWatchdog(); };
+    nextUtterance.onboundary = event => {if (utterance === nextUtterance && (!event.name || event.name === 'word')) audioProgress.value = boundarySpeechProgress(text, event.charIndex, event.charLength, tokens);};
     nextUtterance.onend = () => { if (utterance === nextUtterance) stopAudio(); };
     nextUtterance.onerror = event => { if (utterance === nextUtterance && event.error !== 'canceled' && event.error !== 'interrupted') stopAudio(); };
     utterance = nextUtterance;
     currentAudioKind.value = kind;
     currentAudioText.value = text;
     if (kind !== 'word') currentAudioKey.value = text;
+    currentAudioSource.value = 'browser';
+    currentAudioVoice.value = nextUtterance.voice?.name || '';
+    currentAudioCached.value = false;
+    isPaused.value = false;
     isPlaying.value = true;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(nextUtterance);
+    clearBrowserSpeechWatchdog();
+    browserSpeechWatchdog = window.setTimeout(() => {
+      if (utterance !== nextUtterance) return;
+      stopAudio(false);
+      showNotice(t('selectionTts.browserSpeechTimeout'));
+    }, 8000);
     return true;
   } catch (cause) { console.warn('Browser speech synthesis unavailable:', cause); return false; }
+}
+
+async function playBrowserSpeechAsync(text: string, language: string, kind: AudioKind, requestId: number): Promise<boolean> {
+  if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return false;
+  const synth = window.speechSynthesis;
+  const initialVoices = synth.getVoices?.() ?? [];
+  if (initialVoices.length > 0 || typeof synth.addEventListener !== 'function') {
+    return speakBrowserUtterance(text, language, kind, initialVoices, requestId);
+  }
+  const voices = await loadBrowserSpeechVoices(synth);
+  if (!ttsContentController.isCurrentGeneration(requestId)) return true;
+  return speakBrowserUtterance(text, language, kind, voices, requestId);
+}
+
+function playBrowserSpeech(text: string, language: string, kind: AudioKind, requestId = ttsContentController.currentGeneration()): boolean {
+  if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return false;
+  const synth = window.speechSynthesis;
+  const initialVoices = synth.getVoices?.() ?? [];
+  if (initialVoices.length > 0 || typeof synth.addEventListener !== 'function') {
+    return speakBrowserUtterance(text, language, kind, initialVoices, requestId);
+  }
+  currentAudioKind.value = kind;
+  currentAudioText.value = text;
+  if (kind !== 'word') currentAudioKey.value = text;
+  isPreparingAudio.value = true;
+  void loadBrowserSpeechVoices(synth).then((voices) => {
+    if (!ttsContentController.isCurrentGeneration(requestId)) return;
+    isPreparingAudio.value = false;
+    if (!speakBrowserUtterance(text, language, kind, voices, requestId)) {
+      void playGoogleFallback(text, language, kind);
+    }
+  });
+  return true;
 }
 
 async function playGoogleFallback(text: string, language: string, kind: AudioKind): Promise<void> {
@@ -2261,6 +2551,7 @@ async function playGoogleFallback(text: string, language: string, kind: AudioKin
       type: 'selectionTtsGoogle',
       text,
       language,
+      rate: playbackRate.value,
       clientRequestId: remoteRequest.clientRequestId,
     }) as {
       success?: boolean;
@@ -2269,8 +2560,13 @@ async function playGoogleFallback(text: string, language: string, kind: AudioKin
     const remoteResult = ttsContentController.completeRemoteRequest(remoteRequest, response);
     if (remoteResult === 'stale') return;
     if (remoteResult === 'offscreen') {
+      activeAudioSynthesizedRate = 1;
       currentAudioKind.value = kind;
       currentAudioText.value = text;
+      currentAudioSource.value = 'google';
+      currentAudioVoice.value = 'Google TTS';
+      currentAudioCached.value = false;
+      isPaused.value = false;
       isPlaying.value = true;
       return;
     }
@@ -2284,6 +2580,8 @@ async function playGoogleFallback(text: string, language: string, kind: AudioKin
   const speechUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(language)}&client=tw-ob&q=${encodeURIComponent(text)}`;
   const nextAudio = new Audio(speechUrl);
   nextAudio.preload = 'auto';
+  activeAudioSynthesizedRate = 1;
+  nextAudio.playbackRate = playbackRate.value;
   nextAudio.onended = () => { if (audio === nextAudio) { releasePageAudio(); stopAudio(); } };
   nextAudio.onerror = () => {
     if (audio !== nextAudio) return;
@@ -2296,6 +2594,10 @@ async function playGoogleFallback(text: string, language: string, kind: AudioKin
   currentAudioKind.value = kind;
   currentAudioText.value = text;
   if (kind !== 'word') currentAudioKey.value = text;
+  currentAudioSource.value = 'google';
+  currentAudioVoice.value = 'Google TTS';
+  currentAudioCached.value = false;
+  isPaused.value = false;
   isPlaying.value = true;
   try {
     await nextAudio.play();
@@ -2308,17 +2610,22 @@ async function playGoogleFallback(text: string, language: string, kind: AudioKin
 async function playExternalAudio(url: string, text: string, kind: AudioKind, key: string, requestId: number): Promise<boolean> {
   if (!ttsContentController.isCurrentGeneration(requestId)) return true;
   const nextAudio = new Audio(url);
+  activeAudioSynthesizedRate = 1;
+  nextAudio.playbackRate = playbackRate.value;
   audio = nextAudio;
   currentAudioKind.value = kind;
   currentAudioText.value = text;
   currentAudioKey.value = key;
+  currentAudioSource.value = 'dictionary';
+  currentAudioVoice.value = '';
+  currentAudioCached.value = false;
+  isPaused.value = false;
   isPlaying.value = true;
   followPageAudio(nextAudio, text);
   nextAudio.onended = () => { if (audio === nextAudio) stopAudio(); };
   nextAudio.onerror = () => {
     if (audio !== nextAudio) return;
-    releasePageAudio();
-    isPlaying.value = false;
+    stopAudio(false);
   };
   try {
     await nextAudio.play();
@@ -2326,7 +2633,12 @@ async function playExternalAudio(url: string, text: string, kind: AudioKind, key
   } catch (cause) {
     if (audio === nextAudio) {
       releasePageAudio();
+      activeAudioSynthesizedRate = 1;
       isPlaying.value = false;
+      isPaused.value = false;
+      currentAudioSource.value = null;
+      currentAudioVoice.value = '';
+      currentAudioCached.value = false;
     }
     if (ttsContentController.isCurrentGeneration(requestId)) console.warn('Dictionary pronunciation audio unavailable:', cause);
     return false;
@@ -2336,7 +2648,7 @@ async function playExternalAudio(url: string, text: string, kind: AudioKind, key
 async function toggleAudio(text: string, kind: AudioKind): Promise<void> {
   const cleanText = text.trim();
   if (!cleanText) return;
-  if ((isCurrentAudio(kind) || isPreparingAudio.value && currentAudioKind.value === kind) && currentAudioText.value === cleanText) { stopAudio(); return; }
+  if ((isCurrentAudio(kind) || isPreparingCurrentAudio(kind)) && currentAudioText.value === cleanText) { stopAudio(); return; }
   stopAudio();
   const language = speechLanguage(cleanText, kind);
   const requestId = ttsContentController.currentGeneration();
@@ -2345,16 +2657,17 @@ async function toggleAudio(text: string, kind: AudioKind): Promise<void> {
   currentAudioKind.value = kind;
   currentAudioText.value = cleanText;
   currentAudioKey.value = cleanText;
+  currentAudioLanguage = language;
   try {
     const edgeResult = await playEdgeSpeech(cleanText, language, kind, requestId);
     if (edgeResult.handled || !ttsContentController.isCurrentGeneration(requestId)) return;
-    await fallbackSpeech(edgeResult, cleanText, language, kind);
+    await fallbackSpeech(edgeResult, cleanText, language, kind, requestId);
   } finally {if (ttsContentController.isCurrentGeneration(requestId)) isPreparingAudio.value = false;}
 }
 
-async function fallbackSpeech(edgeResult: EdgeSpeechResult, text: string, language: string, kind: AudioKind): Promise<void> {
+async function fallbackSpeech(edgeResult: EdgeSpeechResult, text: string, language: string, kind: AudioKind, requestId: number): Promise<void> {
   if (edgeResult.errorCode === 'local-tts-model-not-downloaded') {
-    showNotice(t('selectionTts.localModelNotDownloaded'), 'open-local-tts');
+    showNotice(t('selectionTts.localModelNotDownloaded'), 'open-local-tts', 6000);
   } else if (edgeResult.errorCode === 'local-tts-language-unsupported') {
     showNotice(t('selectionTts.languageUnsupported'));
   }
@@ -2363,7 +2676,10 @@ async function fallbackSpeech(edgeResult: EdgeSpeechResult, text: string, langua
     if (!edgeResult.errorCode) showNotice(edgeResult.error || '本地语音生成失败，请重试');
     return;
   }
-  if (!playBrowserSpeech(text, language, kind)) await playGoogleFallback(text, language, kind);
+  const browserStarted = await playBrowserSpeechAsync(text, language, kind, requestId);
+  if (!browserStarted && ttsContentController.isCurrentGeneration(requestId)) {
+    await playGoogleFallback(text, language, kind);
+  }
 }
 
 function handleSelectionTtsState(message: unknown): true | undefined {
@@ -2372,7 +2688,6 @@ function handleSelectionTtsState(message: unknown): true | undefined {
 
   const text = currentAudioText.value;
   const kind = currentAudioKind.value;
-  const language = kind && text ? speechLanguage(text, kind) : '';
   if (state === 'progress') {
     const payload = message as {progress?:unknown; position?:unknown};
     audioProgress.value = parseSpeechProgress(payload.progress);
@@ -2385,6 +2700,8 @@ function handleSelectionTtsState(message: unknown): true | undefined {
   }
   if (state === 'error') {
     const textOffset = audioTextOffset.value;
+    const audioKey = currentAudioKey.value;
+    const audioLang = currentAudioLanguage || (kind && text ? speechLanguage(text, kind) : '');
     stopAudio(false);
     if (config.selectionTtsMode === 'local-only') {
       const error = (message as {error?: string}).error;
@@ -2392,7 +2709,9 @@ function handleSelectionTtsState(message: unknown): true | undefined {
       return true;
     }
     audioTextOffset.value = textOffset;
-    if (text && kind && !playBrowserSpeech(text, language, kind)) void playGoogleFallback(text, language, kind);
+    currentAudioKey.value = audioKey;
+    currentAudioLanguage = audioLang;
+    if (text && kind && !playBrowserSpeech(text, audioLang, kind)) void playGoogleFallback(text, audioLang, kind);
     return true;
   }
   return undefined;
@@ -2403,13 +2722,21 @@ async function toggleWordAudio(pronunciation: WordPronunciation): Promise<void> 
   const cleanText = word.trim();
   if (!cleanText) return;
   const key = wordAudioKey(pronunciation);
-  if (isCurrentAudio('word', key) || isPreparingAudio.value && currentAudioKind.value === 'word' && currentAudioKey.value === key) { stopAudio(); return; }
+  if (isCurrentAudio('word', key) || isPreparingCurrentAudio('word', key)) { stopAudio(); return; }
   stopAudio();
   const requestId = ttsContentController.currentGeneration();
+  const explicitWordSource = currentContentRequest.value?.sourceLanguage ?? config.from;
+  const detectedWordLanguage = explicitWordSource && explicitWordSource !== 'auto'
+    ? explicitWordSource
+    : isSingleEnglishWord(cleanText)
+      ? 'en-US'
+      : sourceLanguage(cleanText);
+  const language = inferWordSpeechLanguage(cleanText, pronunciation.label, detectedWordLanguage);
   isPreparingAudio.value = true;
   currentAudioKind.value = 'word';
   currentAudioText.value = cleanText;
   currentAudioKey.value = key;
+  currentAudioLanguage = language;
   try {
     const externalAudio = pronunciation.audio;
     if (externalAudio && config.selectionTtsMode !== 'local-only') {
@@ -2417,11 +2744,11 @@ async function toggleWordAudio(pronunciation: WordPronunciation): Promise<void> 
       if (!ttsContentController.isCurrentGeneration(requestId)) return;
       if (externalStarted) return;
     }
-    const edgeResult = await playEdgeSpeech(cleanText, 'en-US', 'word', requestId);
+    const edgeResult = await playEdgeSpeech(cleanText, language, 'word', requestId);
     if (!ttsContentController.isCurrentGeneration(requestId)) return;
     currentAudioKey.value = key;
     if (edgeResult.handled) return;
-    await fallbackSpeech(edgeResult, cleanText, 'en-US', 'word');
+    await fallbackSpeech(edgeResult, cleanText, language, 'word', requestId);
     if (ttsContentController.isCurrentGeneration(requestId)) currentAudioKey.value = key;
   } finally {if (ttsContentController.isCurrentGeneration(requestId)) isPreparingAudio.value = false;}
 }
@@ -3762,44 +4089,111 @@ onBeforeUnmount(() => {
 .fr-loading-spinner { width: 18px; height: 18px; border: 2px solid rgba(239, 71, 118, .22); border-top-color: var(--fr-card-brand); border-radius: 50%; animation: fr-spin .7s linear infinite; }
 .fr-loading-spinner.fr-static { animation: none; }
 @keyframes fr-spin { to { transform: rotate(360deg); } }
-.fr-word-learning-card { padding: 1px 1px 0; color: var(--fr-card-ink); }
+.fr-word-learning-card { padding: 0; color: var(--fr-card-ink); }
 .fr-word-card-loading { display: flex; align-items: center; gap: 7px; min-height: 22px; margin-bottom: 8px; color: var(--fr-card-muted); font-size: 11px; line-height: 1.5; }
 .fr-word-card-loading .fr-loading-spinner { flex: 0 0 auto; width: 12px; height: 12px; }
-.fr-word-support-loading { margin: 4px 0; color: var(--fr-card-muted); font-size: 11px; line-height: 1.5; }
-.fr-word-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 0; }
+.fr-word-support-loading { margin: 8px 0 0; color: var(--fr-card-muted); font-size: 11px; line-height: 1.5; }
+.fr-word-hero { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--fr-card-line); }
+.fr-word-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0; }
 .fr-word-heading > div:first-child { min-width: 0; }
-.fr-word-heading h3 { margin: 0; color: var(--fr-card-ink); font-size: 26px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; overflow-wrap: anywhere; user-select: text; }
-.fr-word-normalized { display: block; margin-top: 5px; color: var(--fr-card-muted); font-size: 11px; }
+.fr-word-heading h3 { margin: 0; color: var(--fr-card-ink); font-size: 22px; font-weight: 700; letter-spacing: -.025em; line-height: 1.18; overflow-wrap: anywhere; user-select: text; }
+.fr-word-normalized { display: block; margin-top: 3px; color: var(--fr-card-muted); font-size: 11px; }
 .fr-word-heading-actions { display: flex; flex: none; align-items: center; gap: 4px; }
 .fr-word-heading-audio { background: var(--fr-card-toolbar); color: var(--fr-card-muted); }
-.fr-word-pronunciations { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 7px; padding-bottom: 8px; border-bottom: 1px solid var(--fr-card-line); }
-.fr-word-pronunciation { display: flex; align-items: center; gap: 5px; min-height: 26px; padding: 0; }
-.fr-word-pronunciation:last-child { border-bottom: 0; }
+.fr-word-pronunciations { display: flex; flex-wrap: wrap; gap: 6px; }
+.fr-word-pronunciation {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 1px 3px 1px 8px;
+  border: 1px solid var(--fr-card-line);
+  border-radius: 7px;
+  background: var(--fr-card-toolbar);
+  cursor: pointer;
+  transition: border-color 120ms var(--fr-card-ease), background-color 120ms var(--fr-card-ease);
+}
+.fr-word-pronunciation:hover, .fr-word-pronunciation.is-playing, .fr-word-pronunciation.is-loading {
+  border-color: var(--fr-card-active-border);
+  background: var(--fr-card-active-bg);
+}
 .fr-word-pronunciation-label { color: var(--fr-card-muted); font-size: 11px; font-weight: 500; }
-.fr-word-ipa { color: var(--fr-card-source-ink); font-family: Georgia, "Times New Roman", serif; font-size: 14px; }
-.fr-word-pronunciation .fr-text-audio-btn { width: 24px; height: 24px; }
-.fr-word-translation { display: flow-root; margin-top: 9px; padding: 0 0 10px; border-bottom: 1px solid var(--fr-card-line); color: var(--fr-card-ink); }
-.fr-word-translation-header { float: inline-end; margin-inline-start: 8px; }
+.fr-word-ipa { color: var(--fr-card-source-ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12.5px; }
+.fr-word-pronunciation.is-playing .fr-word-pronunciation-label,
+.fr-word-pronunciation.is-playing .fr-word-ipa,
+.fr-word-pronunciation.is-playing .fr-text-audio-btn,
+.fr-word-pronunciation.is-loading .fr-word-pronunciation-label,
+.fr-word-pronunciation.is-loading .fr-word-ipa,
+.fr-word-pronunciation.is-loading .fr-text-audio-btn { color: var(--fr-card-active-ink); }
+.fr-word-pronunciation .fr-text-audio-btn { width: 22px; height: 22px; border-radius: 5px; }
+.fr-word-pronunciation .fr-text-audio-btn svg { width: 14px; height: 14px; }
+.fr-word-translation {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 6px 7px 10px;
+  border-radius: 8px;
+  background: var(--fr-card-toolbar);
+  color: var(--fr-card-ink);
+}
+.fr-word-translation-header { flex: none; display: flex; align-items: center; gap: 2px; }
 .fr-word-translation .fr-text-label { margin: 0; }
-.fr-word-translation pre { overflow-wrap: anywhere; margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 15.5px; font-weight: 600; line-height: 1.6; user-select: text; }
-.fr-word-translation-loading, .fr-word-empty { margin-top: 12px; color: var(--fr-card-muted); font-size: 12px; }
-.fr-word-meaning-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: var(--fr-card-muted); font-size: 11px; font-weight: 600; }
-.fr-word-meaning-toolbar button { border: 0; padding: 3px 0; background: transparent; color: var(--fr-card-active-ink); cursor: pointer; font: inherit; font-weight: 600; }
-.fr-word-meaning-toolbar button:hover, .fr-word-meaning-toolbar button:focus-visible { text-decoration: underline; outline: none; }
-.fr-word-meanings { display: grid; gap: 16px; margin-top: 14px; }
+.fr-word-translation pre { flex: 1; min-width: 0; overflow-wrap: anywhere; margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 14.5px; font-weight: 600; line-height: 1.55; user-select: text; }
+.fr-word-translation-loading, .fr-word-empty { margin-top: 10px; color: var(--fr-card-muted); font-size: 12px; }
+.fr-word-meaning-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; color: var(--fr-card-muted); font-size: 11px; font-weight: 500; }
+.fr-word-meaning-toolbar button { border: 0; padding: 2px 6px; border-radius: 5px; background: transparent; color: var(--fr-card-active-ink); cursor: pointer; font: inherit; font-weight: 600; transition: background-color 120ms var(--fr-card-ease); }
+.fr-word-meaning-toolbar button:hover, .fr-word-meaning-toolbar button:focus-visible { background: var(--fr-card-active-bg); outline: none; }
+.fr-word-meanings { display: grid; gap: 11px; margin-top: 11px; }
 .fr-word-meaning-toolbar + .fr-word-meanings { margin-top: 8px; }
-.fr-word-meaning { color: var(--fr-card-ink); font-size: 12.5px; line-height: 1.55; }
-.fr-word-meaning > strong { display: inline-flex; padding: 2px 7px; border: 1px solid var(--fr-card-line); border-radius: 6px; background: var(--fr-card-toolbar); color: var(--fr-card-active-ink); font-size: 11px; font-weight: 600; }
-.fr-word-meaning ol { margin: 7px 0 0; padding: 0; list-style: none; counter-reset: definition; }
-.fr-word-meaning li { position: relative; padding-left: 21px; }
-.fr-word-meaning li::before { position: absolute; top: 0; left: 0; width: 14px; color: var(--fr-card-muted); content: counter(definition); counter-increment: definition; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
-.fr-word-meaning li + li { margin-top: 9px; }
+.fr-word-meaning { color: var(--fr-card-ink); font-size: 13px; line-height: 1.6; }
+.fr-word-meaning > strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 1px 6px;
+  border: 1px solid var(--fr-card-line);
+  border-radius: 5px;
+  background: var(--fr-card-toolbar);
+  color: var(--fr-card-active-ink);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+.fr-word-meaning ol { margin: 6px 0 0; padding: 0; list-style: none; counter-reset: definition; }
+.fr-word-meaning li { position: relative; padding-left: 18px; }
+.fr-word-meaning li::before { position: absolute; top: 1px; left: 0; width: 12px; color: var(--fr-card-muted); content: counter(definition); counter-increment: definition; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.fr-word-meaning li + li { margin-top: 7px; }
+.fr-word-meaning--single {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+.fr-word-meaning--single ol { margin: 0; }
+.fr-word-meaning--single li { padding-left: 0; }
+.fr-word-meaning--single li::before { display: none; }
 .fr-word-definition-en, .fr-word-example-en { display: block; }
-.fr-word-definition-zh, .fr-word-example-zh { display: block; margin-top: 3px; color: var(--fr-card-muted); font-size: 12px; }
+.fr-word-definition-zh, .fr-word-example-zh { display: block; margin-top: 2px; color: var(--fr-card-muted); font-size: 12px; }
 .fr-word-meaning em { display: block; margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--fr-card-line-strong); color: var(--fr-card-muted); font-size: 11.5px; font-style: normal; line-height: 1.5; }
-.fr-word-card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--fr-card-line); color: var(--fr-card-muted); font-size: 11px; }
-.fr-word-card-footer a { color: var(--fr-card-active-ink); text-decoration: none; }
-.fr-word-card-footer a:hover, .fr-word-card-footer a:focus-visible { text-decoration: underline; }
+.fr-word-card-meta {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--fr-card-line);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+.fr-word-card-meta > :deep(.fr-dictionary-tools) { flex: 0 1 auto; }
+.fr-word-card-meta > :deep(.fr-dictionary-tools:has(details[open], dl, .fr-dictionary-web)) { flex-basis: 100%; }
+.fr-word-card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; color: var(--fr-card-muted); font-size: 11px; line-height: 1.4; }
+.fr-word-source-sep { opacity: .55; }
+.fr-word-card-footer a { color: var(--fr-card-muted); text-decoration: none; transition: color 120ms var(--fr-card-ease); }
+.fr-word-card-footer a:hover, .fr-word-card-footer a:focus-visible { color: var(--fr-card-active-ink); text-decoration: underline; }
 .fr-word-fallback-note, .fr-inline-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--fr-card-active-ink); font-size: 11px; }
 .fr-word-fallback-note { padding: 6px 8px; border-radius: 7px; background: var(--fr-card-active-bg); }
 .fr-inline-error button, .fr-word-fallback-note button { border: 1px solid currentColor; border-radius: 6px; padding: 2px 7px; background: transparent; color: inherit; cursor: pointer; font-size: 11px; }
@@ -3821,18 +4215,34 @@ onBeforeUnmount(() => {
 .fr-text-copy-btn:active:not(:disabled) { transform: scale(.95); }
 .fr-text-copy-btn.fr-copied { border-color: var(--fr-card-active-border); background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); }
 .fr-text-copy-btn:disabled { cursor: not-allowed; opacity: .42; }
-.fr-text-audio-btn { position: static; display: grid; flex: none; width: 26px; height: 26px; padding: 0; place-items: center; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fr-card-muted); transition: background-color 120ms var(--fr-card-ease), border-color 120ms var(--fr-card-ease), color 120ms var(--fr-card-ease), transform 120ms var(--fr-card-ease); }
+.fr-text-audio-btn { position: static; display: grid; flex: none; width: 26px; height: 26px; padding: 0; place-items: center; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fr-card-muted); cursor: pointer; transition: background-color 120ms var(--fr-card-ease), border-color 120ms var(--fr-card-ease), color 120ms var(--fr-card-ease), transform 120ms var(--fr-card-ease); }
 .fr-text-audio-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.fr-text-audio-btn:hover, .fr-text-audio-btn:focus-visible { border-color: var(--fr-card-active-border); background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); outline: none; }
+.fr-text-audio-btn:hover, .fr-text-audio-btn:focus-visible, .fr-text-audio-btn.is-playing, .fr-text-audio-btn.is-loading { border-color: var(--fr-card-active-border); background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); outline: none; }
 .fr-text-audio-btn:active { transform: scale(.95); }
+.fr-audio-spinner { animation: fr-spin .75s linear infinite; }
+.fr-audio-spinner.fr-static { animation: none; }
+.fr-status-spinner { width: 13px; height: 13px; flex: none; fill: none; stroke: var(--fr-card-brand); stroke-width: 2.2; stroke-linecap: round; }
 .fr-text-block pre { overflow-wrap: anywhere; margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 14.5px; line-height: 1.68; user-select: text; }
 .fr-original-text pre { font-size: 13px; line-height: 1.64; }
-.fr-playing-status { flex: none; box-sizing: border-box; min-height: 38px; padding: 5px 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; border-top: 1px solid var(--fr-card-line); background: var(--fr-card-toolbar); color: var(--fr-card-muted); font-size: 12px; line-height: 1.4; }
+.fr-playing-status { position: relative; flex: none; box-sizing: border-box; min-height: 38px; padding: 6px 12px 5px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; border-top: 1px solid var(--fr-card-line); background: var(--fr-card-toolbar); color: var(--fr-card-muted); font-size: 12px; line-height: 1.4; }
 .fr-playing-status.is-idle { display: none; }
-.fr-playing-status button { flex: none; min-height: 26px; border: 1px solid var(--fr-card-active-border); border-radius: 7px; padding: 3px 9px; background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); font: inherit; font-weight: 500; line-height: 1.2; }
-.fr-playing-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-playback-progress-track { position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--fr-card-line); overflow: hidden; }
+.fr-playback-progress-track.is-seekable { cursor: pointer; }
+.fr-playback-progress-track.is-seekable:hover { height: 4px; }
+.fr-playback-progress-fill { display: block; height: 100%; background: var(--fr-card-brand); transition: width 90ms linear; }
+.fr-playing-meta { display: inline-flex; flex: 1 1 auto; min-width: 0; align-items: center; gap: 6px; }
+.fr-playing-status button { flex: none; min-height: 26px; border: 1px solid var(--fr-card-active-border); border-radius: 7px; padding: 3px 9px; background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); font: inherit; font-weight: 500; line-height: 1.2; cursor: pointer; transition: background-color 120ms var(--fr-card-ease), border-color 120ms var(--fr-card-ease), color 120ms var(--fr-card-ease); }
+.fr-playing-label { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-playback-source { display: inline-flex; flex: none; align-items: center; gap: 4px; padding: 1px 6px; border: 1px solid var(--fr-card-line); border-radius: 999px; background: var(--fr-card-bg); color: var(--fr-card-muted); font-size: 10.5px; font-weight: 500; line-height: 1.4; white-space: nowrap; }
+.fr-playback-cached-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--fr-card-brand); flex: none; }
 .fr-playback-controls { display: flex; flex-wrap: wrap; flex: 0 1 auto; max-width: 100%; margin-inline-start: auto; align-items: center; justify-content: flex-end; gap: 5px; }
 .fr-playback-time { font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fr-playing-status .fr-pause-btn { display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border-color: transparent; background: transparent; color: var(--fr-card-ink); }
+.fr-playing-status .fr-pause-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fr-playing-status .fr-pause-btn:hover:not(:disabled) { background: var(--fr-card-hover); }
+.fr-playing-status .fr-pause-btn[aria-pressed="true"] { border-color: var(--fr-card-active-border); background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); }
+.fr-playing-status .fr-rate-btn { min-width: 36px; padding: 2px 6px; border-color: var(--fr-card-line); background: var(--fr-card-bg); color: var(--fr-card-ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fr-playing-status .fr-rate-btn:hover:not(:disabled) { border-color: var(--fr-card-active-border); background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); }
 .fr-playing-status .fr-seek-btn { display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border-color: transparent; background: transparent; color: inherit; }
 .fr-seek-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .fr-seek-btn text { fill: currentColor; stroke: none; font: 10px system-ui; text-anchor: middle; }
@@ -3895,7 +4305,7 @@ onBeforeUnmount(() => {
 .fr-short-viewport .fr-tooltip-content, .fr-short-viewport :deep(.fr-reading), .fr-short-viewport :deep(.fr-reading-scroll) { flex: none; height: auto; max-height: none; overflow: visible; }
 .fr-short-viewport .fr-popup-resize-handle { display: none; }
 @media (prefers-reduced-motion: reduce) {
-  .fr-selection-indicator, .fr-translation-tooltip.fr-tooltip-animated, .fr-loading-spinner, .fr-study-toolbar button, .fr-action-btn, .fr-close-btn, .fr-selection-target-trigger, .fr-selection-target-chevron, .fr-selection-target-option, .fr-text-copy-btn, .fr-text-audio-btn { transition: none; animation: none; }
+  .fr-selection-indicator, .fr-translation-tooltip.fr-tooltip-animated, .fr-loading-spinner, .fr-audio-spinner, .fr-playback-progress-fill, .fr-playing-status button, .fr-study-toolbar button, .fr-action-btn, .fr-close-btn, .fr-selection-target-trigger, .fr-selection-target-chevron, .fr-selection-target-option, .fr-text-copy-btn, .fr-text-audio-btn { transition: none; animation: none; }
 }
 
 </style>

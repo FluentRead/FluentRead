@@ -221,6 +221,25 @@ describe('扩展 ZIP 无损 WASM 压缩', () => {
             ? {parentPort: {postMessage}, workerData: Uint8Array.from([7])} : {deflateAsync}}, {filename: resolve(root, 'scripts/wasm/zip-deflate-worker.cjs')});
         await Promise.resolve(); expect(deflateAsync).toHaveBeenCalledWith(Uint8Array.from([7]), {numiterations: 1}); expect(postMessage).toHaveBeenCalledWith(bytes);
     });
+    it('支持 Firefox/Safari 的 asyncify ONNX WASM 并拒绝同时包含两个 ONNX 变体的包', async () => {
+        const asyncifyZip = new JSZip();
+        const asyncifyNames = [
+            'fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm',
+            'fluent-read-ai/wllama.wasm',
+            'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm',
+        ];
+        asyncifyNames.forEach((name, index) => asyncifyZip.file(name, source(index), {date, createFolders: false, compression: 'DEFLATE'}));
+        asyncifyZip.file('a.txt', 'unchanged', {date, createFolders: false, compression: 'DEFLATE'});
+        await fs.writeFile(zipPath, await asyncifyZip.generateAsync({type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: {level: 1}}));
+        const result = await compact();
+        expect(result.entries.map(e => e.name)).toEqual(asyncifyNames);
+        expect(result.savedBytes).toBeGreaterThan(0);
+
+        // 同时包含 .jspi.wasm 和 .asyncify.wasm 必须被拒绝。
+        asyncifyZip.file('fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm', source(9), {date, createFolders: false, compression: 'DEFLATE'});
+        await fs.writeFile(zipPath, await asyncifyZip.generateAsync({type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: {level: 1}}));
+        await expect(compact()).rejects.toThrow('同时包含多个 ONNX WASM 条目');
+    });
 });
 
 type Mutator = (bytes: Buffer, p: ReturnType<typeof positions>) => void;

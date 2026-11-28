@@ -2,10 +2,10 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {translate, translateLegacyText, type UiLanguage} from '@/src/core/i18n';
 import {createImageOperationRegistry, createImageTranslationBackgroundHandlers, IMAGE_TRANSLATE_MESSAGE_TYPE, IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, IMAGE_CANCEL_MESSAGE_TYPE} from '@/src/features/image-translation/background/handlers';
-import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, normalizeImageProgress} from '@/src/features/image-translation/progress';
+import {IMAGE_PROGRESS_MESSAGE_TYPE, imageLoadingProgress, isImageTranslationStage, normalizeImageProgress} from '@/src/features/image-translation/progress';
 import {createOpenOptionsPageHandler} from '@/src/features/settings/background';
 import {IMAGE_LOCAL_FAILURES, imageLocalFailureMessage, imageTranslationFailureCode, imageTranslationFailureResponse, createImageTranslationFailure} from '@/src/features/image-translation/failure';
-import {createImageControls} from '@/src/features/image-translation/content/controls';
+import {createImageControls, IMAGE_CONTROLS_CSS} from '@/src/features/image-translation/content/controls';
 import {IMAGE_READER_CSS} from '@/src/features/image-translation/content/textReader';
 import {sendCancellableImageOperation, prepareImageOcrLanguages} from '@/src/features/image-translation/services/client';
 import {imageTranslationProgressTransport} from '@/src/features/image-translation/background/offscreenAdapter';
@@ -416,7 +416,7 @@ it.each([
     expect(ui.reader.hidden).toBe(false);
     if (outcome === 'resolve') operation.resolve();else operation.reject(new Error('late clipboard failure'));
     await Promise.resolve();
-    expect(ui.reader.querySelector('[role=status]')!.textContent).toContain('本地 OCR');
+    expect(ui.reader.querySelector('[role=status]')!.textContent).toContain('识别内容仅供参考');
     expect(vi.getTimerCount()).toBe(0);ui.dispose();
 });
 
@@ -443,29 +443,43 @@ describe('图片翻译流程优化',()=>{
         expect(await handler('fluentReadMangaModelRemove').handle({type:'fluentReadMangaModelRemove'})).toEqual({success:true});expect(removeMangaModels).toHaveBeenCalledOnce();
         await expect(handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_MESSAGE_TYPE,image:'data:image/png,x',sourceLanguage:'en',manga:'true'} as never)).rejects.toThrow('漫画翻译模式无效');
     });
-    it('识别进度接受有效百分比，语言刷新保留数值，完成或失败清除百分比', () => {
+    it('识别进度接受有效百分比，支持平滑阶段换算与隐藏文本百分比，语言刷新保留数值，完成或失败清除百分比', () => {
         for (const invalid of [undefined, null, '50', NaN, Infinity, -1, 101]) expect(normalizeImageProgress(invalid)).toBeUndefined();
         expect(normalizeImageProgress(0)).toBe(0); expect(normalizeImageProgress(100)).toBe(100);
+        expect(imageLoadingProgress()).toBe(8);
+        expect(imageLoadingProgress('preparing')).toBe(12);
+        expect(imageLoadingProgress('initializing', undefined, 12)).toBe(22);
+        expect(imageLoadingProgress('recognizing', undefined, 22)).toBe(38);
+        expect(imageLoadingProgress('recognizing', 50, 38)).toBe(45);
+        expect(imageLoadingProgress('recognizing', 0, 45)).toBe(45);
+        expect(imageLoadingProgress('translating', undefined, 45)).toBe(72);
+        expect(imageLoadingProgress('cleaning', undefined, 72)).toBe(82);
+        expect(imageLoadingProgress('cleaning', 100, 82)).toBe(90);
+        expect(imageLoadingProgress('rendering', undefined, 90)).toBe(94);
         const {document} = parseHTML('<html><body></body></html>'); vi.stubGlobal('document', document);
         let language: UiLanguage = 'en-US';
         const ui = createImageControls({onAction(){},onPrepare(){},translate:source=>translateLegacyText(source,language)});
-        ui.update('loading','正在识别图片文字…',{progress:42.9});
+        ui.update('loading','首次准备中…',{progress:42.9});
         expect(ui.status.textContent).toContain('42%');
         language='ja-JP';ui.refreshLanguage();expect(ui.status.textContent).toContain('42%');
-        ui.update('loading','正在翻译文字…');expect(ui.status.textContent).not.toContain('%');
+        ui.update('loading','翻译中…',{progress:72, showPercent:false});
+        expect(ui.status.textContent).not.toContain('%');
+        expect(ui.feedback.querySelector<HTMLElement>('[role=progressbar]')!.hidden).toBe(false);
+        expect(ui.feedback.querySelector('[role=progressbar]')!.getAttribute('aria-valuenow')).toBe('72');
+        ui.update('loading','翻译中…');expect(ui.status.textContent).not.toContain('%');
         ui.update('error','识别失败',{progress:42});expect(ui.status.textContent).not.toContain('%');
         ui.dispose();
     });
 
-    it('漫画处理显示轻量进度，失败才在所属图片边缘提供恢复动作，完成和原图撤下', () => {
+    it('漫画处理显示边缘轻量进度，单图加载把取消整合进左下角轻胶囊，完成和原图撤下', () => {
         const {document} = parseHTML('<html><body></body></html>');vi.stubGlobal('document', document);
         const ui = createImageControls({onAction(){},onPrepare(){}});
-        ui.update('loading', '正在识别图片文字…', {quiet:true, progress:42});
+        ui.update('loading', '翻译中…', {quiet:true, progress:42, showPercent:false});
         expect(ui.feedback.hidden).toBe(false);expect(ui.element.hidden).toBe(true);
-        expect(ui.element.getAttribute('aria-busy')).toBe('true');expect(ui.status.textContent).toContain('42%');
+        expect(ui.element.getAttribute('aria-busy')).toBe('true');expect(ui.status.textContent).toBe('翻译中…');
         const bar=ui.feedback.querySelector<HTMLElement>('[role=progressbar]')!;
         expect(bar.hidden).toBe(false);expect(bar.getAttribute('aria-valuenow')).toBe('42');
-        ui.update('loading','正在翻译文字…',{quiet:true});expect(ui.feedback.hidden).toBe(false);
+        ui.update('loading','翻译中…',{quiet:true});expect(ui.feedback.hidden).toBe(false);
         expect(bar.hidden).toBe(true);expect(bar.getAttribute('aria-valuenow')).toBeNull();expect(ui.status.textContent).not.toContain('%');
         ui.update('error', '翻译失败', {quiet:true});
         expect(ui.feedback.hidden).toBe(false);expect(ui.element.hidden).toBe(true);
@@ -473,18 +487,22 @@ describe('图片翻译流程优化',()=>{
         expect(ui.feedback.querySelector<HTMLElement>('.fr-image-feedback-title')!.hidden).toBe(true);
         ui.setLines([{text:'译文'}]);ui.update('translated', '查看译图', {quiet:true});expect(ui.element.hidden).toBe(true);expect(ui.feedback.hidden).toBe(true);
         ui.update('idle','查看译图',{quiet:true});expect(ui.feedback.hidden).toBe(true);expect(ui.element.hidden).toBe(true);
-        ui.update('loading', '正在读取图片…');expect(ui.feedback.hidden).toBe(false);expect(ui.element.hidden).toBe(false);
-        expect(ui.button.parentElement!.parentElement).toBe(ui.element);expect(ui.feedback.querySelector('button')).toBeNull();ui.dispose();
+        ui.update('loading', '翻译中…', {progress:22, showPercent:false});
+        expect(ui.feedback.hidden).toBe(false);expect(ui.element.hidden).toBe(true);
+        expect(bar.hidden).toBe(false);expect(bar.getAttribute('aria-valuenow')).toBe('22');
+        expect(ui.button.parentElement!.parentElement).toBe(ui.feedback);expect(ui.button.textContent).toBe('取消');
+        ui.update('idle','翻译图片');expect(ui.button.parentElement!.parentElement).toBe(ui.element);
+        ui.dispose();
     });
 
     it('漫画单页排队时提供取消操作，开始处理后恢复普通轻量进度', () => {
         const {document} = parseHTML('<html><body></body></html>');vi.stubGlobal('document', document);
         const ui = createImageControls({onAction(){},onPrepare(){},translate:source=>translateLegacyText(source,'en-US')});
-        ui.update('loading', '等待上一项任务结束…', {quiet:true, queued:true});
+        ui.update('loading', '排队中…', {quiet:true, queued:true});
         expect(ui.feedback.hidden).toBe(false);expect(ui.feedback.dataset.queued).toBe('true');
-        expect(ui.status.textContent).toBe('Waiting for the previous task…');
+        expect(ui.status.textContent).toBe('Queued…');
         expect(ui.button.parentElement!.parentElement).toBe(ui.feedback);expect(ui.button.textContent).toBe('Cancel');
-        ui.update('loading', '正在识别图片文字…', {quiet:true});
+        ui.update('loading', '翻译中…', {quiet:true});
         expect(ui.feedback.dataset.queued).toBe('false');expect(ui.feedback.querySelector('button')).toBeNull();
         expect(ui.button.parentElement!.parentElement).toBe(ui.element);ui.dispose();
     });
@@ -502,8 +520,9 @@ describe('图片翻译流程优化',()=>{
         const visible=Array.from(row.children).filter(n=>n.tagName==='BUTTON'&&!(n as HTMLButtonElement).hidden);
         expect(visible.map(n=>n.className)).toEqual([primary]);expect(more.open).toBe(false);
         more.open=true;ui.refreshLanguage();expect(more.open).toBe(true);
-        ui.update('loading','正在识别');expect(more.hidden).toBe(true);expect(ui.button.parentElement).toBe(row);
-        expect(row.parentElement).toBe(ui.element);expect(row.firstElementChild).toBe(ui.button);ui.dispose();
+        ui.update('loading','翻译中…');expect(more.hidden).toBe(true);expect(ui.button.parentElement).toBe(row);
+        expect(row.parentElement).toBe(ui.feedback);expect(row.firstElementChild).toBe(ui.button);
+        ui.update('idle','翻译图片');expect(row.parentElement).toBe(ui.element);ui.dispose();
     });
 
     it('漫画错误恢复保留详情、键盘和设置入口，拒绝合成动作且不触发宿主翻页快捷键', () => {
@@ -542,8 +561,8 @@ describe('图片翻译流程优化',()=>{
         expect(details.open).toBe(true);expect(details.querySelector('p')!.textContent).toBe(longDetail);
         expect(ui.button.closest('.fr-image-more')).not.toBeNull();expect(ui.dismiss.parentElement).toBe(ui.button.parentElement);expect(row.parentElement).toBe(ui.feedback);
         recoveryBeforeDetails();
-        ui.update('loading','正在翻译文字…',{quiet});expect(details.hidden).toBe(true);expect(details.open).toBe(false);
-        expect(row.parentElement).toBe(ui.element);
+        ui.update('loading','翻译中…',{quiet});expect(details.hidden).toBe(true);expect(details.open).toBe(false);
+        expect(row.parentElement).toBe(quiet ? ui.element : ui.feedback);
         ui.update('error','仍未完成',{quiet,errorDetails:'new exact error'});recoveryBeforeDetails();
         expect(details.querySelector('p')!.textContent).toBe('new exact error');ui.dispose();
     });
@@ -768,12 +787,12 @@ describe('图片翻译流程优化',()=>{
         const focusEventsBeforeProgress = focusEvents;
         const blurEventsBeforeProgress = blurEvents;
 
-        ui.update('loading', '正在识别图片文字…', {progress: 40});
-        ui.update('loading', '正在识别图片文字…', {progress: 70});
+        ui.update('loading', '翻译中…', {progress: 40, showPercent: false});
+        ui.update('loading', '翻译中…', {progress: 70, showPercent: false});
 
-        expect(row.parentElement).toBe(ui.element);
+        expect(row.parentElement).toBe(ui.feedback);
         expect(ui.button.parentElement).toBe(row);
-        expect(ui.feedback.contains(ui.button)).toBe(false);
+        expect(ui.feedback.contains(ui.button)).toBe(true);
         expect(focusEvents).toBe(focusEventsBeforeProgress);
         expect(blurEvents).toBe(blurEventsBeforeProgress);
         expect(append).not.toHaveBeenCalled();
@@ -1117,7 +1136,7 @@ describe('普通图片提示入口的焦点与恢复', () => {
         const ui=createImageControls({onAction(){},onPrepare(){}});document.body.append(ui.element,ui.feedback);
         ui.setLines([{text:'完整旧译文',sourceText:'SOURCE',renderSkipped:true}]);ui.update(phase,'状态检查',{retainedReading:true});
         const inspect=document.querySelector<HTMLButtonElement>('[aria-label="查看完整译文"]')!;
-        expect(inspect.hidden).toBe(false);expect(inspect.closest('.fr-image-more')).toBeNull();expect(ui.element.hidden).toBe(false);
+        expect(inspect.hidden).toBe(false);expect(inspect.closest('.fr-image-more')).toBeNull();expect(ui.feedback.hidden).toBe(false);expect(ui.feedback.contains(inspect)).toBe(true);
         let active:Element=inspect;Object.defineProperty(document,'activeElement',{configurable:true,get:()=>active});
         vi.spyOn(ui.reader,'focus').mockImplementation(()=>{active=ui.reader;});const focus=vi.spyOn(inspect,'focus').mockImplementation(()=>{active=inspect;});
         const click=()=>{const event=new window.Event('click',{bubbles:true});Object.defineProperties(event,{isTrusted:{value:true},detail:{value:0}});inspect.dispatchEvent(event);};
@@ -1293,5 +1312,75 @@ describe('图片文字面板嵌套 ShadowRoot 所有权',()=>{
         if(scenario==='owned'){expect(warningFocus).toHaveBeenCalledOnce();expect(innerActive).toBe(warning);}
         else {expect(warningFocus).not.toHaveBeenCalled();expect(docActive).toBe(scenario==='document-moved'?external:outerHost);expect(outerActive).toBe(scenario==='middle-moved'?middleExternal:innerHost);}
         ui.dispose();
+    });
+});
+
+describe('漫画单页悬停微胶囊与深色样式', () => {
+    it('已完成漫画单页在未悬停时隐藏，悬停或键盘聚焦显现原图/译图切换与重新翻译，离开恢复隐藏', () => {
+        const {document, window} = parseHTML('<html><body></body></html>');
+        vi.stubGlobal('document', document);
+        let language: UiLanguage = 'zh-CN';
+        const onAction = vi.fn(), onRetranslate = vi.fn();
+        const ui = createImageControls({onAction, onPrepare() {}, onRetranslate, translate: source => translateLegacyText(source, language)});
+        document.body.append(ui.element, ui.feedback);
+        ui.setHovered(false);
+        ui.setLines([{text: '译文'}]);
+        ui.update('translated', '已翻译 · 点击恢复原图', {quiet: true, mangaActions: true, mangaOriginalShown: false});
+        expect(ui.element.dataset.mangaActions).toBe('true');
+        expect(ui.element.dataset.mangaOriginal).toBe('false');
+        expect(ui.element.hidden).toBe(true);
+        expect(ui.element.querySelector<HTMLButtonElement>('.fr-image-inspect')!.hidden).toBe(true);
+        const retranslate = ui.element.querySelector<HTMLButtonElement>('.fr-image-retranslate')!;
+        expect(retranslate.hidden).toBe(false);
+        expect(ui.button.textContent).toBe('原图');
+        expect(retranslate.textContent).toBe('重新翻译');
+
+        ui.setHovered(true);
+        expect(ui.element.hidden).toBe(false);
+        const click = (target: Element, trusted = true) => {
+            const event = new window.Event('click', {bubbles: true});
+            Object.defineProperty(event, 'isTrusted', {value: trusted});
+            target.dispatchEvent(event);
+        };
+        click(retranslate, false); expect(onRetranslate).not.toHaveBeenCalled();
+        click(retranslate, true); expect(onRetranslate).toHaveBeenCalledOnce();
+        click(ui.button, true); expect(onAction).toHaveBeenCalledOnce();
+
+        // 切到原图态并再次更新时保持单一重译按钮节点，本地化同步生效。
+        ui.update('translated', '已翻译 · 点击恢复原图', {quiet: true, mangaActions: true, mangaOriginalShown: true});
+        expect(ui.element.querySelectorAll('.fr-image-retranslate')).toHaveLength(1);
+        expect(ui.button.textContent).toBe('译图');
+        expect(ui.button.title).toContain('查看译图');
+        language = 'en-US'; ui.refreshLanguage();
+        expect(ui.button.textContent).toBe(translateLegacyText('译图', 'en-US'));
+        expect(retranslate.textContent).toBe(translateLegacyText('重新翻译', 'en-US'));
+
+        // 键盘焦点在移出指针后保持微胶囊可见。
+        vi.spyOn(ui.button, 'matches').mockImplementation(selector => selector === ':focus-visible');
+        ui.button.dispatchEvent(new window.Event('focusin', {bubbles: true}));
+        ui.setHovered(false);
+        expect(ui.element.hidden).toBe(false);
+        ui.button.dispatchEvent(new window.Event('focusout', {bubbles: true}));
+        expect(ui.element.hidden).toBe(true);
+
+        // 退出漫画单页态后移除重译按钮，保证错误态按钮数量不变。
+        ui.update('error', '翻译失败', {quiet: true});
+        expect(ui.feedback.querySelector('.fr-image-retranslate')).toBeNull();
+        expect(ui.element.hidden).toBe(true);
+        ui.dispose();
+
+        // 未传入 onRetranslate 时点击安全无异常。
+        const optional = createImageControls({onAction() {}, onPrepare() {}});
+        document.body.append(optional.element, optional.feedback);
+        optional.update('translated', '已翻译', {quiet: true, mangaActions: true});
+        expect(() => click(optional.element.querySelector('.fr-image-retranslate')!, true)).not.toThrow();
+        optional.dispose();
+    });
+
+    it('漫画错误卡片与未绘制徽章包含深色模式与磨砂胶囊样式，单页悬停微胶囊声明独立样式', () => {
+        expect(IMAGE_CONTROLS_CSS).toContain('.fr-image-feedback[data-theme=dark][data-manga=true][data-phase=error]');
+        expect(IMAGE_CONTROLS_CSS).toContain('@media (prefers-color-scheme: dark)');
+        expect(IMAGE_CONTROLS_CSS).toContain('.fr-image-feedback[data-manga=true][data-warning=true] .fr-image-warning-button');
+        expect(IMAGE_CONTROLS_CSS).toContain('.fr-image-controls[data-manga-actions=true]');
     });
 });

@@ -267,6 +267,15 @@ describe('userscript remote UI language data', () => {
             expect(Object.keys(currentUserscriptLanguageBundle(language).messages).some(key => key.startsWith(prefix))).toBe(false);
         }
     });
+    it('omits extension-only local translation model management copy from userscript bundles', () => {
+        const prefix = 'settings.localTranslation.';
+        expect(extensionChinese[`${prefix}hunyuan3`]).toBeTruthy();
+        expect(Object.keys(zhCNMessages).some(key => key.startsWith(prefix))).toBe(false);
+        for (const language of Object.keys(extensionBundles) as (keyof typeof extensionBundles)[]) {
+            expect(extensionBundles[language].messages[`${prefix}hunyuan3`]).toBeTruthy();
+            expect(Object.keys(currentUserscriptLanguageBundle(language).messages).some(key => key.startsWith(prefix))).toBe(false);
+        }
+    });
     it('keeps the complete settings notice aligned with the shared locale source', () => {
         const component = readFileSync(resolve(process.cwd(), 'src/features/settings/ui/services/ServiceConfiguration.vue'), 'utf8');
         expect(component).toContain("translateLegacy('" + mimoRetirementSource + "')");
@@ -772,9 +781,7 @@ describe('userscript excludes unreachable native ASR translations', () => {
         const excluded = [
         "识别方式",
         "本机服务地址",
-        "固定模型：Qwen/Qwen3-ASR-1.7B。使用标准 vLLM 音频转写接口，仅允许 127.0.0.1 或 [::1]，服务需由你事先启动。",
-        "保存设置不会探测端口、启动服务或下载权重。开始 AI 字幕后才发送音频到所填本机地址；失败会报错，不自动切回 Whisper。",
-        "该接口返回文本，字幕时间按音频窗口估计，并非字级对齐；此处不代表模型已经加载或已使用 GPU。",
+        "使用本机已启动的 vLLM 接口（仅限 127.0.0.1 / [::1]，模型固定为 Qwen/Qwen3-ASR-1.7B）；开始识别时才发送音频，不自动回退 Whisper。",
         "请在设置中切换识别方式",
         "字幕配置尚未安全加载，请稍后重试",
         "原生转写模型与请求不一致",

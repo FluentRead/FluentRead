@@ -128,6 +128,37 @@ describe('共享分词的有界漫画候选搜索',()=>{
         const glyph=createMangaTranslationSearch('A',measure,20,()=>{throw native;});
         expect(()=>glyph.prepare(100,100)).toThrow(native);
     });
+    it('带目标语言与椭圆塑形选项时，候选搜索与直接排版保持完全一致',()=>{
+        for(const [text,w,h,options] of [
+            ['ภาษาไทยไม่มีช่องว่าง',60,80,{language:'th'}],
+            ['aaaa bbb cccc dddd eee fff',110,120,{elliptical:true}],
+            ['aaaaaaaaa bbbbbbbbbb ccccccccc',60,40,{elliptical:true}],
+        ] as const){
+            const expected=layoutMangaTranslationText(text,w,h,measure,10,ink,undefined,options);
+            const search=createMangaTranslationSearch(text,measure,10,ink,options);
+            expect(search.finish(search.prepare(w,h))).toEqual(expected);
+        }
+    });
+    it('finish 在最大字号缓存和椭圆精修缩字后都严格遵守 winningSize 与 allowEqual 剪枝契约',()=>{
+        const unitMeasure=(text:string,size:number)=>Array.from(text).length*size;
+        const maxSearch=createMangaTranslationSearch('aaaaaaaaa bbbbbbbbbb ccccccccc',unitMeasure,10,ink,{elliptical:true});
+        const maxState=maxSearch.prepare(100,120);
+        expect(maxState.maximum).toBeDefined();
+        expect(maxState.maximum!.fontSize).toBeLessThan(10);
+        expect(maxSearch.finish(maxState,maxState.maximum!.fontSize+.01,true)).toBeUndefined();
+        expect(maxSearch.finish(maxState,maxState.maximum!.fontSize,false)).toBeUndefined();
+        expect(maxSearch.finish(maxState,maxState.maximum!.fontSize,true)).toBe(maxState.maximum);
+
+        const search=createMangaTranslationSearch('aaaaaaaaa bbbbbbbbbb ccccccccc',unitMeasure,20,ink,{elliptical:true});
+        const state=search.prepare(100,35);
+        expect(state.maximum).toBeUndefined();
+        const refined=search.finish(state)!;
+        expect(refined.fontSize).toBeGreaterThanOrEqual(9.2);
+        expect(refined.fontSize).toBeLessThan(9.8);
+        expect(search.finish(state,9.8,true)).toBeUndefined();
+        expect(search.finish(state,refined.fontSize,false)).toBeUndefined();
+        expect(search.finish(state,refined.fontSize,true)).toEqual(refined);
+    });
 });
 
 function context(){return {font:'',lineWidth:0,save:vi.fn(),restore:vi.fn(),beginPath:vi.fn(),rect:vi.fn(),clip:vi.fn(),fillRect:vi.fn(),strokeText:vi.fn(),fillText:vi.fn(),

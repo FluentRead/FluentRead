@@ -1,0 +1,4 @@
+interface:
+  display_name: "FluentRead 扩展 UI 验证"
+  short_description: "在不抢占前台焦点的隔离浏览器中验证扩展 UI"
+  default_prompt: "使用 $fluentread-extension-ui-test，在不抢占前台焦点的隔离浏览器中验证 FluentRead 弹窗、设置页、持久化状态与交付构建。"

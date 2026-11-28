@@ -1057,3 +1057,140 @@ it('未配置本地化端口时完成提示的语言刷新保留可访问说明'
     expect(warning.textContent).toBe('已识别');expect(warning.title).toBe('已识别文字，原图未改动');
     f.runtime.dispose();
 });
+
+describe('漫画画布加载胶囊、无损原图速览与读写批处理', () => {
+    it('翻译超过 150ms 显示封闭深色磨砂加载胶囊，支持语言刷新并在完成或取消时清理', async () => {
+        vi.useFakeTimers();
+        const f = fixture({retry: () => false, openSettings: async () => {}, translateUi: text => `L:${text}`});
+        const pending = deferred<typeof result>();
+        f.ports.translate.mockReturnValueOnce(pending.promise);
+        const task = f.runtime.translate(f.canvas);
+        await flush();
+        await vi.advanceTimersByTimeAsync(149);
+        expect(f.roots).toHaveLength(0);
+        await vi.advanceTimersByTimeAsync(1);
+        const capsule = f.roots[0]?.querySelector<HTMLElement>('.fr-manga-loading');
+        expect(capsule).not.toBeNull();
+        expect(capsule?.hidden).toBe(false);
+        expect(capsule?.textContent).toContain('L:翻译中…');
+        f.runtime.refreshLanguage();
+        expect(capsule?.querySelector('.fr-manga-loading-text')?.textContent).toBe('L:翻译中…');
+        pending.resolve(result);
+        await task;
+        expect(capsule?.isConnected).toBe(false);
+        expect(f.outputs[0].className).toBe('fr-manga-surface');
+        expect(f.outputs[0].dataset.reveal).toBe('true');
+        // 无本地化端口且在 150ms 后因禁用跳过胶囊创建。
+        const plain = fixture();
+        const slow = deferred<typeof result>();
+        plain.ports.translate.mockReturnValueOnce(slow.promise);
+        const t2 = plain.runtime.translate(plain.canvas);
+        await flush();
+        plain.ports.enabled.mockReturnValue(false);
+        await vi.advanceTimersByTimeAsync(150);
+        expect(plain.roots).toHaveLength(0);
+        plain.ports.enabled.mockReturnValue(true);
+        slow.resolve(result);
+        await t2;
+        // 无本地化端口时正常显示默认“翻译中…”。
+        const slow2 = deferred<typeof result>();
+        plain.ports.cacheEnabled.mockReturnValue(false);
+        plain.runtime.release(plain.canvas);
+        plain.ports.translate.mockReturnValueOnce(slow2.promise);
+        const t3 = plain.runtime.translate(plain.canvas);
+        await flush();
+        await vi.advanceTimersByTimeAsync(150);
+        const plainCapsule = plain.roots[0]?.querySelector<HTMLElement>('.fr-manga-loading');
+        expect(plainCapsule?.textContent).toContain('翻译中…');
+        plain.runtime.refreshLanguage();
+        expect(plainCapsule?.querySelector('.fr-manga-loading-text')?.textContent).toBe('翻译中…');
+        plain.runtime.restore(plain.canvas);
+        expect(plainCapsule?.isConnected).toBe(false);
+        slow2.resolve(result);
+        await t3;
+        f.runtime.dispose();
+        plain.runtime.dispose();
+        vi.useRealTimers();
+    });
+
+    it('setPeekOriginal 无损隐藏译层与提示并归还原画布透明度，松开立即恢复且不重跑 OCR', async () => {
+        const f = fixture();
+        f.ports.translate.mockResolvedValueOnce({...result, lines: [{...result.lines[0], renderSkipped: true}]});
+        await f.runtime.translate(f.canvas);
+        const output = f.outputs[0];
+        const warning = f.roots[0].querySelector<HTMLElement>('.fr-manga-render-warning')!;
+        expect(output.style.display).toBe('block');
+        expect(f.canvas.style.opacity).toBe('0');
+        expect(warning.hidden).toBe(false);
+        f.runtime.setPeekOriginal(true);
+        f.runtime.setPeekOriginal(true);
+        expect(output.style.display).toBe('none');
+        expect(f.canvas.style.opacity).not.toBe('0');
+        expect(warning.hidden).toBe(true);
+        f.runtime.setPeekOriginal(false);
+        expect(output.style.display).toBe('block');
+        expect(f.canvas.style.opacity).toBe('0');
+        expect(warning.hidden).toBe(false);
+        expect(f.ports.translate).toHaveBeenCalledOnce();
+        f.runtime.dispose();
+        f.runtime.setPeekOriginal(true);
+    });
+
+    it('update 支持透传本帧已算身份以跳过重复采样，并先批量读取再写入多个画布', async () => {
+        const f = fixture();
+        const second = f.document.createElement('canvas') as HTMLCanvasElement;
+        second.width = 400; second.height = 300; second.dataset.pixel = '2';
+        second.getBoundingClientRect = () => ({left: 100, top: 400, right: 500, bottom: 700, width: 400, height: 300}) as DOMRect;
+        f.document.getElementById('reader')!.append(second);
+        const parent = f.canvas.parentElement!;
+        parent.getBoundingClientRect = () => ({left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800}) as DOMRect;
+        f.styles.set(parent, {overflowX: 'hidden', overflowY: 'auto'});
+        await f.runtime.translate(f.canvas);
+        await f.runtime.translate(second);
+        const id1 = f.runtime.identity(f.canvas)!;
+        const id2 = f.runtime.identity(second)!;
+        const known = new Map<HTMLCanvasElement, string | null>([[f.canvas, id1], [second, id2]]);
+        const drawBefore = f.drawCalls.length;
+        const parentRectSpy = vi.spyOn(parent, 'getBoundingClientRect');
+        f.runtime.update(known);
+        // 传入 knownIdentities 后不再对画布重复做 8x8 抽样 drawImage，且共用祖先矩形仅测一次。
+        expect(f.drawCalls.length).toBe(drawBefore);
+        expect(parentRectSpy).toHaveBeenCalledOnce();
+        // 单向 overflow 裁切同样按需应用，不误裁另一轴；缺少 elementFromPoint 时保守隐藏不抛错。
+        f.styles.set(parent, {overflowX: 'hidden', overflowY: 'visible'});
+        f.runtime.update(known);
+        f.styles.set(parent, {overflowX: 'visible', overflowY: 'clip'});
+        f.runtime.update(known);
+        Reflect.deleteProperty(f.document, 'elementFromPoint');
+        f.runtime.update(known);
+        expect(f.outputs[0].style.display).toBe('none');
+        f.runtime.dispose();
+    });
+
+    it('加载胶囊复用已定义渐显动画，失败恢复控件在 showFailure 与 update 时同步主题', async () => {
+        let mode: 'light' | 'dark' | 'auto' = 'dark';
+        let prefersDark = true;
+        const f = fixture({retry: () => false, openSettings: async () => {}, theme: () => mode});
+        Object.defineProperty(window, 'matchMedia', {configurable: true, value: vi.fn(() => ({matches: prefersDark}))});
+        f.ports.translate.mockRejectedValueOnce(new Error('network error'));
+        await expect(f.runtime.translate(f.canvas)).rejects.toThrow('network error');
+        const styleText = f.roots[0].querySelector('style')?.textContent ?? '';
+        expect(styleText).toContain('animation:fr-manga-surface-in .14s ease-out both;');
+        expect(styleText).not.toContain('fr-image-fade');
+        const feedback = f.roots[0].querySelector<HTMLElement>('.fr-image-feedback')!;
+        expect(feedback.dataset.theme).toBe('dark');
+        // 主题未变时 update 保持一致，主题切换后同步更新 light / auto(dark) / auto(light)。
+        f.runtime.update();
+        expect(feedback.dataset.theme).toBe('dark');
+        mode = 'light';
+        f.runtime.update();
+        expect(feedback.dataset.theme).toBe('light');
+        mode = 'auto'; prefersDark = true;
+        f.runtime.update();
+        expect(feedback.dataset.theme).toBe('dark');
+        prefersDark = false;
+        f.runtime.update();
+        expect(feedback.dataset.theme).toBe('light');
+        f.runtime.dispose();
+    });
+});

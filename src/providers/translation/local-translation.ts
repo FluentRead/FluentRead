@@ -6,8 +6,7 @@
  * 模块边界：只负责 provider 输入转换，模型缓存、Worker 生命周期和取消由 local-translation feature 管理。
  */
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
-import {getTranslationProviderLanguages} from '@/src/services/translation/requestSnapshot';
-import {requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderLanguages, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderRequest} from '@/src/services/translation/types';
 import {resolveConfiguredModel, services} from '@/src/core/config/catalog';
 import {normalizeLocalTranslationModel, localTranslationErrorKey} from '@/src/core/config/localTranslation';

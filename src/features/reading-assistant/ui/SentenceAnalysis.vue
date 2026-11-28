@@ -88,36 +88,76 @@ watch(() => [props.source, props.annotations.length] as const, ([source, length]
 });
 </script>
 <style scoped>
-.fr-sentence-analysis { margin: 8px 0; }
-.fr-sentence-tokens { line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.fr-sentence-unit { display: inline-flex; align-items: flex-start; max-width: 100%; vertical-align: top; margin-block: 3px; }
-.fr-sentence-gap { white-space: pre-wrap; padding-top: 6px; }
-.fr-sentence-tokens button { --pos-color: #846242; font: inherit; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; max-width: 100%; margin: 0; padding: 6px 9px; border: 1px solid color-mix(in srgb,var(--pos-color) 18%,transparent); border-bottom: 2px solid color-mix(in srgb,var(--pos-color) 45%,transparent); border-radius: 8px; background: color-mix(in srgb,var(--pos-color) 5%,transparent); color: inherit; cursor: pointer; text-align: start; white-space: normal; overflow-wrap: anywhere; }
-.fr-sentence-token-text { max-width: 100%; font-size: 13px; line-height: 1.5; }
-.fr-sentence-token-meta { max-width: 100%; font-size: 11px; line-height: 1.45; color: var(--fr-reading-muted, var(--el-text-color-secondary, #756a74)); white-space: normal; overflow-wrap: anywhere; user-select: none; }
-.fr-dark-theme .fr-sentence-token-meta { color: #b6a9b5; }
-.fr-sentence-tokens button[data-pos=noun], .fr-sentence-tokens button[data-pos=pronoun] { --pos-color:#3c7fbb; }
-.fr-sentence-tokens button[data-pos=verb], .fr-sentence-tokens button[data-pos=auxiliary] { --pos-color:#bd5481; }
-.fr-sentence-tokens button[data-pos=adjective], .fr-sentence-tokens button[data-pos=adverb] { --pos-color:#398579; }
-.fr-sentence-tokens button[data-pos=article], .fr-sentence-tokens button[data-pos=determiner] { --pos-color:#9c713b; }
-.fr-sentence-tokens button[data-pos=conjunction], .fr-sentence-tokens button[data-pos=preposition] { --pos-color:#8067bc; }
-.fr-sentence-tokens button[data-role=subject] { --pos-color:#398579; }
-.fr-sentence-tokens button[data-role=predicate] { --pos-color:#bd5481; }
-.fr-sentence-tokens button[data-role=object], .fr-sentence-tokens button[data-role=indirect-object] { --pos-color:#527fbb; }
-.fr-sentence-tokens button[data-role=attribute], .fr-sentence-tokens button[data-role=postmodifier] { --pos-color:#a4792c; }
-.fr-sentence-tokens button[aria-pressed=true] { border-color: var(--pos-color); background: color-mix(in srgb,var(--pos-color) 8%,transparent); }
-.fr-sentence-tokens button:hover { background: color-mix(in srgb,var(--pos-color) 10%,transparent); }
-.fr-sentence-tokens button:focus-visible, .fr-sentence-reference summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-.fr-sentence-detail { margin: 8px 0 0; padding: 9px 10px; border: 1px solid var(--fr-answer-border,#e9e9ef); border-radius: 8px; background: var(--fr-answer-soft,#f8f8fa); }
-.fr-sentence-detail-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
-.fr-sentence-detail-heading strong { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
-.fr-sentence-detail-heading > span { font-size: 11px; opacity: .75; }
-.fr-sentence-detail p { margin: 4px 0 0; overflow-wrap: anywhere; }
-.fr-sentence-meaning { font-size: 13px; line-height: 1.7; }
-.fr-sentence-role { font-size: 12px; }
-.fr-sentence-role > span { margin-inline-end: 8px; opacity: .65; }
-.fr-sentence-reference { margin-top: 6px; font-size: 11px; color: var(--fr-reading-muted, var(--el-text-color-secondary, #756a74)); }
-.fr-sentence-reference summary { cursor: pointer; width: fit-content; }
-.fr-sentence-reference p { line-height: 1.7; }
-.fr-dark-theme .fr-sentence-reference { color: #b6a9b5; }
+.fr-sentence-analysis { margin: 6px 0 10px; }
+.fr-sentence-tokens { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 5px 4px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fr-sentence-unit { display: inline-flex; align-items: flex-start; max-width: 100%; vertical-align: top; }
+.fr-sentence-gap { white-space: pre-wrap; padding-top: 5px; }
+.fr-sentence-tokens button {
+  --pos-color: #64748b;
+  font: inherit;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--pos-color) 22%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--pos-color) 52%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--pos-color) 6%, transparent);
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  transition: background-color 120ms cubic-bezier(.23, 1, .32, 1), border-color 120ms cubic-bezier(.23, 1, .32, 1), box-shadow 120ms cubic-bezier(.23, 1, .32, 1), transform 120ms cubic-bezier(.23, 1, .32, 1);
+}
+.fr-sentence-token-text { max-width: 100%; font-size: 12.5px; font-weight: 500; line-height: 1.4; }
+.fr-sentence-token-meta { max-width: 100%; font-size: 11px; line-height: 1.35; color: var(--fr-reading-muted, var(--el-text-color-secondary, #5d6678)); white-space: normal; overflow-wrap: anywhere; user-select: none; }
+.fr-dark-theme .fr-sentence-token-meta { color: #a5aebf; }
+.fr-sentence-tokens button[data-pos=noun], .fr-sentence-tokens button[data-pos=pronoun] { --pos-color: #2563a6; }
+.fr-sentence-tokens button[data-pos=verb], .fr-sentence-tokens button[data-pos=auxiliary] { --pos-color: #d4235a; }
+.fr-sentence-tokens button[data-pos=adjective], .fr-sentence-tokens button[data-pos=adverb] { --pos-color: #147e5c; }
+.fr-sentence-tokens button[data-pos=article], .fr-sentence-tokens button[data-pos=determiner] { --pos-color: #8f5f16; }
+.fr-sentence-tokens button[data-pos=conjunction], .fr-sentence-tokens button[data-pos=preposition] { --pos-color: #6d4ec4; }
+.fr-sentence-tokens button[data-role=subject] { --pos-color: #147e5c; }
+.fr-sentence-tokens button[data-role=predicate] { --pos-color: #d4235a; }
+.fr-sentence-tokens button[data-role=object], .fr-sentence-tokens button[data-role=indirect-object] { --pos-color: #2563a6; }
+.fr-sentence-tokens button[data-role=attribute], .fr-sentence-tokens button[data-role=postmodifier] { --pos-color: #8f5f16; }
+.fr-dark-theme .fr-sentence-tokens button[data-pos=noun], .fr-dark-theme .fr-sentence-tokens button[data-pos=pronoun], .fr-dark-theme .fr-sentence-tokens button[data-role=object], .fr-dark-theme .fr-sentence-tokens button[data-role=indirect-object] { --pos-color: #7ab3f0; }
+.fr-dark-theme .fr-sentence-tokens button[data-pos=verb], .fr-dark-theme .fr-sentence-tokens button[data-pos=auxiliary], .fr-dark-theme .fr-sentence-tokens button[data-role=predicate] { --pos-color: #f46590; }
+.fr-dark-theme .fr-sentence-tokens button[data-pos=adjective], .fr-dark-theme .fr-sentence-tokens button[data-pos=adverb], .fr-dark-theme .fr-sentence-tokens button[data-role=subject] { --pos-color: #5cd4ab; }
+.fr-dark-theme .fr-sentence-tokens button[data-pos=article], .fr-dark-theme .fr-sentence-tokens button[data-pos=determiner], .fr-dark-theme .fr-sentence-tokens button[data-role=attribute], .fr-dark-theme .fr-sentence-tokens button[data-role=postmodifier] { --pos-color: #ebca84; }
+.fr-dark-theme .fr-sentence-tokens button[data-pos=conjunction], .fr-dark-theme .fr-sentence-tokens button[data-pos=preposition] { --pos-color: #b49ef2; }
+.fr-sentence-tokens button[aria-pressed=true] {
+  border-color: var(--pos-color);
+  background: color-mix(in srgb, var(--pos-color) 12%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pos-color) 35%, transparent);
+}
+.fr-sentence-tokens button:hover { background: color-mix(in srgb, var(--pos-color) 11%, transparent); }
+.fr-sentence-tokens button:active { transform: scale(.98); }
+.fr-sentence-tokens button:focus-visible, .fr-sentence-reference summary:focus-visible { outline: 2px solid var(--fr-reading-button, #d4235a); outline-offset: 2px; }
+.fr-sentence-detail { margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--fr-reading-line, #e7eaf1); border-radius: 9px; background: var(--fr-reading-soft, #f7f8fb); }
+.fr-sentence-detail-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+.fr-sentence-detail-heading strong { font-size: 13.5px; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
+.fr-sentence-detail-heading > span { padding: 1px 6px; border: 1px solid var(--fr-reading-line, #e7eaf1); border-radius: 5px; background: var(--fr-reading-bg, #ffffff); color: var(--fr-reading-button, #d4235a); font-size: 11px; font-weight: 600; }
+.fr-sentence-detail p { margin: 5px 0 0; overflow-wrap: anywhere; }
+.fr-sentence-meaning { font-size: 13px; line-height: 1.65; }
+.fr-sentence-role { font-size: 12px; color: var(--fr-reading-muted, #5d6678); }
+.fr-sentence-role > span { margin-inline-end: 6px; font-weight: 600; }
+.fr-sentence-reference { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--fr-reading-line, #e7eaf1); font-size: 11px; color: var(--fr-reading-muted, var(--el-text-color-secondary, #5d6678)); }
+.fr-sentence-reference summary { display: inline-flex; align-items: center; gap: 5px; list-style: none; cursor: pointer; width: fit-content; font-weight: 500; }
+.fr-sentence-reference summary::-webkit-details-marker { display: none; }
+.fr-sentence-reference summary::before { content: ''; width: 5px; height: 5px; flex: none; border: solid currentColor; border-width: 0 1.4px 1.4px 0; transform: rotate(-45deg); transition: transform 140ms cubic-bezier(.23, 1, .32, 1); }
+.fr-sentence-reference[open] summary::before { transform: rotate(45deg); }
+.fr-sentence-reference p { line-height: 1.6; }
+.fr-dark-theme .fr-sentence-detail { background: #232833; border-color: #2f3542; color: #f1f3f7; }
+.fr-dark-theme .fr-sentence-detail-heading > span { background: #1c2028; border-color: #2f3542; color: #ff85ab; }
+.fr-dark-theme .fr-sentence-reference { border-top-color: #2f3542; }
+.fr-dark-theme .fr-sentence-reference, .fr-dark-theme .fr-sentence-role { color: #a5aebf; }
+@media (prefers-reduced-motion: reduce) {
+  .fr-sentence-tokens button, .fr-sentence-reference summary::before { transition: none; }
+}
 </style>

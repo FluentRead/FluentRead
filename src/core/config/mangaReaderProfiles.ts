@@ -1,7 +1,7 @@
 /**
  * @file src/core/config/mangaReaderProfiles.ts
  * 文件职责：保存经公开阅读页结构核对的正文规则，避免通用图片过滤漏掉正文或误选推荐封面。
- * 主要内容：Ridi 公开试读语义容器的 blob 整页与商品推广排除、Ynjn 公开正文的直系 Swiper 画布与 Yomonga 明确章节参数的整页分片圈选、已核对的 MangaLib、Mangahub 俄语与 ComicNaver 韩语阅读路径语言提示、Templetoons 免费章直系长图与链接推广排除、MangaLib 原站语义阅读容器的编号页面与 MangaOI 直系章节图片、ACG 当前域名编号页的直接正文与推荐排除、Yamibo 公开单章主图与同章分页、Bomtoon 公开可读的正文画布与版权图片排除、公开图书库当前页与合法档案编号边界、BeLTOON 免费正文、comipo 公开免费 blob 正文与 JComic 单帖直系正文，Hentaizap 路径翻页主图及 Yaoi Manga Online、NHentaiYaoi 单帖正文列表，Raven 正文长图、Novelpia 受限首话圈选、蜡笔小新正文、Lezhin 英语 blob 正文和 Ameba 受限试读画布圈选、已核对章节站与 GANMA 编号原稿及路径页码、TOPTOON 不可读画布和首图的圈选规则、Ranfren 静态正文、漫画站懒加载正文、POIPIKU 单帖主图、Countdown 的主页正文、MANGA Million 编号图片、Orchisasia、Qi Manga、Nyx、Omega、MangaYun、Mangahub、Rinko、RawDEX、Raw1001 等正文规则，GlobalComix 跨域正文提供圈选入口，MechaComic 完整图与 Palcy、Comic Pixiv 背景正文规则，查询参数章节边界与 Mangahub 正整数翻页参数，哔哩哔哩在内容脚本中可读的正文画布及透明弹幕交互层、PASH UP 当前屏与 GigaViewer、Comici、ComicWalker、Animate 正文画布规则，MangaLove 不可读画布和 Booklive、CMOA 分片的圈选入口；路径与域名均保留边界。
+ * 主要内容：Ridi 公开试读语义容器的 blob 整页与商品推广排除、Ynjn 公开正文的直系 Swiper 画布与 Yomonga 明确章节参数的整页分片圈选、已核对的 MangaLib、Mangahub 俄语与 ComicNaver、Ridi、Bomtoon、Novelpia、TOPTOON、Kakao 韩语阅读路径语言提示、Templetoons 免费章直系长图与链接推广排除、MangaLib 原站语义阅读容器的编号页面与 MangaOI 直系章节图片、ACG 当前域名编号页的直接正文与推荐排除、Yamibo 公开单章主图与同章分页、Bomtoon 公开可读的正文画布结构兜底与版权图片排除、公开图书库当前页与合法档案编号边界、BeLTOON 免费正文及结构兜底、comipo 公开免费 blob 正文与 JComic 单帖直系正文，Hentaizap 路径翻页主图及 Yaoi Manga Online、NHentaiYaoi 单帖正文列表，Raven 正文长图、Novelpia 受限首话圈选、蜡笔小新正文、Lezhin 英语 blob 正文和 Ameba 受限试读画布圈选、已核对章节站与 GANMA 编号原稿及路径页码、TOPTOON 不可读画布和首图的圈选规则、Ranfren 静态正文、漫画站懒加载正文、POIPIKU 单帖主图、Countdown 的主页正文、MANGA Million 编号图片、Orchisasia、Qi Manga、Nyx、Omega、MangaYun、Mangahub、Rinko、RawDEX、Raw1001 等正文规则，GlobalComix 跨域正文提供圈选入口，MechaComic 完整图与 Palcy、Comic Pixiv 背景正文规则，查询参数章节边界与 Mangahub 正整数翻页参数，哔哩哔哩在内容脚本中可读的正文画布及透明弹幕交互层、PASH UP 当前屏与 GigaViewer、Comici、ComicWalker、Animate 正文画布规则，MangaLove 不可读画布和 Booklive、CMOA 分片的圈选入口；路径与域名均保留边界。
  * 正文补充：Toonily 正整数章节路径只选择直系阅读页图片，排除封面、推荐和嵌套推广。
  * 模块边界：纯匹配，不执行站点脚本、不读取私有接口、不截图；可访问的图片由 content 阅读器检测。
  */
@@ -18,7 +18,7 @@ export function resolveMangaReaderProfile(hostname: string, pathname: string, se
         name: 'Toonily', selector: '.entry-content_wrap > .read-container > .reading-content > .page-break > img.wp-manga-chapter-img',
     };
     if (host === 'ridibooks.com' && /^\/books\/[1-9]\d*\/preview\/?$/.test(pathname)) return {
-        name: 'Ridi', selector: '#root .pre_reading .contents_comics > .reading_body > .viewer > .viewer_viewport .simplebar-content > div > div > div > div > img[src^="blob:https://ridibooks.com/"]',
+        name: 'Ridi', selector: '#root .pre_reading .contents_comics > .reading_body > .viewer > .viewer_viewport .simplebar-content > div > div > div > div > img[src^="blob:https://ridibooks.com/"]', sourceLanguage: 'ko',
     };
     if (host === 'ynjn.jp' && /^\/title\/[1-9]\d*\/?$/.test(pathname)) return {
         name: 'ヤンジャン＋', selector: ':not(*)',
@@ -55,9 +55,9 @@ export function resolveMangaReaderProfile(hostname: string, pathname: string, se
         };
     }
     if (host === 'bomtoon.com' && /^\/viewer\/[A-Za-z\d]+(?:[-_][A-Za-z\d]+)*\/p(?:0|[1-9]\d*)\/?$/.test(pathname)) return {
-        name: 'Bomtoon', selector: ':not(*)',
-        canvasSelector: '.printView .sc-gHLcSH > .sc-jvLaUc > .sc-edUIhV > .sc-hjQCSK > canvas.sc-bSakgD',
-        areaSelector: '.printView .sc-gHLcSH > .sc-jvLaUc > .sc-edUIhV > .sc-hjQCSK > canvas.sc-bSakgD',
+        name: 'Bomtoon', selector: ':not(*)', sourceLanguage: 'ko',
+        canvasSelector: '.printView .sc-gHLcSH > .sc-jvLaUc > .sc-edUIhV > .sc-hjQCSK > canvas.sc-bSakgD, .printView div > div > div > div > canvas[class*="sc-"]',
+        areaSelector: '.printView .sc-gHLcSH > .sc-jvLaUc > .sc-edUIhV > .sc-hjQCSK > canvas.sc-bSakgD, .printView div > div > div > div > canvas[class*="sc-"]',
     };
     if (host === 'lrr.tvc-16.science' && /^\/reader\/?$/.test(pathname)
         && new URLSearchParams(search).getAll('id').length === 1
@@ -65,7 +65,7 @@ export function resolveMangaReaderProfile(hostname: string, pathname: string, se
         name: 'LANraragi public demo', selector: '#i1 > #i3 > a#display > img#img.reader-image',
     };
     if (host === 'beltoon.jp' && /^\/viewer\/[a-z\d]+(?:[-_][a-z\d]+)*\/p[1-9]\d*\/?$/.test(pathname)) return {
-        name: 'BeLTOON', selector: '.printView .sc-iXxrte > .sc-jhzXDd > img.sc-jSMfEi[src^="blob:https://www.beltoon.jp/"]',
+        name: 'BeLTOON', selector: '.printView .sc-iXxrte > .sc-jhzXDd > img.sc-jSMfEi[src^="blob:https://www.beltoon.jp/"], .printView div > div > img[src^="blob:https://www.beltoon.jp/"]',
     };
     if (host === 'play.comipo.app' && /^\/viewer\/free\/BJ\d+\/?$/.test(pathname)) return {
         name: 'comipo', selector: 'div[class^="_slide_container_"] > div[class^="_spread_"] > div[class^="_page_container_"] > div[class^="_placeholder_"] > img[class^="_page_"][src^="blob:https://play.comipo.app/"]',
@@ -87,7 +87,7 @@ export function resolveMangaReaderProfile(hostname: string, pathname: string, se
         name: 'Yaksha / Raven Scans', selector: 'article #readerarea > img.ts-main-image',
     };
     if (host === 'novelpia.com' && /^\/comic_viewer\/[1-9]\d*\/?$/.test(pathname)) return {
-        name: 'Novelpia', selector: ':not(*)', areaSelector: '#viewer_wrap > .viewer_content > div > .viewer_content_box > .comic-content > img',
+        name: 'Novelpia', selector: ':not(*)', sourceLanguage: 'ko', areaSelector: '#viewer_wrap > .viewer_content > div > .viewer_content_box > .comic-content > img',
     };
     if (host === 'manga-shinchan.com' && /^\/[a-z\d]+(?:-[a-z\d]+)*\/episode\/[a-z\d]+(?:-[a-z\d]+)*\/?$/.test(pathname)) return {
         name: 'まんがクレヨンしんちゃん', selector: '#ep_blog .item__list-lists > figure > img[src*="/book_data/article_data/"]',
@@ -105,7 +105,7 @@ export function resolveMangaReaderProfile(hostname: string, pathname: string, se
         selector: '.h-full-container.w-full-container > .flex.select-none > .relative.flex-1 > img.pointer-events-none.object-contain[alt$="ページ目の原稿画像"]',
     };
     if (host === 'toptoon.com' && /^\/comic\/ep_view\/[A-Za-z\d_]+\/[1-9]\d*\/rent\/?$/.test(pathname)) return {
-        name: 'TOPTOON', selector: ':not(*)',
+        name: 'TOPTOON', selector: ':not(*)', sourceLanguage: 'ko',
         areaSelector: '#viewerContentsWrap > .comic_img > img.document_img, #viewerContentsWrap > .comic_img > .canvas-wrapper.document_img > canvas',
     };
     if (host === 'manga.bilibili.com' && /^\/mc\d+\/\d+\/?$/.test(pathname)) return {
@@ -219,7 +219,7 @@ export function resolveMangaReaderProfile(hostname: string, pathname: string, se
         name: 'Tapas', selector: '[id^="episode-"].episode-unit .viewer__body img.content__img',
     };
     if (host === 'page.kakao.com' && /^\/content\/\d+\/viewer\/\d+\/?$/.test(pathname)) return {
-        name: 'Kakao', selector: '.image-container > img[src^="https://page-edge.kakao.com/sdownload/resource?"]',
+        name: 'Kakao', selector: '.image-container > img[src^="https://page-edge.kakao.com/sdownload/resource?"]', sourceLanguage: 'ko',
     };
     if (host === 'manhwaclub.net' && /^\/manga\/[^/]+\/chapter-[^/]+\/?$/.test(pathname)) return {
         name: 'ManhwaClub', selector: '.reading-content .page-break > img.wp-manga-chapter-img',

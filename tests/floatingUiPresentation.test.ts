@@ -27,12 +27,27 @@ describe('低干扰悬浮 UI', () => {
     expect(floatingBall).toContain('filter: none;');
     expect(floatingBall).toContain('prefers-reduced-motion: reduce');
     expect(floatingBall).toContain('outline: 2px solid var(--fr-accent)');
+    expect(floatingBall).toContain('.floating-ball-manga .translation-indicator.is-counter');
+    expect(floatingBall).toContain('mangaProgressSummary');
+    expect(floatingBall).toContain('mangaActionLabel');
+    expect(floatingBall).toContain("t('已翻译')");
+    expect(floatingBall).toContain("t('已预译')");
+    expect(floatingBall).toContain("t('翻译完成')");
+    expect(floatingBall).toContain("if (mangaCompleted.value > 0) return 'translated';");
 
     const mangaEntry = source('src/features/image-translation/ui/manga-entry.css');
     const launcherRule = cssRule(mangaEntry, '.fr-manga-launcher');
     expect(launcherRule).toContain('grayscale(');
     expect(Number(launcherRule.match(/opacity:\s*([0-9.]+)/u)?.[1])).toBeLessThanOrEqual(0.36);
-    expect(cssRule(mangaEntry, '.fr-manga-launcher.is-expanded,.fr-manga-launcher:focus-visible')).toContain('filter: none');
+    expect(cssRule(mangaEntry, '.fr-manga-launcher.is-touch,.fr-manga-launcher.is-expanded,.fr-manga-launcher:focus-visible')).toContain('filter: none');
+    expect(cssRule(mangaEntry, '.fr-manga-dock')).toContain('z-index: 2147483645');
+    expect(cssRule(mangaEntry, '.fr-manga-peek-launcher')).toContain('touch-action: none');
+    expect(mangaEntry).toContain('.fr-manga-reading-line-label > span:first-child:not(.fr-manga-reading-badge)');
+    expect(mangaEntry).toMatch(/\.fr-manga-reading,\s*\.fr-manga-entry,\s*\.fr-manga-dock\s*\{/);
+
+    const imageControlsCss = source('src/features/image-translation/ui/image-controls.css');
+    expect(imageControlsCss).toContain('.fr-image-feedback[data-theme=dark][data-phase=error] .fr-image-actions > button {color:#171b24;}');
+    expect(imageControlsCss).toContain('.fr-image-feedback:not([data-theme=light])[data-phase=error] .fr-image-actions > button {color:#171b24;}');
   });
 
   it('进度面板使用半透明背景，并由活动请求而非离屏候选决定显隐', () => {

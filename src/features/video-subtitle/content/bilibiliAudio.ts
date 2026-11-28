@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/bilibiliAudio.ts
  * 文件职责：为 B 站当前分 P 读取独立 DASH 音轨并解码成本地识别 PCM。
- * 主要内容：复用播放器身份桥，禁止跨站重定向，在下载前核对接口时长，限制体积与等待时间并丢弃迟到解码。
+ * 主要内容：复用播放器身份桥，提取官方 AAC 主地址与备用 CDN 地址（backupUrl/backup_url）及多码率候选并在瞬时失败时顺序故障转移，禁止跨站重定向，在下载前核对接口时长，限制体积、总读取时间与有界解码超时，以 subarray 安全切片传入解码器并丢弃迟到解码。
  * 模块边界：不修改可见播放器、不读取登录凭据、不上传音频；只读取当前账号可播放的普通视频。
  */
 import {captionRecord, isBilibiliBangumiPart} from './courseCaptionData';
@@ -11,23 +11,48 @@ import {resampleToWhisperAudio} from '../transcription';
 import {VIDEO_AI_SAMPLE_RATE} from './video-ai/audioWindow';
 
 const MAX_BILIBILI_AUDIO_SECONDS = 20 * 60;
+const BILIBILI_DECODE_TIMEOUT_MS = 30_000;
 
-export function chooseBilibiliAudio(value: unknown): string {
+function normalizeOfficialBilibiliAudioUrl(source: unknown): string | null {
+    if (typeof source !== 'string' || !source) return null;
+    try {
+        const url = new URL(source);
+        if (url.protocol === 'https:' && !url.username && !url.password && (!url.port || url.port === '443')
+            && /(^|\.)(?:bilivideo\.com|bilivideo\.cn|hdslb\.com)$/.test(url.hostname)) return url.href;
+    } catch { /* 非法媒体地址不进入网络层。 */ }
+    return null;
+}
+
+export function chooseBilibiliAudioCandidates(value: unknown): string[] {
     const audio = captionRecord(captionRecord(value).dash).audio;
     if (!Array.isArray(audio)) throw new Error('当前视频没有可读取的独立音轨');
-    // AAC 可由浏览器原生解码；选择较小音轨以控制完整解码内存。
+    // AAC 可由浏览器原生解码；按带宽升序排列以控制完整解码内存，并收集备用 CDN 节点做故障转移。
     const candidates = audio.map(captionRecord).filter(item => typeof item.codecs === 'string' && item.codecs.startsWith('mp4a'))
         .sort((a, b) => Number(a.bandwidth) - Number(b.bandwidth));
+    const urls: string[] = [];
+    const seen = new Set<string>();
+    const addUrl = (raw: unknown) => {
+        const valid = normalizeOfficialBilibiliAudioUrl(raw);
+        if (valid && !seen.has(valid)) {
+            seen.add(valid);
+            urls.push(valid);
+        }
+    };
     for (const item of candidates) {
-        const source = item.baseUrl || item.base_url;
-        if (typeof source !== 'string') continue;
-        try {
-            const url = new URL(source);
-            if (url.protocol === 'https:' && !url.username && !url.password && (!url.port || url.port === '443')
-                && /(^|\.)(?:bilivideo\.com|bilivideo\.cn|hdslb\.com)$/.test(url.hostname)) return url.href;
-        } catch { /* 非法媒体地址不进入网络层。 */ }
+        addUrl(item.baseUrl || item.base_url);
+        const backups = item.backupUrl || item.backup_url;
+        if (Array.isArray(backups)) {
+            for (const backup of backups) addUrl(backup);
+        } else if (typeof backups === 'string') {
+            addUrl(backups);
+        }
     }
-    throw new Error('当前视频没有可解码的官方 AAC 音轨');
+    if (urls.length === 0) throw new Error('当前视频没有可解码的官方 AAC 音轨');
+    return urls;
+}
+
+export function chooseBilibiliAudio(value: unknown): string {
+    return chooseBilibiliAudioCandidates(value)[0];
 }
 
 export interface BilibiliAudioPorts {
@@ -68,16 +93,39 @@ export async function readBilibiliAudio(part: string, video: HTMLMediaElement, s
             || declaredDuration > MAX_BILIBILI_AUDIO_SECONDS || Math.abs(declaredDuration - duration) > 2) {
             throw new Error('接口音轨时长与当前视频不匹配');
         }
-        const audio = chooseBilibiliAudio(payload);
-        const media = await ports.fetch(audio, {signal: controller.signal, redirect: 'error', credentials: 'omit', referrer: 'https://www.bilibili.com/'});
-        const encoded = await readBoundedMediaResponse(media, 48 * 1024 * 1024, controller.signal);
+        const audioCandidates = chooseBilibiliAudioCandidates(payload);
+        let encoded!: Uint8Array<ArrayBuffer>;
+        for (let index = 0; index < audioCandidates.length; index += 1) {
+            try {
+                const media = await ports.fetch(audioCandidates[index], {
+                    signal: controller.signal,
+                    redirect: 'error',
+                    credentials: 'omit',
+                    referrer: 'https://www.bilibili.com/',
+                });
+                encoded = await readBoundedMediaResponse(media, 48 * 1024 * 1024, controller.signal);
+                break;
+            } catch (error) {
+                if (controller.signal.aborted || index === audioCandidates.length - 1) throw error;
+            }
+        }
         controller.signal.throwIfAborted();
-        const work = ports.decode(encoded.buffer);
+        const audioBuffer = encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength);
+        const work = ports.decode(audioBuffer);
         const decoded = await new Promise<AudioBuffer>((resolve, reject) => {
-            const cancel = () => reject(controller.signal.reason);
+            const cancel = () => {
+                clearTimeout(decodeTimeout);
+                reject(controller.signal.reason);
+            };
+            const decodeTimeout = setTimeout(() => {
+                controller.signal.removeEventListener('abort', cancel);
+                reject(new Error('B 站音轨解码超时，请重试'));
+            }, BILIBILI_DECODE_TIMEOUT_MS);
             controller.signal.addEventListener('abort', cancel, {once: true});
-            void work.then(resolve, reject)
-                .finally(() => controller.signal.removeEventListener('abort', cancel));
+            void work.then(resolve, reject).finally(() => {
+                clearTimeout(decodeTimeout);
+                controller.signal.removeEventListener('abort', cancel);
+            });
         });
         controller.signal.throwIfAborted();
         if (decoded.duration <= 0 || decoded.duration > MAX_BILIBILI_AUDIO_SECONDS || Math.abs(decoded.duration - video.duration) > 2) {

@@ -2174,3 +2174,97 @@ describe('document service timeout compatibility', () => {
         expect(calls).toHaveLength(1); expect(calls[0][2].timeout).toBeUndefined(); expect(calls[0][2].maxRetries).toBe(2);
     });
 });
+
+describe('document translation batch recovery and priority optimizations', () => {
+    const createAITranslator = () => createDocumentSegmentTranslator({
+        waitUntilReady: mocks.waitUntilReady,
+        getDefaultService: () => mocks.defaultService,
+        supportsBatch: service => service === 'microsoft',
+        supportsAIMultiSegment: service => service === 'openai',
+        translateText: mocks.translateText,
+        translateTextBatch: mocks.translateTextBatch,
+    });
+    const protocolError = () => Object.assign(new Error('unsupported slots'), {code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID'});
+    const echoError = (partialTranslations?: unknown[]) => Object.assign(
+        new Error('untranslated echo'),
+        {code: 'UNTRANSLATED_RESPONSE', ...(partialTranslations ? {partialTranslations} : {})},
+    );
+
+    it('preserves valid translated slots from a partial UNTRANSLATED_RESPONSE batch and retries only missing slots', async () => {
+        const segments = [
+            {id: 0, source: 'Latency'},
+            {id: 1, source: 'ARGUS'},
+            {id: 2, source: 'Seconds'},
+            {id: 3, source: 'Full sentence.'},
+        ];
+        mocks.translateTextBatch.mockRejectedValueOnce(echoError(['延迟', '', '秒', '完整句子。']));
+        mocks.translateText.mockRejectedValueOnce(echoError());
+        const progress: number[] = [];
+        const result = await translateDocumentSegments(segments, {
+            fileName: 'paper.pdf',
+            batchConcurrency: 1,
+            onProgress: ({completed}) => progress.push(completed),
+        });
+        expect(result).toEqual(['延迟', 'ARGUS', '秒', '完整句子。']);
+        expect(mocks.translateTextBatch).toHaveBeenCalledOnce();
+        expect(mocks.translateText).toHaveBeenCalledOnce();
+        expect(mocks.translateText.mock.calls[0][0]).toBe('ARGUS');
+        expect(progress).toEqual([0, 3, 4]);
+
+        // All-empty or mismatched partialTranslations falls back to retrying all slots without extra progress.
+        mocks.translateTextBatch.mockReset().mockRejectedValueOnce(echoError(['', '  ']));
+        mocks.translateText.mockReset().mockImplementation(async source => `译 ${source}`);
+        const progressEmpty: number[] = [];
+        expect(await translateDocumentSegments(segments.slice(0, 2), {
+            fileName: 'paper.pdf', batchConcurrency: 1, onProgress: ({completed}) => progressEmpty.push(completed),
+        })).toEqual(['译 Latency', '译 ARGUS']);
+        expect(mocks.translateText).toHaveBeenCalledTimes(2);
+        expect(progressEmpty).toEqual([0, 1, 2]);
+    });
+
+    it('recovers from transient AI_MULTI_SEGMENT_RESPONSE_INVALID glitches after prior success and disables batching only after 3 consecutive failures', async () => {
+        mocks.defaultService = 'openai';
+        const segments = Array.from({length: 12}, (_, id) => ({id, source: `Paragraph ${id}`}));
+        const translate = createAITranslator();
+
+        // Transient single glitch after success: batch 1 succeeds, batch 2 fails once, batch 3 resumes batching (resetting streak).
+        mocks.translateTextBatch
+            .mockImplementationOnce(async (sources: string[]) => sources.map(s => `批 ${s}`))
+            .mockRejectedValueOnce(protocolError())
+            .mockImplementationOnce(async (sources: string[]) => sources.map(s => `批 ${s}`))
+            .mockRejectedValueOnce(protocolError())
+            .mockRejectedValueOnce(protocolError())
+            .mockRejectedValueOnce(protocolError());
+        mocks.translateText.mockImplementation(async (source: string) => `单 ${source}`);
+
+        const result = await translate(segments, {fileName: 'paper.pdf', batchLimits: {items: 2}, batchConcurrency: 1});
+        // Batches: [0,1] ok -> [2,3] glitch(1)->single -> [4,5] ok(streak reset to 0) -> [6,7] fail(1)->single -> [8,9] fail(2)->single -> [10,11] fail(3)->single & singleFallback=true
+        expect(mocks.translateTextBatch).toHaveBeenCalledTimes(6);
+        expect(mocks.translateText).toHaveBeenCalledTimes(8);
+        expect(result.slice(0, 6)).toEqual(['批 Paragraph 0', '批 Paragraph 1', '单 Paragraph 2', '单 Paragraph 3', '批 Paragraph 4', '批 Paragraph 5']);
+
+        // Verify once 3 consecutive failures happen after a success, the next batch skips translateTextBatch completely.
+        mocks.translateTextBatch.mockReset()
+            .mockImplementationOnce(async (sources: string[]) => sources.map(s => `批 ${s}`))
+            .mockRejectedValue(protocolError());
+        mocks.translateText.mockReset().mockImplementation(async (source: string) => `单 ${source}`);
+        const longResult = await translate(segments.slice(0, 10), {fileName: 'paper2.pdf', batchLimits: {items: 2}, batchConcurrency: 1});
+        // [0,1] ok, [2,3] fail(1), [4,5] fail(2), [6,7] fail(3) => singleFallback=true, [8] and [9] go straight to translateText
+        expect(mocks.translateTextBatch).toHaveBeenCalledTimes(4);
+        expect(mocks.translateText).toHaveBeenCalledTimes(8);
+        expect(longResult).toHaveLength(10);
+    });
+
+    it('short-circuits identity prioritizers and avoids calling prioritize on an empty queue', async () => {
+        mocks.defaultService = 'openai';
+        mocks.translateText.mockImplementation(async source => `译 ${source}`);
+        const calls: number[] = [];
+        const prioritize = vi.fn((pending: readonly {id: number; source: string}[]) => {
+            calls.push(pending.length);
+            return pending;
+        });
+        const segments = [{id: 0, source: 'One'}, {id: 1, source: 'Two'}];
+        expect(await translateDocumentSegments(segments, {fileName: 'fast.txt', prioritize})).toEqual(['译 One', '译 Two']);
+        expect(calls.every(length => length > 0)).toBe(true);
+    });
+});

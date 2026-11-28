@@ -380,4 +380,37 @@ describe('共享页累计工作量不因run结束退款',()=>{
         const boxes=[box(),box(),box()],{controller}=start({boxes});borrowed(controller,0);borrowed(controller,1);borrowed(controller,2);const r=finish(controller,boxes,output(800,3));expect(r.result.map(x=>x.text)).toEqual(['AB12 CD','AB12 CD','AB12CD']);
     });
     it('constants冻结且完全无Canvas、模型或会话端口',()=>{expect(Object.isFrozen(LIMIT)).toBe(true);expect(Object.keys(create()).sort()).toEqual(['applyToSdkResults','beginPage','beginRun','bindInput','endPage','endRun','observeBorrowedRead','observeOutput']);});
+    it('非恒色裁图的共享直方图按一次扫描筛除超4096色、半透明、并列主色与零预算状态',()=>{
+        // 超过 4096 色直接一次扫描早退，不读 logits
+        const busy=chromaticImage(120,'busy-border');
+        busy.set([200,20,40,255],0);
+        for(let i=1;i<4101;i++)busy.set([i&255,(i>>8)&255,30,255],i*4);
+        {const {controller,boxes}=start();borrowed(controller,0,busy);expect(finish(controller,boxes,noRead()).result[0].text).toBe('AB12CD');}
+        // 半透明像素在紧裁路径早退
+        const translucent=chromaticImage(120,'busy-border');
+        translucent.set([200,20,40,255],0);
+        translucent[(20*120+40)*4+3]=128;
+        {const {controller,boxes}=start();borrowed(controller,0,translucent);expect(finish(controller,boxes,noRead()).result[0].text).toBe('AB12CD');}
+        // 精确并列暗色与精确并列浅中性主色均保守跳过
+        const tiedDark=new Uint8ClampedArray(120*48*4);
+        for(let i=0;i<120*48;i++)tiedDark.set(i<2800?[10,10,10,255]:i<5600?[20,20,20,255]:[200,20,40,255],i*4);
+        {const {controller,boxes}=start();borrowed(controller,0,tiedDark);expect(finish(controller,boxes,noRead()).result[0].text).toBe('AB12CD');}
+        const tiedLight=new Uint8ClampedArray(120*48*4);
+        for(let i=0;i<120*48;i++)tiedLight.set(i<2800?[240,240,240,255]:i<5600?[245,245,245,255]:[90,30,170,255],i*4);
+        {const {controller,boxes}=start();borrowed(controller,0,tiedLight);expect(finish(controller,boxes,noRead()).result[0].text).toBe('AB12CD');}
+        // 浅有色底但无显著宽隙时 clippedTintedGap 返回 undefined
+        const tintedNoGap=new Uint8ClampedArray(120*48*4);
+        for(let i=0;i<120*48;i++)tintedNoGap.set([250,240,200,255],i*4);
+        for(let y=0;y<48;y++)for(let x=0;x<12;x++)tintedNoGap.set([30,30,30,255],(y*120+x)*4);
+        {const {controller,boxes}=start();borrowed(controller,0,tintedNoGap);expect(finish(controller,boxes,noRead()).result[0].text).toBe('AB12CD');}
+        // 暗色预算耗尽且边界无浅色/中色/浅彩资格时，不扫描直方图直接返回
+        const controller=create();controller.beginPage();
+        const darkFail=new Uint8ClampedArray(160*48*4);
+        for(let i=0;i<160*48;i++)darkFail.set([10,10,10,255],i*4);
+        for(let x=0;x<160;x++){darkFail.set([90,30,170,255],x*4);darkFail.set([90,30,170,255],(47*160+x)*4);}
+        darkFail.set([200,20,40,255],0);
+        for(let i=0;i<20;i++){next(controller,160);borrowed(controller,0,darkFail,160);controller.endRun();}
+        const last=next(controller,160);borrowed(controller,0,darkFail,160);
+        expect(finish(controller,last,noRead()).result[0].text).toBe('AB12CD');
+    });
 });

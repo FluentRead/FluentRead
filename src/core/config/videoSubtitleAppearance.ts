@@ -14,7 +14,7 @@ export const VIDEO_SUBTITLE_SKINS = [
     {id: 'paper', label: '纸张', description: '温暖的阅读感', background: '43, 35, 26', shadow: '0 2px 12px rgba(0,0,0,.3)', fontFamily: 'Georgia, serif', backdropFilter: 'none', border: 'rgba(255,225,190,.2)', textColor: '#fff7ed', translationColor: '#fed7aa', backgroundOpacity: 82, textShadow: '0 1px 2px rgba(35,20,10,.65)', textStroke: '1px rgba(35,20,10,.6)', outlineColor: '#23140a99', outlineWidth: 1},
     {id: 'terminal', label: '终端', description: '紧凑的等宽字风格', background: '4, 20, 16', shadow: '0 2px 14px rgba(0,0,0,.42)', fontFamily: 'ui-monospace, monospace', backdropFilter: 'none', border: 'rgba(94,234,212,.25)', textColor: '#d1fae5', translationColor: '#5eead4', backgroundOpacity: 88, textShadow: '0 0 5px rgba(94,234,212,.4)', textStroke: '0', outlineColor: '#000000', outlineWidth: 1},
     {id: 'neon', label: '霓虹', description: '更鲜明的科技感配色', background: '16, 8, 38', shadow: '0 2px 16px rgba(90,48,180,.5)', fontFamily: 'Arial, sans-serif', backdropFilter: 'blur(5px)', border: 'rgba(217,180,255,.35)', textColor: '#f5f3ff', translationColor: '#f0abfc', backgroundOpacity: 72, textShadow: '0 0 8px rgba(240,171,252,.65)', textStroke: '0', outlineColor: '#000000', outlineWidth: 1},
-    {id: 'minimal', label: '极简', description: '低干扰透明字幕', background: '0, 0, 0', shadow: '0 1px 6px rgba(0,0,0,.5)', fontFamily: 'Arial, sans-serif', backdropFilter: 'none', border: 'transparent', textColor: '#ffffff', translationColor: '#ffffff', backgroundOpacity: 0, textShadow: '0 1px 3px rgba(0,0,0,.9)', textStroke: '1px #000', outlineColor: '#000000', outlineWidth: 1},
+    {id: 'minimal', label: '极简', description: '低干扰透明字幕', background: '0, 0, 0', shadow: 'none', fontFamily: 'Arial, sans-serif', backdropFilter: 'none', border: 'transparent', textColor: '#ffffff', translationColor: '#ffffff', backgroundOpacity: 0, textShadow: '0 1px 3px rgba(0,0,0,.9)', textStroke: '1px #000', outlineColor: '#000000', outlineWidth: 1},
 ] as const;
 
 export type VideoSubtitleSkinId = typeof VIDEO_SUBTITLE_SKINS[number]['id'];
@@ -159,7 +159,7 @@ export function getVideoSubtitleAppearanceCssVars(value: unknown): Record<string
         '--fluent-read-video-subtitle-max-width': `${appearance.maxWidth}%`,
         '--fluent-read-video-subtitle-font-scale': `${appearance.fontScale}%`,
         '--fluent-read-video-subtitle-preview-font-size': `${13 * appearance.fontScale / 100}px`,
-        '--fluent-read-video-subtitle-shadow': appearance.backgroundVisible ? skin.shadow : 'none',
+        '--fluent-read-video-subtitle-shadow': appearance.backgroundVisible && appearance.backgroundOpacity > 0 ? skin.shadow : 'none',
         '--fluent-read-video-subtitle-font-family': skin.fontFamily,
         '--fluent-read-video-subtitle-backdrop-filter': appearance.backgroundVisible ? skin.backdropFilter : 'none',
         '--fluent-read-video-subtitle-border': appearance.backgroundVisible ? skin.border : 'transparent',

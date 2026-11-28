@@ -256,4 +256,22 @@ describe('X 首页音轨恢复', () => {
     expect(await reader.read(video, cancelled.signal)).toBeNull();
     expect(fetcher).not.toHaveBeenCalled();
   });
+
+  it('supports webkitAudioContext, falls back to default sampleRate, and returns null when AudioContext is unavailable', async () => {
+    const {reader, video, signal} = fixture([]);
+    reader.remember(media('111'), manifest);
+    class WebkitFallbackContext extends FakeContext {
+      constructor(options?: AudioContextOptions) {
+        if (options?.sampleRate === 16_000) throw new DOMException('NotSupportedError');
+        super();
+      }
+    }
+    vi.stubGlobal('AudioContext', undefined);
+    vi.stubGlobal('webkitAudioContext', WebkitFallbackContext);
+    expect(await reader.read(video, signal)).toHaveLength(16_000);
+    expect(FakeContext.closed).toBe(1);
+
+    vi.stubGlobal('webkitAudioContext', undefined);
+    expect(await reader.read(video, signal)).toBeNull();
+  });
 });

@@ -9,7 +9,6 @@ import type {MaterialDetailMetadata} from './materialDetailPage';
 import type {MaterialReference} from './materialProtocol';
 
 export const MATERIAL_PAGE_PORT_NAME = 'fluentread-material-page-v1';
-export const MATERIAL_PAGE_PROTOCOL_VERSION = 1;
 /** 单行超过此预算时明确失败；发送帧另有 24 KiB 限制。 */
 export const MATERIAL_PAGE_MAX_LINE_BYTES = 512 * 1024;
 export type MaterialPageErrorCode = 'stale-operation'|'invalid-input'|'busy'|'limit-exceeded'|'storage-error'|'not-found';

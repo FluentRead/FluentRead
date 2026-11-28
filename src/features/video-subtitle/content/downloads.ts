@@ -165,7 +165,7 @@ export function createVideoSubtitleDownloads(ports: VideoDownloadPorts) {
             assertCurrent();
             const cues = finalizeVideoSubtitleCues(result.cues);
             ports.save(serializeSrtCues(cues), result.languageCode, cues);
-            feedback = ports.ui('video.downloaded', {count: result.cues.length});
+            feedback = ports.ui('video.downloaded', {count: cues.length});
         } catch (error) {
             feedback = errorMessage(error);
             feedbackDelay = 3200;

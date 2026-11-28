@@ -449,7 +449,7 @@ describe('配置差异预览', () => {
             },
             popupQuickFeatureOrder: ['hover', 'selection', 'appearance', 'image', 'video', 'document'],
         }, {
-            interfaceSkin: 'minimal',
+            interfaceSkin: 'liquid-glass',
             interfaceVisibility: {
                 popupQuickFeatures: false,
                 popupSiteRule: true,
@@ -468,7 +468,7 @@ describe('配置差异预览', () => {
         });
 
         expect(group(result, 'general')?.changes).toEqual(expect.arrayContaining([
-            {key: 'interfaceSkin', label: '界面皮肤', before: '默认风格', after: '简约风格'},
+            {key: 'interfaceSkin', label: '界面皮肤', before: '默认经典', after: '液态玻璃'},
             {
                 key: 'interfaceVisibility',
                 label: '界面栏目',
@@ -507,14 +507,14 @@ describe('配置差异预览', () => {
         });
 
         const paletteResult = buildConfigDiff(
-            {interfaceSkin: 'yuebai'},
-            {interfaceSkin: 'xiangse'},
+            {interfaceSkin: 'aurora'},
+            {interfaceSkin: 'midnight-gold'},
         );
         expect(group(paletteResult, 'general')?.changes).toContainEqual({
             key: 'interfaceSkin',
             label: '界面皮肤',
-            before: '月白',
-            after: '缃色',
+            before: '极光幻彩',
+            after: '黑金典藏',
         });
 
         const malformed = buildConfigDiff(

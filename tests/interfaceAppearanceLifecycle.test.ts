@@ -46,17 +46,19 @@ describe('界面根节点和字体异步归属', () => {
     const a=root(),b=root();register(a);register(b);
     appearance.applyInterfaceFont('system',a);await settle();
     expect(a.dataset.interfaceFont).toBe('system');expect(b.dataset.interfaceFont).toBeUndefined();
-    appearance.applyInterfaceSkin('compact');expect(b.dataset.interfaceSkin).toBe('compact');
+    appearance.applyInterfaceSkin('brutalist');expect(b.dataset.interfaceSkin).toBe('brutalist');
   })
   it('旧页面释放自己的注册，不能清除新页面根节点；重复释放幂等', () => {
     const a = root(), b = root();const old = register(a);register(b);old();old()
-    appearance.applyInterfaceSkin('compact');appearance.applyInterfaceTheme(true)
-    expect(b.dataset.interfaceSkin).toBe('compact');expect(b.classList.contains('dark')).toBe(true)
+    appearance.applyInterfaceSkin('brutalist');appearance.applyInterfaceTheme(true)
+    expect(b.dataset.interfaceSkin).toBe('brutalist');expect(b.classList.contains('dark')).toBe(true)
     expect(doc.documentElement.dataset.interfaceSkin).toBeUndefined()
   })
-  it('最后页面释放后回到仍存在的上一页面，全部释放才使用文档根节点', () => {
+  it('最后页面释放后回到仍存在的上一页面，全部释放才使用文档根节点；旧皮肤回退默认', () => {
     const a = root(), b = root();const releaseA = register(a);const releaseB = register(b)
-    releaseB();appearance.applyInterfaceSkin('cheese');expect(a.dataset.interfaceSkin).toBe('xiangse')
+    releaseB();appearance.applyInterfaceSkin('cheese');expect(a.dataset.interfaceSkin).toBe('default')
+    appearance.applyInterfaceSkin('shuimo');expect(a.dataset.interfaceSkin).toBe('default')
+    appearance.applyInterfaceSkin('cyber');expect(a.dataset.interfaceSkin).toBe('cyber')
     releaseA();appearance.applyInterfaceSkin('unknown');expect(doc.documentElement.dataset.interfaceSkin).toBe('default')
   })
   it('同一 DOM 的新注册不被旧释放撤销，新的字体请求仍可以完成', async () => {
@@ -116,11 +118,11 @@ describe('界面根节点和字体异步归属', () => {
     expect(ports.load).not.toHaveBeenCalled();expect(ports.loadCached).not.toHaveBeenCalled()
   })
   it('皮肤、主题、未知字体只作用于指定节点，默认字体立即可用', async () => {
-    const a = root();appearance.applyInterfaceSkin('minimal', a);appearance.applyInterfaceTheme(true, a)
+    const a = root();appearance.applyInterfaceSkin('liquid-glass', a);appearance.applyInterfaceTheme(true, a)
     appearance.applyInterfaceTheme(false, a);appearance.applyInterfaceFont('invalid', a);await settle()
-    expect(a.dataset.interfaceSkin).toBe('minimal');expect(a.dataset.interfaceSkinKind).toBe('minimal')
+    expect(a.dataset.interfaceSkin).toBe('liquid-glass');expect(a.dataset.interfaceSkinKind).toBe('craft')
     expect(a.dataset.interfaceFont).toBe('system')
-    expect(a.style.getPropertyValue('--interface-popup-width')).toBe('310px')
+    expect(a.style.getPropertyValue('--interface-popup-width')).toBe('324px')
     expect(a.style.getPropertyValue('--interface-font-family')).toContain('system-ui');expect(a.classList.contains('dark')).toBe(false)
     expect(doc.documentElement.dataset.interfaceFont).toBeUndefined()
   })

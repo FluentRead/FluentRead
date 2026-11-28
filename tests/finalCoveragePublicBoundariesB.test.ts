@@ -312,6 +312,7 @@ describe('final boundary B independent local-download ownership', () => {
             match: async (key: string) => entries.get(key)?.clone(),
             put: async (key: string, value: Response) => {entries.set(key, value.clone());},
         })});
+        vi.stubGlobal('WebAssembly', {...WebAssembly, Suspending: function () {}, promising: function () {}});
         vi.stubGlobal('navigator', {storage: {estimate: async () => ({quota: 10_000_000_000, usage: 0})}});
         const {createLocalTranslationDownloadManager} = await import('@/src/features/local-translation/offscreen/downloads');
         let pausedCount = 0;
@@ -329,13 +330,14 @@ describe('final boundary B independent local-download ownership', () => {
         await pausedFinal.promise;
         expect((await manager.status()).tasks.find(task => task.model === ids.opusZhEn))
             .toMatchObject({phase: 'paused', bytesPerSecond: 0, error: undefined});
-        expect(download).toHaveBeenCalledOnce();
+        const initialCalls = download.mock.calls.length;
+        expect(initialCalls).toBe(Math.min(3, actual.getTranslationArtifacts(ids.opusZhEn).length));
         download.mockImplementation(async () => undefined);
         await manager.start(ids.opusZhEn);
         await resumedFinal.promise;
         expect((await manager.status()).tasks.find(task => task.model === ids.opusZhEn))
             .toMatchObject({phase: 'ready', bytesPerSecond: 0, error: undefined});
-        expect(download).toHaveBeenCalledTimes(1 + actual.getTranslationArtifacts(ids.opusZhEn).length);
+        expect(download).toHaveBeenCalledTimes(initialCalls + actual.getTranslationArtifacts(ids.opusZhEn).length);
     });
 });
 

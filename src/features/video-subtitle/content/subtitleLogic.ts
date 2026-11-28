@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/subtitleLogic.ts
  * 文件职责：提供字幕批量翻译、配置指纹和渐进文本展示的纯逻辑。
- * 主要内容：相同译文保留原文且不重复展示；合成双语导出的双行文本和单轨时间轴，去重并限制批译并发，按目录中的实际服务标识生成配置键，使免费线路和 DeepL 套餐变化失效旧字幕；按原文进度截取译文与按时间选择渐进字幕；保持 X 短 cue 的最小展示区间与旧 DOM 文本切换语义；按播放速度选取当前句和八条不同的后续原文，在时间边界之间复用预取窗口，并以手动偏移计算有效字幕区间。
+ * 主要内容：相同译文保留原文且不重复展示；为单调排序的时间轴惰性建立 WeakMap 索引（只缓存起点与前缀最大结束时间，不缓存文本以保留原位编辑可见性）实现 O(log n) 当前句、校时偏移、预翻译窗口与 YouTube 活跃区查询，无序数组自动回退线性扫描；优化渐进字幕单次归一化与邻近查找及 YouTube 过期句向外扩散检测；合成双语导出的双行文本和单轨时间轴，去重并限制批译并发，按目录中的实际服务标识生成配置键；按原文进度截取译文。
  * 模块边界：只处理输入数据和注入翻译函数，不读取 DOM、全局配置或浏览器接口。
  */
 import {getCompositeTranslationConfigFingerprint} from '@/src/core/config/compositeTranslation';
@@ -14,9 +14,87 @@ import type {VideoSubtitleCue} from './youtubeSubtitleData';
 /** 同一同步更新轮次的选择证据；数组身份、原文和第二次时钟读取相同才可复用。 */
 export type YoutubeCueSelection = ReturnType<typeof selectYoutubeCaptionCue> & {cues: readonly VideoSubtitleCue[]; source: string; currentMs: number};
 
+interface SortedCueIndex {
+  readonly length: number;
+  readonly starts: number[];
+  readonly maxMinDisplayEnds: number[];
+  readonly maxExactEnds: number[];
+}
+
+const EMPTY_CUES: readonly VideoSubtitleCue[] = [];
+const sortedCueIndexCache = new WeakMap<readonly VideoSubtitleCue[], {length: number; index: SortedCueIndex | null}>();
+
+function getSortedCueIndex(cues: readonly VideoSubtitleCue[]): SortedCueIndex | null {
+  const length = cues.length;
+  if (length === 0) return null;
+  const cached = sortedCueIndexCache.get(cues);
+  if (cached && cached.length === length) return cached.index;
+
+  const starts = new Array<number>(length);
+  const maxMinDisplayEnds = new Array<number>(length);
+  const maxExactEnds = new Array<number>(length);
+  let previousStart = -Infinity;
+  let runningMinDisplayEnd = -Infinity;
+  let runningExactEnd = -Infinity;
+
+  for (let i = 0; i < length; i += 1) {
+    const cue = cues[i]!;
+    const startMs = cue.startMs;
+    const durationMs = cue.durationMs;
+    if (!Number.isFinite(startMs) || !Number.isFinite(durationMs) || startMs < previousStart) {
+      sortedCueIndexCache.set(cues, {length, index: null});
+      return null;
+    }
+    previousStart = startMs;
+    starts[i] = startMs;
+    const minDisplayEnd = startMs + Math.max(durationMs, 500);
+    if (minDisplayEnd > runningMinDisplayEnd) runningMinDisplayEnd = minDisplayEnd;
+    maxMinDisplayEnds[i] = runningMinDisplayEnd;
+    const exactEnd = durationMs > 0 ? startMs + durationMs : -Infinity;
+    if (exactEnd > runningExactEnd) runningExactEnd = exactEnd;
+    maxExactEnds[i] = runningExactEnd;
+  }
+
+  const index: SortedCueIndex = {length, starts, maxMinDisplayEnds, maxExactEnds};
+  sortedCueIndexCache.set(cues, {length, index});
+  return index;
+}
+
+function upperBound(starts: readonly number[], target: number): number {
+  let low = 0;
+  let high = starts.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (starts[mid]! <= target) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
+function isBetterScore(nextScore: readonly number[], bestScore: readonly number[] | null): boolean {
+  if (!bestScore) return true;
+  for (let index = 0; index < nextScore.length; index += 1) {
+    if (nextScore[index] === bestScore[index]) continue;
+    return nextScore[index]! < bestScore[index]!;
+  }
+  return false;
+}
+
 /** 渐进字幕沿用最短 500ms 展示区间，重叠时选择最新开始的原始 cue。 */
 export function findActiveVideoCaptionCue(cues: readonly VideoSubtitleCue[], currentMs: number): VideoSubtitleCue | null {
   if (!Number.isFinite(currentMs)) return null;
+  const index = getSortedCueIndex(cues);
+  if (index) {
+    const upper = upperBound(index.starts, currentMs);
+    let active: VideoSubtitleCue | null = null;
+    for (let i = upper - 1; i >= 0 && index.maxMinDisplayEnds[i]! > currentMs; i -= 1) {
+      const startMs = index.starts[i]!;
+      if (active && startMs < active.startMs) break;
+      const cue = cues[i]!;
+      if (currentMs < startMs + Math.max(cue.durationMs, 500)) active = cue;
+    }
+    return active;
+  }
   let active: VideoSubtitleCue | null = null;
   for (const cue of cues) {
     if (currentMs < cue.startMs || currentMs >= cue.startMs + Math.max(cue.durationMs, 500)) continue;
@@ -41,43 +119,40 @@ export function findProgressiveVideoCaptionCue(cues: readonly VideoSubtitleCue[]
 
   const foldedSource = normalizedSource.toLocaleLowerCase();
   const sourceLength = Array.from(normalizedSource).length;
+  const finiteTime = Number.isFinite(currentMs);
   const getTimeDistance = (cue: VideoSubtitleCue): number => {
+    if (!finiteTime) return 0;
     const endMs = cue.startMs + Math.max(cue.durationMs, 500);
-    return Number.isFinite(currentMs)
-      ? currentMs < cue.startMs
-        ? cue.startMs - currentMs
-        : currentMs > endMs
-          ? currentMs - endMs
-          : 0
-      : 0;
+    return currentMs < cue.startMs
+      ? cue.startMs - currentMs
+      : currentMs > endMs
+        ? currentMs - endMs
+        : 0;
   };
-  const score = (cue: VideoSubtitleCue): number[] => {
-    const fullSource = normalizeVideoCaptionText(cue.text);
-    const exact = fullSource.toLocaleLowerCase() === foldedSource ? 0 : 1;
-    return [
-      getTimeDistance(cue),
-      exact,
-      Math.abs(Array.from(fullSource).length - sourceLength),
-      cue.startMs,
-    ];
-  };
+  const score = (cue: VideoSubtitleCue, fullSource: string, foldedText: string, distance: number): number[] => [
+    distance,
+    foldedText === foldedSource ? 0 : 1,
+    Math.abs(Array.from(fullSource).length - sourceLength),
+    cue.startMs,
+  ];
 
-  const pickBest = (predicate: (cue: VideoSubtitleCue, foldedText: string) => boolean): VideoSubtitleCue | null => {
+  const pickBest = (
+    startIndex: number,
+    endIndex: number,
+    maxDistance: number,
+    predicate: (foldedText: string) => boolean,
+  ): VideoSubtitleCue | null => {
     let best: VideoSubtitleCue | null = null;
     let bestScore: number[] | null = null;
-    for (const cue of cues) {
-      const foldedText = normalizeVideoCaptionText(cue.text).toLocaleLowerCase();
-      if (!predicate(cue, foldedText)) continue;
-      const nextScore = score(cue);
-      let isBetter = bestScore === null;
-      if (bestScore) {
-        for (let index = 0; index < nextScore.length; index += 1) {
-          if (nextScore[index] === bestScore[index]) continue;
-          isBetter = nextScore[index] < bestScore[index];
-          break;
-        }
-      }
-      if (isBetter) {
+    for (let i = startIndex; i < endIndex; i += 1) {
+      const cue = cues[i]!;
+      const distance = getTimeDistance(cue);
+      if (distance > maxDistance) continue;
+      const fullSource = normalizeVideoCaptionText(cue.text);
+      const foldedText = fullSource.toLocaleLowerCase();
+      if (!predicate(foldedText)) continue;
+      const nextScore = score(cue, fullSource, foldedText, distance);
+      if (isBetterScore(nextScore, bestScore)) {
         best = cue;
         bestScore = nextScore;
       }
@@ -85,23 +160,51 @@ export function findProgressiveVideoCaptionCue(cues: readonly VideoSubtitleCue[]
     return best;
   };
 
-  const matched = pickBest((_cue, fullSource) =>
-    fullSource === foldedSource || fullSource.startsWith(foldedSource));
+  const prefixPredicate = (fullSource: string) =>
+    fullSource === foldedSource || fullSource.startsWith(foldedSource);
+  const index = getSortedCueIndex(cues);
+
+  if (index && finiteTime) {
+    const upperActive = upperBound(index.starts, currentMs);
+    let lowActive = upperActive;
+    while (lowActive > 0 && index.maxMinDisplayEnds[lowActive - 1]! >= currentMs) lowActive -= 1;
+    const activeMatched = pickBest(lowActive, upperActive, 0, prefixPredicate);
+    if (activeMatched) return activeMatched;
+  }
+
+  const matched = pickBest(0, cues.length, Infinity, prefixPredicate);
   if (matched) return matched;
 
   // 部分 YouTube 版本只把“当前词”写入 DOM，而不是写入完整前缀。
   // 此时用播放器时间轴和当前词反查完整 cue，避免一直等不到稳定句子。
-  if (!Number.isFinite(currentMs) || normalizedSource.length < 3) return null;
-  return pickBest((cue, fullSource) => {
-    if (getTimeDistance(cue) > 1200) return false;
-    return fullSource.includes(foldedSource) || foldedSource.includes(fullSource);
-  });
+  if (!finiteTime || normalizedSource.length < 3) return null;
+  const wordPredicate = (fullSource: string) =>
+    fullSource.includes(foldedSource) || foldedSource.includes(fullSource);
+  if (index) {
+    const upperNear = upperBound(index.starts, currentMs + 1200);
+    let lowNear = upperNear;
+    while (lowNear > 0 && index.maxMinDisplayEnds[lowNear - 1]! >= currentMs - 1200) lowNear -= 1;
+    return pickBest(lowNear, upperNear, 1200, wordPredicate);
+  }
+  return pickBest(0, cues.length, 1200, wordPredicate);
 }
 
 /** 手动校时只改变显示时钟；区间严格使用原始时间戳，不填补空档或修改下载数据。 */
 export function selectVideoSubtitleCueAtOffset(cues: readonly VideoSubtitleCue[], playbackMs: number, offsetMs: number): VideoSubtitleCue | null {
   const currentMs = playbackMs - offsetMs;
   if (!Number.isFinite(currentMs)) return null;
+  const index = getSortedCueIndex(cues);
+  if (index) {
+    const upper = upperBound(index.starts, currentMs);
+    let active: VideoSubtitleCue | null = null;
+    for (let i = upper - 1; i >= 0 && index.maxExactEnds[i]! > currentMs; i -= 1) {
+      const startMs = index.starts[i]!;
+      if (active && startMs < active.startMs) break;
+      const cue = cues[i]!;
+      if (cue.durationMs > 0 && currentMs < startMs + cue.durationMs) active = cue;
+    }
+    return active;
+  }
   let active: VideoSubtitleCue | null = null;
   for (const cue of cues) {
     if (cue.durationMs <= 0 || currentMs < cue.startMs || currentMs >= cue.startMs + cue.durationMs) continue;
@@ -121,10 +224,13 @@ export class VideoSubtitlePretranslationWindow {
     selected: readonly VideoSubtitleCue[];
   };
 
-  clear(): void { this.previous = undefined; }
+  clear(): void {
+    if (this.previous) sortedCueIndexCache.delete(this.previous.cues);
+    this.previous = undefined;
+  }
 
   select(cues: readonly VideoSubtitleCue[], currentMs: number, windowMs: number, playbackRate = 1): readonly VideoSubtitleCue[] {
-    if (!Number.isFinite(currentMs) || !Number.isFinite(windowMs) || windowMs <= 0) return [];
+    if (!Number.isFinite(currentMs) || !Number.isFinite(windowMs) || windowMs <= 0) return EMPTY_CUES;
     const rate = Number.isFinite(playbackRate) && playbackRate > 0 ? Math.max(1, playbackRate) : 1;
     const spanMs = windowMs * rate;
     const windowEndMs = currentMs + spanMs;
@@ -137,19 +243,43 @@ export class VideoSubtitlePretranslationWindow {
     const upcoming: VideoSubtitleCue[] = [];
     let nextChangeMs = Infinity;
     let nextOutsideStartMs = Infinity;
-    for (const cue of cues) {
-      const {startMs, durationMs} = cue;
-      if (!(durationMs > 0)) continue;
-      if (startMs > currentMs) {
-        if (startMs <= windowEndMs) {
-          upcoming.push(cue);
-          nextChangeMs = Math.min(nextChangeMs, startMs);
-        } else {
-          nextOutsideStartMs = Math.min(nextOutsideStartMs, startMs);
-        }
-      } else if (startMs + durationMs > currentMs && (!active || startMs > active.startMs)) {
-        active = cue;
+    const index = getSortedCueIndex(cues);
+    if (index) {
+      const upperCurrent = upperBound(index.starts, currentMs);
+      for (let i = upperCurrent - 1; i >= 0 && index.maxExactEnds[i]! > currentMs; i -= 1) {
+        const startMs = index.starts[i]!;
+        if (active && startMs < active.startMs) break;
+        const cue = cues[i]!;
+        if (cue.durationMs > 0 && startMs + cue.durationMs > currentMs) active = cue;
       }
+      for (let i = upperCurrent; i < cues.length; i += 1) {
+        const cue = cues[i]!;
+        if (!(cue.durationMs > 0)) continue;
+        const startMs = index.starts[i]!;
+        if (startMs <= windowEndMs) {
+          if (upcoming.length === 0) nextChangeMs = Math.min(nextChangeMs, startMs);
+          upcoming.push(cue);
+        } else {
+          nextOutsideStartMs = startMs;
+          break;
+        }
+      }
+    } else {
+      for (const cue of cues) {
+        const {startMs, durationMs} = cue;
+        if (!(durationMs > 0)) continue;
+        if (startMs > currentMs) {
+          if (startMs <= windowEndMs) {
+            upcoming.push(cue);
+            nextChangeMs = Math.min(nextChangeMs, startMs);
+          } else {
+            nextOutsideStartMs = Math.min(nextOutsideStartMs, startMs);
+          }
+        } else if (startMs + durationMs > currentMs && (!active || startMs > active.startMs)) {
+          active = cue;
+        }
+      }
+      upcoming.sort((left, right) => left.startMs - right.startMs);
     }
     if (active) nextChangeMs = Math.min(nextChangeMs, active.startMs + active.durationMs);
 
@@ -163,13 +293,13 @@ export class VideoSubtitlePretranslationWindow {
     };
     if (active) append(active);
     const limit = selected.length + 8;
-    upcoming.sort((left, right) => left.startMs - right.startMs);
     for (const cue of upcoming) {
       append(cue);
       if (selected.length === limit) break;
     }
-    this.previous = {cues, currentMs, spanMs, nextChangeMs, nextOutsideStartMs, selected};
-    return selected;
+    const result = selected.length > 0 ? selected : EMPTY_CUES;
+    this.previous = {cues, currentMs, spanMs, nextChangeMs, nextOutsideStartMs, selected: result};
+    return result;
   }
 }
 
@@ -183,6 +313,15 @@ function hasRollingCaptionPrefix(visible: string, full: string): boolean {
   return false;
 }
 
+function rankYoutubeCaptionText(visible: string, rawText: string): number {
+  const text = normalizeVideoCaptionText(rawText).toLocaleLowerCase();
+  if (!text) return 3;
+  const directRank = text === visible ? 0 : text.startsWith(visible) ? 1 : 3;
+  if (directRank < 3) return directRank;
+  if (hasRollingCaptionPrefix(visible, text)) return 1;
+  return visible.length >= 3 && (text.includes(visible) || visible.includes(text)) ? 2 : 3;
+}
+
 /** 原生文本与播放时间必须同时匹配；不得用邻句或其他时段的同文 cue 替换当前原文。 */
 export function selectYoutubeCaptionCue(
   cues: readonly VideoSubtitleCue[], source: string, currentMs: number,
@@ -191,14 +330,40 @@ export function selectYoutubeCaptionCue(
   if (!visible || !Number.isFinite(currentMs)) return {cue: null, stale: false};
   let selected: VideoSubtitleCue | null = null;
   let selectedRank = Infinity;
+  const index = getSortedCueIndex(cues);
+  if (index) {
+    const upper = upperBound(index.starts, currentMs);
+    for (let i = upper - 1; i >= 0 && index.maxExactEnds[i]! > currentMs; i -= 1) {
+      const cue = cues[i]!;
+      const startMs = index.starts[i]!;
+      if (cue.durationMs <= 0 || currentMs >= startMs + cue.durationMs) continue;
+      const rank = rankYoutubeCaptionText(visible, cue.text);
+      if (rank === 3) continue;
+      if (rank < selectedRank || (rank === selectedRank && (!selected || startMs >= selected.startMs))) {
+        selected = cue;
+        selectedRank = rank;
+      }
+    }
+    if (selected) return {cue: selected, stale: false};
+    let stale = false;
+    for (let offset = 0; upper - 1 - offset >= 0 || upper + offset < cues.length; offset += 1) {
+      const left = upper - 1 - offset;
+      if (left >= 0 && normalizeVideoCaptionText(cues[left]!.text).toLocaleLowerCase().startsWith(visible)) {
+        stale = true;
+        break;
+      }
+      const right = upper + offset;
+      if (right < cues.length && normalizeVideoCaptionText(cues[right]!.text).toLocaleLowerCase().startsWith(visible)) {
+        stale = true;
+        break;
+      }
+    }
+    return {cue: null, stale};
+  }
   for (const cue of cues) {
     // 正常播放每帧只清洗当前区间的文本；长视频的其他数千句无需反复替换和大小写转换。
     if (currentMs < cue.startMs || currentMs >= cue.startMs + cue.durationMs || cue.durationMs <= 0) continue;
-    const text = normalizeVideoCaptionText(cue.text).toLocaleLowerCase();
-    if (!text) continue;
-    const directRank = text === visible ? 0 : text.startsWith(visible) ? 1 : 3;
-    const rank = directRank < 3 ? directRank : hasRollingCaptionPrefix(visible, text) ? 1
-      : visible.length >= 3 && (text.includes(visible) || visible.includes(text)) ? 2 : 3;
+    const rank = rankYoutubeCaptionText(visible, cue.text);
     if (rank === 3) continue;
     if (rank < selectedRank || (rank === selectedRank && (!selected || cue.startMs > selected.startMs))) {
       selected = cue;
@@ -207,10 +372,7 @@ export function selectYoutubeCaptionCue(
   }
   if (selected) return {cue: selected, stale: false};
   // 无当前匹配才判断原生播放器是否残留旧句；找到首个前缀即可停止，不改变跨时段重复句语义。
-  const stale = cues.some(cue => {
-    const text = normalizeVideoCaptionText(cue.text).toLocaleLowerCase();
-    return text.startsWith(visible);
-  });
+  const stale = cues.some(cue => normalizeVideoCaptionText(cue.text).toLocaleLowerCase().startsWith(visible));
   return {cue: null, stale};
 }
 

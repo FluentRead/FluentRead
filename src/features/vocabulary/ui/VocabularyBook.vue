@@ -8,7 +8,7 @@
  -->
 <template>
   <div class="vocabulary-book">
-    <VocabularyStudy v-if="studyEntry" :key="studyEntry.id" :entry="studyEntry" :reference="entryTranslation(studyEntry)" :playing="playingEntryId === studyEntry.id" @updated="replaceEntry" @close="selectedEntryId = ''" @speak="toggleEntrySpeech(studyEntry)" @navigate="emit('navigate', $event)" />
+    <VocabularyStudy v-if="studyEntry" :key="studyEntry.id" :entry="studyEntry" :reference="entryTranslation(studyEntry)" :playing="playingEntryId === studyEntry.id" :speech-phase="playingEntryId === studyEntry.id ? speechPhase : 'idle'" @updated="replaceEntry" @close="selectedEntryId = ''" @speak="toggleEntrySpeech(studyEntry)" @navigate="emit('navigate', $event)" />
     <template v-else>
     <div v-if="!reviewActive && !entries.length && betaEnabled && !selectionTranslatorEnabled" class="selection-reminder" role="note">
       <span>{{ t('learning.collection.emptyHint') }}</span>
@@ -39,7 +39,7 @@
           <button v-if="!reviewAnswerVisible" class="reveal-button" type="button" @click="reviewAnswerVisible = true">显示答案 <kbd>Space</kbd></button>
 
           <div v-else class="review-answer">
-            <div class="answer-heading"><h3 data-i18n-ignore>{{ currentReview.term }}</h3><button class="vocabulary-speak" type="button" :aria-label="playingEntryId === currentReview.id ? '停止朗读' : '朗读原文'" :title="playingEntryId === currentReview.id ? '停止朗读' : '朗读原文'" @click="toggleEntrySpeech(currentReview)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7h4l4-3v12l-4-3H3z" /><path :d="playingEntryId === currentReview.id ? 'M14 7v6m3-6v6' : 'M14 7a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12'" /></svg></button><span v-if="currentReview.phonetic">{{ currentReview.phonetic }}</span></div>
+            <div class="answer-heading"><h3 data-i18n-ignore>{{ currentReview.term }}</h3><button class="vocabulary-speak" type="button" :aria-label="playingEntryId === currentReview.id ? '停止朗读' : '朗读原文'" :title="playingEntryId === currentReview.id ? '停止朗读' : '朗读原文'" :aria-pressed="playingEntryId === currentReview.id" :aria-busy="playingEntryId === currentReview.id && speechPhase === 'requesting'" @click="toggleEntrySpeech(currentReview)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7h4l4-3v12l-4-3H3z" /><path :d="playingEntryId === currentReview.id ? 'M14 7v6m3-6v6' : 'M14 7a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12'" /></svg></button><span v-if="currentReview.phonetic">{{ currentReview.phonetic }}</span></div>
             <p v-if="recallDraft" class="recall-attempt">你的回忆：<span data-i18n-ignore>{{ recallDraft }}</span></p>
             <span v-if="!entryTranslation(currentReview) || hasDistinctTranslation(currentReview.term, entryTranslation(currentReview))" class="answer-reference-label">收藏时的参考内容</span>
             <ReadingAnswer v-if="hasDistinctTranslation(currentReview.term, entryTranslation(currentReview))" :text="entryTranslation(currentReview)" />
@@ -171,7 +171,7 @@ import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import UiSelect from '@/src/ui/components/UiSelect.vue';
 import {applyInterfaceTheme} from '@/src/ui/interfaceAppearance'
 import {useUiI18n} from '@/src/ui/i18n';
-import {ElOption} from 'element-plus';
+import {ElMessageBox, ElOption} from 'element-plus';
 
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, watch } from 'vue';
 import VocabularyStudy from './VocabularyStudy.vue';
@@ -179,12 +179,12 @@ import CollectionEntry from './CollectionEntry.vue';
 import VocabularySource from './VocabularySource.vue';
 import {vocabularySourceContext, vocabularySourceLink} from '../source';
 import {ReadingAnswer} from '@/src/features/reading-assistant/ui/answer/public';
-import {ElMessageBox} from 'element-plus';
 import browser from 'webextension-polyfill';
 import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
-import {createSelectionTtsClientRequestId, createSelectionTtsContentController, normalizeSpeechLanguage} from '@/src/features/selection-translation/speech/public';
+import {createSelectionTtsClientRequestId, createSelectionTtsContentController, loadBrowserSpeechVoices, normalizeSpeechLanguage, selectBrowserSpeechVoice} from '@/src/features/selection-translation/speech/public';
 import {normalizeLocalTtsMode} from '@/src/core/config/localTts';
+import {normalizeSelectionTtsRate} from '@/src/core/config/selectionTts';
 import {
   config as runtimeConfig,
   configReady,
@@ -385,8 +385,19 @@ function prepareEntryAudioContext(): AudioContext | null {
   } catch { return null; }
 }
 
-async function playEntryAudioBytes(bytes: Uint8Array, contentType: string, generation: number, fallback: 'google' | 'browser' = 'google'): Promise<'playing' | 'stale' | 'fallback'> {
+function currentSpeechRate(): number {
+  return normalizeSelectionTtsRate(runtimeConfig.selectionTtsRate);
+}
+
+async function playEntryAudioBytes(
+  bytes: Uint8Array,
+  contentType: string,
+  generation: number,
+  fallback: 'google' | 'browser' = 'google',
+  playbackRate = currentSpeechRate(),
+): Promise<'playing' | 'stale' | 'fallback'> {
   if (generation !== speechRequestGeneration) return 'stale';
+  const safePlaybackRate = Math.round(Math.min(4, Math.max(0.25, Number.isFinite(playbackRate) && playbackRate > 0 ? playbackRate : 1)) * 100) / 100;
   if (entryAudioContext && entryAudioContext.state !== 'closed') {
     await entryAudioContext.resume();
     if (generation !== speechRequestGeneration) return 'stale';
@@ -396,6 +407,7 @@ async function playEntryAudioBytes(bytes: Uint8Array, contentType: string, gener
     if (generation !== speechRequestGeneration) return 'stale';
     const source = entryAudioContext.createBufferSource();
     source.buffer = buffer;
+    if (source.playbackRate) source.playbackRate.value = safePlaybackRate;
     source.connect(entryAudioContext.destination);
     source.onended = () => { if (entryAudioSource === source) stopEntrySpeech(false); };
     entryAudioSource = source;
@@ -406,6 +418,7 @@ async function playEntryAudioBytes(bytes: Uint8Array, contentType: string, gener
   const audioUrl = URL.createObjectURL(new Blob([asArrayBufferBytes(bytes)], {type: contentType || 'audio/mpeg'}));
   entryAudioUrl = audioUrl;
   const audio = new Audio(audioUrl);
+  audio.playbackRate = safePlaybackRate;
   entryAudio = audio;
   audio.onended = () => { if (entryAudio === audio) stopEntrySpeech(false); };
   let failureHandled = false;
@@ -438,24 +451,18 @@ function stopEntrySpeech(notifyRemote = true): void {
   speechPhase.value = 'idle';
 }
 
-function speakEntryWithBrowser(entry: VocabularyEntry, generation = speechRequestGeneration, failureContext = ''): boolean {
+function startBrowserEntryUtterance(
+  entry: VocabularyEntry,
+  voices: readonly SpeechSynthesisVoice[],
+  generation: number,
+  failureContext: string,
+): boolean {
   if (generation !== speechRequestGeneration) return false;
-  if (entryUtterance) return true;
-  if (normalizeLocalTtsMode(runtimeConfig.selectionTtsMode) === 'local-only') {
-    stopEntrySpeech(false); showToast('本地语音生成失败，请重试'); return false;
-  }
-  // 远端失败后的结束消息或 page.play 的迟到拒绝不能再停止或重复当前浏览器回退。
-  speechController.stop(false);
-  releaseEntryAudio();
-  if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
-    stopEntrySpeech(false);
-    showToast('当前环境无法朗读，请稍后重试。'); return false;
-  }
   try {
     const utterance = new SpeechSynthesisUtterance(entry.term);
     utterance.lang = normalizeSpeechLanguage(entry.sourceLanguage);
-    const voices = window.speechSynthesis.getVoices();
-    utterance.voice = voices.find(voice => voice.lang.toLowerCase() === utterance.lang.toLowerCase()) ?? null;
+    utterance.rate = currentSpeechRate();
+    utterance.voice = selectBrowserSpeechVoice(voices, utterance.lang) ?? null;
     utterance.onstart = () => {
       if (entryUtterance !== utterance) return;
       speechPhase.value = 'playing';
@@ -479,13 +486,49 @@ function speakEntryWithBrowser(entry: VocabularyEntry, generation = speechReques
       window.speechSynthesis.cancel();
       entryUtterance = null;
       playingEntryId.value = '';
+      speechPhase.value = 'idle';
       entrySpeechWatchdog = null;
       showToast(t('learning.collection.speechBrowserNotStarted', {details: failureContext ? `；${failureContext}` : ''}), false, 10000);
     }, 8000);
     return true;
-  } catch (cause) { if (generation === speechRequestGeneration) { entryUtterance = null; playingEntryId.value = ''; showToast(t('learning.collection.speechBrowserCallFailed', {
-    error: speechErrorText(cause), details: failureContext ? `；${failureContext}` : '',
-  }), false, 10000); } return false; }
+  } catch (cause) {
+    if (generation === speechRequestGeneration) {
+      entryUtterance = null;
+      playingEntryId.value = '';
+      speechPhase.value = 'idle';
+      showToast(t('learning.collection.speechBrowserCallFailed', {
+        error: speechErrorText(cause), details: failureContext ? `；${failureContext}` : '',
+      }), false, 10000);
+    }
+    return false;
+  }
+}
+
+function speakEntryWithBrowser(entry: VocabularyEntry, generation = speechRequestGeneration, failureContext = ''): boolean {
+  if (generation !== speechRequestGeneration) return false;
+  if (entryUtterance) return true;
+  if (normalizeLocalTtsMode(runtimeConfig.selectionTtsMode) === 'local-only') {
+    stopEntrySpeech(false); showToast('本地语音生成失败，请重试'); return false;
+  }
+  // 远端失败后的结束消息或 page.play 的迟到拒绝不能再停止或重复当前浏览器回退。
+  speechController.stop(false);
+  releaseEntryAudio();
+  if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+    stopEntrySpeech(false);
+    showToast('当前环境无法朗读，请稍后重试。'); return false;
+  }
+  const synth = window.speechSynthesis;
+  const initialVoices = synth.getVoices?.() ?? [];
+  if (initialVoices.length > 0 || typeof synth.addEventListener !== 'function') {
+    return startBrowserEntryUtterance(entry, initialVoices, generation, failureContext);
+  }
+  playingEntryId.value = entry.id;
+  speechPhase.value = 'requesting';
+  void loadBrowserSpeechVoices(synth).then((voices) => {
+    if (generation !== speechRequestGeneration || entryUtterance) return;
+    startBrowserEntryUtterance(entry, voices, generation, failureContext);
+  });
+  return true;
 }
 
 function speechErrorText(cause: unknown): string {
@@ -499,11 +542,12 @@ async function toggleEntrySpeech(entry: VocabularyEntry): Promise<void> {
   if (wasPlaying) return;
   prepareEntryAudioContext();
   const generation = speechRequestGeneration;
+  const rate = currentSpeechRate();
   playingEntryId.value = entry.id;
   speechPhase.value = 'requesting';
   const remote = speechController.beginRemoteRequest();
   try {
-    const response = await browser.runtime.sendMessage({type: 'selectionTts', text: entry.term, language: normalizeSpeechLanguage(entry.sourceLanguage), clientRequestId: remote.clientRequestId}) as {success?: boolean; transport?: 'offscreen' | 'page'; audioBase64?: string; contentType?: string; error?: string; errorCode?: string};
+    const response = await browser.runtime.sendMessage({type: 'selectionTts', text: entry.term, language: normalizeSpeechLanguage(entry.sourceLanguage), rate, clientRequestId: remote.clientRequestId}) as {success?: boolean; transport?: 'offscreen' | 'page'; audioBase64?: string; contentType?: string; source?: unknown; synthesizedRate?: unknown; error?: string; errorCode?: string};
     const result = speechController.completeRemoteRequest(remote, response);
     if (result === 'stale' || generation !== speechRequestGeneration) return;
     if (result === 'offscreen') { speechPhase.value = 'playing'; return; }
@@ -514,7 +558,11 @@ async function toggleEntrySpeech(entry: VocabularyEntry): Promise<void> {
     }
     const binary = atob(response.audioBase64);
     const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
-    await playEntryAudioBytes(bytes, response.contentType || 'audio/mpeg', generation);
+    const bakedRate = typeof response.synthesizedRate === 'number' && Number.isFinite(response.synthesizedRate) && response.synthesizedRate > 0
+      ? response.synthesizedRate
+      : (response.source === 'youdao' || response.source === 'google' ? 1 : rate);
+    const effectivePlaybackRate = Math.min(4, Math.max(0.25, rate / bakedRate));
+    await playEntryAudioBytes(bytes, response.contentType || 'audio/mpeg', generation, 'google', effectivePlaybackRate);
   } catch (cause) {
     const current = speechController.rejectRemoteRequest(remote);
     if (current && generation === speechRequestGeneration) await fallbackEntrySpeech(entry, generation,
@@ -542,10 +590,11 @@ async function fallbackEntrySpeech(entry: VocabularyEntry, generation: number, p
 async function speakEntryWithGoogle(entry: VocabularyEntry, generation: number): Promise<string | null> {
   if (generation !== speechRequestGeneration) return t('learning.collection.speechCancelled');
   releaseEntryAudio();
+  const rate = currentSpeechRate();
   const remote = speechController.beginRemoteRequest();
   try {
     const response = await browser.runtime.sendMessage({type: 'selectionTtsGoogle', text: entry.term,
-      language: normalizeSpeechLanguage(entry.sourceLanguage), clientRequestId: remote.clientRequestId}) as {success?: boolean; transport?: 'offscreen' | 'page'; audioBase64?: string; contentType?: string; error?: string};
+      language: normalizeSpeechLanguage(entry.sourceLanguage), rate, clientRequestId: remote.clientRequestId}) as {success?: boolean; transport?: 'offscreen' | 'page'; audioBase64?: string; contentType?: string; error?: string};
     const result = speechController.completeRemoteRequest(remote, response);
     if (generation !== speechRequestGeneration) return t('learning.collection.speechCancelled');
     if (result === 'offscreen') { playingEntryId.value = entry.id; speechPhase.value = 'playing'; return null; }
@@ -553,7 +602,7 @@ async function speakEntryWithGoogle(entry: VocabularyEntry, generation: number):
     if (result === 'page' && response.audioBase64) {
       const binary = atob(response.audioBase64);
       const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
-      const playback = await playEntryAudioBytes(bytes, response.contentType || 'audio/mpeg', generation, 'browser');
+      const playback = await playEntryAudioBytes(bytes, response.contentType || 'audio/mpeg', generation, 'browser', rate);
       return playback === 'stale' ? t('learning.collection.speechCancelled') : null;
     }
     return response.error || t('learning.collection.speechGoogleNoAudio');
@@ -1117,6 +1166,7 @@ onBeforeUnmount(() => {
   if (toastTimer !== null) window.clearTimeout(toastTimer);
   if (timeRefreshTimer !== null) window.clearTimeout(timeRefreshTimer);
   if (entryAudioContext && entryAudioContext.state !== 'closed') void entryAudioContext.close().catch(() => undefined);
+  entryAudioContext = null;
 });
 </script>
 

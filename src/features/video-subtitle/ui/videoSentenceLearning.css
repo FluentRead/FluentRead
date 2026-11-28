@@ -132,7 +132,7 @@
   scrollbar-width: thin; scrollbar-color: #66708366 transparent;
 }
 #fluent-read-video-learning-panel[data-short-height=true] .fr-video-learning-header {
-  position: sticky; top: 0; z-index: 2; background: var(--fr-video-menu-surface);
+  position: sticky; top: 0; z-index: 2; background: var(--fluent-read-video-learning-background, var(--fr-video-menu-surface));
 }
 #fluent-read-video-learning-panel[data-short-height=true] .fr-video-learning-body { overflow: visible; }
 #fluent-read-video-learning-panel[data-short-height=true] .fr-video-learning-position { max-height: none; overflow: visible; }
@@ -158,14 +158,15 @@
 #fluent-read-video-learning-panel .fr-video-learning-resize-handle span { width: 38px; height: 4px; border-radius: 99px; background: currentColor; opacity: .65; }
 #fluent-read-video-learning-panel .fr-video-learning-resize-handle:focus-visible { outline: 2px solid var(--fr-learning-accent); outline-offset: -3px; }
 @media (any-pointer: coarse) {
-  #fluent-read-video-learning-panel[data-floating=true] .fr-video-learning-resize-handle { height: 36px; }
+  #fluent-read-video-learning-panel[data-floating=true] .fr-video-learning-resize-handle { height: 44px; }
 }
 #fluent-read-video-learning-panel[data-floating=true] .fr-video-learning { height: 100%; }
+#fluent-read-video-learning-panel[data-floating=true] .fr-video-learning.is-collapsed { height: auto; }
 
 #fluent-read-video-learning-panel .fr-video-learning button.fr-video-learning-word { display: inline; min-height: 0; min-width: 0; padding: 0; margin: 0; line-height: inherit; vertical-align: baseline; border: 0; border-radius: 2px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 #fluent-read-video-learning-panel .fr-video-learning button.fr-video-learning-word:hover, #fluent-read-video-learning-panel .fr-video-learning button.fr-video-learning-word:focus-visible { background: var(--fr-video-menu-brand-soft); outline: 1px solid var(--fr-learning-accent); }
 #fluent-read-video-learning-panel .fr-video-learning-word-popup { position: relative; padding: 12px; border: 1px solid var(--fr-video-menu-border); border-radius: 8px; background: var(--fr-video-menu-surface); }
-#fluent-read-video-learning-panel .fr-video-learning-word-popup > button { float: right; }
+#fluent-read-video-learning-panel .fr-video-learning-word-popup > .fr-video-learning-icon { float: right; }
 #fluent-read-video-learning-panel .fr-video-learning-word-popup p { margin: 6px 0; }
 #fluent-read-video-learning-panel .fr-video-learning-transcript-scroll { height: 224px; overflow: auto; overscroll-behavior: contain; }
 #fluent-read-video-learning-panel .fr-video-learning .fr-video-learning-transcript-scroll button { position: absolute; display: block; width: 100%; height: 56px; overflow: hidden; padding: 6px 8px; border: 0; text-align: start; background: transparent; color: inherit; font: inherit; cursor: pointer; }

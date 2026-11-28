@@ -43,89 +43,17 @@ function settingsGroupTitles(content: string): string[] {
     .map((match) => match[1])
 }
 
-function minimalPopupSpacing(viewportWidth: number, skin: string, dark: boolean, footerLast: boolean) {
-  const { document } = parseHTML(`<html data-interface-skin="${skin}" class="${dark ? 'dark' : ''}">
-    <head><style>${source('src/ui/styles/interface-skins/minimal.css')}</style></head>
-    <body><main class="popup-shell"><div class="popup-content">
-      <footer data-popup-module-last="${footerLast}"></footer>
-    </div></main></body></html>`)
-  const rules = document.querySelector('style')!.sheet!.cssRules
-
-  // 解析真实 CSS 的像素间距与媒体覆盖，不模拟浏览器布局；渲染后的边界另由生产 UI 套件验证。
-  function spacingFor(selector: string) {
-    const element = document.querySelector(selector)!
-    const spacing = { 'padding-left': 0, 'padding-right': 0, 'margin-left': 0, 'margin-right': 0 }
-    function applyRules(cssRules: CSSRuleList) {
-      for (const rule of Array.from(cssRules)) {
-        if (rule.type === 4) {
-          const media = rule as CSSMediaRule
-          const maxWidth = media.conditionText.match(/^\(max-width:\s*(\d+)px\)$/u)
-          if (!maxWidth) throw new Error(`Unsupported spacing media query: ${media.conditionText}`)
-          if (viewportWidth <= Number(maxWidth[1])) applyRules(media.cssRules)
-          continue
-        }
-        if (rule.type !== 1) continue
-        const styleRule = rule as CSSStyleRule
-        if (!element.matches(styleRule.selectorText)) continue
-        for (let index = 0; index < styleRule.style.length; index += 1) {
-          const property = styleRule.style[index]
-          if (!(property in spacing) && property !== 'padding' && property !== 'margin') continue
-          const values = styleRule.style.getPropertyValue(property).trim().split(/\s+/u).map(value => {
-            if (!/^(?:-?\d+(?:\.\d+)?px|0)$/u.test(value)) throw new Error(`Unsupported spacing: ${value}`)
-            return Number.parseFloat(value)
-          })
-          if (property === 'padding' || property === 'margin') {
-            spacing[`${property}-left`] = values[3] ?? values[1] ?? values[0]
-            spacing[`${property}-right`] = values[1] ?? values[0]
-          } else {
-            spacing[property as keyof typeof spacing] = values[0]
-          }
-        }
-      }
-    }
-    applyRules(rules)
-    return spacing
-  }
-  return { shell: spacingFor('.popup-shell'), footer: spacingFor('footer') }
-}
-
 describe('options UI composition architecture', () => {
-  it('keeps persistent all-node recognition in advanced settings using the shared config and localized switch', () => {
+  it('keeps persistent all-node recognition in webpage translation strategy using the shared config and localized switch', () => {
     const sections = source('src/features/settings/ui/SettingsSections.vue')
-    const advanced = activeSectionSource(sections, 'settings-advanced')
-    expect(advanced).toContain('<SettingsGroup :title="t(\'settings.pageRecognition.title\')">')
-    expect(advanced).toContain(':label="t(\'settings.pageRecognition.allNodes\')"')
-    expect(advanced).toContain(':description="t(\'settings.pageRecognition.description\')"')
-    expect(advanced).toContain('v-model="config.translationScope" active-value="all" inactive-value="content"')
-    expect(advanced).toContain(':aria-label="t(\'settings.pageRecognition.allNodes\')"')
+    const translation = activeSectionSource(sections, 'settings-translation')
+    expect(translation).toContain('id="page-recognition-settings"')
+    expect(translation).toContain(':label="t(\'settings.pageRecognition.allNodes\')"')
+    expect(translation).toContain(':description="t(\'settings.pageRecognition.description\')"')
+    expect(translation).toContain('v-model="config.translationScope" active-value="all" inactive-value="content"')
+    expect(translation).toContain(':aria-label="t(\'settings.pageRecognition.allNodes\')"')
     expect(sections.match(/v-model="config\.translationScope"/gu)).toHaveLength(1)
     expect(source('src/app/popup/PopupApp.vue')).not.toContain('translationScope')
-  })
-
-  it.each([380, 400, 420, 421, 900])('keeps the minimal last footer inside its shell at a %ipx viewport', viewportWidth => {
-    for (const dark of [false, true]) {
-      const { shell, footer } = minimalPopupSpacing(viewportWidth, 'minimal', dark, true)
-      const shellWidth = 380
-      const left = shell['padding-left'] + footer['margin-left']
-      const right = shellWidth - shell['padding-right'] - footer['margin-right']
-
-      expect(left).toBe(0)
-      expect(right).toBe(shellWidth)
-      expect(shell['padding-left']).toBe(viewportWidth <= 420 ? 12 : 16)
-      expect(shell['padding-right']).toBe(viewportWidth <= 420 ? 12 : 16)
-    }
-  })
-
-  it.each([400, 900])('preserves inset footers and does not apply minimal spacing to the default skin at %ipx', viewportWidth => {
-    const { shell, footer } = minimalPopupSpacing(viewportWidth, 'minimal', false, false)
-    expect(footer['margin-left']).toBe(0)
-    expect(footer['margin-right']).toBe(0)
-    expect(shell['padding-left']).toBe(viewportWidth <= 420 ? 12 : 16)
-    for (const dark of [false, true]) {
-      const defaultSpacing = minimalPopupSpacing(viewportWidth, 'default', dark, true)
-      expect(Object.values(defaultSpacing.shell)).toEqual([0, 0, 0, 0])
-      expect(Object.values(defaultSpacing.footer)).toEqual([0, 0, 0, 0])
-    }
   })
 
   it('keeps cache management inside advanced settings without another navigation or popup surface', () => {
@@ -281,8 +209,8 @@ describe('options UI composition architecture', () => {
     const popupEntry = source('src/app/popup/index.ts')
     const optionsEntry = source('src/app/options/index.ts')
     const skinStyles = source('src/ui/styles/interface-skins.css')
-    const minimalSkinStyles = source('src/ui/styles/interface-skins/minimal.css')
-    const paletteSkinStyles = source('src/ui/styles/interface-skins/palette.css')
+    const baseSkinStyles = source('src/ui/styles/interface-skins/popup-skins-base.css')
+    const themeSkinStyles = source('src/ui/styles/interface-skins/popup-skins-themes.css')
     const interfaceAppearance = source('src/ui/interfaceAppearance.ts')
     const popupHtml = source('entrypoints/popup/index.html')
     const configManagement = source('src/features/settings/ui/ConfigManagement.vue')
@@ -354,17 +282,24 @@ describe('options UI composition architecture', () => {
     expect(interfaceSettings).toContain('withPopupQuickFeatureVisibility(')
     expect(interfaceSettings).toContain('popupModuleOptions.map')
     expect(interfaceSettings).toContain('popupQuickFeatureOptions.map')
+    expect(optionsApp).not.toContain('applyInterfaceSkin')
+    expect(interfaceSettings).toContain('class="popup-skin-studio"')
     expect(interfaceSettings).toContain('class="interface-skin-option"')
-    expect(interfaceSettings).toContain('<template #copy>')
     expect(interfaceSettings).toContain('<InterfaceSkinPreview')
     expect(interfaceSettings).toContain('selectedSkinOption')
+    expect(interfaceSettings).toContain('activePreviewSkin')
     expect(interfaceSettings).toContain(':aria-label="translateLegacy(\'弹窗风格\')"')
     expect(interfaceSettings).toContain('const {t, translateLegacy} = useUiI18n()')
     expect(settingsItem).toContain('<slot name="copy">')
-    expect(interfaceSkinPreview).toContain('class="interface-skin-live-preview"')
+    expect(interfaceSkinPreview).toContain('class="interface-skin-live-preview popup-skin-scope"')
+    expect(interfaceSkinPreview).toContain(':data-interface-skin="skin.value"')
+    expect(interfaceSkinPreview).toContain(':data-popup-theme="effectiveTheme"')
     expect(interfaceSkinPreview).toContain(':data-preview-skin="skin.value"')
-    // 风格预览和菜单栏布局预览共用同一份真实 DOM 的菜单栏还原，两处不会再各画一套。
+    // 风格预览和菜单栏布局预览共用同一份真实 DOM 的菜单栏还原，并通过 .popup-skin-scope 与 Options 彻底隔离。
     expect(interfaceSkinPreview).toContain('<PopupPreview :skin="skin"')
+    expect(popupLayoutPreview).toContain('class="popup-layout-live-preview popup-skin-scope"')
+    expect(popupLayoutPreview).toContain(':data-interface-skin="skin.value"')
+    expect(popupLayoutPreview).toContain(':data-popup-theme="effectiveTheme"')
     expect(popupLayoutPreview).toContain('<PopupPreview')
     expect(popupLayoutPreview).toContain(':modules="visibleModules"')
     expect(popupLayoutPreview).toContain(':quick-features="visibleQuickFeatures"')
@@ -409,34 +344,23 @@ describe('options UI composition architecture', () => {
     expect(popupSiteRule).toContain('data-popup-module="siteRule"')
     expect(popupEntry).toContain("@/src/ui/styles/interface-skins.css")
     expect(optionsEntry).toContain("@/src/ui/styles/interface-skins.css")
+    expect(popupHtml).toContain('data-popup-root')
     expect(popupHtml).toContain('class="popup-page"')
     expect(skinStyles).toContain('body.popup-page')
     expect(skinStyles).toContain('data-popup-height="content"')
     expect(skinStyles).toContain('min-height: 0')
-    const nonDefaultSkins = ['minimal', 'compact', 'contrast', 'qinghua', 'zhusha', 'shuimo', 'zhuqing', 'ouhe', 'xiangse', 'qinglv', 'yuebai', 'xuanqing', 'wujin']
-    for (const skin of nonDefaultSkins) {
-      expect(skinStyles).toContain(`./interface-skins/${skin}.css`)
-      expect(source(`src/ui/styles/interface-skins/${skin}.css`)).toContain(`data-interface-skin="${skin}"`)
+    expect(skinStyles).toContain('./interface-skins/popup-skins-base.css')
+    expect(skinStyles).toContain('./interface-skins/popup-skins-themes.css')
+    const craftSkins = ['liquid-glass', 'aurora', 'tactile', 'brutalist', 'cyber', 'retro-os', 'terminal', 'editorial', 'sakura', 'matcha', 'midnight-gold']
+    for (const skin of craftSkins) {
+      expect(themeSkinStyles).toContain(`data-interface-skin="${skin}"`)
     }
-    expect(skinStyles).toContain('./interface-skins/palette.css')
-    expect(skinStyles).not.toContain('./interface-skins/plain.css')
-    expect(skinStyles).not.toContain('./interface-skins/soft.css')
-    expect(minimalSkinStyles).toContain('data-interface-skin="minimal"')
-    expect(minimalSkinStyles).toContain('overflow-wrap: anywhere')
-    expect(minimalSkinStyles).not.toContain('.beta-badge')
-    expect(paletteSkinStyles).not.toContain('.beta-badge')
-    // 品牌图标在任何风格下都保持原样：简约风格只调整它的尺寸，不再降低不透明度。
-    expect(minimalSkinStyles).not.toMatch(/\.brand img \{[^}]*(?:opacity|filter)/)
-    expect(minimalSkinStyles).not.toContain('saturate(')
-    expect(minimalSkinStyles).toContain('background: color-mix(in srgb, var(--brand) 16%, var(--surface-soft))')
-    // 简约风格的主操作是中性浅灰，不带品牌色底。
-    expect(minimalSkinStyles).not.toContain('background: color-mix(in srgb, var(--brand) 5%, var(--surface-soft))')
-    expect(minimalSkinStyles).toContain('.translate-button.translated .translate-hotkey')
-    expect(paletteSkinStyles).toContain('data-interface-skin-kind="palette"')
-    expect(paletteSkinStyles).toContain('.settings-card .service-catalog')
-    expect(paletteSkinStyles).toContain('.image-ocr-recommendation')
-    expect(paletteSkinStyles).toContain('.settings-card.vocabulary-view .vocabulary-book')
-    expect(paletteSkinStyles).toContain('--el-bg-color: var(--surface)')
+    expect(baseSkinStyles).toContain('data-interface-skin-kind="craft"')
+    expect(baseSkinStyles).toContain('--el-bg-color: var(--skin-surface)')
+    expect(baseSkinStyles).not.toContain('.settings-card')
+    expect(baseSkinStyles).not.toMatch(/\.sidebar(?:\s|\{|,|\.)/u)
+    expect(baseSkinStyles).not.toContain('.vocabulary-book')
+    expect(themeSkinStyles).not.toContain('.settings-card')
     expect(interfaceAppearance).toContain('dataset.interfaceSkinKind = skin.kind')
     expect(interfaceAppearance).toContain("style.setProperty('--interface-popup-width'")
     expect(settingsSections).toContain('<ImageOcrSettings v-if="viewActive && props.activeSection === \'settings-image-translation\'" compact embedded :active="config.imageTranslationOcrEngine === \'tesseract\'" v-model:source-language="config.from" />')
@@ -643,7 +567,7 @@ describe('options UI composition architecture', () => {
     expect(drawerSections).toBeDefined()
     expect(Object.fromEntries([...drawerSections!.matchAll(/(\w+):\s*'([^']+)'/gu)]
       .map(([, drawer, section]) => [drawer, section]))).toEqual({
-      services: 'settings-services', aiContext: 'settings-general', hover: 'settings-translation',
+      services: 'settings-services', aiContext: 'settings-translation', hover: 'settings-translation',
       selection: 'settings-selection', appearance: 'settings-interface', image: 'settings-image-translation',
     })
     const popupTemplate = popup.match(/^<template>([\s\S]*?)^<\/template>/mu)?.[1]
@@ -660,9 +584,9 @@ describe('options UI composition architecture', () => {
     expect(playerMenu).toContain('button.disabled = !state.available || state.checking || downloading')
     expect(playerMenu).toContain("!state.available ? 'video.aiUnavailable'")
     const navigation = source('src/features/settings/model/navigation.ts')
-    expect(navigation).toContain("description: 'YouTube/X 边看边译'")
+    expect(navigation).toContain("description: 'YouTube/X 边看边译与外观'")
     expect(navigation).toContain('视频与网页会议的双语字幕')
-    expect(navigation).toContain('YouTube、X、Twitter、视频字幕、本地 AI、Whisper')
+    expect(navigation).toContain('YouTube、X、Twitter、Bilibili、Udemy、edX、视频字幕')
     expect(videoModelSettings).toMatch(/\.capability-warning\s*\{[^}]*color:\s*var\(--el-color-danger\)/u)
     expect(settingsSections).toContain('VIDEO_SOURCE_LANGUAGE_OPTIONS')
     // Resource guidance is localized; assert the live key and its Chinese catalog entry.
@@ -679,7 +603,7 @@ describe('options UI composition architecture', () => {
     expect(videoAppearanceSettings).toContain('data-video-subtitle-preview')
     expect(videoAppearanceSettings).toContain('subtitle-appearance-advanced')
     expect(videoAppearanceSettings).toContain('恢复默认')
-    expect(settingsSections).toContain('<SettingsGroup title="X 本地 AI 字幕"')
+    expect(settingsSections).toContain(":title=\"t('settings.video.localAiSummary')\"")
     expect(settingsSections).toContain('<VideoSubtitleAppearanceSettings :config="config" />')
     expect(settingsSections).toContain('config.videoSourceLanguage')
     expect(videoAppearanceSettings).toContain('config.videoSubtitleAppearance.fontScale')
@@ -709,7 +633,8 @@ describe('options UI composition architecture', () => {
     expect(popup).toContain("import PopupSiteRule from './PopupSiteRule.vue'")
     expect(popupStyles).toContain('.popup-content > [data-popup-module] + .hero-card')
     expect(popupStyles).toContain('footer[data-popup-module-last="false"]')
-    expect(minimalSkinStyles).toContain('.popup-content > footer[data-popup-module-last="true"]')
+    expect(baseSkinStyles).toContain(':root[data-popup-root][data-interface-skin-kind="craft"][data-interface-skin] footer')
+    expect(themeSkinStyles).toContain('[data-interface-skin="liquid-glass"]')
     expect(popup).toContain('popupUsesContentHeight')
     expect(popup).toContain('interfaceSkinUsesContentHeight(config.value.interfaceSkin)')
     expect(popup).not.toContain("config.value.interfaceSkin === 'minimal'")
@@ -1034,7 +959,7 @@ describe('options UI composition architecture', () => {
       expect(group.match(/data-configuration-group=/gu)).toHaveLength(1)
       expect(connectionGroup).not.toContain(group)
     }
-    expect(serviceConfiguration).toContain('<Teleport v-if="connectionActionTarget && !publicPlanBlocked && !browserTranslationUnavailable" :to="connectionActionTarget">')
+    expect(serviceConfiguration).toContain('<Teleport v-if="connectionActionTarget && !publicPlanBlocked && !browserTranslationUnavailable && service !== services.localTranslation" :to="connectionActionTarget">')
     expect(catalog).toContain('class="hero-connection-action"')
     expect(apiKeyList).not.toContain('data-connection-test-button')
     expect(serviceConfiguration).toContain(':disabled="connectionTestDisabled"')
@@ -1081,18 +1006,15 @@ describe('options UI composition architecture', () => {
     expect(promptEditor).toContain('@mousedown.prevent')
   })
 
-  it('prioritizes basic configuration before webpage assistance and basic preferences in General', () => {
+  it('prioritizes basic configuration before basic preferences and feature services in General', () => {
     const settings = source('src/features/settings/ui/SettingsSections.vue')
     const general = activeSectionSource(settings, 'settings-general')
     const services = activeSectionSource(settings, 'settings-services')
     const styles = sourceBody('src/features/settings/ui/settings-sections.css')
 
-    expect(settingsGroupTitles(general)).toEqual(['基础配置', "t('settings.general.assistance')", "t('settings.general.preferences')"])
+    expect(settingsGroupTitles(general)).toEqual(['基础配置', "t('settings.general.preferences')"])
     expect(general).not.toContain('class="settings-subgroup-heading"')
     expect(general).not.toContain('id="translated-display-heading"')
-    expect(general).toContain('data-testid="open-translation-settings"')
-    expect(general).toContain('data-testid="open-floating-ball-settings"')
-    expect(general).toContain("openSettingsSection('settings-translation', 'floating-ball-settings')")
     expect(general).toContain('data-testid="default-translation-service-card"')
     expect(general).toContain(':data-default-service="config.service"')
     expect(general).toContain('data-testid="translation-language-setting"')
@@ -1106,19 +1028,10 @@ describe('options UI composition architecture', () => {
     expect(general).toContain('<template #prefix><ServiceIcon :service="config.service" :label="defaultTextServiceLabel" size="small"')
     expect(general).toContain('aria-label="默认网页翻译服务"')
     expect(general).toContain('defaultTextServiceLabel')
-    expect(general).toContain(":aria-label=\"t('popup.aiContext.settingsTitle')\"")
-    const aiContextSwitch = general.match(/<el-switch\b[^>]*v-model="config.enableAIContext"[^>]*\/>/u)?.[0]
-    expect(aiContextSwitch).toBeDefined()
-    expect(aiContextSwitch).not.toContain(':disabled')
     expect(general).toContain('label="翻译模式"')
-    // 译文样式、逐句高亮和预览已迁到界面风格页第一组，通用设置只保留跳转入口。
     expect(general).not.toContain('aria-label="译文样式"')
     expect(general).not.toContain('v-model="config.bilingualSentenceHighlightEnabled"')
     expect(general).not.toContain('data-testid="bilingual-highlight-preview"')
-    expect(general).toContain('data-testid="open-translation-style-settings"')
-    expect(general).toContain("openSettingsSection('settings-interface')")
-    expect(general).toContain("t('settings.translationStyle.title')")
-    expect(general).toContain('settings-heading-link')
     expect(settings).not.toContain('highlightPreviewSentence')
     expect(settings).not.toContain('styleGroups')
     expect(styles).not.toContain('.style-preview-text')
@@ -1156,13 +1069,11 @@ describe('options UI composition architecture', () => {
     expect(styleSettings).toContain(':class="preset.className"')
     expect(styleSettings).toContain('getTranslationAppearanceStyle(appearance.value)')
     for (const field of ['textColor', 'lineColor', 'fillColor']) expect(styleSettings).toContain(`v-model="appearance.${field}"`)
-    expect(source('src/features/settings/ui/ReadingAssistanceSettings.vue')).not.toContain('v-model="config.bilingualSentenceHighlightEnabled"')
-    expect(source('src/features/settings/ui/ReadingAssistanceSettings.vue')).toContain('data-testid="current-sentence-highlight-style"')
     expect(styleSettings).toContain("t('settings.translationStyle.bilingualOnly')")
     expect(styleSettings).toContain('@click="config.display = 1"')
     expect(styleSettings).toContain('container-type: inline-size')
     // 设置搜索的控件直达目标必须指向真实元素。
-    expect(source('src/features/settings/ui/ReadingAssistanceSettings.vue')).toContain('id="translation-sentence-highlight"')
+    expect(source('src/features/settings/ui/SentenceHighlightStyleSettings.vue')).toContain('id="translation-sentence-highlight"')
     expect(styleSettings).toContain('id="translation-appearance-panel"')
     for (const testId of ['bilingual-highlight-preview', 'bilingual-highlight-preview-source', 'bilingual-highlight-preview-translation']) {
       expect(preview).toContain(`data-testid="${testId}"`)
@@ -1219,31 +1130,35 @@ describe('options UI composition architecture', () => {
     expect(item).toContain(':data-service-value="item.value"')
     expect(item).not.toContain('library-favorite')
     expect(item).toContain('<ServiceIcon')
+    expect(item).toContain('.library-item:has(> .library-select:focus-visible)')
+    expect(item).toContain('.library-select:focus-visible { outline: none; }')
+    expect(source('src/ui/styles/interface-skins/popup-skins-base.css')).not.toContain('.library-item')
+    expect(source('src/ui/styles/interface-skins/popup-skins-themes.css')).not.toContain('.library-item')
   })
 
-  it('keeps translation interactions together in the requested order', () => {
+  it('keeps webpage translation and interactions organized in clear layers', () => {
     const settings = source('src/features/settings/ui/SettingsSections.vue')
     const translation = activeSectionSource(settings, 'settings-translation')
+    const interactions = activeSectionSource(settings, 'settings-interactions')
+    const writing = activeSectionSource(settings, 'settings-writing')
     const inputTranslation = source('src/features/settings/ui/InputTranslationSettings.vue')
     const paragraphCopySettings = source('src/features/settings/ui/ParagraphCopySettings.vue')
     const aiMultiSegmentSettings = source('src/features/settings/ui/AiMultiSegmentSettings.vue')
 
     expect(settingsGroupTitles(translation)).toEqual([
-      '鼠标悬浮翻译',
       '全文翻译',
-      "t('contextMenuSettings.title')",
+      '鼠标悬浮翻译',
     ])
-    expect(translation).toContain("v-if=\"browserCapabilities.browser === 'userscript'\"")
-    expect(translation).toContain('data-userscript-unavailable="context-menu"')
+    expect(interactions).toContain("v-if=\"browserCapabilities.browser === 'userscript'\"")
+    expect(interactions).toContain('data-userscript-unavailable="context-menu"')
+    expect(interactions).toContain('<FloatingBallSettings :config="config"')
+    expect(interactions).toContain('id="floating-ball-settings"')
     expect(translation).toContain('aria-label="鼠标悬浮快捷键"')
     expect(translation).not.toContain("openSettingsSection('settings-selection')")
     expect(activeSectionSource(settings, 'settings-selection')).toContain('label="划词显示内容"')
-    expect(translation).toContain('<InputTranslationSettings')
+    expect(writing).toContain('<InputTranslationSettings')
     expect(inputTranslation.indexOf('data-testid="input-translation-trigger"')).toBeLessThan(inputTranslation.indexOf('data-testid="input-translation-target"'))
-    expect(inputTranslation.indexOf('data-testid="input-translation-target"')).toBeLessThan(inputTranslation.indexOf('data-testid="input-translation-service"'))
     expect(inputTranslation).not.toContain('<el-dialog')
-    expect(inputTranslation).toContain('class="input-translation-service-control"')
-    expect(inputTranslation).toContain('<ServiceIcon')
     expect(translation).toContain('label="全文翻译范围"')
     expect(translation).toContain('<AiMultiSegmentSettings :config="config"')
     expect(aiMultiSegmentSettings).toContain(":aria-label=\"t('settings.fullPage.multiSegmentTitle')\"")
@@ -1255,35 +1170,19 @@ describe('options UI composition architecture', () => {
     expect(translation.match(/:profiles="config\.quickTranslationProfiles"/gu)).toHaveLength(2)
     expect(translation.match(/@update:profiles="config\.quickTranslationProfiles = \$event"/gu)).toHaveLength(2)
 
-    // 悬浮球详细设置属于全文翻译入口，段落复制紧随其后，形成翻译设置的末尾操作区。
-    expect(translation).toContain("<ParagraphCopySettings :config=\"config\" :active=\"viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'paragraph-copy')\" />")
-    expect(translation).toContain('<FloatingBallSettings :config="config" />')
-    expect(translation).toContain('id="floating-ball-settings"')
+    expect(translation).toContain("<ParagraphCopySettings :config=\"config\" :active=\"viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'reading')\" />")
     expect(settingsGroupTitles(paragraphCopySettings)).toEqual(["t('paragraphCopy.settings.title')"])
     expect(paragraphCopySettings).toContain('data-testid="paragraph-copy-hotkey"')
     expect(paragraphCopySettings).toContain('data-testid="paragraph-copy-content"')
-    expect(translation.indexOf('<FloatingBallSettings'))
-      .toBeGreaterThan(translation.indexOf('title="全文翻译"'))
-    expect(translation.indexOf('<ParagraphCopySettings'))
-      .toBeGreaterThan(translation.indexOf('<FloatingBallSettings'))
-    // 局部翻译紧跟段落复制：两者都是“对网页某一块内容”的操作，快捷键冲突提示也相互覆盖。
     const sectionTranslationSettings = source('src/features/settings/ui/SectionTranslationSettings.vue')
-    expect(translation.indexOf('<SectionTranslationSettings :config="config" :active="viewActive && props.activeSection === \'settings-translation\' && (!props.activePanel || props.activePanel === \'section-translation\')" />'))
-      .toBeGreaterThan(translation.indexOf('<ParagraphCopySettings'))
+    expect(translation).toContain("<SectionTranslationSettings :config=\"config\" :active=\"viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'hover')\" />")
     expect(settingsGroupTitles(sectionTranslationSettings)).toEqual(["t('sectionTranslation.settings.title')"])
     expect(sectionTranslationSettings).toContain('data-testid="section-translation-hotkey"')
     expect(sectionTranslationSettings).toContain('v-model="props.config.sectionTranslationHotkeyEnabled"')
     expect(paragraphCopySettings).toContain("feature: t('sectionTranslation.settings.title')")
 
-    const hoverProfiles = translation.indexOf('action="hover"')
-    const fullPageProfiles = translation.indexOf('action="full-page"')
-    const inputTranslationSection = translation.indexOf('<InputTranslationSettings')
-    expect(hoverProfiles).toBeGreaterThan(translation.indexOf('aria-label="悬浮翻译延迟"'))
-    expect(hoverProfiles).toBeLessThan(inputTranslationSection)
-    expect(inputTranslationSection).toBeGreaterThan(hoverProfiles)
-    expect(inputTranslationSection).toBeLessThan(translation.indexOf('title="全文翻译"'))
-    expect(fullPageProfiles).toBeGreaterThan(translation.indexOf('label="全文翻译范围"'))
-    expect(fullPageProfiles).toBeGreaterThan(translation.indexOf('aria-label="右键全文翻译"'))
+    expect(translation.indexOf('action="hover"')).toBeGreaterThan(translation.indexOf('aria-label="悬浮翻译延迟"'))
+    expect(translation.indexOf('action="full-page"')).toBeGreaterThan(translation.indexOf('label="全文翻译范围"'))
   })
 
   it('loads shared tokens before the unchanged settings page rules', () => {
@@ -1329,7 +1228,7 @@ describe('options UI composition architecture', () => {
     expect(item).toContain('<FieldHelp v-if="help" :content="help" />')
     expect(item).toContain('<slot name="description"><small v-if="description">{{ description }}</small></slot>')
     expect(settings).toContain(`label="划词触发方式" :help="t('selectionTrigger.modeDescription')">`)
-    expect(settings).toContain(`<SettingsItem id="floating-ball-toggle" :label="t('settings.general.floatingBall')">`)
+    expect(source('src/features/settings/ui/FloatingBallSettings.vue')).toContain('id="floating-ball-toggle"')
     expect(source('src/features/settings/ui/AiMultiSegmentSettings.vue')).toContain(`:description="t('settings.fullPage.multiSegmentDescription')" :help="t('settings.fullPage.multiSegmentHelp')"`)
   })
 
@@ -1404,8 +1303,7 @@ describe('options UI composition architecture', () => {
     expect(source('src/features/writing-assistant/markdown.ts')).toContain("@/src/features/reading-assistant/answer/public")
     expect(sourceBody('src/features/reading-assistant/ui/answer/public.ts').trim()).toBe("export {default as ReadingAnswer} from '../ReadingAnswer.vue';")
     expect(sourceBody('src/features/reading-assistant/ui/panel/public.ts').trim()).toBe("export {default as ReadingPanel} from '../ReadingPanel.vue';")
-    for (const file of ['src/features/settings/ui/HarnessSettings.vue', 'src/features/settings/ui/SelectionSettings.vue',
-      'src/features/vocabulary/ui/VocabularyBook.vue', 'src/features/vocabulary/ui/ReencounterPanel.vue',
+    for (const file of ['src/features/vocabulary/ui/VocabularyBook.vue', 'src/features/vocabulary/ui/ReencounterPanel.vue',
       'src/features/vocabulary/ui/VocabularyStudy.vue', 'src/features/writing-assistant/ui/WritingPanel.vue']) {
       expect(source(file), file).toContain("@/src/features/reading-assistant/ui/answer/public")
     }
@@ -1419,11 +1317,10 @@ describe('options UI composition architecture', () => {
     const speech = source('src/features/settings/ui/LocalTtsSettings.vue')
     const floatingBall = source('src/features/settings/ui/FloatingBallSettings.vue')
 
-    expect(manga).toContain(`<SettingsGroup class="manga-translation-options" :title="t('image.settings.languageServiceTitle')"`)
     expect(manga).not.toContain('class="manga-setting-fields"')
     expect(writing).not.toContain('class="writing-service-grid"')
-    expect(writing).toContain('<SettingsItem label="AI 服务">')
+    expect(writing).toContain('<SettingsItem label="输出语言">')
     expect(speech).not.toContain(' stacked')
-    expect(floatingBall).toContain('.floating-ball-settings :deep(.site-rules-editor)')
+    expect(floatingBall).toContain('class="floating-ball-advanced"')
   })
 })

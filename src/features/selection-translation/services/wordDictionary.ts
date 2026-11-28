@@ -12,8 +12,6 @@ import {canCacheOptionalEcdict, downloadFullEcdict, readCachedFullEcdict, type E
 import {normalizeEnglishWord} from './wordNormalization';
 import type {DictionaryEntry} from '../dictionary/model';
 
-export {isSingleEnglishWord, normalizeEnglishWord} from './wordNormalization';
-
 export type {WordDictionaryProviderId} from '@/src/core/config/selectionDictionary';
 
 export interface WordPronunciation {

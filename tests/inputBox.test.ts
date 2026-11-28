@@ -7,17 +7,21 @@ import {
     getInputBoxText,
     getInputBoxValueAfterInsertion,
     getInputBoxValueSnapshot,
+    isImeProcessedKeyEvent,
     normalizeEditableText,
     normalizeInputBoxTranslationInterval,
     isEditableHost,
     isFormControl,
     isInputElement,
     matchesInputBoxTrigger,
+    matchInsertedControlTriggerSymbol,
+    matchInsertedEditableTriggerSymbol,
     removeInsertedTriggerSymbols,
+    resolveInputBoxTriggerSymbol,
 } from '@/src/features/input-translation/content/inputBox';
 
-function keyEvent(key: string, code: string, shiftKey = false): KeyboardEvent {
-    return { key, code, shiftKey } as KeyboardEvent;
+function keyEvent(key: string, code: string, shiftKey = false, keyCode = 0): KeyboardEvent {
+    return { key, code, shiftKey, keyCode } as KeyboardEvent;
 }
 
 function fakeElement(
@@ -45,13 +49,43 @@ function fakeElement(
 }
 
 describe('输入框快捷键', () => {
-    it('兼容浏览器的 Space、Equal 和 Minus 按键值', () => {
+    it('兼容浏览器的 Space、Equal 和 Minus 按键值、全角符号、小键盘与 IME 过程键', () => {
         expect(matchesInputBoxTrigger(keyEvent(' ', 'Space'), 'triple_space')).toBe(true);
+        expect(matchesInputBoxTrigger(keyEvent('\u3000', 'Space'), 'triple_space')).toBe(true);
         expect(matchesInputBoxTrigger(keyEvent('x', 'KeyX'), 'triple_space')).toBe(false);
         expect(matchesInputBoxTrigger(keyEvent('=', 'Equal'), 'triple_equal')).toBe(true);
+        expect(matchesInputBoxTrigger(keyEvent('＝', 'Equal'), 'triple_equal')).toBe(true);
+        expect(matchesInputBoxTrigger(keyEvent('Process', 'Equal', false, 229), 'triple_equal')).toBe(true);
+        expect(matchesInputBoxTrigger(keyEvent('Process', 'NumpadEqual', false, 229), 'triple_equal')).toBe(true);
         expect(matchesInputBoxTrigger(keyEvent('+', 'Equal', true), 'triple_equal')).toBe(false);
         expect(matchesInputBoxTrigger(keyEvent('-', 'Minus'), 'triple_dash')).toBe(true);
+        expect(matchesInputBoxTrigger(keyEvent('－', 'Minus'), 'triple_dash')).toBe(true);
+        expect(matchesInputBoxTrigger(keyEvent('Process', 'Minus', false, 229), 'triple_dash')).toBe(true);
+        expect(matchesInputBoxTrigger(keyEvent('Process', 'NumpadSubtract', false, 229), 'triple_dash')).toBe(true);
         expect(matchesInputBoxTrigger(keyEvent('_', 'Minus', true), 'triple_dash')).toBe(false);
+
+        expect(isImeProcessedKeyEvent(keyEvent('Process', 'Equal', false, 229))).toBe(true);
+        expect(isImeProcessedKeyEvent(keyEvent('Process', 'Equal', false, 0))).toBe(true);
+        expect(isImeProcessedKeyEvent(keyEvent('Unidentified', '', false, 0))).toBe(true);
+        expect(isImeProcessedKeyEvent(keyEvent('=', 'Equal', false, 187))).toBe(false);
+
+        expect(resolveInputBoxTriggerSymbol(keyEvent('＝', 'Equal'), 'triple_equal')).toBe('＝');
+        expect(resolveInputBoxTriggerSymbol(keyEvent('Process', 'Equal'), 'triple_equal')).toBe('=');
+        expect(resolveInputBoxTriggerSymbol(keyEvent('－', 'Minus'), 'triple_dash')).toBe('－');
+        expect(resolveInputBoxTriggerSymbol(keyEvent('\u3000', 'Space'), 'triple_space')).toBe('\u3000');
+
+        expect(matchInsertedControlTriggerSymbol('你好', {start: 2, end: 2}, '你好=', {start: 3, end: 3}, 'triple_equal')).toBe('=');
+        expect(matchInsertedControlTriggerSymbol('你好', {start: 2, end: 2}, '你好＝', {start: 3, end: 3}, 'triple_equal')).toBe('＝');
+        expect(matchInsertedControlTriggerSymbol('你好', {start: 2, end: 2}, '你好－', {start: 3, end: 3}, 'triple_dash')).toBe('－');
+        expect(matchInsertedControlTriggerSymbol('你好', {start: 2, end: 2}, '你好——', {start: 4, end: 4}, 'triple_dash')).toBeNull();
+        expect(matchInsertedControlTriggerSymbol('你好', {start: 2, end: 2}, '你好=', {start: 1, end: 1}, 'triple_equal')).toBeNull();
+        expect(matchInsertedControlTriggerSymbol('你好', {start: 2, end: 2}, '你好=', null, 'triple_equal')).toBeNull();
+
+        expect(matchInsertedEditableTriggerSymbol({text: '你好', caret: 2}, {text: '你好=', caret: 3}, 'triple_equal')).toBe('=');
+        expect(matchInsertedEditableTriggerSymbol({text: '你好', caret: 2}, {text: '你好＝', caret: 3}, 'triple_equal')).toBe('＝');
+        expect(matchInsertedEditableTriggerSymbol({text: '你好', caret: 2}, {text: '你好－', caret: 3}, 'triple_dash')).toBe('－');
+        expect(matchInsertedEditableTriggerSymbol({text: '你好', caret: 2}, {text: '你好=', caret: 2}, 'triple_equal')).toBeNull();
+        expect(matchInsertedEditableTriggerSymbol({text: '你好', caret: 2}, null, 'triple_equal')).toBeNull();
     });
 
     it('识别非敏感输入、纯文本与富文本编辑宿主，并拒绝密码、只读和代码编辑器', () => {
@@ -134,8 +168,13 @@ describe('输入框快捷键', () => {
         expect(matchesInputBoxTrigger(keyEvent('x', 'KeyX'), 'unknown' as never)).toBe(false);
     });
 
-    it('只移除本次插入的触发符号并保留真实输入内容', () => {
+    it('只移除本次插入的触发符号（含全角与 IME 三连提交）并保留真实输入内容', () => {
         expect(removeInsertedTriggerSymbols('Hello===', 'triple_equal', 5)).toBe('Hello=');
+        expect(removeInsertedTriggerSymbols('你好===', 'triple_equal', 2, 3)).toBe('你好');
+        expect(removeInsertedTriggerSymbols('你好＝＝＝', 'triple_equal', 2, 3)).toBe('你好');
+        expect(removeInsertedTriggerSymbols('你好=＝=', 'triple_equal', 2, 3)).toBe('你好');
+        expect(removeInsertedTriggerSymbols('你好－－－', 'triple_dash', 2, 3)).toBe('你好');
+        expect(removeInsertedTriggerSymbols('你好==', 'triple_equal', 2, 3)).toBe('你好==');
         expect(removeInsertedTriggerSymbols('a==b==', 'triple_equal', 1)).toBe('ab==');
         expect(removeInsertedTriggerSymbols('a  b', 'triple_space', 1)).toBe('ab');
         expect(removeInsertedTriggerSymbols('a--b', 'triple_dash', 1)).toBe('ab');

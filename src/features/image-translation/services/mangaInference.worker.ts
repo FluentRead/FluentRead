@@ -1,13 +1,13 @@
 /**
  * @file src/features/image-translation/services/mangaInference.worker.ts
  * 文件职责：在独立 Worker 中执行 PaddleOCR、气泡分析、LaMa 和可选离线 CTD 分割，保持 Offscreen 音频与消息线程响应。
- * 主要内容：按需复用已校验模型端口，真实下载和初始化阶段转发，CPU 重建锁定后端；CTD 只读已导入缓存，接收有界 RGBA 快照并在本线程执行低通缩放与张量构造，验证固定模型元数据，量化独占 seg 后释放所有 ORT 张量；串行会话创建避免同一 Asyncify 运行时交错初始化。
+ * 主要内容：按需复用已校验模型端口，真实下载和初始化阶段转发，CPU 重建锁定后端；按请求维护 AbortController 响应客户端协作取消消息，排队取消在懒加载模型前即刻退出，推理与分割在进入算子前复核取消并在中止后回报 aborted 保留温热会话，若回退期间原会话已损毁则立即清理对应端口以便后续重建；CTD 只读已导入缓存，接收有界 RGBA 快照并在本线程执行低通缩放与张量构造，验证固定模型元数据，单遍内联循环核验概率并量化独占 seg 后释放所有 ORT 张量；串行会话创建避免同一 Asyncify 运行时交错初始化。
  * 诊断：会话创建成功后报告该会话配置的执行提供程序；不推断混合后端中每个算子的实际设备，也不传输模型或图片内容。
- * 模块边界：不读取网页、不翻译文本、不播放音频；取消和超时由 Worker 外部 owner 硬终止。
+ * 模块边界：不读取网页、不翻译文本、不播放音频；协作取消优先提前结束当前推理，单次同步算子超时仍由外部 owner 硬终止。
  */
 import * as ort from 'onnxruntime-web/webgpu';
 import {forceSingleThreadInference, localWasmThreads, paceLocalInference, paceLocalInitialization} from '@/src/shared/onnx/resources';
-import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
+import {assertOnnxWasmRuntimeSupported, configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
 import {createBrowserMangaOcr} from './mangaOcr';
 import {createBrowserMangaInpainter} from './mangaInpainting';
 import type {MangaInferenceMessage, MangaInferenceResponse} from './mangaInferenceClient';
@@ -28,8 +28,12 @@ export function startMangaInferenceWorker(): void {
     let ocr: Awaited<ReturnType<typeof createBrowserMangaOcr>> | undefined;
     let painter: Awaited<ReturnType<typeof createBrowserMangaInpainter>> | undefined;
     let segmenter:ort.InferenceSession|undefined;
+    let ocrBroken = false, painterBroken = false;
     let tail: Promise<void> = Promise.resolve(), creating: Promise<void> = Promise.resolve();
     let currentRequestId = 0;
+    const controllers = new Map<number, AbortController>();
+    const abortError = () => new DOMException('漫画处理已取消', 'AbortError');
+    const ignore = () => undefined;
     const create = ort.InferenceSession.create.bind(ort.InferenceSession);
     ort.InferenceSession.create = ((...args: Parameters<typeof create>) => {
         const result = creating.then(() => paceLocalInitialization(() => create(...args)));
@@ -59,6 +63,7 @@ export function startMangaInferenceWorker(): void {
     };
     async function prepareSeg(progress:(stage:'preparing'|'initializing')=>void,cpu:boolean):Promise<boolean>{
         if(segmenter)return true;
+        assertOnnxWasmRuntimeSupported();
         progress('preparing');let bytes:ArrayBuffer|undefined;
         try{bytes=await loadMangaTextSegmentationAsset();}
         catch(error){throw new SegmentationProtocolError(error instanceof Error?error.message:String(error),{cause:error});}
@@ -74,18 +79,22 @@ export function startMangaInferenceWorker(): void {
         }
         segmenter=created;return true;
     }
-    async function segment(source:ImageTextSegmentationSource):Promise<Uint8Array>{
+    async function segment(source:ImageTextSegmentationSource,signal:AbortSignal):Promise<Uint8Array>{
         if(!isImageTextSegmentationSource(source))throw new SegmentationProtocolError('图片分割输入无效');
         const tensor=createImageTextSegmentationInput(source.pixels,source.width,source.height);
         const input=new ort.Tensor('float32',tensor,[1,3,1024,1024]);
         let outputs:ort.InferenceSession.ReturnType|undefined,owned:Uint8Array|undefined,failure:unknown,failed=false;
         try{
-            outputs=await paceLocalInference(()=>segmenter!.run({images:input}));
+            outputs=await paceLocalInference(()=>{if(signal.aborted)throw abortError();return segmenter!.run({images:input});});
+            if(signal.aborted)throw abortError();
             if(Object.keys(outputs).length!==3||!SEG_OUTPUTS.every(([name,shape])=>{const value=outputs![name];return value?.type==='float32'&&shapeIs(value.dims,shape)&&value.data instanceof Float32Array&&value.data.length===shape.reduce<number>((product,dimension)=>product*dimension,1);}))throw new SegmentationProtocolError('图片分割输出无效');
             const data=outputs.seg.data as Float32Array;
-            if(!data.every(value=>Number.isFinite(value)&&value>=0&&value<=1))throw new SegmentationProtocolError('图片分割概率无效');
             owned=new Uint8Array(SEG_SIZE);
-            for(let index=0;index<SEG_SIZE;index++)owned[index]=Math.fround(data[index]*255);
+            for(let index=0;index<SEG_SIZE;index++){
+                const value=data[index];
+                if(!(value>=0&&value<=1))throw new SegmentationProtocolError('图片分割概率无效');
+                owned[index]=Math.fround(value*255);
+            }
         } catch(error) {
             failed=true;failure=error;
         }
@@ -98,9 +107,11 @@ export function startMangaInferenceWorker(): void {
         if(failed)throw failure;
         return owned!;
     }
-    async function handle(message: MangaInferenceMessage) {
+    async function handle(message: MangaInferenceMessage, controller: AbortController) {
         const requestId = message.requestId;
+        const signal = controller.signal;
         currentRequestId = requestId;
+        let response: MangaInferenceResponse;
         try {
             if (message.cpu) {forceSingleThreadInference(); Object.defineProperty(navigator, 'gpu', {value: undefined, configurable: true});}
             const progress = (stage: 'preparing' | 'initializing' | 'recognizing', percent?: number) => post({requestId, stage, percent});
@@ -109,23 +120,47 @@ export function startMangaInferenceWorker(): void {
             else if (message.type === 'dispose-inpaint') { await painter?.release(); painter = undefined; }
             else if(message.type==='dispose-seg'){const current=segmenter;segmenter=undefined;await current?.release();}
             else if(message.type==='prepare-seg'||message.type==='segment'){
+                if(message.type==='segment'&&signal.aborted)throw abortError();
                 const ready=await prepareSeg(progress,message.cpu);
                 if(message.type==='prepare-seg')result=ready;
-                else {if(!ready)throw new SegmentationProtocolError('图片分割模型未导入');progress('recognizing');result=await segment(message.source!);}
+                else {if(signal.aborted)throw abortError();if(!ready)throw new SegmentationProtocolError('图片分割模型未导入');progress('recognizing');result=await segment(message.source!,signal);}
             }
             else if (message.type === 'prepare-ocr' || message.type === 'recognize') {
-                ocr ??= await createBrowserMangaOcr(undefined, progress);
-                if (message.type === 'recognize') { progress('recognizing'); result = await ocr.recognize(message.image!, {flatten: true, noCache: true, strategy: 'per-box',...(message.imageDetectionEvidence===true?{imageDetectionEvidence:true as const}:{}),...(message.mangaParagraphGapEvidence===true?{mangaParagraphGapEvidence:true as const}:{})}); }
+                if (message.type === 'recognize' && signal.aborted) throw abortError();
+                ocr ??= await createBrowserMangaOcr(undefined, progress, () => { ocrBroken = true; });
+                if (message.type === 'recognize') { if(signal.aborted)throw abortError(); progress('recognizing'); result = await ocr.recognize(message.image!, {flatten: true, noCache: true, strategy: 'per-box', signal, ...(message.profile?{profile:message.profile}:{}), ...(message.imageDetectionEvidence===true?{imageDetectionEvidence:true as const}:{}),...(message.mangaParagraphGapEvidence===true?{mangaParagraphGapEvidence:true as const}:{})}); }
             } else {
-                painter ??= await createBrowserMangaInpainter(undefined, (percent, initializing) => progress(initializing ? 'initializing' : 'preparing', percent));
-                if (message.type === 'inpaint') { progress('recognizing'); result = await painter.run(message.patch!); }
+                if (message.type === 'inpaint' && signal.aborted) throw abortError();
+                painter ??= await createBrowserMangaInpainter(undefined, (percent, initializing) => progress(initializing ? 'initializing' : 'preparing', percent), () => { painterBroken = true; });
+                if (message.type === 'inpaint') { if(signal.aborted)throw abortError(); progress('recognizing'); result = await painter.run(message.patch!, signal); }
             }
-            post({requestId, success: true, result});
-        } catch (error) { post({requestId, success: false, error: error instanceof Error ? error.message : String(error),...(['prepare-seg','segment','dispose-seg'].includes(message.type)?{errorKind:error instanceof SegmentationProtocolError?'protocol' as const:'execution' as const}:{})}); }
+            if (signal.aborted) throw abortError();
+            response = {requestId, success: true, result};
+        } catch (error) {
+            const aborted = signal.aborted && (error as {name?: unknown} | null | undefined)?.name === 'AbortError';
+            response = {requestId, success: false, ...(aborted ? {aborted: true} : {}), error: error instanceof Error ? error.message : String(error),...(['prepare-seg','segment','dispose-seg'].includes(message.type)?{errorKind:error instanceof SegmentationProtocolError?'protocol' as const:'execution' as const}:{})};
+        } finally {
+            if (ocrBroken) {
+                ocrBroken = false;
+                const broken = ocr!; ocr = undefined;
+                await Promise.resolve().then(() => broken.destroy()).catch(ignore);
+            }
+            if (painterBroken) {
+                painterBroken = false;
+                const broken = painter!; painter = undefined;
+                await Promise.resolve().then(() => broken.release()).catch(ignore);
+            }
+            controllers.delete(requestId);
+        }
+        post(response);
     }
     self.onmessage = (event: MessageEvent<MangaInferenceMessage>) => {
         const message = event.data;
-        if (!message || !Number.isSafeInteger(message.requestId) || !['prepare-ocr', 'recognize', 'prepare-inpaint', 'inpaint', 'dispose-ocr', 'dispose-inpaint','prepare-seg','segment','dispose-seg'].includes(message.type)) return;
-        tail = tail.then(() => handle(message));
+        if (!message || !Number.isSafeInteger(message.requestId)) return;
+        if (message.type === 'cancel') { controllers.get(message.requestId)?.abort(); return; }
+        if (!['prepare-ocr', 'recognize', 'prepare-inpaint', 'inpaint', 'dispose-ocr', 'dispose-inpaint','prepare-seg','segment','dispose-seg'].includes(message.type)) return;
+        const controller = new AbortController();
+        controllers.set(message.requestId, controller);
+        tail = tail.then(() => handle(message, controller));
     };
 }

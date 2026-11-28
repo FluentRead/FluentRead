@@ -5,7 +5,7 @@
  * 模块边界：仅修改父级传入的配置草稿，复用现有字段与自动保存；不保存第二份映射，不发起翻译或测试连接请求。
  -->
 <template>
-  <SettingsDisclosure class="feature-services" data-testid="feature-services" data-i18n-ignore default-open
+  <SettingsDisclosure class="feature-services" default-open data-testid="feature-services" data-i18n-ignore
     :title="t('featureServices.open')" :description="t('featureServices.shortHelp')"
     :status-tone="summaryWarning ? 'warning' : 'neutral'">
     <template #status><span class="feature-services-status" :title="summaryWarning || summaryServices">{{ summaryWarning ? t('featureServices.needsSetup') : summaryServices }}</span></template>

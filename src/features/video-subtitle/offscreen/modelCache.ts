@@ -105,10 +105,6 @@ export async function readCachedVideoAiModelState(receipts: unknown): Promise<{
   return {models: [...new Set([...localModels, ...sharedModels])], localModels, sharedModels};
 }
 
-export async function readCachedVideoAiModels(receipts: unknown): Promise<VideoLocalTranscriptionModel[]> {
-  return (await readCachedVideoAiModelState(receipts)).models;
-}
-
 /**
  * 顺序下载并写入 Transformers.js 使用的同一个 Cache Storage。cache.put 会
  * 直接消费 Response，不在 JS 堆中再构造一份几十 MB 的 ONNX ArrayBuffer。

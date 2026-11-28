@@ -2,7 +2,7 @@
  * @file src/platform/offscreen/client.ts
  *
  * 文件职责：统一管理扩展自有 DOM 的创建、复用与消息发送，为 OCR、内置翻译和音频等后台能力提供基础设施客户端。
- * 主要内容：为 requests.ts 的已知消息端口及其它能力提供同一底层传输，定义 runtime/document 依赖端口和 OffscreenClient，串行创建文档、等待接收端 ready 握手，并在接收端丢失时受控重建一次，恢复请求的取消信号贯穿排队和文档变更边界；准备超时后继续持有未结束的原生创建或关闭操作，避免迟到文档与后续重建重叠。默认 chromeOffscreenClient 连接浏览器 API。
+ * 主要内容：为 requests.ts 的已知消息端口及其它能力提供同一底层传输，定义 runtime/document 依赖端口和 OffscreenClient，串行创建文档、以有上限指数退避等待接收端 ready 握手；通过单调递增的 documentEpoch 保护就绪状态，仅在无文档变更且 epoch 一致的 READY 握手确认后置位，已确认就绪且无在途准备时 send() 走快速路径直发消息，跳过重复的 getContexts 与 READY 探测；而在接收端丢失、准备失败、文档重建、变更或查询到空文档集合时立即失效就绪标记并递增 epoch，sendIfPresent 不提升就绪状态，接收端丢失或消息端口异常关闭时受控重建一次，恢复请求的取消信号贯穿排队和文档变更边界；ensureDocument() 仍执行权威探测；准备超时后继续持有未结束的原生创建或关闭操作，避免迟到文档与后续重建重叠。默认 chromeOffscreenClient 连接浏览器 API。
  * 模块边界：只封装文档生命周期与消息可靠性；默认连接 Chrome Offscreen，Firefox 注入文档容器与查询端口，不复制任务调度或业务逻辑。
  */
 
@@ -77,6 +77,8 @@ export interface OffscreenClient {
 }
 
 const DEFAULT_PREPARATION_TIMEOUT_MS = 10_000;
+const DEFAULT_READY_RETRY_BASE_MS = 25;
+const DEFAULT_READY_RETRY_MAX_MS = 400;
 // 大模型下载可以显式申请十分钟加三十秒收尾；默认准备及其他请求的较短预算保持独立。
 const MAX_OFFSCREEN_TIMEOUT_MS = 630_000;
 
@@ -87,7 +89,8 @@ function errorMessage(error: unknown): string {
 function isMissingReceiverError(error: unknown): boolean {
     const message = errorMessage(error);
     return message.includes('Receiving end does not exist')
-        || message.includes('Could not establish connection');
+        || message.includes('Could not establish connection')
+        || message.includes('message port closed before a response was received');
 }
 
 function normalizeTimeoutMs(value: number | undefined, fallback: number): number {
@@ -118,9 +121,14 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
         promise: Promise<DocumentPreparationResult>;
     } | null = null;
     let documentMutation: Promise<void> | null = null;
+    let documentReady = false;
+    let documentEpoch = 0;
+    const invalidateDocumentReady = (): void => {
+        documentReady = false;
+        documentEpoch += 1;
+    };
     const readyRetryAttempts = Math.max(1, Math.floor(dependencies.readyRetryAttempts ?? 40));
-    const readyRetryDelay = dependencies.readyRetryDelay
-        ?? (() => new Promise<void>((resolve) => setTimeout(resolve, 25)));
+    const customReadyRetryDelay = dependencies.readyRetryDelay;
     const preparationTimeoutMs = normalizeTimeoutMs(
         dependencies.preparationTimeoutMs,
         DEFAULT_PREPARATION_TIMEOUT_MS,
@@ -191,6 +199,7 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
         if (!dependencies.getOffscreen()
             || (!dependencies.getDocumentContexts && typeof runtime.getContexts !== 'function')) return false;
         const contexts = await getExistingContexts();
+        if (contexts.length === 0) invalidateDocumentReady();
         return contexts.length > 0;
     };
 
@@ -208,7 +217,9 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
             runtime.sendMessage({...message, target: 'offscreen'}, (response) => {
                 const runtimeError = dependencies.getRuntime().lastError;
                 if (runtimeError) {
-                    reject(new Error(runtimeError.message || 'Offscreen 消息发送失败'));
+                    const error = new Error(runtimeError.message || 'Offscreen 消息发送失败');
+                    if (isMissingReceiverError(error)) invalidateDocumentReady();
+                    reject(error);
                 } else {
                     resolve(response as TResponse);
                 }
@@ -231,28 +242,59 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
         onCancel,
     );
 
+    const waitForReadyBackoff = (attempt: number, deadlineAt: number, signal: AbortSignal): Promise<void> => {
+        if (customReadyRetryDelay) {
+            return runWithinDeadline(customReadyRetryDelay, deadlineAt, 'Offscreen 文档准备超时', signal);
+        }
+        const backoffMs = Math.min(
+            DEFAULT_READY_RETRY_MAX_MS,
+            DEFAULT_READY_RETRY_BASE_MS * (2 ** Math.min(attempt, 4)),
+        );
+        let delayTimer: ReturnType<typeof setTimeout> | undefined;
+        return runWithinDeadline(
+            () => new Promise<void>((resolve) => {
+                delayTimer = setTimeout(() => {
+                    delayTimer = undefined;
+                    resolve();
+                }, backoffMs);
+            }),
+            deadlineAt,
+            'Offscreen 文档准备超时',
+            signal,
+            () => {
+                clearTimeout(delayTimer);
+                delayTimer = undefined;
+            },
+        );
+    };
+
     const waitForReceiver = async (signal: AbortSignal, deadlineAt: number): Promise<void> => {
         let lastError: unknown = new Error('Offscreen 文档尚未就绪');
         for (let attempt = 0; attempt < readyRetryAttempts; attempt += 1) {
+            const epoch = documentEpoch;
             try {
                 const response = await sendWithoutCreating<{
                     success?: boolean;
                     ready?: boolean;
                 }, OffscreenMessage>({type: OFFSCREEN_READY_MESSAGE_TYPE}, deadlineAt, signal);
-                if (response?.success === true && response.ready === true) return;
+                if (response?.success === true && response.ready === true) {
+                    if (documentEpoch === epoch) documentReady = true;
+                    return;
+                }
                 lastError = new Error('Offscreen 文档未确认接收端就绪');
             } catch (error) {
                 if (!isMissingReceiverError(error)) throw error;
                 lastError = error;
             }
             if (attempt + 1 < readyRetryAttempts) {
-                await runWithinDeadline(readyRetryDelay, deadlineAt, 'Offscreen 文档准备超时', signal);
+                await waitForReadyBackoff(attempt, deadlineAt, signal);
             }
         }
         throw lastError;
     };
 
     const mutateDocument = (operation: () => Promise<void>): Promise<void> => {
+        invalidateDocumentReady();
         const pending = operation().finally(() => {
             // 准备队列等待实际文档操作结束后才准入下一次变更。
             documentMutation = null;
@@ -306,6 +348,7 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
         forceRecreate: boolean,
         rebuildSignal?: AbortSignal,
     ): Promise<DocumentPreparationResult> => {
+        if (forceRecreate) invalidateDocumentReady();
         const currentPreparation = preparingDocument;
         if (currentPreparation) {
             // 强制重建可以同时满足普通探测，但业务消息丢失接收端后，普通探测绝不能
@@ -344,7 +387,10 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
             'Offscreen 文档准备超时',
             rebuildSignal,
             () => controller.abort(),
-        ).finally(() => {
+        ).catch((error) => {
+            documentReady = false;
+            throw error;
+        }).finally(() => {
             // 在途准备只能被复用或等待；只有本次 finally 可以释放槽位。
             preparingDocument = null;
         });
@@ -419,12 +465,15 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
             const deadlineAt = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
             const preparationDeadlineAt = deadlineAt ?? Date.now() + preparationTimeoutMs;
             const cancel = () => sendCancellation(options.cancelMessage);
-            await ensureDocumentWithin(preparationDeadlineAt, options.signal, cancel);
+            if (!documentReady || preparingDocument) {
+                await ensureDocumentWithin(preparationDeadlineAt, options.signal, cancel);
+            }
             try {
                 return await sendWithoutCreating<TResponse, TMessage>(message, deadlineAt, options.signal, cancel);
             } catch (error) {
                 if (options.signal?.aborted || isAbortError(error)) throw error;
                 if (!isMissingReceiverError(error)) throw error;
+                invalidateDocumentReady();
                 const rebuildDeadlineAt = deadlineAt ?? Date.now() + preparationTimeoutMs;
                 await runWithinDeadline(
                     () => rebuildDocument(options.signal),

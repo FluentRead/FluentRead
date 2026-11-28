@@ -102,6 +102,7 @@ describe('公开背景漫画正文接入既有连续翻译',()=>{
         const f=fixture(),original=f.element.outerHTML;
         const other=f.element.cloneNode() as HTMLElement;other.id='page-2';other.getBoundingClientRect=()=>f.rect as DOMRect;f.document.body.append(other);
         expect(f.runtime.identity(f.element)).toBeNull();expect(f.runtime.identity(other)).toBeNull();expect(f.images).toHaveLength(1);
+        f.runtime.prepare([f.element]);expect(f.images[0].src).not.toBe('');
         f.images[0].onload!();await flush();expect(f.images[0].src).toBe('');expect(f.ports.ready).toHaveBeenCalledOnce();
         expect(f.runtime.identity(f.element)).not.toBeNull();expect(f.runtime.identity(other)).toBeNull();expect(f.images).toHaveLength(2);
         f.runtime.prepare([f.element]);expect(f.images[1].src).toBe('');await flush();expect(f.ports.ready).toHaveBeenCalledOnce();
@@ -362,5 +363,20 @@ describe('背景译图单属性所有权与有界编码',()=>{
         if(reason==='hidden')Object.defineProperty(f.document,'hidden',{configurable:true,value:false});
         if(reason==='offscreen'){f.rect.left=0;f.rect.right=640;}if(reason==='disabled')f.ports.enabled.mockReturnValue(true);if(reason==='occluded')f.document.elementFromPoint=()=>f.element;
         f.runtime.update();expect(f.element.style.backgroundImage).toContain('fluent-read-translated-');expect(f.encodeBlob).toHaveBeenCalledOnce();f.runtime.dispose();expect(f.element.outerHTML).toBe(original);
+    });
+    it('按住对照原图无损归还原背景，松手立即恢复译图且不重新编码、不撤销地址，清缓存和卸载安全复位',async()=>{
+        const f=fixture();await f.ready();const original=f.element.outerHTML;
+        await f.translate();expect(f.element.style.backgroundImage).toContain('fluent-read-translated-1');
+        expect(f.encodeBlob).toHaveBeenCalledOnce();expect(f.revokeUrl).not.toHaveBeenCalled();
+        f.runtime.setPeekOriginal(true);expect(f.element.outerHTML).toBe(original);
+        expect(f.revokeUrl).not.toHaveBeenCalled();expect(f.ports.translate).toHaveBeenCalledOnce();
+        f.runtime.setPeekOriginal(false);expect(f.element.style.backgroundImage).toContain('fluent-read-translated-1');
+        expect(f.encodeBlob).toHaveBeenCalledOnce();expect(f.ports.translate).toHaveBeenCalledOnce();
+        f.runtime.setPeekOriginal(true);expect(f.element.outerHTML).toBe(original);
+        f.runtime.resetCache();await f.ready();await f.translate();
+        // 清缓存保持按住原图速览状态，避免与运行时 peekingOriginal 脱节；松手后立即显示新译图。
+        expect(f.element.outerHTML).toBe(original);
+        f.runtime.setPeekOriginal(false);expect(f.element.style.backgroundImage).toContain('fluent-read-translated-2');
+        f.runtime.dispose();f.runtime.setPeekOriginal(true);expect(f.element.outerHTML).toBe(original);
     });
 });

@@ -7,9 +7,15 @@ const ports = vi.hoisted(() => ({config: {on: true, videoTranslationEnabled: tru
 vi.mock('@/src/services/config/store', () => ({config: ports.config, configReady: Promise.resolve(),
     subscribeConfig: (callback: () => void) => {ports.listeners.add(callback); return () => ports.listeners.delete(callback);}}));
 vi.mock('@/src/platform/i18n/uiLanguageBundles', () => ({ensureUiLanguageBundle: ports.language}));
-vi.mock('@/src/features/video-subtitle/content/htmlMedia', () => ({mountWhenHtmlMediaPresent: (activate: () => () => void) => {
-    ports.activate = activate; return ports.stopScanner;
-}}));
+vi.mock('@/src/features/video-subtitle/content/htmlMedia', async () => {
+    const actual = await vi.importActual<typeof import('@/src/features/video-subtitle/content/htmlMedia')>('@/src/features/video-subtitle/content/htmlMedia');
+    return {
+        ...actual,
+        mountWhenHtmlMediaPresent: (activate: () => () => void) => {
+            ports.activate = activate; return ports.stopScanner;
+        },
+    };
+});
 vi.mock('@/src/features/video-subtitle/public', () => ({mountVideoSubtitleTranslation: ports.mount}));
 vi.mock('@/src/app/content/pageLifecycle', () => ({waitForContentDocument: ports.waitDocument, installContentPageLifecycle: (_window: unknown, _signal: unknown, actions: typeof ports.actions) => {
     ports.actions = actions; return {isSuspended: () => ports.suspended};
@@ -27,8 +33,21 @@ beforeEach(() => {
 });
 afterEach(() => {ports.actions?.dispose(); vi.unstubAllGlobals();});
 
-it.each(['https://www.youtube.com/embed/abcdefghijk', 'https://x.com/home', 'https://www.edx.org/course', 'file:///example.html'])('defers to existing adapters or unsupported URLs: %s', async url => {
+it.each([
+    'https://www.youtube.com/embed/abcdefghijk',
+    'https://x.com/home',
+    'https://www.edx.org/course',
+    'https://www.douyin.com/jingxuan/search/demo',
+    'https://live.bilibili.com/123',
+    'file:///example.html',
+])('defers to existing adapters or unsupported URLs: %s', async url => {
     page(url); await startHtmlMediaFrameApp(ctx()); expect(ports.activate).toBeUndefined();
+});
+it('skips frames embedded by excluded domestic video platforms via referrer', async () => {
+    page('https://player.example/embed');
+    vi.stubGlobal('document', {referrer: 'https://www.douyin.com/jingxuan/search/demo'});
+    await startHtmlMediaFrameApp(ctx());
+    expect(ports.activate).toBeUndefined();
 });
 it('does not start twice in a top frame or invalid context', async () => {
     page(undefined, true); await startHtmlMediaFrameApp(ctx()); page(); const invalid = ctx(); Object.defineProperty(invalid, 'isInvalid', {value: true});

@@ -30,8 +30,7 @@ import {
     reportTranslationModelUsage,
     getTranslationImageInput,
 } from '@/src/services/translation/requestSnapshot';
-import type {TranslationProviderRequestContext} from '@/src/services/translation/types';
-import type {TranslationProviderConfigSnapshot} from '@/src/services/translation/types';
+import type {TranslationProviderConfigSnapshot, TranslationProviderRequestContext} from '@/src/services/translation/types';
 import {normalizeOpenAICompatibleUsage} from '../usage';
 import {normalizeTranslationMaxRetries} from '@/src/core/config/scheduling';
 import {DEFAULT_AI_REQUEST_TIMEOUT_MS, normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';

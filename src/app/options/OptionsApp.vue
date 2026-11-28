@@ -2,7 +2,7 @@
  @file src/app/options/OptionsApp.vue
  文件职责：实现扩展 Options 页的顶层布局，组织设置导航、全局搜索结果和学习中心入口，并把选中分区交给对应 feature UI。
  主要内容：页面名称由 main 辅助技术标签提供，内容直接从统一的紧凑页内导航或表单开始，不再渲染重复页面标题；侧栏展示品牌与多语言宣传语；关于页以随界面语言显示产品名的宽幅品牌介绍、项目链接卡片、开源项目下方的微信交流按钮和独立赞赏区组织内容，联系二维码与赞赏码在当前页弹窗展示；渲染默认展开的分组侧栏、窄屏分类选择和全局搜索，搜索只在同次派生内复用原始查询的小写值和语言入口判断，语言恢复查询优先展示现有软件语言入口并定位选择控件；普通设置连续展示并提供顶部滚动定位导航，统计保留任务视图切换，智能高亮锚点及搜索入口随脚本版能力隐藏，服务目录使用完整工作区，复用 settingsNavigation 的项目解析/过滤逻辑，在 SettingsSections 与 LearningCenter 之间切换并重置内容区滚动，通过当前导航 getter 向迟到学习面板提供可见性，同步 URL hash 的深链接与前进后退导航，URL 目标仅接受当前分区登记的具体设置或可用分类并复用已有滚动定位，兼容模型用量迁入翻译统计后的旧链接；界面根节点注册在卸载时只释放本页面句柄。
- 模块边界：组件负责页面壳、导航状态和主题、界面皮肤根属性同步，不定义具体配置字段、不直接写 browser.storage，也不实现词汇仓库；设置表单、收藏与阅读记录业务由各 feature 组件拥有；学习栏目加载失败的重载动作在普通设置页保留栏目参数，页内设置只重载宿主文档。
+ 模块边界：组件负责页面壳、导航状态和主题、界面字体根属性同步（Popup 皮肤仅作用于扩展弹窗与设置页内的局部预览容器，不改动 Options 根节点），不定义具体配置字段、不直接写 browser.storage，也不实现词汇仓库；设置表单、收藏与阅读记录业务由各 feature 组件拥有；学习栏目加载失败的重载动作在普通设置页保留栏目参数，页内设置只重载宿主文档。
 -->
 <template>
   <div class="settings-app" :class="{'has-overlay-close': Boolean(props.onClose)}" @click="dismissSearchOutside">
@@ -190,7 +190,19 @@
 import '@/src/features/settings/ui/components/settings-navigation.css'
 import UiIcon from '@/src/ui/components/UiIcon.vue'
 import {getSupportImageUrl, getContactImageUrl} from './aboutImages'
-import {SETTINGS_TABBED_SECTION_IDS, settingsPagePanels, resolveSettingsPanel, filterNavigationItems, filterSettingsSearchTargets, isUiLanguageSearch, settingsSearchTargets} from '@/src/features/settings/model/navigation';
+import {
+  SETTINGS_TABBED_SECTION_IDS,
+  settingsPagePanels,
+  resolveSettingsPanel,
+  filterNavigationItems,
+  filterSettingsSearchTargets,
+  isUiLanguageSearch,
+  settingsSearchTargets,
+  navigationGroups,
+  navigationItems,
+  resolveNavigationItem,
+  resolveRequestedSection,
+} from '@/src/features/settings/model/navigation';
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SettingsNavigationIcon from '@/src/features/settings/ui/SettingsNavigationIcon.vue'
 import SettingsSectionNavigation from '@/src/features/settings/ui/components/SettingsSectionNavigation.vue'
@@ -198,17 +210,11 @@ const SettingsSections = defineAsyncComponent(() => import('@/src/features/setti
 const LearningCenter = defineAsyncComponent(() => import('@/src/features/settings/ui/LearningCenter.vue'))
 import {useUiI18n} from '@/src/ui/i18n'
 import {
-  navigationGroups,
-  navigationItems,
-  resolveNavigationItem,
-  resolveRequestedSection,
-} from '@/src/features/settings/model/navigation'
-import {
   config as runtimeConfig,
   configReady,
   subscribeConfig,
 } from '@/src/services/config/store'
-import {applyInterfaceFont, applyInterfaceSkin, applyInterfaceTheme, registerInterfaceAppearanceRoot} from '@/src/ui/interfaceAppearance'
+import {applyInterfaceFont, applyInterfaceTheme, registerInterfaceAppearanceRoot} from '@/src/ui/interfaceAppearance'
 import {browserCapabilities} from '@/src/platform/browser/capabilities'
 
 const props = defineProps<{
@@ -305,7 +311,6 @@ const userscriptUnavailableSections = new Set([
   'settings-image-translation',
   'settings-area-translation',
   'settings-video',
-  'settings-writing',
   'settings-translation-stats',
   'settings-model-usage',
 ])
@@ -379,7 +384,6 @@ const activeItem = computed(() => localizedNavigationItems.value.find((item) => 
 const unsubscribeInterfaceConfig = subscribeConfig((nextConfig) => {
   if (disposed) return
   syncInterfaceTheme(nextConfig.theme)
-  applyInterfaceSkin(nextConfig.interfaceSkin, props.appearanceRoot)
   applyInterfaceFont(nextConfig.interfaceFont, props.appearanceRoot)
 })
 
@@ -387,13 +391,11 @@ void configReady
   .then(() => {
     if (disposed) return
     syncInterfaceTheme(runtimeConfig.theme)
-    applyInterfaceSkin(runtimeConfig.interfaceSkin, props.appearanceRoot)
     applyInterfaceFont(runtimeConfig.interfaceFont, props.appearanceRoot)
   })
   .catch(() => {
     if (disposed) return
     syncInterfaceTheme('auto')
-    applyInterfaceSkin('default', props.appearanceRoot)
     applyInterfaceFont('system', props.appearanceRoot)
   })
 

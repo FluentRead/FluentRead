@@ -288,7 +288,6 @@ vi.mock("@/src/core/translation/public", async (importOriginal) => {
             snapshot.slots.length > 1
                 ? snapshot.slots.map(({source}) => source).join("").replace(/\s+/gu, " ").trim()
                 : null,
-        evaluateHardGuard: (element: Element) => ({prune: isProtected(element)}),
         getComposedParent: (element: Element) => element.parentElement ??
             ((element.getRootNode?.() as {host?: Element})?.host ?? null),
         isProtectedDescendantElement: (element: Element) => element.matches(protectedSelector),
@@ -4610,6 +4609,10 @@ describe("全文翻译可见性锚点", () => {
         {service: 'ai', enabled: true, model: 'mt-only', configured: 1, expected: 1},
         {service: 'microsoft', enabled: true, model: '', configured: 1, expected: 1},
         {service: 'composite:fixture', enabled: true, model: '', configured: 1, expected: 1},
+        {service: 'localTranslation', enabled: false, model: '', configured: 1, expected: 1},
+        {service: 'localTranslation', enabled: false, model: '', configured: 2, expected: 2},
+        {service: 'localTranslation', enabled: false, model: '', configured: 6, expected: 2},
+        {service: 'localTranslation', enabled: false, model: '', configured: 0, expected: 2},
     ])('候选准备容量仅为可用 AI 多段保留一批 %j', ({service, enabled, model, configured, expected}) => {
         expect(getFullPageTranslationCandidateConcurrency(translationSnapshot({service, model, enableAIMultiSegment: enabled}), configured))
             .toBe(expected);

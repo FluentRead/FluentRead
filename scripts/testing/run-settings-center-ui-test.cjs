@@ -70,25 +70,26 @@ function contrastRatio(foreground, background) {
 const expectedNavigation = [
   ['settings-general', '通用设置'],
   ['settings-services', '翻译服务'],
-  ['settings-translation', '翻译设置'],
-  ['settings-interface', '界面风格'],
+  ['settings-interface', '外观与界面'],
+  ['settings-translation', '网页翻译'],
+  ['settings-interactions', '悬浮球与右键'],
   ['settings-selection', '划词翻译'],
-  ['settings-image-translation', '图片/漫画翻译'],
-  ['settings-video', '视频字幕翻译'],
-  ['settings-writing', '写作助手'],
+  ['settings-writing', '输入与写作'],
+  ['settings-image-translation', '图片与漫画'],
+  ['settings-video', '视频字幕'],
+  ['settings-sites', '网站规则'],
+  ['settings-glossary', '术语库'],
   ['settings-translation-center', '翻译中心'],
   ['settings-vocabulary', '学习中心'],
-  ['settings-glossary', '术语库'],
-  ['settings-sites', '网站规则'],
   ['settings-translation-stats', '翻译统计'],
-  ['settings-advanced', '高级选项'],
+  ['settings-advanced', '高级与隐私'],
   ['settings-data', '备份与恢复'],
   ['settings-about', '关于流畅阅读'],
 ];
 const expectedNavigationGroups = [
-  ['基础配置', ['settings-general', 'settings-services', 'settings-translation', 'settings-interface']],
-  ['专项翻译', ['settings-selection', 'settings-image-translation', 'settings-video']],
-  ['工具与学习', ['settings-writing', 'settings-translation-center', 'settings-vocabulary', 'settings-glossary', 'settings-sites', 'settings-translation-stats']],
+  ['基础配置', ['settings-general', 'settings-services', 'settings-interface']],
+  ['翻译与交互', ['settings-translation', 'settings-interactions', 'settings-selection', 'settings-writing', 'settings-image-translation', 'settings-video']],
+  ['规则与工具', ['settings-sites', 'settings-glossary', 'settings-translation-center', 'settings-vocabulary', 'settings-translation-stats']],
   ['系统与数据', ['settings-advanced', 'settings-data', 'settings-about']],
 ];
 const settingsNavigationSelector = 'nav[aria-label="设置分类"] button[data-section]';
@@ -131,12 +132,12 @@ function resolveSolidBackground(layers) {
   }
   return null;
 }
-const expectedGeneralGroups = ['基础配置', '网页辅助', '基本偏好'];
+const expectedGeneralGroups = ['基础配置', '基本偏好'];
 const expectedGeneralSubgroups = [];
-const expectedInterfacePanelOrder = ['translation', 'skin', 'motion', 'layout', 'video-learning', 'font'];
-const expectedInterfaceGroups = ['译文样式', '逐句高亮样式', '界面与弹窗', '翻译加载样式', '菜单栏布局', '完整句学习外观', '界面字体'];
-// 划词触发、翻译卡片与朗读均在划词页；阅读辅助保留在翻译设置首项。
-const expectedTranslationGroups = ['阅读辅助', '智能高亮', '鼠标悬浮翻译', '输入框翻译', '全文翻译', '右键菜单', '悬浮球设置', '段落复制', '局部翻译', '不翻译的语言'];
+const expectedInterfacePanelOrder = ['translation', 'skin', 'motion', 'layout', 'font'];
+const expectedInterfaceGroups = ['译文样式', '界面与弹窗', '翻译加载样式', '菜单栏布局', '界面字体'];
+// 网页翻译聚焦全文、悬浮与局部、阅读辅助与不翻译的语言；悬浮球与右键独立分区。
+const expectedTranslationGroups = ['全文翻译', '鼠标悬浮翻译', '局部翻译', '双语逐句高亮', '智能高亮', '段落复制', '不翻译的语言'];
 const expectedLoadingStyles = [
   ['ring', '柔和圆环'],
   ['minimal', '简洁'],
@@ -1957,20 +1958,18 @@ async function main() {
       throw new Error('界面布局仍向用户显示 Popup 布局旧名称');
     }
     const expectedInterfaceSkins = [
-      {value: 'default', label: '默认风格', kind: 'default', contentHeight: true, popupWidth: 320, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
-      {value: 'minimal', label: '简约风格', kind: 'minimal', contentHeight: true, popupWidth: 310, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
-      {value: 'compact', label: '紧凑风格', kind: 'compact', contentHeight: true, popupWidth: 300, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
-      {value: 'contrast', label: '高对比 ⚡', kind: 'contrast', contentHeight: true, popupWidth: 320, brand: '#111', surface: '#fff', darkSurface: '#050505'},
-      {value: 'qinghua', label: '青花', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#183a65', surface: '#ffffff', darkSurface: '#111d31'},
-      {value: 'zhusha', label: '朱砂', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#c3272b', surface: '#ffffff', darkSurface: '#211a17'},
-      {value: 'shuimo', label: '水墨', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#3d3b4f', surface: '#ffffff', darkSurface: '#17181d'},
-      {value: 'zhuqing', label: '竹青', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#057748', surface: '#ffffff', darkSurface: '#17221b'},
-      {value: 'ouhe', label: '藕荷', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#574266', surface: '#ffffff', darkSurface: '#221b27'},
-      {value: 'xiangse', label: '缃色', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#8a6200', surface: '#ffffff', darkSurface: '#1f1c16'},
-      {value: 'qinglv', label: '青绿', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#205580', surface: '#ffffff', darkSurface: '#142430'},
-      {value: 'yuebai', label: '月白', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#576d93', surface: '#ffffff', darkSurface: '#1b2c37'},
-      {value: 'xuanqing', label: '玄青', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#8db4dc', surface: '#1e2030', darkSurface: '#1e2030'},
-      {value: 'wujin', label: '乌金', kind: 'palette', contentHeight: true, popupWidth: 320, brand: '#f2be45', surface: '#1b1a16', darkSurface: '#1b1a16'},
+      {value: 'default', label: '默认经典', kind: 'default', contentHeight: true, popupWidth: 320, brand: '#ef4776', surface: '#ffffff', darkSurface: '#1b1f26'},
+      {value: 'liquid-glass', label: '液态玻璃', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#1466e6', surface: '#f4f9ff', darkSurface: '#142036'},
+      {value: 'aurora', label: '极光幻彩', kind: 'craft', contentHeight: true, popupWidth: 322, brand: '#7c3aed', surface: '#fdfaff', darkSurface: '#13172c'},
+      {value: 'tactile', label: '拟物硬件', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#cc3f10', surface: '#f1eee8', darkSurface: '#23252a'},
+      {value: 'brutalist', label: '新粗野波普', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#d91b60', surface: '#ffffff', darkSurface: '#222028'},
+      {value: 'cyber', label: '赛博霓虹', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#00e5ff', surface: '#0f0d24', darkSurface: '#0f0d24'},
+      {value: 'retro-os', label: '经典复古桌面', kind: 'craft', contentHeight: true, popupWidth: 320, brand: '#0b3d91', surface: '#dfded6', darkSurface: '#2e313a'},
+      {value: 'terminal', label: '极客终端', kind: 'craft', contentHeight: true, popupWidth: 320, brand: '#4ade80', surface: '#0a140e', darkSurface: '#0a140e'},
+      {value: 'editorial', label: '典藏画报', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#881c28', surface: '#faf6ee', darkSurface: '#1e1b18'},
+      {value: 'sakura', label: '樱雾物语', kind: 'craft', contentHeight: true, popupWidth: 322, brand: '#d4356f', surface: '#ffffff', darkSurface: '#231720'},
+      {value: 'matcha', label: '宇治手账', kind: 'craft', contentHeight: true, popupWidth: 322, brand: '#2b6946', surface: '#fbf8f0', darkSurface: '#18241c'},
+      {value: 'midnight-gold', label: '黑金典藏', kind: 'craft', contentHeight: true, popupWidth: 324, brand: '#dfc076', surface: '#131218', darkSurface: '#131218'},
     ];
     const skinCards = interfaceSettingsGroup.locator('.interface-skin-option');
     if (await skinCards.count() !== expectedInterfaceSkins.length) {

@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/VideoLocalModelSettings.vue
  * 文件职责：提供本地视频字幕识别方式、Whisper 模型下载与跨浏览器共享、本机 Qwen 服务地址和字幕缓存管理。
- * 主要内容：紧凑卡片选择模型并显示缓存来源，支持授权共享目录、下载到共享位置、迁移已有文件和清除本机副本；下载来源始终自动处理且不展示供应方信息，失败可重试，旧视图迟到回包不会覆盖新状态。
+ * 主要内容：紧凑卡片选择模型并显示缓存来源，支持授权共享目录、下载到共享位置、迁移已有文件和清除本机副本；下载来源始终自动处理且不展示供应方信息，失败可重试，返回标签页时合并并发的 visibilitychange 与 focus 刷新避免重复 IPC，旧视图迟到回包不会覆盖新状态。
  * 模块边界：沿用设置草稿及显式保存，不在加载/切换时探测本机服务；通过视频 feature 公共配置和后台消息获取浏览器模型状态，不直接执行识别或操作网页播放器；下载进度只读取后台转存的变化事件。
  -->
 <template>
@@ -15,13 +15,13 @@
     <p v-if="!browserCapabilities.extensionDom" class="capability-warning" role="status">当前浏览器不支持本地 AI 字幕，无法下载或运行本地模型</p>
     <fieldset class="video-asr-provider" :disabled="!active || !config.videoTranslationEnabled || !browserCapabilities.extensionDom">
       <legend>识别方式</legend>
-      <label><input :checked="config.videoTranscriptionProvider === 'browser'" :onChange="providerControls.chooseBrowser" type="radio" name="video-asr-provider" value="browser" /> 浏览器内 Whisper</label>
-      <label><input :checked="config.videoTranscriptionProvider === 'native-qwen'" :onChange="providerControls.chooseNative" type="radio" name="video-asr-provider" value="native-qwen" /> 本机 Qwen3 ASR</label>
+      <div class="video-asr-provider-options">
+        <label :class="{ selected: config.videoTranscriptionProvider === 'browser' }"><input :checked="config.videoTranscriptionProvider === 'browser'" :onChange="providerControls.chooseBrowser" type="radio" name="video-asr-provider" value="browser" /> <span>浏览器内 Whisper</span></label>
+        <label :class="{ selected: config.videoTranscriptionProvider === 'native-qwen' }"><input :checked="config.videoTranscriptionProvider === 'native-qwen'" :onChange="providerControls.chooseNative" type="radio" name="video-asr-provider" value="native-qwen" /> <span>本机 Qwen3 ASR</span></label>
+      </div>
       <div v-if="config.videoTranscriptionProvider === 'native-qwen'" class="video-native-asr-settings">
         <label>本机服务地址 <input :value="config.videoNativeAsrBaseUrl" :onInput="providerControls.inputEndpoint" type="url" maxlength="512" placeholder="http://127.0.0.1:8000" /></label>
-        <p>固定模型：Qwen/Qwen3-ASR-1.7B。使用标准 vLLM 音频转写接口，仅允许 127.0.0.1 或 [::1]，服务需由你事先启动。</p>
-        <p>保存设置不会探测端口、启动服务或下载权重。开始 AI 字幕后才发送音频到所填本机地址；失败会报错，不自动切回 Whisper。</p>
-        <p>该接口返回文本，字幕时间按音频窗口估计，并非字级对齐；此处不代表模型已经加载或已使用 GPU。</p>
+        <p>使用本机已启动的 vLLM 接口（仅限 127.0.0.1 / [::1]，模型固定为 Qwen/Qwen3-ASR-1.7B）；开始识别时才发送音频，不自动回退 Whisper。</p>
       </div>
     </fieldset>
     <div v-if="config.videoTranscriptionProvider !== 'native-qwen'" class="video-model-list" role="radiogroup" aria-label="本地 AI 字幕模型">
@@ -443,12 +443,19 @@ watch(() => [mounted.value, revision.value], () => {
     if (current() && areaName === 'local' && changes[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]) void refresh();
   };
   // 回到设置时重新核对模型文件与字幕统计；Cache Storage 丢失文件不会触发 storage.onChanged。
-  const refreshVisibleCacheStats = () => {
-    if (current() && !clearingCache.value && document.visibilityState !== 'hidden') {
-      void refresh();
-      void refreshSharedDirectory();
-      void refreshCacheStats();
-    }
+  // 合并同一次切回标签页同时触发的 visibilitychange 与 focus，避免双倍 IPC 轮询。
+  let lastVisibleRefreshAt = -Infinity;
+  let lastVisibleRefreshType = '';
+  const refreshVisibleCacheStats = (event?: Event) => {
+    if (!current() || clearingCache.value || document.visibilityState === 'hidden') return;
+    const now = Date.now();
+    const type = event?.type || '';
+    if (type && lastVisibleRefreshType && type !== lastVisibleRefreshType && now - lastVisibleRefreshAt < 300) return;
+    lastVisibleRefreshAt = now;
+    lastVisibleRefreshType = type;
+    void refresh();
+    void refreshSharedDirectory();
+    void refreshCacheStats();
   };
   browser.storage.onChanged.addListener(handleStorageChange);
   const stopProgress = watchDownloadProgress(modelOptions.map(item => videoModelDownloadId(item.value)), (id, next) => {
@@ -481,8 +488,12 @@ svg { width: 15px; height: 15px; flex: none; }
 .video-model-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
 .video-model-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); transition: border-color 150ms ease, background 150ms ease; }
 .video-model-card:not(.disabled) { cursor: pointer; }
-.video-asr-provider { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
-.video-asr-provider > label { display: flex; align-items: center; gap: 8px; }
+.video-asr-provider { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 0; border: 0; font-size: 12px; }
+.video-asr-provider > legend { padding: 0; margin-bottom: 6px; color: var(--ink); font-size: 12px; font-weight: 600; }
+.video-asr-provider-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.video-asr-provider-options > label { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); cursor: pointer; font-weight: 550; }
+.video-asr-provider-options > label.selected { border-color: var(--brand); color: var(--brand-strong); background: var(--brand-soft); }
+.video-asr-provider-options input { accent-color: var(--brand); margin: 0; }
 .video-native-asr-settings { display: grid; gap: 8px; overflow-wrap: anywhere; }
 .video-native-asr-settings label { display: grid; gap: 6px; }
 .video-native-asr-settings input { width: 100%; min-width: 0; box-sizing: border-box; padding: 8px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }

@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/sentencePlayback.ts
  * 文件职责：在现有网页媒体元素上提供可解除的单句循环与句末暂停控制。
- * 主要内容：只在选句期间检查媒体状态，按原文毫秒范围识别自身跳转与用户 seek；尚未进入所选范围时只准备辅助模式，待 seek 完成再检查边界，尊重暂停和倍速，并在媒体重载、卸载或销毁时取消监听与动画帧。
+ * 主要内容：只在选句期间检查媒体状态，按原文毫秒范围与当前倍速动态容差识别自身跳转与用户 seek；尚未进入所选范围时只准备辅助模式，待 seek 完成再检查边界，句末暂停停在句尾前避开下句起跳闪烁，尊重暂停和倍速，媒体自然结束接近句尾时允许循环，并在媒体重载、卸载或销毁时取消监听与动画帧。
  * 模块边界：不创建播放器、不修改倍速/全屏/画中画，不进行字幕翻译或隐式播放；媒体与帧调度边界可注入，UI 只在用户明确播放时调用原媒体 play。
  */
 import type {VideoSentence} from './sentenceTimeline';
@@ -15,7 +15,8 @@ export interface SentencePlaybackState {
 }
 
 export type SentencePlaybackMedia = Pick<HTMLMediaElement,
-  'currentTime' | 'paused' | 'seeking' | 'ended' | 'isConnected' | 'play' | 'pause' | 'addEventListener' | 'removeEventListener'>;
+  'currentTime' | 'paused' | 'seeking' | 'ended' | 'isConnected' | 'play' | 'pause' | 'addEventListener' | 'removeEventListener'>
+  & Partial<Pick<HTMLMediaElement, 'playbackRate' | 'duration'>>;
 
 export interface SentencePlaybackScheduler {
   request(callback: () => void): number;
@@ -138,6 +139,18 @@ export class SentencePlaybackController {
     this.tick();
   };
 
+  private seekToleranceMs(): number {
+    const rate = this.media.playbackRate ?? 1;
+    return Math.max(150, Math.round(75 * Math.max(1, Number.isFinite(rate) && rate > 0 ? rate : 1)));
+  }
+
+  private isAtSentenceEnd(currentMs: number, endMs: number): boolean {
+    if (currentMs >= endMs - 250) return true;
+    const duration = this.media.duration;
+    return typeof duration === 'number' && Number.isFinite(duration) && duration > 0
+      && endMs >= duration * 1000 && currentMs >= duration * 1000 - 250;
+  }
+
   private seek(milliseconds: number): boolean {
     if (!this.media.seeking && Math.abs(this.media.currentTime * 1000 - milliseconds) < 1) {
       this.expectedSeekMs = null;
@@ -147,7 +160,7 @@ export class SentencePlaybackController {
     this.expectedSeekMs = milliseconds;
     try {
       this.media.currentTime = milliseconds / 1000;
-      this.seekPending = this.media.seeking || Math.abs(this.media.currentTime * 1000 - milliseconds) > 75;
+      this.seekPending = this.media.seeking || Math.abs(this.media.currentTime * 1000 - milliseconds) > this.seekToleranceMs();
       return true;
     } catch {
       this.stop();
@@ -157,11 +170,11 @@ export class SentencePlaybackController {
 
   private handleSeeking = (): void => {
     this.cancelFrame();
-    if (this.expectedSeekMs === null || Math.abs(this.media.currentTime * 1000 - this.expectedSeekMs) > 75) this.stop();
+    if (this.expectedSeekMs === null || Math.abs(this.media.currentTime * 1000 - this.expectedSeekMs) > this.seekToleranceMs()) this.stop();
   };
 
   private handleSeeked = (): void => {
-    if (this.expectedSeekMs !== null && Math.abs(this.media.currentTime * 1000 - this.expectedSeekMs) > 75) {
+    if (this.expectedSeekMs !== null && Math.abs(this.media.currentTime * 1000 - this.expectedSeekMs) > this.seekToleranceMs()) {
       this.stop();
       return;
     }
@@ -185,7 +198,7 @@ export class SentencePlaybackController {
       this.stop();
       return;
     }
-    if (this.mode === 'loop' && this.boundaryArmed && this.media.currentTime * 1000 >= this.sentence.endMs) {
+    if (this.mode === 'loop' && this.boundaryArmed && this.isAtSentenceEnd(this.media.currentTime * 1000, this.sentence.endMs)) {
       const operation = this.operation;
       if (this.seek(this.sentence.startMs)) {
         void this.media.play().catch(() => {
@@ -207,16 +220,17 @@ export class SentencePlaybackController {
     }
     if (this.mode === 'off' || this.media.paused || this.media.seeking || this.pausedAtEnd) return;
     const currentMs = this.media.currentTime * 1000;
+    const toleranceMs = this.seekToleranceMs();
     // currentTime 写入后播放器可能还停在旧画面；等待自己的 seek 落地，不能重复跳转。
     if (this.seekPending && this.expectedSeekMs !== null) {
-      if (Math.abs(currentMs - this.expectedSeekMs) > 75) return;
+      if (Math.abs(currentMs - this.expectedSeekMs) > toleranceMs) return;
       this.seekPending = false;
     }
     if (!this.boundaryArmed) {
       if (!this.isInsideSentence()) return;
       this.boundaryArmed = true;
     }
-    if (!Number.isFinite(currentMs) || currentMs < this.sentence.startMs - 150) {
+    if (!Number.isFinite(currentMs) || currentMs < this.sentence.startMs - toleranceMs) {
       this.stop();
       return;
     }
@@ -225,7 +239,8 @@ export class SentencePlaybackController {
       else {
         this.pausedAtEnd = true;
         this.media.pause();
-        if (!this.seek(this.sentence.endMs)) return;
+        const pauseTargetMs = Math.max(this.sentence.startMs, this.sentence.endMs - 10);
+        if (!this.seek(pauseTargetMs)) return;
         this.notify();
       }
     }

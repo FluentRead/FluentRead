@@ -5,7 +5,8 @@ import browser from 'webextension-polyfill';
 import {vocabularyBook} from '@/src/features/vocabulary/repository';
 import {installBrowserMaterialPageRuntime,installMaterialPageRuntime} from '@/src/app/background/materialPageRuntime';
 import {MATERIAL_PAGE_PORT_NAME} from '@/src/features/vocabulary/materialPageProtocol';
-import {receiveMaterialRead,type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
+import {startMaterialRead,type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
+const receiveMaterialRead = async (...args: Parameters<typeof startMaterialRead>) => startMaterialRead(...args).result;
 
 vi.mock('webextension-polyfill',()=>({default:{}}));
 type Fn=(...args:any[])=>void;

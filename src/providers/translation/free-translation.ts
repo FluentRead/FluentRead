@@ -2,7 +2,7 @@
  * @file src/providers/translation/free-translation.ts
  * 服务启用：冻结配置中的全局关闭项不参与权重、自动候选或单路检查，原免费池选择与健康记录保留。
  * 文件职责：按冻结的用户设置编排免费翻译，并接入有界请求、取消和跨段冷却。
- * 主要内容：冻结匿名请求配置和共享预算；Safari 每次请求读取临时域授权集合，未授权候选不入池、不计健康，单服务检查同样拦截；文档合批保留完整混合池，原生候选消费有界全组、其他候选只消费首段并继续余槽，普通调用沿用原分组条件和冻结的服务合批偏好；逐槽验证术语、文档标签、语言和原文回显，图片文字的内部策略接受有效原样结果且不继续换线，保持线路健康、间隔、取消及真实字符统计；向免费池与子服务传递真实在途租约，使取消后的迟到传输继续受候选、总池和后台并发约束；单服务检查不换线，跳过多线路中已确认不支持的语言方向。
+ * 主要内容：冻结匿名请求配置和共享预算；Safari 每次请求读取临时域授权集合，未授权候选不入池、不计健康，单服务检查同样拦截；同图多行批次由单条健康线路整组完成（原生线路按有界块合批，其余线路单路顺序完成，失败时整组换线），保持同一图片内术语一致；文档合批保留完整混合池，原生候选消费有界全组、其他候选只消费首段并继续余槽，普通调用沿用原分组条件和冻结的服务合批偏好；逐槽验证术语、文档标签、语言和原文回显，图片文字的内部策略接受有效原样结果且不继续换线，保持线路健康、间隔、取消及真实字符统计；向免费池与子服务传递真实在途租约，使取消后的迟到传输继续受候选、总池和后台并发约束；单服务检查不换线，跳过多线路中已确认不支持的语言方向。
  * 模块边界：只装配已有 provider；健康状态与并发调度由 freeFallback 服务持有。
  */
 import {sha256Hex} from '@/src/shared/function/sha256';
@@ -47,9 +47,9 @@ import {
     getTranslationRequestScheduler,
     reportTranslationRoute,
     isUnchangedTranslationResultAllowed,
+    isImageTextBatch,
 } from '@/src/services/translation/requestSnapshot';
-import type {TranslationProviderRequest} from '@/src/services/translation/types';
-import type {TranslationProviderConfigSnapshot} from '@/src/services/translation/types';
+import type {TranslationProviderConfigSnapshot, TranslationProviderRequest} from '@/src/services/translation/types';
 import {documentFreeAttemptCharacters, runDocumentFreeNativeCandidate, serializeDocumentFreeFirstSlot, translateDocumentFreeGroups} from './documentFreeBatch';
 
 type FreeTranslationRequest = Omit<TranslationProviderRequest<string>, 'origin'>;
@@ -129,17 +129,16 @@ class InvalidFreeGroupResultError extends Error {
     constructor() { super('免费翻译分组返回格式或译文数量异常'); }
 }
 
-async function translateNativeProviderGroup(
+async function translateNativeProviderTexts(
     id: 'microsoft' | 'google', message: TranslationProviderRequest<string>, sources: readonly string[],
     lease?: FreeFallbackLease,
-): Promise<string> {
-    const packet = serializeTranslationSlots(sources);
+): Promise<string[]> {
     // 只接原生数组 transport；不把文本适配器的串行 HTTP 压进同一 attempt。
     const result = id === 'microsoft'
         ? await translateMicrosoftTexts([...sources], message.sourceLanguage!, message.targetLanguage!, message.abortSignal, true, lease)
         : await translateGoogleOwnerTexts(sources, message.sourceLanguage!, message.targetLanguage!, message.abortSignal!, lease);
     if (!Array.isArray(result) || result.length !== sources.length) throw new InvalidFreeGroupResultError();
-    const translations = sources.map((source, index) => {
+    return sources.map((source, index) => {
         const value = validateProtectedResult(source, result[index], message);
         if (typeof value !== 'string' || !value.trim()) throw new InvalidFreeGroupResultError();
         if (!isUnchangedTranslationResultAllowed(message) || !isUnchangedTranslationResponse(source, value)) {
@@ -152,11 +151,49 @@ async function translateNativeProviderGroup(
         const suffix = source.slice(prefix.length + content.length);
         return prefix + value.trim() + suffix;
     });
+}
+
+function packFreeGroupTranslations(
+    packet: ReturnType<typeof serializeTranslationSlots>, translations: readonly string[],
+): string {
     const nonce = packet.starts[0]!.slice('___FLUENTREAD_'.length, -'_0_BEGIN___'.length);
     const translatedPacket = serializeTranslationSlots(translations, nonce).payload;
     // 返回值仍使用同一槽协议；译文夹带本包标记时须在 candidate 内拒绝，才能按原池换线。
     if (!parseTranslationSlots(packet, translatedPacket)) throw new InvalidFreeGroupResultError();
     return translatedPacket;
+}
+
+async function translateNativeProviderGroup(
+    id: 'microsoft' | 'google', message: TranslationProviderRequest<string>, sources: readonly string[],
+    lease?: FreeFallbackLease,
+): Promise<string> {
+    const packet = serializeTranslationSlots(sources);
+    const translations = await translateNativeProviderTexts(id, message, sources, lease);
+    return packFreeGroupTranslations(packet, translations);
+}
+
+/** 同图多行批次留在单条健康线路上完成，消除相邻标签跨不同免费服务产生的术语漂移。 */
+async function translateCoherentImageProvider(
+    id: FreeProviderId, message: TranslationProviderRequest<string>, sources: readonly string[],
+    signal: AbortSignal, lease?: FreeFallbackLease,
+): Promise<string> {
+    const current = requireTranslationProviderConfig(message);
+    const packet = serializeTranslationSlots(sources);
+    const translations: string[] = [];
+    if ((id === 'microsoft' || id === 'google') && isNativeTranslationBatchEnabled(id, current.nativeBatchTranslationEnabled)) {
+        for (const chunk of groupFreeSlots(sources)) {
+            if (signal.aborted) throw abortErrorFromSignal(signal);
+            translations.push(...await translateNativeProviderTexts(id, message, chunk.sources, lease));
+        }
+        return packFreeGroupTranslations(packet, translations);
+    }
+    for (const source of sources) {
+        if (signal.aborted) throw abortErrorFromSignal(signal);
+        const value = await translateProviderText(id, {...message, origin: source}, lease);
+        if (typeof value !== 'string' || !value.trim()) throw new InvalidFreeGroupResultError();
+        translations.push(value);
+    }
+    return packFreeGroupTranslations(packet, translations);
 }
 
 /** 逐服务检查复用免费池的匿名配置和结果验证，不受启用列表、冷却或自动换线影响。 */
@@ -237,7 +274,9 @@ export async function getFreeTranslationWeightSnapshot(current: TranslationProvi
     return calculateFreeTranslationWeightSnapshot(enabledProviderIds, health, now);
 }
 
-function candidatesFor(text: string, message: PreparedRequest, groupSources?: readonly string[], scalarProviders?: Set<string>): {
+function candidatesFor(
+    text: string, message: PreparedRequest, groupSources?: readonly string[], scalarProviders?: Set<string>, coherentImageBatch = false,
+): {
     candidates: FreeFallbackCandidate[];
     routeByIdentity: Map<string, string>;
 } {
@@ -264,6 +303,9 @@ function candidatesFor(text: string, message: PreparedRequest, groupSources?: re
                 if (schedulerContext) request = attachTranslationRequestScheduler(
                     request, schedulerContext.scheduler, schedulerContext.identity, lease,
                 );
+                if (coherentImageBatch && groupSources) {
+                    return translateCoherentImageProvider(provider.id, request, groupSources, signal, lease);
+                }
                 if (groupSources && (provider.id === 'microsoft' || provider.id === 'google')
                     && !(import.meta.env.BROWSER !== 'userscript' && message.documentBatch === true && scalarProviders?.has(provider.id))) {
                     const translate = () => translateNativeProviderGroup(provider.id as 'microsoft' | 'google', request, groupSources, lease);
@@ -283,10 +325,17 @@ function candidatesFor(text: string, message: PreparedRequest, groupSources?: re
     return {candidates, routeByIdentity};
 }
 
-async function translatePreparedText(text: string, message: PreparedRequest, groupSources?: readonly string[], scalarProviders?: Set<string>): Promise<string> {
+async function translatePreparedText(
+    text: string, message: PreparedRequest, groupSources?: readonly string[], scalarProviders?: Set<string>, coherentImageBatch = false,
+): Promise<string> {
     const current = requireTranslationProviderConfig(message);
-    const {candidates, routeByIdentity} = candidatesFor(text, message, groupSources, scalarProviders);
+    const {candidates, routeByIdentity} = candidatesFor(text, message, groupSources, scalarProviders, coherentImageBatch);
     const scalarBeforeAttempt = import.meta.env.BROWSER !== 'userscript' && message.documentBatch === true ? new Set(scalarProviders) : undefined;
+    const baseTimeoutMs = normalizeFreeTranslationTimeoutMs(current.freeTranslationTimeoutMs);
+    const maxCoherentImageTimeoutMs = Math.floor(FREE_TRANSLATION_TOTAL_TIMEOUT_MS / 2);
+    const timeoutMs = coherentImageBatch && groupSources
+        ? Math.min(maxCoherentImageTimeoutMs, baseTimeoutMs * Math.min(2, Math.ceil(groupSources.length / 6)))
+        : baseTimeoutMs;
     return runFallback(candidates, {
         signal: message.abortSignal,
         lease: getTranslationRequestScheduler(message)?.lease,
@@ -299,7 +348,7 @@ async function translatePreparedText(text: string, message: PreparedRequest, gro
                 ? documentFreeAttemptCharacters(routeByIdentity.get(attempt.identity)!, groupSources, scalarBeforeAttempt!)
                 : groupSources ? groupSources.reduce((total, source) => total + source.length, 0) : text.length,
         }),
-        timeoutMs: normalizeFreeTranslationTimeoutMs(current.freeTranslationTimeoutMs),
+        timeoutMs,
         cooldownMs: normalizeFreeTranslationCooldownMs(current.freeTranslationCooldownMs),
         mode: normalizeFreeTranslationMode(current.freeTranslationMode),
         deadline: message[FREE_TRANSLATION_DEADLINE],
@@ -336,7 +385,7 @@ function groupFreeSlots(texts: readonly string[]): FreeSlotGroup[] {
     return groups;
 }
 
-async function translateFreeBatch(texts: string[], message: PreparedRequest): Promise<string[]> {
+async function translateFreeBatch(texts: string[], message: PreparedRequest, imageBatch: boolean): Promise<string[]> {
     if (message.abortSignal?.aborted) throw abortErrorFromSignal(message.abortSignal);
     if (import.meta.env.BROWSER !== 'userscript' && message.documentBatch === true) {
         return translateDocumentFreeGroups(texts, groupFreeSlots(texts), FREE_TRANSLATION_BATCH_CONCURRENCY, message.abortSignal,
@@ -353,6 +402,16 @@ async function translateFreeBatch(texts: string[], message: PreparedRequest): Pr
                     return translate();
                 }
             });
+    }
+    if (imageBatch && texts.length > 1) {
+        const entries = texts.flatMap((source, index) => source.trim() ? [{index, source}] : []);
+        const sources = entries.map(entry => entry.source);
+        const packet = serializeTranslationSlots(sources);
+        const translated = await translatePreparedText(packet.payload, message, sources, undefined, true);
+        const values = parseTranslationSlots(packet, translated)!;
+        const result = [...texts];
+        entries.forEach((entry, ordinal) => { result[entry.index] = values[ordinal]!; });
+        return result;
     }
     // 按冻结的完整启用池决定；不能借健康/方向过滤把混合池提升为原生分组池。
     const grouped = usesNativeFreeGroups(texts.length, message);
@@ -404,13 +463,14 @@ export default async function freeTranslation(message: TranslationProviderReques
     if (typeof origin !== 'string' && !Array.isArray(origin)
         || Array.isArray(origin) && origin.some(text => typeof text !== 'string')) throw new Error('免费翻译服务仅支持文本输入');
     const frozen = prepareRequest(message);
+    const imageBatch = import.meta.env.BROWSER !== 'userscript' && isImageTextBatch(message);
     if (Array.isArray(origin)) {
         // 只提前返回原本没有候选工作的路径；普通小批次/混合池的逐段策略保持原样。
-        if (origin.length === 0 || ((import.meta.env.BROWSER !== 'userscript' && message.documentBatch === true
+        if (origin.length === 0 || ((import.meta.env.BROWSER !== 'userscript' && message.documentBatch === true || imageBatch
             || usesNativeFreeGroups(origin.length, frozen)) && origin.every(text => !text.trim()))) return origin;
     }
     const prepared = import.meta.env.BROWSER === 'safari'
         ? await prepareAuthorizedRequest(frozen, enabledFreeProviders(requireTranslationProviderConfig(frozen))) : frozen;
     if (typeof origin === 'string') return translatePreparedText(origin, prepared);
-    return translateFreeBatch(origin, prepared);
+    return translateFreeBatch(origin, prepared, imageBatch);
 }

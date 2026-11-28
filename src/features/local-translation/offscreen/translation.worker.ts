@@ -1,8 +1,8 @@
 /**
  * @file src/features/local-translation/offscreen/translation.worker.ts
  *
- * 文件职责：在隔离 Worker 中运行轻量 OPUS 翻译和混元 Hy-MT2 翻译。
- * 主要内容：只读取已校验的离线模型；混元优先使用 WebGPU，OPUS 保持 CPU；复用有界线程与计算间歇，失败重建单线程 Worker，分句推理和重复保护约束资源与输出。
+ * 文件职责：在隔离 Worker 中运行轻量 OPUS 翻译和混元翻译。
+ * 主要内容：只读取已校验的离线模型；混元经硬件 WebGPU 探测跳过软件适配器并启用提示词前缀 KV 缓存与批处理调优，按模型 ID 跟踪会话切换；OPUS 保持 CPU 内存池优化并按设备内存做双语 LRU(2) 缓存；复用有界线程与计算间歇，失败重建单线程 Worker，分句推理和重复保护约束资源与输出。
  * 模块边界：入站先经 feature 公共协议校验，不下载模型、不读取页面配置；空闲释放、请求取消和最终超时由外层 Worker 生命周期控制。
  */
 import {forceSingleThreadInference, localWasmThreads, paceLocalInference, paceLocalInitialization} from '@/src/shared/onnx/resources';
@@ -14,20 +14,26 @@ import {
 } from '@/src/core/config/localTranslation';
 import {assertLocalTranslationOutput, hunyuanTranslationPrompt, splitLocalTranslationText} from '@/src/core/translation/localInference';
 import {getTranslationArtifacts, matchTranslationArtifact, translationArtifactBlob} from './artifactStore';
-import {supportsHunyuanTranslation} from '@/src/platform/browser/localTranslationSupport';
+import {supportsHunyuanTranslation, supportsOpusTranslation} from '@/src/platform/browser/localTranslationSupport';
 import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
+import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 import {readWorkerRequestId} from '@/src/core/messaging/validation';
 import {parseLocalTranslationWorkerRequest, type LocalTranslationWorkerRequest as WorkerRequest, type LocalTranslationWorkerResponse as WorkerResponse} from '../workerProtocol';
 
 type Translator = ((text: string, options?: Record<string, unknown>) => Promise<unknown>) & {dispose?: () => Promise<void>};
 const MAX_INFERENCE_MS = 90_000;
-let translator: Translator | undefined;
-let translatorRepository = '';
+const translators = new Map<string, Translator>();
 let hunyuan: Wllama | undefined;
+let hunyuanModel = '';
 let backend: WorkerResponse['backend'];
 let taskQueue = Promise.resolve();
 
 function extensionUrl(path: string): string { return new URL(path, self.location.href).toString(); }
+
+function maxOpusTranslators(): number {
+    const memory = (globalThis.navigator as {deviceMemory?: unknown} | undefined)?.deviceMemory;
+    return typeof memory === 'number' && memory >= 8 ? 2 : 1;
+}
 
 function configureEnvironment(): void {
     env.allowLocalModels = true;
@@ -54,24 +60,62 @@ function configureEnvironment(): void {
     }
 }
 
+async function disposeAll(entries: Array<() => Promise<void> | undefined>): Promise<void> {
+    let firstError: unknown;
+    let hasError = false;
+    for (const close of entries) {
+        try {
+            await close();
+        } catch (error) {
+            if (!hasError) {
+                hasError = true;
+                firstError = error;
+            }
+        }
+    }
+    if (hasError) throw firstError;
+}
+
 async function dispose(): Promise<void> {
     backend = undefined;
-    const previousTranslator = translator;
+    const previousTranslators = [...translators.values()];
+    translators.clear();
     const previousHunyuan = hunyuan;
-    translator = undefined;
-    translatorRepository = '';
     hunyuan = undefined;
+    hunyuanModel = '';
     // 释放失败也不能让损坏会话继续占用缓存；下一条队列请求应能够创建新实例。
-    try { await previousTranslator?.dispose?.(); }
-    finally { await previousHunyuan?.exit(); }
+    await disposeAll([
+        ...previousTranslators.map((item) => () => item.dispose?.()),
+        () => previousHunyuan?.exit(),
+    ]);
 }
 
 async function getTranslator(request: Extract<WorkerRequest, {type: 'translate'}>): Promise<Translator> {
+    if (!supportsOpusTranslation()) throw new Error('LOCAL_TRANSLATION_BROWSER_UNSUPPORTED');
     const item = getLocalTranslationModel(request.model);
     const repository = item.engine === 'opus'
         ? resolveOpusTranslationRepository(request.model, request.sourceLanguage!, request.targetLanguage!) : request.model;
-    if (translator && translatorRepository === repository) return translator;
-    await dispose();
+    const cached = translators.get(repository);
+    if (cached) {
+        translators.delete(repository);
+        translators.set(repository, cached);
+        backend = 'wasm';
+        return cached;
+    }
+    if (hunyuan) {
+        const previousHunyuan = hunyuan;
+        hunyuan = undefined;
+        hunyuanModel = '';
+        backend = undefined;
+        await previousHunyuan.exit();
+    }
+    const capacity = maxOpusTranslators();
+    while (translators.size >= capacity) {
+        const oldestKey = translators.keys().next().value!;
+        const oldest = translators.get(oldestKey)!;
+        translators.delete(oldestKey);
+        await oldest.dispose?.();
+    }
     const revision = getTranslationArtifacts(request.model).find((file) => file.repo === repository)?.revision || 'main';
     const create = () => pipeline('translation', repository, {
         device: 'wasm', dtype: LOCAL_TRANSLATION_DTYPE, revision, local_files_only: true,
@@ -79,21 +123,21 @@ async function getTranslator(request: Extract<WorkerRequest, {type: 'translate'}
         session_options: {
             graphOptimizationLevel: 'all',
             extra: {optimization: {disable_specified_optimizers: 'QDQSelectorActionTransformer'}},
-            enableCpuMemArena: false, enableMemPattern: false, executionMode: 'sequential',
+            enableCpuMemArena: true, enableMemPattern: false, executionMode: 'sequential',
         },
     }) as unknown as Promise<Translator>;
     const wasm = env.backends.onnx.wasm;
-    translator = await paceLocalInitialization(() => wasm
+    const instance = await paceLocalInitialization(() => wasm
         ? withCompressedWasmBinary(wasm, resolveOnnxWasmAssetPaths(extensionUrl).wasm, create)
         : create());
-    translatorRepository = repository;
+    translators.set(repository, instance);
     backend = 'wasm';
-    return translator;
+    return instance;
 }
 
 async function getHunyuan(model: string): Promise<Wllama> {
     if (!supportsHunyuanTranslation()) throw new Error('LOCAL_TRANSLATION_BROWSER_UNSUPPORTED');
-    if (hunyuan) return hunyuan;
+    if (hunyuan && hunyuanModel === model) return hunyuan;
     await dispose();
     const file = getTranslationArtifacts(model)[0];
     if (!file) throw new Error('LOCAL_TRANSLATION_INVALID_MODEL');
@@ -106,10 +150,10 @@ async function getHunyuan(model: string): Promise<Wllama> {
         engine.setCompat(null);
         return engine;
     };
-    const supportsGpu = 'gpu' in navigator && 'Suspending' in WebAssembly;
+    const supportsGpu = 'Suspending' in WebAssembly && (await probeWebGpu()).available;
     let engine = makeEngine();
     const load = (gpu: boolean) => paceLocalInitialization(() => engine.loadModel([blob], {
-        n_ctx: 2048, n_batch: 128, n_ubatch: 64, n_threads: 1, n_parallel: 1,
+        n_ctx: 2048, n_batch: 512, n_ubatch: 256, n_threads: 1, n_parallel: 1,
         n_gpu_layers: gpu ? 99 : 0, warmup: false, jinja: true,
         cache_idle_slots: false, ctx_shift: false,
     }));
@@ -125,6 +169,7 @@ async function getHunyuan(model: string): Promise<Wllama> {
         backend = 'wasm';
     }
     hunyuan = engine;
+    hunyuanModel = model;
     return engine;
 }
 
@@ -145,7 +190,7 @@ async function translate(request: Extract<WorkerRequest, {type: 'translate'}>): 
                 const response = await paceLocalInference(() => (engine as Wllama).createChatCompletion({
                     messages: [{role: 'user', content: hunyuanTranslationPrompt(chunk.trim(), request.sourceLanguage!, request.targetLanguage!)}],
                     max_tokens: 768, temperature: 0.7, top_p: 0.6, top_k: 20,
-                    penalty_repeat: 1.05, seed: 42, cache_prompt: false, abortSignal: abort.signal,
+                    penalty_repeat: 1.05, seed: 42, cache_prompt: true, abortSignal: abort.signal,
                 }));
                 if (response.choices[0]?.finish_reason === 'length') throw new Error('LOCAL_TRANSLATION_OUTPUT_LIMIT');
                 translated = response.choices[0]?.message.content || '';

@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {createMangaSiteRule, normalizeMangaSiteRules, normalizeMangaPrefetchPages, resolveMangaSite, resolveMangaSourceLanguage} from '@/src/core/config/manga';
+import {isLocalMangaHost} from '@/src/core/config/mangaNormalization';
 import {isCatalogMangaHost, MANGA_SITE_DOMAINS, MANGA_SITE_CATALOG} from '@/src/core/config/mangaSiteCatalog';
 import {resolveMangaReaderProfile} from '@/src/core/config/mangaReaderProfiles';
 import {normalizeConfig} from '@/src/core/config/model';
@@ -59,6 +60,11 @@ describe('漫画阅读规则与持久偏好', () => {
         ['https://mangalib.me/ru/1--title/read/v22/c129?p=2', 'ru'],
         ['https://www.mangahub.ru/read/123?page=2', 'ru'],
         ['https://comic.naver.com/webtoon/detail?titleId=855297&no=1&week=mon', 'ko'],
+        ['https://ridibooks.com/books/1690002642/preview', 'ko'],
+        ['https://www.bomtoon.com/viewer/PAYBACK/p1', 'ko'],
+        ['https://novelpia.com/comic_viewer/18735', 'ko'],
+        ['https://toptoon.com/comic/ep_view/Legendary_Hunter/1/rent', 'ko'],
+        ['https://page.kakao.com/content/12345/viewer/67890', 'ko'],
     ])('自动漫画语言只在已确认的内置正文路径 %s 使用 %s 提示', (href, source) => {
         expect(resolveMangaSourceLanguage(href, 'auto')).toBe(source);
         for (const manual of ['en','ru-RU','ko-KR','ja']) expect(resolveMangaSourceLanguage(href,manual)).toBe(manual);
@@ -121,6 +127,8 @@ describe('漫画阅读规则与持久偏好', () => {
         expect(site).toMatchObject({name: 'Bomtoon', requireContent: true});
         const {document} = parseHTML('<div class="printView"><div class="sc-gHLcSH"><div class="sc-jvLaUc"><div class="sc-edUIhV"><div class="sc-hjQCSK"><canvas id="body" class="sc-bSakgD" width="1440" height="1440"></canvas><canvas id="other"></canvas><aside><canvas id="nested" class="sc-bSakgD"></canvas></aside></div></div></div><img id="copyright" class="sc-jSMfEi"><canvas id="ad" class="sc-bSakgD"></canvas></div></div><div class="sc-gHLcSH"><div class="sc-jvLaUc"><div class="sc-edUIhV"><div class="sc-hjQCSK"><canvas id="outside" class="sc-bSakgD"></canvas></div></div></div></div>');
         expect([...document.querySelectorAll(site.canvasSelector!)].map(canvas => canvas.id)).toEqual(['body']);
+        const {document: rehashed} = parseHTML('<div class="printView"><div class="sc-aaaa"><div class="sc-bbbb"><div class="sc-cccc"><div class="sc-dddd"><canvas id="rehashed-body" class="sc-eeee"></canvas><canvas id="plain"></canvas><aside><canvas id="nested" class="sc-eeee"></canvas></aside></div></div></div><canvas id="ad" class="sc-eeee"></canvas></div></div>');
+        expect([...rehashed.querySelectorAll(site.canvasSelector!)].map(canvas => canvas.id)).toEqual(['rehashed-body']);
         expect(site.areaSelector).toBe(site.canvasSelector);
         expect(document.querySelectorAll(site.selector)).toHaveLength(0);
         expect(site.canvasInteractionSelector).toBeUndefined();
@@ -141,6 +149,8 @@ describe('漫画阅读规则与持久偏好', () => {
         expect(site).toMatchObject({name: 'BeLTOON', requireContent: true});
         const {document} = parseHTML('<div class="printView"><div class="sc-iXxrte eWYGf"><div class="sc-jhzXDd vufrE"><img id="body" class="sc-jSMfEi izegLd" src="blob:https://www.beltoon.jp/body"><img id="cover" class="sc-jSMfEi" src="https://www.beltoon.jp/cover.jpg"><img id="foreign" class="sc-jSMfEi" src="blob:https://other.example/body"><aside><img id="nested" class="sc-jSMfEi" src="blob:https://www.beltoon.jp/ad"></aside></div></div></div><div class="sc-iXxrte"><div class="sc-jhzXDd"><img id="outside" class="sc-jSMfEi" src="blob:https://www.beltoon.jp/recommended"></div></div>');
         expect([...document.querySelectorAll(site.selector)].map(image => image.id)).toEqual(['body']);
+        const {document: rehashed} = parseHTML('<div class="printView"><div class="sc-aaaa"><div class="sc-bbbb"><img id="rehashed-body" class="sc-cccc" src="blob:https://www.beltoon.jp/page"><img id="cover" src="https://www.beltoon.jp/cover.jpg"><aside><img id="nested" src="blob:https://www.beltoon.jp/ad"></aside></div></div></div>');
+        expect([...rehashed.querySelectorAll(site.selector)].map(image => image.id)).toEqual(['rehashed-body']);
         for (const path of ['/', '/app/all/main', '/detail/digging', '/user/login', '/viewer/digging/p0', '/viewer/digging/p01', '/viewer/digging/pword', '/viewer/digging/p1/extra']) expect(resolveMangaReaderProfile('beltoon.jp', path)).toBeNull();
         expect(resolveMangaReaderProfile('beltoon.jp.attacker.test', '/viewer/digging/p1')).toBeNull();
     });
@@ -721,6 +731,9 @@ describe('漫画阅读规则与持久偏好', () => {
         }
         for (const href of ['https://pixiv.net/','http://pixiv.net/artworks/1','https://www.pixiv.net/artworks/name','https://pixiv.net.attacker.test/chapter/1']) expect(resolveMangaSite(href)).toBeNull();
         expect(resolveMangaSite('https://new-manga.example/chapter/123')?.selector).toContain('main img');
+        for (const path of ['/manga/solo-leveling/1', '/manhwa/title/2', '/manhua/title/3', '/webtoon/title/4', '/webtoons/title/5']) {
+            expect(resolveMangaSite(`https://generic-reader.example${path}`)).toMatchObject({generic: true, custom: false});
+        }
         expect(resolveMangaSite('https://example.com/article/123')).toBeNull();
     });
     it('旧配置保留普通图片关闭，同时启用漫画提示；永久关闭不会被归一化重开', () => {
@@ -748,6 +761,38 @@ describe('漫画阅读规则与持久偏好', () => {
         expect(resolveMangaSite('https://example.com.attacker/read', [rule])).toBeNull();
         const prefix = {...rule, pathPrefix: '/read/'};
         expect(resolveMangaSite('https://example.com/read/4', [prefix])?.custom).toBe(true);
+    });
+    it('允许本机与局域网自托管漫画阅读器的显式端口，仍拒绝公网端口、零端口与非内网段', () => {
+        for (const href of [
+            'http://localhost:25600/read/1',
+            'http://127.0.0.1:8080/manga/1',
+            'http://[::1]:4567/reader/1',
+            'http://192.168.1.50:25600/book/1',
+            'http://10.0.0.8:3000/series/1',
+            'http://172.16.0.5:8080/read/1',
+            'http://172.31.255.1:8080/read/1',
+            'http://nas.local:5000/viewer/1',
+            'http://localhost:443/read/1',
+        ]) {
+            const rule = createMangaSiteRule(href, 'main img')!;
+            expect(rule, href).not.toBeNull();
+            expect(normalizeMangaSiteRules([rule]), href).toEqual([rule]);
+            expect(resolveMangaSite(href, [rule]), href).toMatchObject({custom: true, selector: 'main img'});
+        }
+        expect(resolveMangaSite('http://localhost:25600/reader/42')).toMatchObject({name: 'localhost:25600', generic: true, custom: false});
+        for (const rejected of [
+            'http://localhost:0/read/1',
+            'http://172.15.0.1:8080/read/1',
+            'http://172.32.0.1:8080/read/1',
+            'http://192.169.1.1:8080/read/1',
+            'http://8.8.8.8:8080/read/1',
+            'http://.local:8080/read/1',
+            'https://example.com:8080/read/1',
+            'http://u:p@localhost:25600/read/1',
+        ]) {
+            expect(createMangaSiteRule(rejected, 'main img'), rejected).toBeNull();
+            expect(resolveMangaSite(rejected), rejected).toBeNull();
+        }
     });
     it('过滤损坏规则、限定二十项、同域同路径去重并保留显式选择器覆盖', () => {
         const rule = {hostname: 'example.com', pathPrefix: '/read/', selector: 'article img'};
@@ -909,5 +954,19 @@ describe('漫画归一化的轻量配置入口', () => {
         } finally {
             vi.resetModules();
         }
+    });
+
+    it('isLocalMangaHost 严格校验 .local 主机标签和 IPv4 八位段上限', () => {
+        for (const host of ['localhost', '[::1]', 'nas.local', 'a.local', 'my-nas.home.local', 'NAS.LOCAL', '127.0.0.1', '10.0.0.1', '192.168.1.5', '172.16.0.1', '172.31.255.254']) {
+            expect(isLocalMangaHost(host), host).toBe(true);
+        }
+        for (const host of ['.local', 'a..local', '-foo.local', 'foo-.local', 'foo.-bar.local', 'foo_bar.local', '127.0.0.999', '10.256.0.1', '192.168.1.300', '172.16.999.1', '172.15.0.1', '172.32.0.1', '8.8.8.8', 'example.com']) {
+            expect(isLocalMangaHost(host), host).toBe(false);
+        }
+        expect(createMangaSiteRule('http://nas.local:8080/read/', 'img')).toEqual({
+            hostname: 'nas.local:8080', pathPrefix: '/read/', selector: 'img',
+        });
+        expect(createMangaSiteRule('http://-foo.local:8080/read/', 'img')).toBeNull();
+        expect(createMangaSiteRule('http://a..local:8080/read/', 'img')).toBeNull();
     });
 });

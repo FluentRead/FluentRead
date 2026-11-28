@@ -642,6 +642,66 @@ describe('translation broker', () => {
         await expect(result).resolves.toBe('服务限流切换');
         expect(mocks.service).toHaveBeenCalledTimes(2);
     });
+
+    it.each(['chromeTranslator', 'localTranslation'] as const)('%s 默认豁免全局 HTTP RPS/RPM 限流，但显式启用服务限流时仍严格生效', async (service) => {
+        vi.useFakeTimers();
+        mocks.config.service = service;
+        mocks.config.translationRequestsPerSecond = 1;
+        mocks.config.translationRequestsPerMinute = 1;
+        mocks.service.mockImplementation(async (message: {origin: string}) => `译:${message.origin}`);
+
+        await expect(translateWithCache({origin: 'first on-device paragraph', requestTimeoutMs: 10_000, useCache: false}))
+            .resolves.toBe('译:first on-device paragraph');
+        await expect(translateWithCache({origin: 'second on-device paragraph', requestTimeoutMs: 10_000, useCache: false}))
+            .resolves.toBe('译:second on-device paragraph');
+        expect(mocks.service).toHaveBeenCalledTimes(2);
+
+        mocks.service.mockClear();
+        mocks.config.serviceRequestLimits = {
+            [service]: {
+                enabled: true,
+                limits: {maxConcurrentTranslations: 6, translationRequestsPerSecond: 1, translationRequestsPerMinute: 0},
+            },
+        };
+        await expect(translateWithCache({origin: 'explicit limit first', requestTimeoutMs: 10_000, useCache: false}))
+            .resolves.toBe('译:explicit limit first');
+        const second = translateWithCache({origin: 'explicit limit second', requestTimeoutMs: 10_000, useCache: false});
+        await flushMicrotasks(60);
+        expect(mocks.service).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(999);
+        expect(mocks.service).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(second).resolves.toBe('译:explicit limit second');
+        expect(mocks.service).toHaveBeenCalledTimes(2);
+    });
+
+    it('localTranslation 显式启用模型级限流时按模型速率排队', async () => {
+        vi.useFakeTimers();
+        mocks.config.service = 'localTranslation';
+        mocks.config.model.localTranslation = 'nllb-200-distilled-600M';
+        mocks.config.translationRequestsPerSecond = 0;
+        mocks.config.modelRequestLimits = {
+            localTranslation: {
+                'nllb-200-distilled-600M': {
+                    enabled: true,
+                    limits: {maxConcurrentTranslations: 6, translationRequestsPerSecond: 1, translationRequestsPerMinute: 0},
+                },
+            },
+        };
+        mocks.service.mockImplementation(async (message: {origin: string}) => `译:${message.origin}`);
+
+        await expect(translateWithCache({origin: 'model limit first', requestTimeoutMs: 10_000, useCache: false}))
+            .resolves.toBe('译:model limit first');
+        const second = translateWithCache({origin: 'model limit second', requestTimeoutMs: 10_000, useCache: false});
+        await flushMicrotasks(60);
+        expect(mocks.service).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(999);
+        expect(mocks.service).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(second).resolves.toBe('译:model limit second');
+        expect(mocks.service).toHaveBeenCalledTimes(2);
+    });
+
     it('keeps simultaneous simplified and traditional requests separate and reuses only matching script aliases', async () => {
         const simplified = deferred<string>();
         const traditional = deferred<string>();

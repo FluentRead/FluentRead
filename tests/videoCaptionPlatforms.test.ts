@@ -80,6 +80,37 @@ describe('视频与会议字幕平台边界', () => {
         expect(findCaptionEnableButton(document, 'teams')).toBeNull();
     });
 
+    it('支持日韩法德西葡等多语言会议字幕开启按钮与 Teams 语言菜单，同时拒绝关闭文案', () => {
+        const enableLabels = [
+            'ライブ字幕をオンにする', '字幕を表示する', '실시간 자막 켜기', '자막 표시',
+            'Activer les sous-titres en direct', 'Afficher les sous-titres',
+            'Live-Untertitel aktivieren', 'Untertitel einblenden',
+            'Activar los subtítulos en directo', 'Mostrar subtítulos',
+            'Ativar legendas ao vivo', 'Mostrar as legendas (c)',
+        ];
+        for (const label of enableLabels) {
+            const {document} = parseHTML(`<button id="btn" aria-label="${label}"></button>`);
+            expect(findCaptionEnableButton(document, 'meet')?.id, label).toBe('btn');
+        }
+        const disableLabels = [
+            '字幕をオフにする', '자막 끄기', 'Désactiver les sous-titres',
+            'Untertitel deaktivieren', 'Desactivar los subtítulos', 'Desativar legendas',
+        ];
+        for (const label of disableLabels) {
+            const {document} = parseHTML(`<button aria-label="${label}"></button>`);
+            expect(findCaptionEnableButton(document, 'meet'), label).toBeNull();
+        }
+        const menuLabels = [
+            '语言与语音', '語言和語音', '言語と音声', '언어 및 음성',
+            'Langue et voix', 'Sprache und Sprachausgabe', 'Sprache und Spracheingabe',
+            'Idioma y voz', 'Idioma e fala',
+        ];
+        for (const label of menuLabels) {
+            const {document} = parseHTML(`<div id="lang" role="menuitem">${label}</div>`);
+            expect(findTeamsCaptionMenuStep(document)?.id, label).toBe('lang');
+        }
+    });
+
     it('人工目标轨优先精确语言，区分中文简繁，排除自动生成和翻译轨', () => {
         expect(captionLanguageMatch('zh_CN', 'zh-Hans')).toBe(2);
         expect(captionLanguageMatch('zh-TW', 'zh-Hant')).toBe(2);

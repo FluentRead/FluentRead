@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaCanvas.ts
  * 文件职责：把可读正文画布、背景图片和长图分段快照接入既有漫画识别与局部译图合成，保留宿主正文及翻页交互。
- * 主要内容：自动布局以小尺寸指纹提示重绘，显式操作先隐藏旧译层并以完整 PNG 摘要验证来源；任务复用独立快照编码，合成后复核完整来源再发布；原生画布仅在译层真正显示时借用透明度与过渡样式隐藏下层原字，撤层时归还并保留宿主后续改写；背景等载体可异步准备自身绘制层资源，发布前复核任务归属，暂停时隐藏复用、取消或淘汰时销毁；注入正文锚点、绘制范围及核心裁切支持背景与分段；会话端口串行调度，失败时复用图片的紧凑恢复控件并通过原会话重试，取消、来源变化和关闭释放控件且不伪造成功；缓存只保留有界压缩图块。最后捕获之后的无事件重绘不作逐帧一致性承诺。
+ * 主要内容：自动布局以小尺寸指纹提示重绘，显式操作先隐藏旧译层并以完整 PNG 摘要验证来源；update 支持传入本帧已算身份并在内部先批量读取布局再统一写回样式，避免布局抖动与重复采样；翻译超过 150ms 显示封闭 Shadow DOM 深色磨砂加载胶囊，完成页支持 150ms 轻柔渐显、深浅通用的未绘制药丸徽章以及无损原图速览 setPeekOriginal；失败恢复控件支持按扩展主题同步深浅样式；任务复用独立快照编码，合成后复核完整来源再发布；原生画布仅在译层真正显示时借用透明度与过渡样式隐藏下层原字，撤层时归还并保留宿主后续改写；背景等载体可异步准备自身绘制层资源，发布前复核任务归属，暂停时隐藏复用、取消或淘汰时销毁；会话端口串行调度，失败时复用图片的紧凑恢复控件并通过原会话重试，取消、来源变化和关闭释放控件且不伪造成功；缓存只保留有界压缩图块。最后捕获之后的无事件重绘不作逐帧一致性承诺。
  * 模块边界：只读取公开 DOM 画布或注入的已展示正文快照，不访问站点接口、不读取受污染像素、不更改原画布像素；本模块仅为原生画布借用透明度，背景资源与样式归还由载体端口负责，不隐藏背景元素或共享长图宿主；识别和翻译由注入的现有图片客户端完成。
  * 分段核心：纯坐标 viewport 同时参与译层、阅读及压缩缓存身份；新任务复制冻结一次，识别请求和最终裁切使用同一快照，等待期间范围漂移则撤回迟到结果，不增加布局读取。
  */
@@ -15,6 +15,24 @@ import {prepareMangaReadingLines, type createMangaReadingSnapshots} from './mang
 import type {MangaReadingResult} from './mangaReadingCoordinator';
 import type {ImageViewport} from '@/src/shared/image/types';
 
+const LOADING_CAPSULE_DELAY_MS = 150;
+const MANGA_CANVAS_CSS = IMAGE_CONTROLS_CSS
+    + '.fr-manga-surface{transition:opacity 150ms ease-out;}'
+    + '.fr-manga-surface[data-reveal=true]{animation:fr-manga-surface-in 150ms ease-out;}'
+    + '@keyframes fr-manga-surface-in{from{opacity:0;}}'
+    + '.fr-manga-loading{position:fixed;pointer-events:none;display:flex;flex-direction:column;gap:4px;min-width:88px;padding:5px 10px;border:1px solid rgba(255,255,255,.14);border-radius:9999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px) saturate(135%);box-shadow:0 4px 16px rgba(15,23,42,.28);color:#f8fafc;font:500 11px/1.35 system-ui,-apple-system,sans-serif;animation:fr-manga-surface-in .14s ease-out both;}'
+    + '.fr-manga-loading[hidden]{display:none!important;}'
+    + '.fr-manga-loading-row{display:flex;align-items:center;gap:6px;white-space:nowrap;}'
+    + '.fr-manga-loading-spinner{width:11px;height:11px;flex:0 0 auto;box-sizing:border-box;border:1.5px solid rgba(248,250,252,.22);border-top-color:#f46590;border-radius:50%;animation:fr-image-spin .75s linear infinite;}'
+    + '.fr-manga-loading-bar{height:2px;width:100%;border-radius:9999px;background:rgba(248,250,252,.16);overflow:hidden;}'
+    + '.fr-manga-loading-bar>span{display:block;height:100%;width:45%;border-radius:inherit;background:linear-gradient(90deg,#ef4776,#f46590);animation:fr-manga-bar 1.1s ease-in-out infinite;}'
+    + '@keyframes fr-manga-bar{0%{transform:translateX(-100%);}100%{transform:translateX(260%);}}'
+    + '.fr-manga-render-warning{position:fixed;overflow:hidden;padding:3px 9px;border:1px solid rgba(255,255,255,.16);border-radius:9999px;background:rgba(15,23,42,.82);backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(15,23,42,.22);color:#f8fafc;font:500 11px/1.35 system-ui,-apple-system,sans-serif;white-space:nowrap;}'
+    + '.fr-manga-render-warning[hidden]{display:none!important;}'
+    + 'button.fr-manga-render-warning{cursor:pointer;}'
+    + 'button.fr-manga-render-warning:hover{background:rgba(15,23,42,.92);}'
+    + '@media (prefers-reduced-motion: reduce){.fr-manga-surface{transition:none;animation:none;}.fr-manga-loading,.fr-manga-loading-spinner,.fr-manga-loading-bar>span{animation:none;}}';
+
 interface CanvasState {
     identity: string;
     controller: AbortController | null;
@@ -26,6 +44,8 @@ interface CanvasState {
     renderSkipped?: boolean;
     noPaint?: boolean;
     warning?: HTMLElement;
+    loading?: HTMLElement;
+    loadingTimer?: ReturnType<typeof setTimeout>;
     validationPending: boolean;
     contentKey?: string;
     readingKey?: number;
@@ -116,6 +136,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         retry: (surface: T) => boolean;
         openSettings: (section: ImageSettingsSection) => Promise<void>;
         translateUi?: (source: string) => string;
+        theme?: () => 'light' | 'dark' | 'auto';
     };
     translate: (image: string, signal: AbortSignal, mangaViewport?:ImageViewport) => Promise<{mangaPatches?: MangaPatchPacket; lines: MangaCompressedPage['lines']}>;
 }) {
@@ -139,9 +160,52 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
     let sequence = 0;
     let sample: HTMLCanvasElement | null = null;
     let host: HTMLDivElement | null = null, root: ShadowRoot | null = null;
-    let recoveryStyled = false;
+    let peekingOriginal = false;
     let disposed = false;
     const anchor = (element: T) => ports.source?.anchor ? ports.source.anchor(element) : element as unknown as HTMLElement;
+
+    function syncFeedbackTheme(feedback: HTMLElement): void {
+        const mode = ports.recovery?.theme?.();
+        if (!mode) return;
+        const resolved = mode === 'auto'
+            ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : mode;
+        if (feedback.dataset.theme !== resolved) feedback.dataset.theme = resolved;
+    }
+
+    function clearLoading(state: CanvasState): void {
+        if (state.loadingTimer !== undefined) { clearTimeout(state.loadingTimer); state.loadingTimer = undefined; }
+        state.loading?.remove();
+        state.loading = undefined;
+    }
+
+    function scheduleLoading(canvas: T, state: CanvasState): void {
+        state.loadingTimer = setTimeout(() => {
+            state.loadingTimer = undefined;
+            if (disposed || states.get(canvas) !== state || state.completed || state.failed || !state.showing || !ports.enabled()) return;
+            const capsule = document.createElement('div');
+            capsule.className = 'fr-manga-loading';
+            capsule.setAttribute('role', 'status');
+            capsule.setAttribute('aria-live', 'polite');
+            const row = document.createElement('div');
+            row.className = 'fr-manga-loading-row';
+            const spinner = document.createElement('span');
+            spinner.className = 'fr-manga-loading-spinner';
+            spinner.setAttribute('aria-hidden', 'true');
+            const text = document.createElement('span');
+            text.className = 'fr-manga-loading-text';
+            text.textContent = ports.recovery?.translateUi?.('翻译中…') ?? '翻译中…';
+            row.append(spinner, text);
+            const bar = document.createElement('div');
+            bar.className = 'fr-manga-loading-bar';
+            bar.setAttribute('aria-hidden', 'true');
+            bar.append(document.createElement('span'));
+            capsule.append(row, bar);
+            state.loading = capsule;
+            ensureRoot().append(capsule);
+            update();
+        }, LOADING_CAPSULE_DELAY_MS);
+    }
 
     function restoreSource(canvas: T, state: CanvasState): void {
         const lease = state.sourceLease;
@@ -212,6 +276,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         const state = states.get(canvas);
         if (!state) return;
         untrack(state);
+        clearLoading(state);
         restoreSource(canvas, state);
         state.presentation?.dispose();
         state.controller?.abort();
@@ -222,56 +287,84 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         states.delete(canvas);
     }
 
-    function update(): void {
+    function update(knownIdentities?: ReadonlyMap<T, string | null>): void {
+        type LayoutPlan =
+            | {kind: 'release'; canvas: T}
+            | {kind: 'apply'; canvas: T; state: CanvasState; leaseBroken: boolean; rect: DOMRect; left: number; right: number; top: number; bottom: number; visible: boolean; loadingVisible: boolean; canHide: boolean; sourceOpacity: string};
+        const plans: LayoutPlan[] = [];
+        const ancestorStyles = new Map<Element, CSSStyleDeclaration>();
+        const ancestorRects = new Map<Element, DOMRect>();
         for (const [canvas, state] of states) {
             const element = anchor(canvas);
-            if (!element.isConnected || identity(canvas) !== state.identity) {release(canvas);continue;}
+            const currentId = knownIdentities?.has(canvas) ? knownIdentities.get(canvas)! : identity(canvas);
+            if (!element.isConnected || currentId !== state.identity) {plans.push({kind: 'release', canvas});continue;}
             const surface = state.surface;
-            if (state.sourceLease && (element.style.getPropertyValue('opacity') !== '0' || element.style.getPropertyPriority('opacity') !== 'important'
+            const leaseBroken = !!state.sourceLease && (element.style.getPropertyValue('opacity') !== '0' || element.style.getPropertyPriority('opacity') !== 'important'
                 || element.getAttribute('class') !== state.sourceLease.classAttribute
-                || state.sourceLease.ownedTransition.some(saved => !matchesStyleProperty(element.style, saved)))) {
-                restoreSource(canvas, state);state.showing = false;surface?.remove();
-            }
-            if (!surface && !state.presentation && !state.recovery && !state.warning) continue;
+                || state.sourceLease.ownedTransition.some(saved => !matchesStyleProperty(element.style, saved)));
+            if (!leaseBroken && !surface && !state.presentation && !state.recovery && !state.warning && !state.loading) continue;
             const rect = ports.source ? ports.source.bounds(canvas) : element.getBoundingClientRect();
             let left = Math.max(0, rect.left), right = Math.min(window.innerWidth, rect.right);
             let top = Math.max(0, rect.top), bottom = Math.min(window.innerHeight, rect.bottom);
-            let visible = state.showing && !state.validationPending && ports.enabled() && !document.hidden && rect.width > 0 && rect.height > 0;
+            let baseVisible = !leaseBroken && state.showing && ports.enabled() && !document.hidden && rect.width > 0 && rect.height > 0;
             let canHide = !ports.source, sourceOpacity = '1';
             for (let parent: Element | null = element; parent; parent = parent.parentElement) {
-                const style = getComputedStyle(parent);
+                let style = ancestorStyles.get(parent);
+                if (!style) {style = getComputedStyle(parent);ancestorStyles.set(parent, style);}
                 const alpha = parent === element && state.sourceLease ? state.sourceLease.computedOpacity : style.opacity;
                 if (parent === element) sourceOpacity = alpha || '1';
                 if (canHide) canHide = (parent === element || !alpha || alpha === '1') && simpleCanvasStyle(style, parent === element) && inactiveCanvas(parent);
-                if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || alpha === '0') visible = false;
+                if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || alpha === '0') baseVisible = false;
                 if (parent === document.documentElement || parent === document.scrollingElement) continue;
-                const bounds = parent.getBoundingClientRect();
-                if (/^(hidden|clip|auto|scroll)$/.test(style.overflowX)) {left = Math.max(left, bounds.left);right = Math.min(right, bounds.right);}
-                if (/^(hidden|clip|auto|scroll)$/.test(style.overflowY)) {top = Math.max(top, bounds.top);bottom = Math.min(bottom, bounds.bottom);}
+                const clipX = /^(hidden|clip|auto|scroll)$/.test(style.overflowX);
+                const clipY = /^(hidden|clip|auto|scroll)$/.test(style.overflowY);
+                if (clipX || clipY) {
+                    let bounds = ancestorRects.get(parent);
+                    if (!bounds) {bounds = parent.getBoundingClientRect();ancestorRects.set(parent, bounds);}
+                    if (clipX) {left = Math.max(left, bounds.left);right = Math.min(right, bounds.right);}
+                    if (clipY) {top = Math.max(top, bounds.top);bottom = Math.min(bottom, bounds.bottom);}
+                }
             }
-            visible &&= right > left && bottom > top;
-            if (visible) {
+            baseVisible &&= right > left && bottom > top;
+            let visible = baseVisible && !state.validationPending;
+            let loadingVisible = baseVisible && !!state.loading;
+            if (visible || loadingVisible) {
                 const x = (left + right) / 2, y = (top + bottom) / 2;
-                let hit = document.elementFromPoint(x, y);
-                if (hit === host) hit = document.elementsFromPoint?.(x, y).find(element => element !== host) ?? null;
-                visible = !!hit && (hit === element || hit.contains(element) || ports.acceptsInteractionLayer?.(canvas, hit) === true);
+                let hit = document.elementFromPoint?.(x, y) ?? null;
+                if (hit === host) hit = document.elementsFromPoint?.(x, y).find(item => item !== host) ?? null;
+                const unoccluded = !!hit && (hit === element || hit.contains(element) || ports.acceptsInteractionLayer?.(canvas, hit) === true);
+                visible &&= unoccluded;
+                loadingVisible &&= unoccluded;
             }
-            if (surface) surface.style.cssText = `position:fixed;pointer-events:none;display:${visible ? 'block' : 'none'};left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;clip-path:inset(${Math.max(0, top - rect.top)}px ${Math.max(0, rect.right - right)}px ${Math.max(0, rect.bottom - bottom)}px ${Math.max(0, left - rect.left)}px);`;
+            plans.push({kind: 'apply', canvas, state, leaseBroken, rect, left, right, top, bottom, visible, loadingVisible, canHide, sourceOpacity});
+        }
+        for (const plan of plans) {
+            if (plan.kind === 'release') {release(plan.canvas);continue;}
+            const {canvas, state, leaseBroken, rect, left, right, top, bottom, visible, loadingVisible, canHide, sourceOpacity} = plan;
+            const surface = state.surface;
+            if (leaseBroken) {restoreSource(canvas, state);state.showing = false;surface?.remove();}
+            const overlayVisible = visible && !peekingOriginal;
+            if (surface) surface.style.cssText = `position:fixed;pointer-events:none;display:${overlayVisible ? 'block' : 'none'};left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;clip-path:inset(${Math.max(0, top - rect.top)}px ${Math.max(0, rect.right - right)}px ${Math.max(0, rect.bottom - bottom)}px ${Math.max(0, left - rect.left)}px);`;
             if (surface && !ports.source) {
                 surface.style.opacity = canHide ? sourceOpacity : '1';
-                if (visible && canHide && state.completed && surface.isConnected) hideSource(canvas, state, sourceOpacity);
+                if (overlayVisible && canHide && state.completed && surface.isConnected) hideSource(canvas, state, sourceOpacity);
                 else restoreSource(canvas, state);
             }
             if (state.presentation) {
-                if (!visible) state.presentation.hide();
+                if (!overlayVisible) state.presentation.hide();
                 else if (!state.presentation.show()) {state.presentation.hide();state.showing = false;}
             }
             if (state.warning) {
-                state.warning.hidden = !visible;
-                state.warning.style.cssText = `position:fixed;pointer-events:${state.renderSkipped ? 'auto' : 'none'};left:${left + 4}px;top:${top + 4}px;max-width:${Math.max(0, Math.min(200, right - left - 8))}px;max-height:${Math.max(0,bottom - top - 8)}px;overflow:hidden;padding:3px 5px;border:0;border-radius:6px;background:rgba(250,251,253,.94);color:#475569;font:11px sans-serif;`;
+                state.warning.hidden = !overlayVisible;
+                state.warning.style.cssText = `position:fixed;pointer-events:${state.renderSkipped ? 'auto' : 'none'};left:${left + 4}px;top:${top + 4}px;max-width:${Math.max(0, Math.min(200, right - left - 8))}px;max-height:${Math.max(0,bottom - top - 8)}px;`;
+            }
+            if (state.loading) {
+                state.loading.hidden = !loadingVisible;
+                state.loading.style.cssText = `left:${left + 8}px;top:${top + 8}px;max-width:${Math.max(0, Math.min(220, right - left - 16))}px;max-height:${Math.max(0, bottom - top - 16)}px;`;
             }
             if (state.recovery) {
                 const feedback = state.recovery.feedback;
+                syncFeedbackTheme(feedback);
                 feedback.hidden = !visible;
                 feedback.style.cssText = `position:fixed;left:${left + 8}px;top:${top + 8}px;max-width:${Math.max(0, Math.min(280, right - left - 16))}px;max-height:${Math.max(0, bottom - top - 16)}px;`;
             }
@@ -284,14 +377,21 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
             host.setAttribute('data-fluent-read-ui', 'manga-canvas');
             // Shadow DOM 隔离内部译图，外层宿主也需抵抗页面的全局 !important 规则。
             host.style.cssText = 'all:initial!important;display:block!important;position:fixed!important;left:0!important;top:0!important;width:0!important;height:0!important;overflow:visible!important;pointer-events:none!important;z-index:2147483644!important;';
-            root = host.attachShadow({mode: 'closed'});document.documentElement.append(host);
+            root = host.attachShadow({mode: 'closed'});
+            const style = document.createElement('style');style.textContent = MANGA_CANVAS_CSS;root.append(style);
+            document.documentElement.append(host);
         }
         return root!;
     }
 
     function show(state: CanvasState): void {
+        clearLoading(state);
         state.showing = true;
-        if (state.surface) ensureRoot().append(state.surface);
+        if (state.surface) {
+            state.surface.className = 'fr-manga-surface';
+            state.surface.dataset.reveal = 'true';
+            ensureRoot().append(state.surface);
+        }
         if ((state.renderSkipped || state.noPaint) && !state.warning) {
             const warning = document.createElement(state.renderSkipped ? 'button' : 'div');
             if (state.renderSkipped) (warning as HTMLButtonElement).type = 'button';
@@ -314,6 +414,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
     }
 
     function showFailure(canvas: T, state: CanvasState, error: unknown): void {
+        clearLoading(state);
         const recovery = ports.recovery;
         if (!recovery) return;
         const current = () => !disposed && state.showing && states.get(canvas) === state
@@ -338,8 +439,8 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         const message = error instanceof Error ? error.message : String(error), local = imageTranslationFailureCode(error);
         controls.update('error', local ? imageLocalFailureMessage(local) : `图片翻译失败：${message}`,
             {quiet: true, modelSettings: !!local, serviceSettings: true, errorDetails: message});
+        syncFeedbackTheme(controls.feedback);
         const target = ensureRoot();
-        if (!recoveryStyled) {const style = document.createElement('style');style.textContent = IMAGE_CONTROLS_CSS;target.append(style);recoveryStyled = true;}
         target.append(controls.feedback);
         update();
     }
@@ -354,7 +455,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         if (disposed || ports.source) return;
         revisions.set(canvas, (revisions.get(canvas) ?? 0) + 1);
         const state = states.get(canvas);
-        if (state) {restoreSource(canvas, state);state.controller?.abort();state.validationPending = true;state.showing = false;state.surface?.remove();state.recovery?.dispose();state.recovery = null;state.warning?.remove();state.warning = undefined;}
+        if (state) {clearLoading(state);restoreSource(canvas, state);state.controller?.abort();state.validationPending = true;state.showing = false;state.surface?.remove();state.recovery?.dispose();state.recovery = null;state.warning?.remove();state.warning = undefined;}
     }
 
     function captureNative(canvas: T, target: HTMLCanvasElement): void {
@@ -381,6 +482,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         const state: CanvasState = {identity: owner, controller, surface: retained?.surface ?? null, completed: false, failed: false, showing: true, recovery: null, validationPending: !ports.source,
             readingKey:retained?.readingKey,readingFailure:retained?.readingFailure,renderSkipped:retained?.renderSkipped,noPaint:retained?.noPaint};
         states.set(canvas, state);
+        scheduleLoading(canvas, state);
         const original = document.createElement('canvas');
         let surface: HTMLCanvasElement | null = null;
         let presentation: MangaSurfacePresentation | undefined;
@@ -463,6 +565,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         } catch (error) {
             if (current()) {untrack(state);if(state.readingKey!==undefined)try{ports.readingSnapshots?.remove(state.readingKey);}catch{/* 文字快照故障不影响译图错误处理 */}state.readingKey=undefined;restoreSource(canvas, state);state.presentation?.dispose();state.presentation = undefined;state.failed = true;state.validationPending = false;releaseSurface(state.surface);state.surface = null;showFailure(canvas, state, error);throw error;}
         } finally {
+            clearLoading(state);
             presentation?.dispose();
             releaseSurface(surface);
             original.width = original.height = 0;
@@ -545,14 +648,19 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
     const clear = () => {Array.from(states.keys()).forEach(release);lightCache.clear();};
     return {
         identity, readingIdentity, readingVisible, translate, reuse, release, update, invalidate, readLines,
+        setPeekOriginal(peeking: boolean) {
+            if (disposed || peekingOriginal === peeking) return;
+            peekingOriginal = peeking;
+            update();
+        },
         readingVersion(canvas:T):object|undefined {const state=states.get(canvas);return state?.completed?state:undefined;},
-        refreshLanguage() {states.forEach(state => {state.recovery?.refreshLanguage();if(state.warning){const message=state.renderSkipped?'部分译文未绘制，请查看漫画文字':'已识别文字，原图未改动',shortMessage=state.renderSkipped?'未绘制':'已识别';state.warning.textContent=ports.recovery?.translateUi?.(shortMessage)??shortMessage;state.warning.title=ports.recovery?.translateUi?.(message)??message;state.warning.setAttribute('aria-label',state.warning.title);}});},
+        refreshLanguage() {states.forEach(state => {state.recovery?.refreshLanguage();const loadingText=state.loading?.querySelector('.fr-manga-loading-text');if(loadingText)loadingText.textContent=ports.recovery?.translateUi?.('翻译中…')??'翻译中…';if(state.warning){const message=state.renderSkipped?'部分译文未绘制，请查看漫画文字':'已识别文字，原图未改动',shortMessage=state.renderSkipped?'未绘制':'已识别';state.warning.textContent=ports.recovery?.translateUi?.(shortMessage)??shortMessage;state.warning.title=ports.recovery?.translateUi?.(message)??message;state.warning.setAttribute('aria-label',state.warning.title);}});},
         failed: (canvas: T) => states.get(canvas)?.failed === true,
         restore(canvas: T) {
             const state = states.get(canvas);
-            if (state) {if(state.readingKey!==undefined)ports.readingSnapshots?.remove(state.readingKey);state.readingKey=undefined;restoreSource(canvas, state);state.presentation?.hide();state.controller?.abort();state.showing = false;state.surface?.remove();state.recovery?.dispose();state.recovery = null;state.warning?.remove();state.warning = undefined;}
+            if (state) {clearLoading(state);if(state.readingKey!==undefined)ports.readingSnapshots?.remove(state.readingKey);state.readingKey=undefined;restoreSource(canvas, state);state.presentation?.hide();state.controller?.abort();state.showing = false;state.surface?.remove();state.recovery?.dispose();state.recovery = null;state.warning?.remove();state.warning = undefined;}
         },
         resetCache: clear,
-        dispose() {disposed = true;clear();if (sample) sample.width = sample.height = 0;host?.remove();host = null;root = null;},
+        dispose() {disposed = true;peekingOriginal = false;clear();if (sample) sample.width = sample.height = 0;host?.remove();host = null;root = null;},
     };
 }

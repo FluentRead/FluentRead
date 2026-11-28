@@ -4,7 +4,7 @@
  * 主要内容：维护设置字段到页面分组及中文标签的映射，按服务展示原生翻译合批开关，在高级设置中以秒展示 AI 翻译超时，格式化枚举、映射和长文本，用迭代比较检查深层对象并对预览深度作安全摘要，生成稳定的分组差异结果。
  * 模块边界：本文件是无浏览器副作用的纯配置算法，不读取存储、不打开确认框也不执行恢复；设置页面只消费其脱敏后的 ConfigDiffResult。
  */
-import {CONFIG_CREDENTIAL_FIELDS, isSensitiveConfigKey} from './credentials';
+import {CONFIG_CREDENTIAL_FIELDS, isSensitiveConfigKey, jsonValuesEqual as valuesEqual} from './credentials';
 import {options} from './catalog';
 import {FREE_TRANSLATION_PROVIDERS} from './freeTranslation';
 import {isCustomOpenAIProviderId} from './customOpenAI';
@@ -159,42 +159,6 @@ function sanitizeSensitiveValue(value: unknown): unknown {
     const sanitized = sanitizeSensitiveContent(value, new WeakSet<object>(), 0, preview);
     // 整个字段使用已翻译的摘要，避免嵌套键和值拼接后无法命中旧文案翻译。
     return preview.depthLimited ? DEPTH_LIMITED_PREVIEW : sanitized;
-}
-
-function jsonComparableValue(value: unknown): unknown {
-    if (typeof value === 'number' && !Number.isFinite(value)) return null;
-    if (typeof value === 'function' || typeof value === 'symbol') return undefined;
-    return value;
-}
-
-function valuesEqual(left: unknown, right: unknown): boolean {
-    const pending: Array<[unknown, unknown]> = [[left, right]];
-    const compared = new WeakMap<object, WeakSet<object>>();
-    while (pending.length > 0) {
-        const [rawA, rawB] = pending.pop()!;
-        const a = jsonComparableValue(rawA), b = jsonComparableValue(rawB);
-        if (a === b) continue;
-        if ((!isRecord(a) && !Array.isArray(a)) || (!isRecord(b) && !Array.isArray(b))) return false;
-        if (Array.isArray(a) !== Array.isArray(b)) return false;
-        let pairs = compared.get(a);
-        if (pairs?.has(b)) continue;
-        if (!pairs) {pairs = new WeakSet(); compared.set(a, pairs);}
-        pairs.add(b);
-        if (Array.isArray(a)) {
-            if (a.length !== (b as unknown[]).length) return false;
-            for (let index = 0; index < a.length; index += 1) {
-                pending.push([jsonComparableValue(a[index]) ?? null, jsonComparableValue((b as unknown[])[index]) ?? null]);
-            }
-        } else {
-            const keys = Object.keys(a).filter(key => jsonComparableValue(a[key]) !== undefined);
-            if (keys.length !== Object.keys(b).filter(key => jsonComparableValue((b as ConfigRecord)[key]) !== undefined).length) return false;
-            for (const key of keys) {
-                if (!Object.hasOwn(b, key)) return false;
-                pending.push([a[key], (b as ConfigRecord)[key]]);
-            }
-        }
-    }
-    return true;
 }
 
 function labelsFor(...optionLists: ReadonlyArray<ReadonlyArray<Option>>): Map<unknown, string> {
@@ -623,6 +587,10 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     selectionTtsVoices: {group: 'translation', label: '划词朗读音色'},
     selectionTtsMode: {group: 'translation', label: '朗读合成策略', format: (value) => formatEnum(value, LOCAL_TTS_MODE_LABELS)},
     selectionTtsLocalVoice: {group: 'translation', label: '本地朗读音色'},
+    selectionTtsRate: {group: 'translation', label: '朗读语速', format: (value) => formatNumber(value, 'x')},
+    selectionTtsOnlineSources: {group: 'translation', label: '在线朗读来源顺序'},
+    selectionTtsOpenAiModel: {group: 'translation', label: 'OpenAI 朗读模型'},
+    selectionTtsOpenAiVoice: {group: 'translation', label: 'OpenAI 朗读音色'},
     inputBoxTranslationTrigger: {group: 'translation', label: '输入框翻译触发方式', format: (value) => formatEnum(value, INPUT_TRIGGER_LABELS)},
     customInputBoxTranslationHotkey: {group: 'translation', label: '自定义输入框翻译快捷键'},
     inputBoxTranslationTarget: {group: 'translation', label: '输入框翻译目标语言', format: (value) => formatEnum(value, LANGUAGE_LABELS)},

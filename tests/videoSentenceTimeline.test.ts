@@ -58,9 +58,37 @@ describe('原字幕完整句学习时间轴', () => {
     const atomic = buildVideoSentenceTimeline([cue('x'.repeat(1000), 0, 30_000)]);
     expect(atomic).toHaveLength(1);
     expect(atomic[0]).toMatchObject({startMs: 0, endMs: 30_000, complete: false, boundary: 'limit'});
-    expect(buildVideoSentenceTimeline([cue('A long sentence.', 0, 30_000)])[0]).toMatchObject({complete: false, boundary: 'limit'});
-    expect(buildVideoSentenceTimeline([cue('x'.repeat(500) + '.', 0)])[0]).toMatchObject({complete: false, boundary: 'limit'});
+    expect(buildVideoSentenceTimeline([cue('x'.repeat(500), 0)])[0]).toMatchObject({complete: false, boundary: 'limit'});
+    expect(buildVideoSentenceTimeline([cue('A long sentence.', 0, 30_000)])[0]).toMatchObject({complete: true, boundary: 'punctuation'});
+    expect(buildVideoSentenceTimeline([cue('x'.repeat(500) + '.', 0)])[0]).toMatchObject({complete: true, boundary: 'punctuation'});
     expect(buildVideoSentenceTimeline([cue('A.', 0)], {maxCues: 0.5})[0]).toMatchObject({complete: false, boundary: 'limit'});
+  });
+
+  it('去重连续完全重复的 cue，正确衔接无空格文字、中日文标点与数字，并识别扩展括号与省略号句末', () => {
+    const dedup = buildVideoSentenceTimeline([
+      cue('Hello', 0, 1000),
+      cue('  Hello  ', 0, 1000),
+      cue('world.', 1000, 1000),
+    ]);
+    expect(dedup).toHaveLength(1);
+    expect(dedup[0]).toMatchObject({text: 'Hello world.', cueIndices: [0, 2], complete: true});
+
+    const joined = buildVideoSentenceTimeline([
+      cue('你好，', 0, 500), cue('第', 500, 500), cue('2026', 1000, 500), cue('年', 1500, 500), cue('，世界】', 2000, 500),
+      cue('ภาษาไทย', 4500, 500), cue('ไม่มีช่องว่าง…', 5000, 500),
+      cue('真的吗⁉》', 6000, 500),
+      cue("This is the team's.", 7000, 500),
+      cue('コーヒー', 8000, 500), cue('を飲む。', 8500, 500),
+      cue('人々', 9500, 500), cue('とカフェ・', 10000, 500), cue('ラテ。', 10500, 500),
+    ]);
+    expect(joined.map(item => [item.text, item.complete])).toEqual([
+      ['你好，第2026年，世界】', false],
+      ['ภาษาไทยไม่มีช่องว่าง…', true],
+      ['真的吗⁉》', true],
+      ["This is the team's.", true],
+      ['コーヒーを飲む。', true],
+      ['人々とカフェ・ラテ。', true],
+    ]);
   });
 
   it('重叠 cue 保留最长原始范围；同起点保持原序；不接受无可靠时间的 cue', () => {

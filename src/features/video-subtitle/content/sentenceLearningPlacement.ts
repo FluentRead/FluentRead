@@ -1,10 +1,11 @@
 /**
  * @file src/features/video-subtitle/content/sentenceLearningPlacement.ts
  * 文件职责：管理学习卡的播放器内定位与独立浮动层，避免小播放器挤压阅读和收藏操作。
- * 主要内容：浮动层保持原组件状态与焦点，支持在可见窗口内拖动及通过底部把手调整高度，提交抬手时的最终坐标；迁移期间串行处理焦点回调和销毁，视口缩小时使用实际可见高度，位置和高度仅记在当前页面会话。
+ * 主要内容：浮动层保持原组件状态与焦点，支持在可见窗口内拖动及通过底部把手调整高度，通过读/算/写分离、指针捕获与缓存引用减少拖拽重排，响应全屏切换及时迁移绘制层，收起浮动卡时自动回退自适应高度，提交抬手时的最终坐标；迁移期间串行处理焦点回调和销毁，视口缩小时使用实际可见高度，位置和高度仅记在当前页面会话。
  * 模块边界：只操作自有面板和绘制层，不选择媒体、不更改媒体时间/速度、不保存学习数据或全局配置；host负责创建、同媒体迁移与最终销毁。
  */
 import {normalizeVideoSentenceLearningAppearance, type VideoSentenceLearningAppearance} from '@/src/core/config/videoSentenceLearningAppearance';
+import {getFullscreenElement} from '@/src/platform/dom/fullscreen';
 import {getYoutubeSubtitleControlsScope} from './youtubeControlsScope';
 
 export type VideoLearningDragPosition = {x: number; y: number};
@@ -63,11 +64,36 @@ export function createVideoSentenceLearningPlacement(options: {
     let pointer: {x: number; y: number} | undefined;
     let resizeDrag: {id: number; y: number; height: number} | undefined;
     let resizePointerY: number | undefined;
+    let capturedPointer: {element: Element; id: number} | undefined;
+    let cachedResizeHandle: HTMLElement | null = null;
+    let lastAriaMin = '', lastAriaMax = '', lastAriaNow = '';
     let renderFrame: HTMLElement | undefined;
     let updatingParent = false;
+    const capturePointer = (element: Element, id: number) => {
+        if (typeof (element as HTMLElement).setPointerCapture !== 'function') return;
+        try {
+            (element as HTMLElement).setPointerCapture(id);
+            capturedPointer = {element, id};
+        } catch { /* ignore unsupported/inactive pointer capture */ }
+    };
+    const releasePointer = () => {
+        const current = capturedPointer;
+        capturedPointer = undefined;
+        if (!current) return;
+        try { (current.element as HTMLElement).releasePointerCapture?.(current.id); } catch { /* ignore already released pointer */ }
+    };
+    const getResizeHandle = (): HTMLElement | null => {
+        if (!cachedResizeHandle || !cachedResizeHandle.isConnected || !host.contains(cachedResizeHandle)) {
+            cachedResizeHandle = host.querySelector<HTMLElement>('[data-learning-resize-handle]');
+            lastAriaMin = ''; lastAriaMax = ''; lastAriaNow = '';
+        }
+        return cachedResizeHandle;
+    };
+    const isCollapsed = () => Boolean(host.querySelector('.fr-video-learning.is-collapsed, [data-learning-collapsed="true"]'));
     const scopeForPlayer = () => {
         const scope = getYoutubeSubtitleControlsScope(player);
-        return doc.fullscreenElement && !doc.fullscreenElement.contains(scope) ? player : scope;
+        const fullscreen = getFullscreenElement(doc);
+        return fullscreen && !fullscreen.contains(scope) ? player : scope;
     };
     const readViewport = () => {
         const viewport = win.visualViewport;
@@ -76,7 +102,7 @@ export function createVideoSentenceLearningPlacement(options: {
             height: viewport?.height || win.innerHeight || doc.documentElement.clientHeight};
     };
     const floatingParent = () => {
-        const fullscreen = doc.fullscreenElement;
+        const fullscreen = getFullscreenElement(doc);
         return fullscreen && fullscreen.contains(player) ? fullscreen as HTMLElement : doc.documentElement;
     };
     const moveHost = (parent: HTMLElement) => {
@@ -174,14 +200,20 @@ export function createVideoSentenceLearningPlacement(options: {
     const paint = () => {
         frame = undefined;
         if (!active) return;
-        if (resizeDrag && resizePointerY !== undefined && detached) {
-            const viewport = readViewport();
-            const available = Math.max(0, viewport.height - GAP * 2);
+        // 拖拽或缩放期间跳过父容器重挂，避免每帧触发布局回流。
+        if (!drag && !resizeDrag) syncRenderParent();
+        // Read phase
+        const resizeViewport = resizeDrag && resizePointerY !== undefined && detached ? readViewport() : undefined;
+        const collapsed = isCollapsed();
+        const resizeHandle = getResizeHandle();
+        // Compute phase
+        if (resizeViewport) {
+            const available = Math.max(0, resizeViewport.height - GAP * 2);
             const minimum = Math.min(MIN_FLOATING_HEIGHT, available);
-            floatingHeight = clamp(resizeDrag.height + resizePointerY - resizeDrag.y, minimum, available);
+            floatingHeight = clamp(resizeDrag!.height + resizePointerY! - resizeDrag!.y, minimum, available);
             options.onFloatingHeight?.(floatingHeight);
         }
-        syncRenderParent();
+        if (detached && collapsed && host.style.height !== 'auto') host.style.height = 'auto';
         const bounds = detached ? readFloatingBounds() : readPlayerBounds();
         if (drag && pointer) {
             const travelX = Math.max(0, bounds.width - GAP * 2 - bounds.panelWidth);
@@ -201,35 +233,40 @@ export function createVideoSentenceLearningPlacement(options: {
                 panelHeight: bounds.panelHeight, maxPanelHeight: bounds.maxHeight, position: appearance.position, dragged: floatingDragged})
             : getVideoLearningPlacement({playerWidth: bounds.width, playerHeight: bounds.height, panelWidth: bounds.panelWidth,
                 panelHeight: bounds.panelHeight, position: appearance.position, dragged});
+        const resolvedHeight = detached && !collapsed && floatingHeight !== undefined ? next.maxHeight + 'px' : 'auto';
+        const nextAriaMin = resizeHandle ? String(Math.round(detached ? Math.min(MIN_FLOATING_HEIGHT, Math.max(0, bounds.height - GAP * 2)) : MIN_FLOATING_HEIGHT)) : '';
+        const nextAriaMax = resizeHandle ? String(Math.round(detached ? Math.max(0, bounds.height - GAP * 2) : DEFAULT_FLOATING_HEIGHT)) : '';
+        const nextAriaNow = resizeHandle ? String(Math.round(detached ? Math.min(floatingHeight ?? bounds.panelHeight, bounds.maxHeight) : floatingHeight ?? DEFAULT_FLOATING_HEIGHT)) : '';
+        // Write phase
         Object.assign(host.style, {left: next.left + 'px', top: next.top + 'px', right: 'auto', bottom: 'auto', overflow: 'visible',
-            width: bounds.panelWidth + 'px', height: detached && floatingHeight !== undefined ? next.maxHeight + 'px' : 'auto', maxHeight: next.maxHeight + 'px'});
+            width: bounds.panelWidth + 'px', height: resolvedHeight, maxHeight: next.maxHeight + 'px'});
         host.style.setProperty('--fluent-read-video-learning-max-height', next.maxHeight + 'px');
         host.dataset.floating = String(detached);
         host.dataset.compact = String(next.compact || appearance.layout === 'compact');
         host.dataset.shortHeight = String(next.maxHeight <= 240);
-        const resizeHandle = host.querySelector<HTMLElement>('[data-learning-resize-handle]');
         if (resizeHandle) {
-            const available = detached ? Math.max(0, bounds.height - GAP * 2) : DEFAULT_FLOATING_HEIGHT;
-            const current = detached ? Math.min(floatingHeight ?? bounds.panelHeight, bounds.maxHeight) : floatingHeight ?? DEFAULT_FLOATING_HEIGHT;
-            resizeHandle.setAttribute('aria-valuemin', String(Math.round(detached ? Math.min(MIN_FLOATING_HEIGHT, available) : MIN_FLOATING_HEIGHT)));
-            resizeHandle.setAttribute('aria-valuemax', String(Math.round(available)));
-            resizeHandle.setAttribute('aria-valuenow', String(Math.round(current)));
+            if (lastAriaMin !== nextAriaMin) { resizeHandle.setAttribute('aria-valuemin', nextAriaMin); lastAriaMin = nextAriaMin; }
+            if (lastAriaMax !== nextAriaMax) { resizeHandle.setAttribute('aria-valuemax', nextAriaMax); lastAriaMax = nextAriaMax; }
+            if (lastAriaNow !== nextAriaNow) { resizeHandle.setAttribute('aria-valuenow', nextAriaNow); lastAriaNow = nextAriaNow; }
         }
     };
     const schedule = () => { if (active && frame === undefined) frame = win.requestAnimationFrame(paint); };
-    const stopDrag = () => { drag = undefined; pointer = undefined; delete host.dataset.dragging; };
-    const stopResize = () => { resizeDrag = undefined; resizePointerY = undefined; delete host.dataset.resizing; };
+    const stopDrag = () => { drag = undefined; pointer = undefined; releasePointer(); delete host.dataset.dragging; };
+    const stopResize = () => { resizeDrag = undefined; resizePointerY = undefined; releasePointer(); delete host.dataset.resizing; };
     const onDown = (event: PointerEvent) => {
         const target = event.target as Element;
         if (event.button !== 0) return;
-        if (target.closest?.('[data-learning-resize-handle]') && detached) {
+        const resizeTarget = target.closest?.('[data-learning-resize-handle]');
+        if (resizeTarget && detached) {
             const bounds = readFloatingBounds();
             resizeDrag = {id: event.pointerId, y: event.clientY, height: Math.min(floatingHeight ?? bounds.panelHeight, bounds.maxHeight)};
             resizePointerY = event.clientY;
             host.dataset.resizing = 'true';
+            capturePointer(resizeTarget, event.pointerId);
             event.preventDefault(); event.stopPropagation(); return;
         }
-        if (!target.closest?.('[data-learning-drag-handle]') || target.closest('button,input,textarea,select,a,summary')) return;
+        const dragTarget = target.closest?.('[data-learning-drag-handle]');
+        if (!dragTarget || target.closest('button,input,textarea,select,a,summary')) return;
         const bounds = detached ? readFloatingBounds() : readPlayerBounds();
         const position = detached ? floatingDragged : dragged;
         const current = detached
@@ -240,6 +277,7 @@ export function createVideoSentenceLearningPlacement(options: {
         drag = {id: event.pointerId, x: event.clientX, y: event.clientY, left: current.left, top: current.top,
             scaleX: bounds.scaleX, scaleY: bounds.scaleY};
         host.dataset.dragging = 'true';
+        capturePointer(dragTarget, event.pointerId);
         event.preventDefault(); event.stopPropagation();
     };
     const onMove = (event: PointerEvent) => {
@@ -254,19 +292,24 @@ export function createVideoSentenceLearningPlacement(options: {
     const onUp = (event: PointerEvent) => {
         if (resizeDrag?.id === event.pointerId) {
             resizePointerY = event.clientY;
-            if (frame !== undefined) win.cancelAnimationFrame(frame);
+            if (frame !== undefined) { win.cancelAnimationFrame(frame); frame = undefined; }
+            syncRenderParent();
             paint();
-            stopResize(); paint(); return;
+            stopResize(); return;
         }
         if (!drag || drag.id !== event.pointerId) return;
         pointer = {x: event.clientX, y: event.clientY};
-        if (frame !== undefined) win.cancelAnimationFrame(frame);
+        if (frame !== undefined) { win.cancelAnimationFrame(frame); frame = undefined; }
+        syncRenderParent();
         paint();
         stopDrag();
-        paint();
     };
     const onFloatingToggle = (event: Event) => {
         const target = event.target as Element;
+        if (target.closest?.('[data-learning-action="collapse"], [data-learning-peek]')) {
+            schedule();
+            return;
+        }
         if (!target.closest?.('[data-learning-action="float"], [data-learning-action="dock"]')) return;
         if (detached) {
             detached = false;
@@ -304,6 +347,7 @@ export function createVideoSentenceLearningPlacement(options: {
         schedule(); event.preventDefault(); event.stopPropagation();
     };
     const onViewportChange = () => schedule();
+    const onFullscreenChange = () => { syncRenderParent(); schedule(); };
     const observer = typeof win.ResizeObserver === 'function' ? new win.ResizeObserver(schedule) : undefined;
     observer?.observe(player); observer?.observe(host);
     host.addEventListener('pointerdown', onDown, true);
@@ -312,6 +356,8 @@ export function createVideoSentenceLearningPlacement(options: {
     doc.addEventListener('pointermove', onMove, true);
     doc.addEventListener('pointerup', onUp, true);
     doc.addEventListener('pointercancel', onUp, true);
+    doc.addEventListener('fullscreenchange', onFullscreenChange);
+    doc.addEventListener('webkitfullscreenchange', onFullscreenChange);
     win.addEventListener('resize', schedule);
     win.visualViewport?.addEventListener('resize', onViewportChange);
     win.visualViewport?.addEventListener('scroll', onViewportChange);
@@ -326,6 +372,8 @@ export function createVideoSentenceLearningPlacement(options: {
         doc.removeEventListener('pointermove', onMove, true);
         doc.removeEventListener('pointerup', onUp, true);
         doc.removeEventListener('pointercancel', onUp, true);
+        doc.removeEventListener('fullscreenchange', onFullscreenChange);
+        doc.removeEventListener('webkitfullscreenchange', onFullscreenChange);
         win.removeEventListener('resize', schedule);
         win.visualViewport?.removeEventListener('resize', onViewportChange);
         win.visualViewport?.removeEventListener('scroll', onViewportChange);

@@ -98,7 +98,8 @@ function assertPatchFootprints(input:Uint8ClampedArray,width:number,height:numbe
         const cx=reflect(x,contentWidth),cy=reflect(y,contentHeight),index=y*patch.width+x;
         const x0=left+cx*sourceWidth/contentWidth,x1=left+(cx+1)*sourceWidth/contentWidth;
         const y0=top+cy*sourceHeight/contentHeight,y1=top+(cy+1)*sourceHeight/contentHeight;
-        if(patch.mask[index]!==Number(boxes.some(box=>x0<box.x1&&box.x0<x1&&y0<box.y1&&box.y0<y1)))maskErrors++;
+        const expectedMask=x<contentWidth&&y<contentHeight?Number(boxes.some(box=>x0<box.x1&&box.x0<x1&&y0<box.y1&&box.y0<y1)):0;
+        if(patch.mask[index]!==expectedMask)maskErrors++;
         for(let channel=0;channel<3;channel++){
             const value=patch.image[channel*count+index];if(!Number.isFinite(value)||value<0||value>1)invalidColors++;
             if(x<contentWidth&&y<contentHeight)sum[channel]+=value;
@@ -112,18 +113,22 @@ function assertPatchFootprints(input:Uint8ClampedArray,width:number,height:numbe
         original[channel]+=input[(y*width+x)*4+channel]/255;
     for(let channel=0;channel<3;channel++)expect(sum[channel]/(contentWidth*contentHeight)).toBeCloseTo(original[channel]/(sourceWidth*sourceHeight),7);
 }
-beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();mocks.gpu.mockResolvedValue({available:false,info:''});mocks.load.mockResolvedValue(new ArrayBuffer(1));mocks.background.mockReturnValue({uniform:false,color:'rgb(255,255,255)'});mocks.release.mockResolvedValue(undefined);mocks.create.mockResolvedValue({run:mocks.run,release:mocks.release});mocks.run.mockResolvedValue({inpainted:{data:new Float32Array([0.25]),dispose:mocks.outputDispose}});vi.stubGlobal('chrome',{runtime:{getURL:(p:string)=>'chrome-extension://test'+p}});
+beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();vi.stubGlobal('WebAssembly',{...WebAssembly,Suspending:function(){},promising:function(){}});mocks.gpu.mockResolvedValue({available:false,info:''});mocks.load.mockResolvedValue(new ArrayBuffer(1));mocks.background.mockReturnValue({uniform:false,color:'rgb(255,255,255)'});mocks.release.mockResolvedValue(undefined);mocks.create.mockResolvedValue({run:mocks.run,release:mocks.release});mocks.run.mockResolvedValue({inpainted:{data:new Float32Array([0.25]),dispose:mocks.outputDispose}});vi.stubGlobal('chrome',{runtime:{getURL:(p:string)=>'chrome-extension://test'+p}});
     mocks.workerPrepare.mockReset().mockResolvedValue(undefined);mocks.workerRequest.mockReset().mockImplementation(async({patch})=>zero(patch));mocks.workerRelease.mockReset().mockResolvedValue(undefined);
 });
 afterEach(async()=>{await mangaInpaintingRuntime.dispose().catch(()=>undefined);vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();});
 describe('漫画局部神经修补',()=>{
-    it('旋转标签恢复精确逐列底色，即使旧采样判为近似均匀也通知绘制方',async()=>{
+    it('旋转标签恢复精确逐列底色，默认保留源缓冲，显式独占时就地写入并通知绘制方',async()=>{
         const f=rotatedSpineFixture(),before=f.pixels.slice(),create=vi.fn(),signal=vi.fn();
         const runtime=createMangaInpaintingRuntime(create);
         const backgrounds=[{uniform:true,color:'rgb(32,34,49)'}];
-        const result=await runtime.repair(f.pixels,f.width,f.height,[f.region],undefined,undefined,undefined,backgrounds,{reuseUniformPixels:true,onRotatedLabelRestored:signal});
-        expect(result).toEqual(f.background);expect(f.pixels).toEqual(before);expect(create).not.toHaveBeenCalled();
+        const copied=await runtime.repair(f.pixels,f.width,f.height,[f.region],undefined,undefined,undefined,backgrounds,{onRotatedLabelRestored:signal});
+        expect(copied).toEqual(f.background);expect(copied).not.toBe(f.pixels);expect(f.pixels).toEqual(before);expect(create).not.toHaveBeenCalled();
         expect(signal).toHaveBeenCalledExactlyOnceWith(0);expect(backgrounds[0].uniform).toBe(true);
+        signal.mockClear();
+        const owned=f.pixels.slice();
+        const inPlace=await runtime.repair(owned,f.width,f.height,[f.region],undefined,undefined,undefined,backgrounds,{reuseUniformPixels:true,onRotatedLabelRestored:signal});
+        expect(inPlace).toBe(owned);expect(inPlace).toEqual(f.background);expect(signal).toHaveBeenCalledExactlyOnceWith(0);
         // 增加一个无法核对的静区像素，原近似均匀快路径仍完整可用。
         f.pixels[f.offset(40,12)]++;
         signal.mockClear();
@@ -144,12 +149,15 @@ describe('漫画局部神经修补',()=>{
         }
         await runtime.dispose();
     });
-    it('完整验证的渐变直接恢复原背景，不初始化模型、不改源缓冲或延长模型驻留',async()=>{
+    it('完整验证的渐变直接恢复原背景，默认不改源缓冲、独占选项就地复用且不初始化模型',async()=>{
         const clean=gradientPixels(),input=clean.slice();
         for(let y=35;y<65;y++)for(let x=35;x<85;x++)input.set([0,0,0,255],(y*128+x)*4);
         const original=input.slice(),create=vi.fn(),preparing=vi.fn(),runtime=createMangaInpaintingRuntime(create);
-        const result=await runtime.repair(input,128,128,[region],undefined,preparing,undefined,[{uniform:false,color:'rgb(128,128,128)'}],{reuseUniformPixels:true});
+        const result=await runtime.repair(input,128,128,[region],undefined,preparing,undefined,[{uniform:false,color:'rgb(128,128,128)'}]);
         expect(result).not.toBe(input);expect(input).toEqual(original);expect(create).not.toHaveBeenCalled();expect(preparing).not.toHaveBeenCalled();
+        const owned=original.slice();
+        const reused=await runtime.repair(owned,128,128,[region],undefined,preparing,undefined,[{uniform:false,color:'rgb(128,128,128)'}],{reuseUniformPixels:true});
+        expect(reused).toBe(owned);expect(reused).toEqual(result);
         const boxes=mangaMaskBoxes(region,128,128);let maxError=0,outsideChanges=0;
         for(let y=0;y<128;y++)for(let x=0;x<128;x++)for(let channel=0;channel<4;channel++){
             const at=(y*128+x)*4+channel;
@@ -587,5 +595,147 @@ describe('漫画局部神经修补',()=>{
         const abort=new AbortController();mocks.create.mockImplementationOnce(async()=>{abort.abort();return {release:mocks.release}});
         await expect(createBrowserMangaInpainter(abort.signal)).rejects.toMatchObject({name:'AbortError'});expect(mocks.release).toHaveBeenCalledOnce();
         const cancelled=new AbortController();cancelled.abort();await expect(createBrowserMangaInpainter(cancelled.signal)).rejects.toMatchObject({name:'AbortError'});expect(mocks.create).toHaveBeenCalledOnce();
+    });
+    it('补丁内侧 2 像素边界按色差门禁保边羽化，跳过透明与保护外周且恒等往返零误差',()=>{
+        const width=80,height=64,input=new Uint8ClampedArray(width*height*4);
+        for(let i=0;i<input.length;i+=4)input.set([200,200,200,255],i);
+        const candidate={text:'seam',fontSize:10,bbox:{x0:20,y0:20,x1:50,y1:40}};
+        const [box]=mangaMaskBoxes(candidate,width,height);
+        const mapping=createMangaPatch(input,width,height,candidate),count=mapping.patch.width*mapping.patch.height;
+        // 恒等往返在非满幅内框上同样保持 0 误差。
+        const identity=input.slice();
+        applyMangaPatch(identity,width,candidate,mapping,mapping.patch.image);
+        expect(identity).toEqual(input);
+        // 温和色差接缝（200 vs 180，差值 20 <= 48）按 dist=1 (0.65/0.35)、dist=2 (0.85/0.15)、dist>=3 (1.0) 平滑羽化。
+        const output=new Float32Array(count*3).fill(180/255);
+        const feathered=input.slice();
+        applyMangaPatch(feathered,width,candidate,mapping,output);
+        expect(feathered[(box.y0*width+box.x0+5)*4]).toBe(Math.round(180*.65+200*.35));
+        expect(feathered[((box.y0+1)*width+box.x0+5)*4]).toBe(Math.round(180*.85+200*.15));
+        expect(feathered[((box.y0+2)*width+box.x0+5)*4]).toBe(180);
+        // 保护外周像素与全透明外周像素不会被羽化采样。
+        const protectedInput=input.slice();
+        protectedInput.set([170,170,170,255],((box.y0-1)*width+box.x0+5)*4);
+        protectedInput.set([170,170,170,0],((box.y0-1)*width+box.x0+6)*4);
+        const hole={x0:box.x0+5,y0:box.y0-1,x1:box.x0+6,y1:box.y0};
+        const rowStarts=new Uint32Array(height+1);
+        for(let y=0;y<=height;y++)rowStarts[y]=y>box.y0-1?1:0;
+        const prot={rectangles:[hole],runs:new Uint16Array([box.y0-1,box.x0+5,box.x0+6]),rowStarts};
+        const protMap=createMangaPatch(protectedInput,width,height,candidate,prot);
+        const protOut=protectedInput.slice();
+        applyMangaPatch(protOut,width,candidate,protMap,output);
+        expect(protOut[(box.y0*width+box.x0+5)*4]).toBe(180);
+        expect(protOut[(box.y0*width+box.x0+6)*4]).toBe(180);
+        // 锐利硬边（200 vs 20，差值 180 > 48）不发生渗色。
+        const sharp=input.slice();
+        applyMangaPatch(sharp,width,candidate,mapping,new Float32Array(count*3).fill(20/255));
+        expect(sharp[(box.y0*width+box.x0+5)*4]).toBe(20);
+    });
+    it('同页透明保护按区域生效：含孔区域走模型，不透明渐变与旋转标签仍走快路径',async()=>{
+        const input=gradientPixels();
+        const alphaRegion={text:'hole',fontSize:10,bbox:{x0:12,y0:12,x1:36,y1:32}};
+        const opaqueRegion={text:'grad',fontSize:10,bbox:{x0:76,y0:76,x1:108,y1:104}};
+        input[(20*128+20)*4+3]=0;
+        const protection=planMangaAlphaProtection(input,128,128,[alphaRegion,opaqueRegion])!;
+        const port={run:vi.fn(async patch=>zero(patch)),release:vi.fn()},runtime=createMangaInpaintingRuntime(async()=>port);
+        try{
+            const result=await runtime.repair(input,128,128,[alphaRegion,opaqueRegion],undefined,undefined,undefined,
+                [{uniform:false,color:'#888'},{uniform:false,color:'#888'}],{protection});
+            expect(port.run).toHaveBeenCalledOnce();
+            expect(result[(20*128+20)*4+3]).toBe(0);
+            expect(result[(90*128+90)*4]).toBe(input[(90*128+90)*4]);
+            // 旋转标签外周碰到透明保护时自动跳过快路径，不覆盖保护孔。
+            const spine=rotatedSpineFixture();
+            spine.pixels[spine.offset(40,30)+3]=0;
+            const spineProt=planMangaAlphaProtection(spine.pixels,spine.width,spine.height,[spine.region])!;
+            const signal=vi.fn();
+            await runtime.repair(spine.pixels,spine.width,spine.height,[spine.region],undefined,undefined,undefined,
+                [{uniform:false,color:'#222'}],{protection:spineProt,onRotatedLabelRestored:signal});
+            expect(signal).not.toHaveBeenCalled();
+            expect(port.run).toHaveBeenCalledTimes(2);
+        }finally{await runtime.dispose();}
+    });
+    it('容忍轻微 JPEG 压缩噪声的近纯色气泡走快速纯色羽化修补，纹理/渐变/透明与无墨迹继续交模型',async()=>{
+        const makeJpegBubble=(width=128,height=128)=>{
+            const buf=new Uint8ClampedArray(width*height*4);
+            for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+                const noise=((x*3+y*5)%7)-3;
+                buf.set([246+noise,244+noise,236+noise,255],(y*width+x)*4);
+            }
+            for(let y=36;y<64;y++)for(let x=38;x<82;x++)if((x+y)%3===0)buf.set([20,20,20,255],(y*width+x)*4);
+            return buf;
+        };
+        const create=vi.fn(async()=>({run:vi.fn(async patch=>zero(patch)),release:vi.fn()}));
+        const runtime=createMangaInpaintingRuntime(create);
+        try{
+            const input=makeJpegBubble(),before=input.slice();
+            const result=await runtime.repair(input,128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'rgb(246,244,236)'}]);
+            expect(create).not.toHaveBeenCalled();expect(result).not.toBe(input);expect(input).toEqual(before);
+            const [box]=mangaMaskBoxes(region,128,128);
+            // 框外像素零改动，框内文字已被平滑均值清除。
+            for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+                const o=(y*128+x)*4;
+                if(x<box.x0||x>=box.x1||y<box.y0||y>=box.y1)expect(result.subarray(o,o+4)).toEqual(before.subarray(o,o+4));
+                else {expect(result[o]).toBeGreaterThan(235);expect(result[o+3]).toBe(255);}
+            }
+            // 显式独占时就地复用缓冲。
+            const owned=before.slice();
+            expect(await runtime.repair(owned,128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'rgb(246,244,236)'}],{reuseUniformPixels:true})).toBe(owned);
+            // 各类拒绝条件均交回 LaMa：触边、外周透明（边与角）、高方差条纹、对边梯度、内部透明、内部无墨迹。
+            const port={run:vi.fn(async patch=>zero(patch)),release:vi.fn()},modelRuntime=createMangaInpaintingRuntime(async()=>port);
+            try{
+                const edgeCase={...region,bbox:{x0:0,y0:0,x1:40,y1:40}};
+                await modelRuntime.repair(makeJpegBubble(),128,128,[edgeCase],undefined,undefined,undefined,[{uniform:false,color:'#eee'}]);
+                const transTop=makeJpegBubble();transTop[((box.y0-1)*128+box.x0+2)*4+3]=128;
+                await modelRuntime.repair(transTop,128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'#eee'}]);
+                const transLeft=makeJpegBubble();transLeft[(box.y0*128+box.x0-1)*4+3]=128;
+                await modelRuntime.repair(transLeft,128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'#eee'}]);
+                const transCorner=makeJpegBubble();transCorner[((box.y0-1)*128+box.x0-1)*4+3]=128;
+                await modelRuntime.repair(transCorner,128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'#eee'}]);
+                const highVar=makeJpegBubble();
+                for(let x=box.x0-1;x<=box.x1;x++){const v=x%2?252:240;highVar.set([v,v,v,255],((box.y0-1)*128+x)*4);highVar.set([v,v,v,255],(box.y1*128+x)*4);}
+                for(let y=box.y0;y<box.y1;y++){const v=y%2?252:240;highVar.set([v,v,v,255],(y*128+box.x0-1)*4);highVar.set([v,v,v,255],(y*128+box.x1)*4);}
+                await modelRuntime.repair(highVar,128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'#eee'}]);
+                const tiltedGrad=makeJpegBubble();
+                for(let x=box.x0-1;x<=box.x1;x++){tiltedGrad.set([240,240,240,255],((box.y0-1)*128+x)*4);tiltedGrad.set([250,250,250,255],(box.y1*128+x)*4);}
+                for(let y=box.y0;y<box.y1;y++){tiltedGrad.set([245,245,245,255],(y*128+box.x0-1)*4);tiltedGrad.set([245,245,245,255],(y*128+box.x1)*4);}
+                await modelRuntime.repair(tiltedGrad,128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'#eee'}]);
+                const transInside=makeJpegBubble();transInside[(45*128+50)*4+3]=128;
+                await modelRuntime.repair(transInside,128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'#eee'}]);
+                const noInk=new Uint8ClampedArray(128*128*4);
+                for(let y=0;y<128;y++)for(let x=0;x<128;x++){const n=((x+y)%3)-1;noInk.set([246+n,246+n,246+n,255],(y*128+x)*4);}
+                await modelRuntime.repair(noInk,128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'#eee'}]);
+                expect(port.run).toHaveBeenCalledTimes(8);
+            }finally{await modelRuntime.dispose();}
+        }finally{await runtime.dispose();}
+    });
+    it('painter.run 在 paceLocalInference 内先校验取消再调用 session.run，且 GPU 回退失败透传 onBroken',async()=>{
+        const controller=new AbortController(),gate=deferred<void>();
+        mocks.pace.mockImplementationOnce(async operation=>{await gate.promise;return operation();});
+        const port=await createBrowserMangaInpainter(),patch={image:new Float32Array(3),mask:new Float32Array(1),width:1,height:1};
+        const pending=port.run(patch,controller.signal);
+        controller.abort();gate.resolve();
+        await expect(pending).rejects.toMatchObject({name:'AbortError'});
+        expect(mocks.run).not.toHaveBeenCalled();
+        expect(mocks.tensorDispose).toHaveBeenCalledTimes(2);
+        await port.release();
+        // GPU 回退期间 createCpu 失败/中止透传 onBroken，且释放异常不覆盖 AbortError。
+        mocks.gpu.mockResolvedValueOnce({available:true});
+        const gpuSession={run:vi.fn().mockRejectedValueOnce(new Error('GPU lost')),release:vi.fn(async()=>undefined)};
+        const cpuAbort=new AbortController();
+        const cpuSession={run:vi.fn(),release:vi.fn().mockRejectedValueOnce(new Error('cpu release fail'))};
+        mocks.create.mockResolvedValueOnce(gpuSession).mockImplementationOnce(async()=>{cpuAbort.abort();return cpuSession;});
+        const onBroken=vi.fn();
+        const gpuPort=await createBrowserMangaInpainter(undefined,undefined,onBroken);
+        await expect(gpuPort.run(patch,cpuAbort.signal)).rejects.toMatchObject({name:'AbortError'});
+        expect(onBroken).toHaveBeenCalledOnce();
+        expect(cpuSession.release).toHaveBeenCalledOnce();
+        await gpuPort.release();
+        // 初始化创建后中止且 release 拒绝时仍保留 AbortError。
+        const initAbort=new AbortController();
+        const releaseFail=vi.fn().mockRejectedValueOnce(new Error('init release fail'));
+        mocks.create.mockImplementationOnce(async()=>{initAbort.abort();return {release:releaseFail};});
+        await expect(createBrowserMangaInpainter(initAbort.signal)).rejects.toMatchObject({name:'AbortError'});
+        expect(releaseFail).toHaveBeenCalledOnce();
     });
 });

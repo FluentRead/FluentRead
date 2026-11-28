@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/offscreen/transcription.ts
  * 文件职责：在 Offscreen Document 中串行调度视频 Whisper Worker、PCM 解码和模型预热。
- * 主要内容：复用共享并行预算及排队任务代次保护，管理单待处理转写、prepare 去重、模型切换、GPU 生命周期失败后的单次 CPU 重建、超时终止、首窗等待的有界预热租期、取消清理与按设备内存安排的空闲释放，兼容解码返回后先检查会话归属再读取 PCM；透传实际语言检测诊断，预下载时校验本次来源偏好，并把字节及连接状态交给调用方。
+ * 主要内容：复用共享并行预算及排队任务代次保护，管理单待处理转写、prepare 去重、模型切换、会话级粘性设备偏好（WebGPU 失败后粘滞到 WASM 并在 WASM 路径使用完整超时且跳过冗余音频副本）、GPU 生命周期失败后的单次 CPU 重建、超时终止、首窗等待的有界预热租期、取消清理、显式页面卸载释放与按设备内存安排的空闲释放，兼容解码返回后先检查会话归属再读取 PCM；透传实际语言检测诊断，预下载时校验本次来源偏好，并把字节及连接状态交给调用方。
  * 模块边界：只编排 Offscreen/Worker 资源，收到未知载荷先经共享 Worker 协议校验；不解析字幕时间轴，也不管理后台 tab owner。
  */
 import {withLocalInferenceBudget} from '@/src/shared/onnx/resources';
@@ -85,6 +85,7 @@ let activeStreamId = '';
 let workerGeneration = 0;
 let currentTranscriptionStreamId = '';
 let transcriptionCancellationVersion = 0;
+let preferredDevice: 'auto' | 'wasm' = 'auto';
 
 function createWorkerLifecycleError(message: string): WorkerLifecycleError {
   const error = new Error(message) as WorkerLifecycleError;
@@ -196,35 +197,42 @@ function requestWorkerNow(
 
 function requestWorkerWithCpuFallback(
   message: Omit<WorkerRequest, 'requestId'> & {type: 'transcribe'},
-  retryMessage: Omit<WorkerRequest, 'requestId'> & {type: 'transcribe'},
+  retryMessage: (Omit<WorkerRequest, 'requestId'> & {type: 'transcribe'}) | undefined,
   transfer: Transferable[], retryTransfer: Transferable[], timeoutMs: number, streamId?: string,
 ): Promise<WorkerResponse & VideoTranscriptionResult>;
 function requestWorkerWithCpuFallback(
-  message: Omit<WorkerRequest, 'requestId'>, retryMessage: Omit<WorkerRequest, 'requestId'>,
+  message: Omit<WorkerRequest, 'requestId'>, retryMessage: Omit<WorkerRequest, 'requestId'> | undefined,
   transfer: Transferable[], retryTransfer: Transferable[], timeoutMs: number, streamId?: string,
 ): Promise<WorkerResponse>;
 async function requestWorkerWithCpuFallback(
   message: Omit<WorkerRequest, 'requestId'>,
-  retryMessage: Omit<WorkerRequest, 'requestId'>,
+  retryMessage: Omit<WorkerRequest, 'requestId'> | undefined,
   transfer: Transferable[],
   retryTransfer: Transferable[],
   timeoutMs: number,
   streamId = '',
 ): Promise<WorkerResponse> {
   const deadlineAt = Date.now() + timeoutMs;
-  const firstAttemptTimeout = Math.max(1, Math.floor(timeoutMs / 2));
+  const useWasmOnly = preferredDevice === 'wasm';
+  const firstMessage = useWasmOnly ? {...message, device: 'wasm' as const} : message;
+  // 已锁定 WASM 时直接给出完整超时，不再对半切分；首次自动路径为冷启动
+  // WebGPU 着色器编译保留 65% 预算，同时为单次 CPU 重建留出余量。
+  const firstAttemptTimeout = useWasmOnly
+    ? timeoutMs
+    : Math.max(1, Math.round(timeoutMs * 0.65));
   try {
-    return await requestWorker(message, transfer, firstAttemptTimeout);
+    return await requestWorker(firstMessage, transfer, firstAttemptTimeout);
   } catch (error) {
     const remainingMs = deadlineAt - Date.now();
     if (!isWorkerLifecycleError(error)) throw error;
-    if (message.device === 'wasm' || remainingMs <= 0) {
+    if (!useWasmOnly) preferredDevice = 'wasm';
+    if (useWasmOnly || remainingMs <= 0) {
       activeStreamId = '';
       throw error;
     }
     if (streamId && activeStreamId !== streamId) throw new Error('本地视频 AI 字幕已取消');
     try {
-      return await requestWorker({...retryMessage, device: 'wasm'}, retryTransfer, remainingMs);
+      return await requestWorker({...retryMessage!, device: 'wasm'}, retryTransfer, remainingMs);
     } catch (retryError) {
       if (isWorkerLifecycleError(retryError)) activeStreamId = '';
       throw retryError;
@@ -369,22 +377,22 @@ async function transcribeLocalVideoAudioNow(request: LocalVideoTranscriptionRequ
   const workerAudio = boundedAudio.byteOffset === 0 && boundedAudio.byteLength === boundedAudio.buffer.byteLength
     ? boundedAudio
     : boundedAudio.slice();
-  // The first request transfers its buffer. Keep an independent copy for the
-  // one allowed retry on a fresh WASM worker.
-  const retryAudio = boundedAudio.slice();
+  // 仅当会话仍允许 CPU 回退时才复制独立重试缓冲；粘滞到 WASM 后跳过冗余分配。
+  const normalizedModel = normalizeVideoLocalTranscriptionModel(request.model);
+  const retryAudio = preferredDevice === 'wasm' ? undefined : boundedAudio.slice();
   const response = await requestWorkerWithCpuFallback({
     type: 'transcribe',
-    model: normalizeVideoLocalTranscriptionModel(request.model),
+    model: normalizedModel,
     sourceLanguage: request.sourceLanguage,
     languageSessionKey: request.streamId,
     audio: workerAudio,
-  }, {
+  }, retryAudio ? {
     type: 'transcribe',
-    model: normalizeVideoLocalTranscriptionModel(request.model),
+    model: normalizedModel,
     sourceLanguage: request.sourceLanguage,
     languageSessionKey: request.streamId,
     audio: retryAudio,
-  }, [workerAudio.buffer], [retryAudio.buffer], getVideoLocalTranscriptionWorkerTimeoutMs(request.model), request.streamId);
+  } : undefined, [workerAudio.buffer], retryAudio ? [retryAudio.buffer] : [], getVideoLocalTranscriptionWorkerTimeoutMs(request.model), request.streamId);
   if (activeStreamId === request.streamId) firstAudioWarmLease = {streamId: request.streamId!, deadlineAt: 0};
   return {
     text: response.text,
@@ -583,6 +591,13 @@ export async function cancelLocalVideoTranscription(
   await closeDecodeAudioContext();
   clearIdleDisposal();
   drainQueue();
+}
+
+/** 离屏页面卸载或显式重置时终止 Worker、关闭解码上下文并恢复初始设备偏好。 */
+export function disposeLocalVideoTranscriber(): void {
+  preferredDevice = 'auto';
+  terminateWorker(new Error('本地视频 AI 字幕已取消'), true);
+  void closeDecodeAudioContext();
 }
 
 /** 空闲时释放已加载 Worker，再删除指定模型；使用或下载过程中拒绝删除。 */

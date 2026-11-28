@@ -168,5 +168,335 @@
         "sha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699"
       }
     ]
+  },
+  "tencent/Hy-MT3-1.8B-GGUF": {
+    "revision": "02969629feae5b30a9c084179517a5de188f8862",
+    "files": [
+      {
+        "path": "Hy-MT3-1.8B-Q4_K_M.gguf",
+        "size": 1348432160,
+        "sha256": "bae6e591103654ff43ef0de7d1492f6e6df1f955505f6bb2cc52e86fc399a942"
+      }
+    ]
+  },
+  "Xenova/opus-mt-en-fr": {
+    "revision": "28726206f80896b90035bd99cccd5cc1e151f916",
+    "files": [
+      {
+        "path": "config.json",
+        "size": 1411,
+        "sha256": "b522b73fcc86f77981349c1df2a2e041eed0dbcbea4acf2635019cf21d51ffc0"
+      },
+      {
+        "path": "generation_config.json",
+        "size": 293,
+        "sha256": "f9a4824ec78c61b4a95afc43bbb6a9545a44ccf1c01d0963a286e799b9e7b256"
+      },
+      {
+        "path": "onnx/decoder_model_merged_quantized.onnx",
+        "size": 57381512,
+        "sha256": "333b244bce16023df04541c8cf9fd60aec9b0569da393c4b831d561897b0bda8"
+      },
+      {
+        "path": "onnx/encoder_model_quantized.onnx",
+        "size": 50090398,
+        "sha256": "0a81bdba62f53223740a8c6c6f58e716eba8ea1f92dfa569caf27ed5e3b6a0f7"
+      },
+      {
+        "path": "special_tokens_map.json",
+        "size": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "path": "tokenizer.json",
+        "size": 5637839,
+        "sha256": "8391785c1a2139e7af4678571ccd8dc654ecbb72e4be186940f65d7c604f0246"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "size": 280,
+        "sha256": "eb8dfaa142fe03627c8d035415f56c46284b6ee4a16e54c6e8236928ac5a1170"
+      }
+    ]
+  },
+  "Xenova/opus-mt-fr-en": {
+    "revision": "6b166a182780e118c997879d0ad5be4b53671644",
+    "files": [
+      {
+        "path": "config.json",
+        "size": 1411,
+        "sha256": "6c2851f154d7b88c7767e4fdcf8a5694a36a456bfa6cbcde1b13fdbade3b56f6"
+      },
+      {
+        "path": "generation_config.json",
+        "size": 293,
+        "sha256": "f9a4824ec78c61b4a95afc43bbb6a9545a44ccf1c01d0963a286e799b9e7b256"
+      },
+      {
+        "path": "onnx/decoder_model_merged_quantized.onnx",
+        "size": 57381512,
+        "sha256": "73bc7ac8e29c42e6f212ebcc29a2991d3646a04aabb642c0036aa54b40e4e1a9"
+      },
+      {
+        "path": "onnx/encoder_model_quantized.onnx",
+        "size": 50090398,
+        "sha256": "e727cb26ac6bf816394c49671af69c9ae5798868fed1e40849872415dffc1772"
+      },
+      {
+        "path": "special_tokens_map.json",
+        "size": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "path": "tokenizer.json",
+        "size": 5637839,
+        "sha256": "8391785c1a2139e7af4678571ccd8dc654ecbb72e4be186940f65d7c604f0246"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "size": 280,
+        "sha256": "bba9e6b1e3b9724d15ebacaf11eaac360c5ae3f4139bcdef0ee1610592eaa3fe"
+      }
+    ]
+  },
+  "Xenova/opus-mt-en-de": {
+    "revision": "1ca130c44c4c5441ef16d48aae521a424ab644f7",
+    "files": [
+      {
+        "path": "config.json",
+        "size": 1411,
+        "sha256": "517955ebf66cd6523f9982851dd41771b74fb2d9c00b4933ba2922ac7a63336f"
+      },
+      {
+        "path": "generation_config.json",
+        "size": 293,
+        "sha256": "cd16a899388283889c6e87b903c689ce73430aaa18335415f9d9ea770606538e"
+      },
+      {
+        "path": "onnx/decoder_model_merged_quantized.onnx",
+        "size": 56652404,
+        "sha256": "8b46a825964cdd182fe47cc780f0fb87d357eae1f47cf20aa63c1c09be5b510c"
+      },
+      {
+        "path": "onnx/encoder_model_quantized.onnx",
+        "size": 49366942,
+        "sha256": "15834b45fabd2dfb8c6c029b3ca3e7289aeefd90ece798ce42bcf548d1bd3b8d"
+      },
+      {
+        "path": "special_tokens_map.json",
+        "size": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "path": "tokenizer.json",
+        "size": 5498450,
+        "sha256": "8e0fcf45621ea87fa680c7f9969c37a7f819c1f4c7658a2e6e0879b866a14b17"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "size": 280,
+        "sha256": "4500a1295197174119cf17f9b2e6eab2d5c3a9c64009fb1e37ebd2868bf1161c"
+      }
+    ]
+  },
+  "Xenova/opus-mt-de-en": {
+    "revision": "399dfd68706739fffd503f876093e455ae268a06",
+    "files": [
+      {
+        "path": "config.json",
+        "size": 1376,
+        "sha256": "6754743ec4754957d8552dad869d1314f3af6626b67446ec4cebe5e2fbaa0fc4"
+      },
+      {
+        "path": "generation_config.json",
+        "size": 293,
+        "sha256": "cd16a899388283889c6e87b903c689ce73430aaa18335415f9d9ea770606538e"
+      },
+      {
+        "path": "onnx/decoder_model_merged_quantized.onnx",
+        "size": 56652404,
+        "sha256": "4712800584b2d77c2f9e620bf29523e2b20b62f65ade5011ee01780e2b0ea5d3"
+      },
+      {
+        "path": "onnx/encoder_model_quantized.onnx",
+        "size": 49366942,
+        "sha256": "4cedda8f8c89b72a42b3c6cd1e7a27f2de24457093e3bf80cb3e46829641fcd8"
+      },
+      {
+        "path": "special_tokens_map.json",
+        "size": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "path": "tokenizer.json",
+        "size": 5498450,
+        "sha256": "8e0fcf45621ea87fa680c7f9969c37a7f819c1f4c7658a2e6e0879b866a14b17"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "size": 280,
+        "sha256": "e3687c40400600366d9b073a3fd9f75dc8b40d5a9d6e5c92544cf2e9592abe6c"
+      }
+    ]
+  },
+  "Xenova/opus-mt-en-es": {
+    "revision": "4b002a4c7edd54a7ced58877258b87f7efd3f892",
+    "files": [
+      {
+        "path": "config.json",
+        "size": 1468,
+        "sha256": "499eae1f97eeba63172fc884f92fd727ae803b7ceb79c0f653aa4b011152af2f"
+      },
+      {
+        "path": "generation_config.json",
+        "size": 293,
+        "sha256": "b743baabb7da4c1a2f19fe558bd6b4c0c7c3b0762fcb5ca7a48fe5a2c2219803"
+      },
+      {
+        "path": "onnx/decoder_model_merged_quantized.onnx",
+        "size": 60212804,
+        "sha256": "58ee5ddd6e22d1693d8722b90c1486afb93700a4376cf28fd74175052ad530ae"
+      },
+      {
+        "path": "onnx/encoder_model_quantized.onnx",
+        "size": 52899742,
+        "sha256": "03434edd1147e6c49e22066e9dc5888235e99cc35a6711d1c4ea5b06455d5da9"
+      },
+      {
+        "path": "special_tokens_map.json",
+        "size": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "path": "tokenizer.json",
+        "size": 6262682,
+        "sha256": "285eb29e7155ee48851a77960797813f86a125f70d2c1a124f613f1fbd2b19c3"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "size": 282,
+        "sha256": "dfb00189b823fb0f15464e9c4e68dd8594f5e5ef5f8dc497468a37741e73aa1f"
+      }
+    ]
+  },
+  "Xenova/opus-mt-es-en": {
+    "revision": "eadfd7c658a9d8929ac3b8e996b68a68e2c7d480",
+    "files": [
+      {
+        "path": "config.json",
+        "size": 1433,
+        "sha256": "fab3a7f93185bc5aa7b419f6a1e6e74d98c8f2a506c94493d3019bf46da3478d"
+      },
+      {
+        "path": "generation_config.json",
+        "size": 293,
+        "sha256": "b743baabb7da4c1a2f19fe558bd6b4c0c7c3b0762fcb5ca7a48fe5a2c2219803"
+      },
+      {
+        "path": "onnx/decoder_model_merged_quantized.onnx",
+        "size": 60212804,
+        "sha256": "4cd91ab30240d295ce907b5100826031838c672005e57e524d711122d75605fa"
+      },
+      {
+        "path": "onnx/encoder_model_quantized.onnx",
+        "size": 52899742,
+        "sha256": "c01e70f8455efc350831aa2af7ed187b16829241f0018ba07d1ba643a391bc18"
+      },
+      {
+        "path": "special_tokens_map.json",
+        "size": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "path": "tokenizer.json",
+        "size": 6262682,
+        "sha256": "285eb29e7155ee48851a77960797813f86a125f70d2c1a124f613f1fbd2b19c3"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "size": 282,
+        "sha256": "e1fac15a910169d5b5ec07a13b0374273626a239b5142db10be229ca66cc52a9"
+      }
+    ]
+  },
+  "Xenova/opus-mt-en-ru": {
+    "revision": "e050376e960175e8ddc5cff85025dc8436cddd68",
+    "files": [
+      {
+        "path": "config.json",
+        "size": 1376,
+        "sha256": "db16bf0ea7bac239273214c3b9ab44577884227371a9a25e0191b7baf8d6f167"
+      },
+      {
+        "path": "generation_config.json",
+        "size": 293,
+        "sha256": "885345001ac4f978b5e295a04eb6bd6c346ebc7381e30d5b3dd927b178d8a5ef"
+      },
+      {
+        "path": "onnx/decoder_model_merged_quantized.onnx",
+        "size": 58931576,
+        "sha256": "7efefcd793a5663bc204224a92a123524f3dfe2ffad59e5f73d6734d1b11ad04"
+      },
+      {
+        "path": "onnx/encoder_model_quantized.onnx",
+        "size": 51628446,
+        "sha256": "97f28d8295d231b7da721ded06fa8c034787df2122cd8f85b904abdc4d15bd53"
+      },
+      {
+        "path": "special_tokens_map.json",
+        "size": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "path": "tokenizer.json",
+        "size": 7205388,
+        "sha256": "981cd3d9fef6bb4dda8082afda716b65deb6717cb3ef35ac0b57002c09dec2bb"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "size": 280,
+        "sha256": "cafb5494f14bc8d395cc02ddaeeb0f8d85b0d9e20fd48371b5edc104cc2020ba"
+      }
+    ]
+  },
+  "Xenova/opus-mt-ru-en": {
+    "revision": "afe8c6c738ec81b6d033fd8f44f9678a639a7c67",
+    "files": [
+      {
+        "path": "config.json",
+        "size": 1376,
+        "sha256": "60dc7d0906dbe42a1d740cdd7e84ce1534685b81fbe16005a0301adac69086ce"
+      },
+      {
+        "path": "generation_config.json",
+        "size": 293,
+        "sha256": "9bcb507fa6117b07870df6627294b878b0710a55bc3abc9cf0db980e0c48fe2c"
+      },
+      {
+        "path": "onnx/decoder_model_merged_quantized.onnx",
+        "size": 58931576,
+        "sha256": "25e7ff97b201bce64ab9c39749761d657b70b8602bcbc1ce01c67f713e90ffdf"
+      },
+      {
+        "path": "onnx/encoder_model_quantized.onnx",
+        "size": 51628446,
+        "sha256": "c10df0466540534bb70c4402d539c349b8bfa9968184cad89f51408cf13e7eb7"
+      },
+      {
+        "path": "special_tokens_map.json",
+        "size": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "path": "tokenizer.json",
+        "size": 7205388,
+        "sha256": "981cd3d9fef6bb4dda8082afda716b65deb6717cb3ef35ac0b57002c09dec2bb"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "size": 280,
+        "sha256": "c0710ba5ee70ccb2d0e6b0092139d00f370b9c4783c4b077584cb3cc8f7ac4e0"
+      }
+    ]
   }
 }

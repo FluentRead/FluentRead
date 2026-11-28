@@ -3,14 +3,14 @@ import {LOCAL_TRANSLATION_MODEL_IDS} from '@/src/core/config/localTranslation';
 
 const mocks = vi.hoisted(() => ({pipeline: vi.fn(), threads: vi.fn(), forceSingleThread: vi.fn(), dispose: vi.fn(),
     env: {backends: {onnx: {}}} as any, artifacts: vi.fn(), matchArtifact: vi.fn(), artifactBlob: vi.fn(),
-    supportsHunyuan: vi.fn(), engine: vi.fn(), configureWasm: vi.fn(), compressedWasm: vi.fn()}));
+    supportsHunyuan: vi.fn(), supportsOpus: vi.fn(), engine: vi.fn(), configureWasm: vi.fn(), compressedWasm: vi.fn()}));
 vi.mock('@huggingface/transformers', () => ({env: mocks.env, pipeline: mocks.pipeline,
     InterruptableStoppingCriteria: class {interrupted = false; interrupt() {this.interrupted = true;}}}));
 vi.mock('@wllama/wllama/esm/index.js', () => ({Wllama: function(...args: unknown[]) {return mocks.engine(...args);}}));
 vi.mock('@/src/shared/onnx/resources', () => ({forceSingleThreadInference: mocks.forceSingleThread, localWasmThreads: mocks.threads,
     paceLocalInference: (run: () => Promise<unknown>) => run(), paceLocalInitialization: (run: () => Promise<unknown>) => run()}));
 vi.mock('@/src/features/local-translation/offscreen/artifactStore', () => ({getTranslationArtifacts: mocks.artifacts, matchTranslationArtifact: mocks.matchArtifact, translationArtifactBlob: mocks.artifactBlob}));
-vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: mocks.supportsHunyuan}));
+vi.mock('@/src/platform/browser/localTranslationSupport', () => ({supportsHunyuanTranslation: mocks.supportsHunyuan, supportsOpusTranslation: mocks.supportsOpus}));
 vi.mock('@/src/shared/onnx/wasmBinary', async () => {
     const actual = await vi.importActual<typeof import('@/src/shared/onnx/wasmBinary')>('@/src/shared/onnx/wasmBinary');
     return {
@@ -21,7 +21,7 @@ vi.mock('@/src/shared/onnx/wasmBinary', async () => {
 });
 
 beforeEach(() => {vi.resetModules();vi.resetAllMocks();mocks.threads.mockReturnValue(1);mocks.env.backends.onnx = {};
-    mocks.artifacts.mockReturnValue([]);mocks.supportsHunyuan.mockReturnValue(true);
+    mocks.artifacts.mockReturnValue([]);mocks.supportsHunyuan.mockReturnValue(true);mocks.supportsOpus.mockReturnValue(true);
     mocks.compressedWasm.mockImplementation((_wasm, _url, create) => create());
     vi.stubGlobal('navigator', {});
     mocks.pipeline.mockResolvedValue(Object.assign(vi.fn(async () => [{translation_text: '你好'}]), {dispose: mocks.dispose}));});
@@ -43,6 +43,9 @@ function hunyuanEngine() {
     return {setCompat: vi.fn(), loadModel: vi.fn().mockResolvedValue(undefined), exit: vi.fn().mockResolvedValue(undefined),
         createChatCompletion: vi.fn().mockResolvedValue({choices: [{finish_reason: 'stop', message: {content: '你好'}}]})};
 }
+function hardwareGpu() {
+    return {gpu: {requestAdapter: vi.fn(async () => ({isFallbackAdapter: false, info: {vendor: 'apple', architecture: 'metal'}}))}};
+}
 describe('actual local translation Worker message boundary', () => {
     it.each(['text', 'sourceLanguage', 'targetLanguage'])('rejects a validated %s cleared before its queued execution', async field => {
         const scope = await start();
@@ -57,6 +60,14 @@ describe('actual local translation Worker message boundary', () => {
         const scope = await start();
         scope.send({requestId: 1, get type() {throw null;}});
         expect(scope.postMessage).toHaveBeenCalledWith({requestId: 1, success: false, error: 'LOCAL_TRANSLATION_INVALID_REQUEST'});
+        expect(mocks.pipeline).not.toHaveBeenCalled();
+    });
+
+    it('rejects OPUS translation cleanly when browser lacks ONNX JSPI support', async () => {
+        mocks.supportsOpus.mockReturnValue(false);
+        const scope = await start();
+        const response = await reply(scope, {...command, requestId: 2});
+        expect(response).toMatchObject({requestId: 2, success: false, error: 'LOCAL_TRANSLATION_BROWSER_UNSUPPORTED'});
         expect(mocks.pipeline).not.toHaveBeenCalled();
     });
 
@@ -109,7 +120,10 @@ describe('actual local translation Worker message boundary', () => {
         expect(await reply(scope, {...command, requestId: 1})).toMatchObject({success: true, result: '你好'});
         expect(await reply(scope, {...command, requestId: 2})).toMatchObject({success: true, result: '你好'});
         expect(mocks.pipeline).toHaveBeenCalledOnce();expect(mocks.compressedWasm).toHaveBeenCalledOnce();
-        expect(mocks.pipeline).toHaveBeenCalledWith('translation', 'Xenova/opus-mt-en-zh', expect.objectContaining({revision: 'pinned', local_files_only: true}));
+        expect(mocks.pipeline).toHaveBeenCalledWith('translation', 'Xenova/opus-mt-en-zh', expect.objectContaining({
+            revision: 'pinned', local_files_only: true,
+            session_options: expect.objectContaining({enableCpuMemArena: true, enableMemPattern: false, executionMode: 'sequential'}),
+        }));
     });
 
     it('can retry the opposite OPUS direction after the previous model fails to dispose', async () => {
@@ -126,8 +140,55 @@ describe('actual local translation Worker message boundary', () => {
         expect(mocks.dispose).toHaveBeenCalledOnce();
     });
 
+    it('caches two OPUS directions with LRU eviction on 8GB+ devices and falls back to capacity 1 otherwise', async () => {
+        vi.stubGlobal('navigator', {deviceMemory: 8});
+        const disposeEnZh = vi.fn().mockRejectedValueOnce(new Error('first dispose failed'));
+        const disposeZhEn = vi.fn().mockResolvedValue(undefined);
+        const disposeJaEn = vi.fn().mockRejectedValueOnce(new Error('second dispose failed'));
+        const enZh = Object.assign(vi.fn(async () => [{translation_text: '中文'}]), {dispose: disposeEnZh});
+        const zhEn = Object.assign(vi.fn(async () => [{translation_text: 'English'}]), {dispose: disposeZhEn});
+        const jaEn = Object.assign(vi.fn(async () => [{translation_text: 'FromJa'}]), {dispose: disposeJaEn});
+        mocks.pipeline
+            .mockResolvedValueOnce(enZh)
+            .mockResolvedValueOnce(zhEn)
+            .mockResolvedValueOnce(jaEn);
+        const scope = await start();
+        const reverse = {...command, text: '你好', sourceLanguage: 'zh', targetLanguage: 'en'};
+        const ja = {...command, model: LOCAL_TRANSLATION_MODEL_IDS.opusJaEn, text: '\n\nこんにちは', sourceLanguage: 'ja', targetLanguage: 'en'};
+        expect(await reply(scope, {...command, requestId: 1})).toMatchObject({success: true, result: '中文'});
+        expect(await reply(scope, {...reverse, requestId: 2})).toMatchObject({success: true, result: 'English'});
+        // Refresh en->zh so zh->en becomes least-recently-used.
+        expect(await reply(scope, {...command, requestId: 3})).toMatchObject({success: true, result: '中文'});
+        expect(mocks.pipeline).toHaveBeenCalledTimes(2);
+        expect(disposeEnZh).not.toHaveBeenCalled();
+        expect(disposeZhEn).not.toHaveBeenCalled();
+        // Loading ja->en evicts zh->en, keeping en->zh cached, and preserves leading blank-line chunks.
+        expect(await reply(scope, {...ja, requestId: 4})).toMatchObject({success: true, result: '\n\nFromJa'});
+        expect(disposeZhEn).toHaveBeenCalledOnce();
+        expect(disposeEnZh).not.toHaveBeenCalled();
+        // Dispose cleans up all cached entries and keeps the first error even when multiple entries reject.
+        expect(await reply(scope, {type: 'dispose', requestId: 5})).toMatchObject({success: false, error: 'first dispose failed'});
+        expect(disposeEnZh).toHaveBeenCalledOnce();
+        expect(disposeJaEn).toHaveBeenCalledOnce();
+
+        // Low-memory (4GB) and missing navigator fall back to capacity 1.
+        vi.stubGlobal('navigator', {deviceMemory: 4});
+        const lowA = Object.assign(vi.fn(async () => [{translation_text: 'A'}]), {dispose: vi.fn().mockResolvedValue(undefined)});
+        const lowB = Object.assign(vi.fn(async () => [{translation_text: 'B'}]), {dispose: vi.fn().mockResolvedValue(undefined)});
+        mocks.pipeline.mockResolvedValueOnce(lowA).mockResolvedValueOnce(lowB);
+        expect(await reply(scope, {...command, requestId: 6})).toMatchObject({success: true, result: 'A'});
+        expect(await reply(scope, {...reverse, requestId: 7})).toMatchObject({success: true, result: 'B'});
+        expect(lowA.dispose).toHaveBeenCalledOnce();
+
+        vi.stubGlobal('navigator', undefined);
+        const noNav = Object.assign(vi.fn(async () => [{translation_text: 'C'}]), {dispose: vi.fn().mockResolvedValue(undefined)});
+        mocks.pipeline.mockResolvedValueOnce(noNav);
+        expect(await reply(scope, {...command, requestId: 8})).toMatchObject({success: true, result: 'C'});
+        expect(lowB.dispose).toHaveBeenCalledOnce();
+    });
+
     it.each(['gpu', 'fallback', 'cpu'] as const)('initializes Hunyuan using %s, reuses its session, and releases it when switching to OPUS', async mode => {
-        if (mode !== 'cpu') {vi.stubGlobal('navigator', {gpu: {}});vi.stubGlobal('WebAssembly', {Suspending: class {}});}
+        if (mode !== 'cpu') {vi.stubGlobal('navigator', hardwareGpu());vi.stubGlobal('WebAssembly', {Suspending: class {}});}
         const failed = hunyuanEngine();failed.loadModel.mockRejectedValue(new Error('GPU unavailable'));failed.exit.mockRejectedValue(new Error('already stopped'));
         const active = hunyuanEngine();mocks.engine.mockReturnValue(active);
         if (mode === 'fallback') mocks.engine.mockReturnValueOnce(failed);
@@ -139,9 +200,11 @@ describe('actual local translation Worker message boundary', () => {
         if (mode === 'gpu') expect(result).not.toHaveProperty('backend');
         else expect(result.backend).toBe('wasm');
         expect(active.setCompat).toHaveBeenCalledWith(null);
-        expect(active.loadModel).toHaveBeenCalledWith([blob], expect.objectContaining({n_gpu_layers: mode === 'gpu' ? 99 : 0, n_threads: 1, n_ctx: 2048}));
+        expect(active.loadModel).toHaveBeenCalledWith([blob], expect.objectContaining({
+            n_gpu_layers: mode === 'gpu' ? 99 : 0, n_threads: 1, n_ctx: 2048, n_batch: 512, n_ubatch: 256,
+        }));
         expect(active.createChatCompletion).toHaveBeenCalledTimes(2);
-        expect(active.createChatCompletion).toHaveBeenCalledWith(expect.objectContaining({abortSignal: expect.any(AbortSignal), max_tokens: 768, cache_prompt: false}));
+        expect(active.createChatCompletion).toHaveBeenCalledWith(expect.objectContaining({abortSignal: expect.any(AbortSignal), max_tokens: 768, cache_prompt: true}));
         if (mode === 'fallback') expect(failed.exit).toHaveBeenCalledOnce();
         expect(await reply(scope, {...hunyuanCommand, requestId: 2})).toMatchObject({success: true});
         expect(active.loadModel).toHaveBeenCalledOnce();expect(mocks.artifactBlob).toHaveBeenCalledOnce();
@@ -149,8 +212,34 @@ describe('actual local translation Worker message boundary', () => {
         expect(active.exit).toHaveBeenCalledOnce();
     });
 
+    it('skips WebGPU for software fallback adapters like SwiftShader and takes CPU WASM directly', async () => {
+        vi.stubGlobal('navigator', {gpu: {requestAdapter: vi.fn(async () => ({isFallbackAdapter: true, info: {description: 'SwiftShader'}}))}});
+        vi.stubGlobal('WebAssembly', {Suspending: class {}});
+        const active = hunyuanEngine();mocks.engine.mockReturnValue(active);
+        mocks.artifacts.mockReturnValue([{}]);mocks.artifactBlob.mockResolvedValue(new Blob(['model']));
+        const scope = await start();
+        const result = await reply(scope, {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan, requestId: 1});
+        expect(result).toMatchObject({success: true, result: '你好', backend: 'wasm'});
+        expect(active.loadModel).toHaveBeenCalledOnce();
+        expect(active.loadModel).toHaveBeenCalledWith([expect.any(Blob)], expect.objectContaining({n_gpu_layers: 0}));
+    });
+
+    it('reloads Hunyuan when switching between distinct Hunyuan model IDs', async () => {
+        const firstEngine = hunyuanEngine();
+        const secondEngine = hunyuanEngine();
+        secondEngine.createChatCompletion.mockResolvedValue({choices: [{finish_reason: 'stop', message: {content: '新版你好'}}]});
+        mocks.engine.mockReturnValueOnce(firstEngine).mockReturnValueOnce(secondEngine);
+        mocks.artifacts.mockImplementation((model: string) => [{repo: model, revision: 'pinned'}]);
+        mocks.artifactBlob.mockResolvedValue(new Blob(['model']));
+        const scope = await start();
+        expect(await reply(scope, {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan, requestId: 1})).toMatchObject({success: true, result: '你好'});
+        expect(await reply(scope, {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan3, requestId: 2})).toMatchObject({success: true, result: '新版你好'});
+        expect(firstEngine.exit).toHaveBeenCalledOnce();
+        expect(secondEngine.loadModel).toHaveBeenCalledOnce();
+    });
+
     it.each([false, true])('never carries an old WASM label into an unconfirmed GPU session after disposal failure=%s', async failDisposal => {
-        vi.stubGlobal('navigator', {gpu: {}});
+        vi.stubGlobal('navigator', hardwareGpu());
         vi.stubGlobal('WebAssembly', {Suspending: class {}});
         mocks.engine.mockImplementation(() => hunyuanEngine());
         mocks.artifacts.mockReturnValue([{}]);
@@ -171,9 +260,10 @@ describe('actual local translation Worker message boundary', () => {
 
     it.each(['unsupported', 'missing-artifact', 'cpu-load', 'gpu-and-cpu-load'] as const)('reports Hunyuan %s failure without retaining a broken engine', async mode => {
         const engine = hunyuanEngine();engine.loadModel.mockRejectedValue(new Error('model load failed'));
+        if (mode === 'gpu-and-cpu-load') engine.exit.mockRejectedValue(new Error('exit failed'));
         mocks.engine.mockReturnValue(engine);mocks.artifacts.mockReturnValue(mode === 'missing-artifact' ? [] : [{}]);
         mocks.artifactBlob.mockResolvedValue(new Blob(['model']));mocks.supportsHunyuan.mockReturnValue(mode !== 'unsupported');
-        if (mode === 'gpu-and-cpu-load') {vi.stubGlobal('navigator', {gpu: {}});vi.stubGlobal('WebAssembly', {Suspending: class {}});}
+        if (mode === 'gpu-and-cpu-load') {vi.stubGlobal('navigator', hardwareGpu());vi.stubGlobal('WebAssembly', {Suspending: class {}});}
         const scope = await start();
         expect(await reply(scope, {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan, requestId: 1})).toMatchObject({success: false,
             error: mode === 'unsupported' ? 'LOCAL_TRANSLATION_BROWSER_UNSUPPORTED' : mode === 'missing-artifact' ? 'LOCAL_TRANSLATION_INVALID_MODEL' : 'model load failed'});

@@ -26,6 +26,7 @@ import {
     createDocumentDownloadName,
     getDocumentFormat,
     getDocumentFormatLabel,
+    getDocxPartLabel as docxPartTitle,
     getDocumentMimeType,
     parseDocument,
     renderDocument,
@@ -1071,14 +1072,7 @@ export function docxParagraphText(paragraph: string): string {
     return tokens.join('').replace(/\u0000/gu, '').trim();
 }
 
-export function docxPartTitle(path: string): string {
-    if (path === 'word/document.xml') return '正文';
-    if (/header/iu.test(path)) return '页眉';
-    if (/footer/iu.test(path)) return '页脚';
-    if (/footnotes/iu.test(path)) return '脚注';
-    if (/endnotes/iu.test(path)) return '尾注';
-    return '文档内容';
-}
+export {docxPartTitle};
 
 export function docxParagraphRole(paragraph: string, path: string): NonNullable<DocumentSegment['role']> {
     if (/header/iu.test(path)) return 'header';

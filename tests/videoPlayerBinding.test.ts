@@ -1901,3 +1901,21 @@ it('preserves a host position declaration whose priority was changed after mount
     else Reflect.deleteProperty(stylePrototype, 'getPropertyPriority');
   }
 });
+
+it('tracks webkitFullscreenElement and webkitfullscreenchange for safe viewport menu hosting', () => {
+  const f = viewportMenuFixture(), menu = ownedMenu();
+  const binding = createVideoPlayerBinding({
+    document: f.document,
+    locator: f.locator,
+    getState: () => ({enabled: true}),
+    createButton: f.createButton,
+    createMenu: () => menu,
+  });
+  const host = menu.parentElement!;
+  expect(host.parentElement).toBe(f.document.documentElement);
+  Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: f.player});
+  f.document.dispatchEvent(new f.window.Event('webkitfullscreenchange'));
+  binding.syncMenuHost();
+  expect(host.parentElement).toBe(f.player);
+  binding.destroy();
+});

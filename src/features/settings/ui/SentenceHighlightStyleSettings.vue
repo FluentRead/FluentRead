@@ -5,8 +5,23 @@
 模块边界：只编辑父级 Config 草稿；与网页共用命名和绘制声明，不请求翻译、不修改宿主 DOM。
 -->
 <template>
-  <SettingsGroup id="translation-sentence-highlight-style" :title="t('sentenceHighlight.title')" :description="t('sentenceHighlight.description')">
-    <div class="sentence-highlight-settings">
+  <SettingsGroup id="translation-sentence-highlight-style" :title="t('settings.general.bilingualSentenceHighlight')" :description="t('settings.general.bilingualSentenceHighlightDescription')">
+    <template #heading-extra>
+      <div id="translation-sentence-highlight" class="sentence-highlight-heading-actions">
+        <FieldHelp :content="t('settings.general.bilingualSentenceHighlightGroupingHint')" :label="t('settings.general.bilingualSentenceHighlight')" />
+        <el-switch
+          v-model="config.bilingualSentenceHighlightEnabled"
+          class="settings-toggle"
+          data-testid="bilingual-sentence-highlight-toggle"
+          :aria-label="t('settings.general.bilingualSentenceHighlight')"
+        />
+      </div>
+    </template>
+    <div v-if="config.bilingualSentenceHighlightEnabled" class="sentence-highlight-settings">
+      <p v-if="config.display === 0" class="sentence-highlight-bilingual-note" role="status">
+        {{ t('settings.translationStyle.bilingualOnly') }}
+        <button type="button" @click="config.display = 1">{{ t('settings.translationStyle.switchToBilingual') }}</button>
+      </p>
       <div class="sentence-highlight-workbench">
         <TranslationStylePreview
           style-class=""
@@ -17,28 +32,22 @@
           :initial-sentence="0"
           :translation-before-original="config.translationBeforeOriginal"
           :page-theme="pageTheme"
-          :caption="t(config.bilingualSentenceHighlightEnabled ? 'sentenceHighlight.tryHint' : 'sentenceHighlight.offHint')"
-          :customized="config.bilingualSentenceHighlightEnabled && customized"
+          :caption="t('sentenceHighlight.tryHint')"
+          :customized="customized"
           @update:page-theme="pageTheme = $event"
         />
         <div class="sentence-highlight-options" role="radiogroup" :aria-label="t('sentenceHighlight.title')">
-          <button v-for="style in SENTENCE_HIGHLIGHT_STYLES" :key="style.value" type="button" role="radio" class="sentence-highlight-option" :class="{selected: config.bilingualSentenceHighlightEnabled && !config.activeSentenceHighlightProfileId && config.bilingualSentenceHighlightStyle === style.value}" :aria-label="t(style.labelKey)" :aria-checked="config.bilingualSentenceHighlightEnabled && !config.activeSentenceHighlightProfileId && config.bilingualSentenceHighlightStyle === style.value" :data-highlight-style="style.value" @click="selectPreset(style.value)">
+          <button v-for="style in SENTENCE_HIGHLIGHT_STYLES" :key="style.value" type="button" role="radio" class="sentence-highlight-option" :class="{selected: !config.activeSentenceHighlightProfileId && config.bilingualSentenceHighlightStyle === style.value}" :aria-label="t(style.labelKey)" :aria-checked="!config.activeSentenceHighlightProfileId && config.bilingualSentenceHighlightStyle === style.value" :data-highlight-style="style.value" @click="selectPreset(style.value)">
             <span class="bilingual-highlight-preview sentence-highlight-swatch" :data-fr-bilingual-sentence-highlight-style="style.value" :data-page-theme="pageTheme" aria-hidden="true"><span class="is-sentence-highlighted">{{ t('sentenceHighlight.sample') }}</span></span>
             <strong>{{ t(style.labelKey) }}</strong>
-            <span class="sentence-highlight-check" aria-hidden="true">{{ config.bilingualSentenceHighlightEnabled && !config.activeSentenceHighlightProfileId && config.bilingualSentenceHighlightStyle === style.value ? '●' : '○' }}</span>
-          </button>
-          <button type="button" role="radio" class="sentence-highlight-option sentence-highlight-option--none" :class="{selected: !config.bilingualSentenceHighlightEnabled}" :aria-label="`${t('common.none')}: ${t('sentenceHighlight.noneDescription')}`" :aria-checked="!config.bilingualSentenceHighlightEnabled" data-highlight-style="none" @click="config.bilingualSentenceHighlightEnabled = false">
-            <span class="sentence-highlight-swatch" :data-page-theme="pageTheme" aria-hidden="true">{{ t('sentenceHighlight.sample') }}</span>
-            <strong>{{ t('common.none') }}</strong>
-            <small>{{ t('sentenceHighlight.noneDescription') }}</small>
-            <span class="sentence-highlight-check" aria-hidden="true">{{ !config.bilingualSentenceHighlightEnabled ? '●' : '○' }}</span>
+            <span class="sentence-highlight-check" aria-hidden="true">{{ !config.activeSentenceHighlightProfileId && config.bilingualSentenceHighlightStyle === style.value ? '●' : '○' }}</span>
           </button>
         </div>
       </div>
       <section v-if="config.bilingualSentenceHighlightProfiles.length" class="sentence-highlight-saved" aria-labelledby="sentence-highlight-saved-title">
         <strong id="sentence-highlight-saved-title">{{ t('sentenceHighlight.savedTitle') }}</strong>
         <div class="sentence-highlight-saved-list" role="radiogroup" :aria-label="t('sentenceHighlight.savedTitle')">
-          <button v-for="profile in config.bilingualSentenceHighlightProfiles" :key="profile.id" type="button" role="radio" class="sentence-highlight-option sentence-highlight-saved-card" data-i18n-ignore :class="{selected: config.bilingualSentenceHighlightEnabled && config.activeSentenceHighlightProfileId === profile.id}" :aria-checked="config.bilingualSentenceHighlightEnabled && config.activeSentenceHighlightProfileId === profile.id" :aria-label="profile.name" :data-profile-id="profile.id" @click="selectProfile(profile)">
+          <button v-for="profile in config.bilingualSentenceHighlightProfiles" :key="profile.id" type="button" role="radio" class="sentence-highlight-option sentence-highlight-saved-card" data-i18n-ignore :class="{selected: config.activeSentenceHighlightProfileId === profile.id}" :aria-checked="config.activeSentenceHighlightProfileId === profile.id" :aria-label="profile.name" :data-profile-id="profile.id" @click="selectProfile(profile)">
             <span class="bilingual-highlight-preview sentence-highlight-swatch" :data-fr-bilingual-sentence-highlight-style="profile.style" :data-page-theme="pageTheme" aria-hidden="true"><span class="is-sentence-highlighted" :style="getSentenceHighlightAppearanceStyle(profile.style, profile.appearance)">{{ t('sentenceHighlight.sample') }}</span></span>
             <strong :title="profile.name">{{ profile.name }}</strong>
             <small>{{ t('settings.translationStyle.profileBase', {name: t(SENTENCE_HIGHLIGHT_STYLES.find(style => style.value === profile.style)!.labelKey)}) }}</small>
@@ -105,7 +114,6 @@
           </div>
         </div>
       </section>
-      <p class="sentence-highlight-note">{{ t('sentenceHighlight.enableHint') }}</p>
     </div>
   </SettingsGroup>
 </template>
@@ -117,8 +125,10 @@ import {DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE, MAX_SENTENCE_HIGHLIGHT_PROFILES, 
 import {MAX_TRANSLATION_CUSTOM_CSS_LENGTH, TRANSLATION_FILL_COLOR_SWATCHES, TRANSLATION_LINE_COLOR_SWATCHES} from '@/src/core/config/translationAppearance'
 import {useUiI18n} from '@/src/ui/i18n'
 import SettingsGroup from './components/SettingsGroup.vue'
+import FieldHelp from './components/FieldHelp.vue'
 import TranslationStylePreview from './components/TranslationStylePreview.vue'
 import TranslationColorField from './components/TranslationColorField.vue'
+import '@/src/ui/styles/translation-display.css'
 const props = defineProps<{config: Config}>()
 const {t} = useUiI18n()
 const pageTheme = ref<'light' | 'dark'>('light')
@@ -201,6 +211,9 @@ function updateNumber(field: 'backgroundOpacity' | 'lineOpacity' | 'lineThicknes
 }
 </script>
 <style scoped>
+.sentence-highlight-heading-actions { display: inline-flex; align-items: center; gap: 8px; flex: none; margin-left: auto; }
+.sentence-highlight-bilingual-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; padding: 9px 12px; border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--line)); border-radius: 10px; color: var(--ink); background: color-mix(in srgb, var(--brand) 6%, var(--surface)); font-size: 12px; }
+.sentence-highlight-bilingual-note button { border: 0; border-radius: 7px; padding: 5px 10px; color: var(--brand-strong); background: var(--brand-soft); cursor: pointer; font: inherit; font-weight: 650; }
 .sentence-highlight-settings { container-type: inline-size; padding: 16px; }
 .sentence-highlight-workbench { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
 .sentence-highlight-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

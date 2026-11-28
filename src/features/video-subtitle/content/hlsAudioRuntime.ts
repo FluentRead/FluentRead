@@ -1,13 +1,26 @@
 /**
  * @file src/features/video-subtitle/content/hlsAudioRuntime.ts
  * 文件职责：将当前 X 视频的 HLS 音轨或完整 MP4 接入浏览器音频解码，为完整字幕提供 16 kHz PCM。
- * 主要内容：按已确认的媒体身份选择候选，优先音频主清单并恢复元数据中的低码率 MP4，对发现、读取、解码失败进行有界重试，校验音轨时长并解码为单声道 PCM。
+ * 主要内容：按已确认的媒体身份选择候选，优先音频主清单并恢复元数据中的低码率 MP4，对发现、读取、解码失败进行有界重试，兼容 AudioContext/webkitAudioContext 与默认采样率回退及 subarray 安全切片，校验音轨时长并解码为单声道 PCM。
  * 模块边界：不修改用户 video 的播放状态；解码资源仅属于本次读取，页面切换或取消后必须释放。
  */
 import {hasMp4AudioTrack, isXMediaUrl, readBoundedMediaResponse, readXHlsAudio} from './hlsAudio';
 import {isXVideoMediaVariantUrl} from './xVideoSubtitleData';
 import {resampleToWhisperAudio} from '../transcription';
 import {buildVideoAiSubtitleVideoKey, type VideoAiSubtitleCacheSource} from '../transcriptionCache';
+
+type AudioContextConstructor = new (contextOptions?: AudioContextOptions) => AudioContext;
+
+function createDecodeAudioContext(): AudioContext | null {
+    const AudioContextCtor = globalThis.AudioContext
+        || (globalThis as typeof globalThis & {webkitAudioContext?: AudioContextConstructor}).webkitAudioContext;
+    if (!AudioContextCtor) return null;
+    try {
+        return new AudioContextCtor({sampleRate: 16_000});
+    } catch {
+        return new AudioContextCtor();
+    }
+}
 
 export class XHlsAudioReader {
     private readonly manifests = new Map<string, string>();
@@ -114,9 +127,10 @@ export class XHlsAudioReader {
                         : await this.readMp4(url, video.duration, scope.signal);
                     if (!result || signal.aborted || scope.signal.aborted) continue;
                     if (Number.isFinite(video.duration) && Math.abs(result.durationMs - video.duration * 1000) > 1000) continue;
-                    context = new AudioContext({sampleRate: 16_000});
+                    context = createDecodeAudioContext();
+                    if (!context) return null;
                     const decoded = await Promise.race([
-                        context.decodeAudioData(result.bytes.buffer as ArrayBuffer),
+                        context.decodeAudioData(result.bytes.slice().buffer),
                         new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('音轨解码超时')), 10_000); }),
                         new Promise<never>((_, reject) => {
                             cancelDecode = () => reject(new Error('音轨解码已取消'));

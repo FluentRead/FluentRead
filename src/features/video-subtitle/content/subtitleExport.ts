@@ -14,6 +14,6 @@ export function serializeSubtitleFile(cues: readonly VideoSubtitleCue[], format:
         const ms = Math.max(0, Math.round(value));
         return `${String(Math.floor(ms / 3600000)).padStart(2, '0')}:${String(Math.floor(ms / 60000) % 60).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}.${String(ms % 1000).padStart(3, '0')}`;
     };
-    if (format === 'vtt') return {text: `WEBVTT\n\n${cues.map(cue => `${time(cue.startMs)} --> ${time(cue.startMs + cue.durationMs)}\n${cue.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n`).join('\n')}`, extension: 'vtt', mime: 'text/vtt;charset=utf-8'};
+    if (format === 'vtt') return {text: `WEBVTT\n\n${cues.map(cue => `${time(cue.startMs)} --> ${time(cue.startMs + cue.durationMs)}\n${cue.text.replace(/\r\n?/g, '\n').replace(/\n[ \t]*\n+/g, '\n').replace(/^\n+|\n+$/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n`).join('\n')}`, extension: 'vtt', mime: 'text/vtt;charset=utf-8'};
     return {text: cues.map(cue => `### ${time(cue.startMs)} – ${time(cue.startMs + cue.durationMs)}\n\n${cue.text.replace(/([\\`*_{}\[\]<>#!|])/g, '\\$1').replace(/\n/g, '  \n')}\n`).join('\n'), extension: 'md', mime: 'text/markdown;charset=utf-8'};
 }

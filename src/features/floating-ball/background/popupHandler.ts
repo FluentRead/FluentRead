@@ -4,6 +4,8 @@
  * 主要内容：仅接受本扩展顶层内容脚本申请，将短期凭据绑定浏览器发送方标签页；仅允许同一网页的默认 popup 子框架兑换一次。
  * 模块边界：不读取 payload 中的网页标识、不保存用户配置、不调用浏览器导航；扩展身份、默认页面、随机数和时钟由 app 注入。
  */
+import {isBrowserTabId as isTabId} from '@/src/platform/browser/ids';
+
 export interface PopupContext {
     sender?: {id?: string; url?: string; frameId?: number; tab?: {id?: number; windowId?: number}};
 }
@@ -16,10 +18,6 @@ export interface FloatingPopupAuthorization {
 }
 
 export const FLOATING_POPUP_AUTHORIZATION_TTL_MS = 30_000;
-
-function isTabId(value: unknown): value is number {
-    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
 
 function isContentUrl(value: string | undefined): boolean {
     try {

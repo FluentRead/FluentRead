@@ -2,7 +2,7 @@
  * @file src/features/image-translation/core.ts
  * 文件职责：提供图片翻译可复用的纯数据算法，用于选择真正发生变化的译文、确定 OCR 语言组合并清理 OCR 行数据。
  * 竖排边界：合列保留各物理列框，坐标恢复同时缩放、去除边框并校验每个源框，防止清字误用整段包络擦掉列间画面。
- * 横排词序：从右向左的整行与识别词相符时，按物理坐标保留原分组和框，组和词按整行证实的阅读顺序输出。
+ * 横排词序：从右向左的整行与识别词相符时，按物理坐标保留原分组和框，组和词按整行证实的阅读顺序输出；横排合词收紧非数值间距阈值至 1.8 倍行高（仅数值/时间语法保留 4 倍），并记录被过滤的低置信中间符号框防止跨控件箭头或分栏竖线误合并。
  * 主要内容：相同译文保留原文且不重复展示；从 shared/image 复用 OcrLine 类型，筛选有效译文、规划图片、圈选及扫描文档各自的有界 OCR 尺寸及边框，映回原图坐标，按完整 Unicode 码点连接词组、规范化标点和置信度，按基线方向区分横竖排并合并同一气泡的竖列，数字保护视图保留独立数值边界，路径压缩与原地分组避免竖列候选的反复数组复制，避免噪声进入翻译与绘制。
  * 文档保真：允许文档适配器按原词对象显式保留有字形证据的数字候选，不抬高其原始置信度；适配器同时负责核对提示，普通图片调用维持原来的过滤策略。
  * 模块边界：该模块不接触 Canvas、Tesseract、网络或浏览器消息；OCR 执行归 ocrRuntime，像素修补与文本绘制归 services，页面展示归 content/runtime。
@@ -342,9 +342,13 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
             if(fast&&/\p{N}/u.test(text))fast.noNumeric=false;
             return {text,confidence:word.confidence??100,explicitConfidence:word.confidence,bbox:word.bbox,retained:retainedDocumentWords?.has(word)};
         });
-        const words = rawWords.filter(word => word.text.length > 0 && Number.isFinite(word.confidence) && (word.confidence >= 25 || word.retained)
-                && isValidOcrBox(word.bbox))
-            .sort((left, right) => left.bbox[main.start] - right.bbox[main.start]);
+        const droppedBoxes: OcrBox[] = [];
+        const words = rawWords.filter(word => {
+            if (word.text.length === 0 || !Number.isFinite(word.confidence) || !isValidOcrBox(word.bbox)) return false;
+            if (word.confidence >= 25 || word.retained) return true;
+            if (!vertical) droppedBoxes.push(word.bbox);
+            return false;
+        }).sort((left, right) => left.bbox[main.start] - right.bbox[main.start]);
 
         const recordRawNumericEvidence=(startIndex:number,rawText:string,rawLine:string)=>{
             if (includeNumericEvidence && numericInformation(rawText) && line.bbox && isValidOcrBox(line.bbox)
@@ -412,6 +416,19 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
             else normalized.push(row);
         };
 
+        const isNumericLine = !vertical && numericInformation(rawText);
+        const hasDroppedBetween = (previousBox: OcrBox, nextBox: OcrBox): boolean => {
+            if (!droppedBoxes.length || nextBox.x0 <= previousBox.x1) return false;
+            const bandY0 = Math.min(previousBox.y0, nextBox.y0), bandY1 = Math.max(previousBox.y1, nextBox.y1);
+            const bandHeight = bandY1 - bandY0;
+            return droppedBoxes.some(dropped => {
+                const center = (dropped.x0 + dropped.x1) / 2;
+                if (center <= previousBox.x1 || center >= nextBox.x0) return false;
+                const overlap = Math.min(dropped.y1, bandY1) - Math.max(dropped.y0, bandY0);
+                return overlap >= Math.min(dropped.y1 - dropped.y0, bandHeight) * 0.35;
+            });
+        };
+
         for (let index = 1; index < words.length; index += 1) {
             const previous = current[current.length - 1];
             const next = words[index];
@@ -419,11 +436,15 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
             const crossOverlap = getAxisOverlap(previous.bbox, next.bbox, cross);
             const gap = next.bbox[main.start] - previous.bbox[main.end];
             const sameLine = crossOverlap >= Math.min(previousThickness, getAxisSize(next.bbox, cross)) * 0.35;
-            // 英文单词间距可能接近一个字高；同一 OCR 行内合并，跨控件的大间距仍保持分开。
-            const adjacentHan = /\p{Script=Han}$/u.test(previous.text) && /^\p{Script=Han}/u.test(next.text);
-            // “一”只有一条横线，不能用它的墨迹高度把同一汉语词中的下一字误拆为另一行。
+            // 英文单词间距可能接近一个字高；收紧非数值横排合词上限，避免跨越控件或分栏。
+            const adjacentHan = (/\p{Script=Han}$/u.test(previous.text) && /^[\p{Script=Han}。，、；：！？「」『』（）【】《》]/u.test(next.text))
+                || (/[。，、；：！？「」『』（）【】《》]$/u.test(previous.text) && /^\p{Script=Han}/u.test(next.text));
+            // “一”或截断汉字与全角标点墨迹较矮，不能用单字矮框把同一汉语行拆成两行。
             const hanGap = adjacentHan ? Math.max(previousThickness, getAxisSize(next.bbox, cross)) * .75 : 0;
-            if (sameLine && gap <= Math.max(6, previousThickness * 4, hanGap)) {
+            const numericTimeJoin = isNumericLine
+                || (!vertical && /\d$/u.test(previous.text) && /^(?:AM|PM)$/iu.test(next.text));
+            const maxGap = Math.max(6, previousThickness * (vertical || numericTimeJoin ? 4 : 1.8), hanGap);
+            if (sameLine && !hasDroppedBetween(previous.bbox, next.bbox) && gap <= maxGap) {
                 current.push(next);
             } else {
                 flush();

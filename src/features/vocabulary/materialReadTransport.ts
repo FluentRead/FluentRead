@@ -199,11 +199,6 @@ export function startMaterialRead(port:MaterialReadPort, onChunk:(chunk:Uint8Arr
   return {result:receiveMaterialReadFromChannel(pipe,onChunk,hash),assertOpen:()=>pipe.assertOpen()};
 }
 
-/** Deliver verified frames one at a time. Treat data as complete only after this resolves. */
-export async function receiveMaterialRead(port:MaterialReadPort, onChunk:(chunk:Uint8Array, signal:AbortSignal)=>void|Promise<void>, options:MaterialReadOptions={}):Promise<void> {
-  return startMaterialRead(port,onChunk,options).result;
-}
-
 async function receiveMaterialReadFromChannel(pipe:ReturnType<typeof channel>, onChunk:(chunk:Uint8Array, signal:AbortSignal)=>void|Promise<void>, hash:ReturnType<typeof sha256.create>):Promise<void> {
   let seq=0, bytes=0;
   try {

@@ -28,10 +28,12 @@ import {
     summarizeSelectionContext,
 } from '@/src/features/selection-translation/core';
 import {
-    buildEdgeTtsSsml,
-    edgeTtsVoiceCandidatesForLanguage,
     synthesizeEdgeTts,
 } from '@/src/features/selection-translation/services/edgeTts';
+import {
+    buildEdgeTtsSsml,
+    edgeTtsVoiceCandidatesForLanguage,
+} from '@/src/features/selection-translation/services/edgeTtsPolicy';
 import { matchesConfiguredHotkey, matchesModifierOnlyHotkey, resolveConfiguredHotkey, shouldClaimConfiguredHotkey } from '@/src/core/hotkey';
 import { normalizeSelectionTtsVoiceOrder, selectionTtsVoiceLocale } from '@/src/core/config/selectionTts';
 import {detectlang} from '@/src/core/language/detect';
@@ -1482,7 +1484,7 @@ describe('selection translator text and speech language normalization', () => {
             await expect(request).rejects.toMatchObject({name: 'AbortError'});
             const synthesisCalls = fetchMock.mock.calls.filter(([input]) => String(input).includes('.tts.speech.microsoft.com'));
             expect(synthesisCalls).toHaveLength(1);
-            expect(synthesisCalls[0]?.[1]?.signal).toBe(controller.signal);
+            expect(synthesisCalls[0]?.[1]?.signal?.aborted).toBe(true);
         } finally {
             vi.stubGlobal('fetch', originalFetch);
         }

@@ -1,6 +1,7 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {localModelIdleMs} from '@/src/shared/onnx/modelResidency';
 import {createInferencePacer,createLocalInferenceBudget,localInferenceLimits,localWasmThreads} from '@/src/shared/onnx/resources';
+import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 afterEach(()=>{vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();vi.resetModules();});
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(r=>{resolve=r;});return {promise,resolve};};
 describe('本地推理共享资源预算',()=>{
@@ -14,9 +15,11 @@ describe('本地推理共享资源预算',()=>{
         vi.stubGlobal('navigator', {deviceMemory: 8}); expect(localModelIdleMs()).toBe(180_000);
     });
     it('限制硬件线程与并行数量，为小设备保留资源',()=>{
-        expect(localInferenceLimits(16,8)).toEqual({jobs:2,threads:2});
+        expect(localInferenceLimits(16,8)).toEqual({jobs:2,threads:4});
+        expect(localInferenceLimits(12,8)).toEqual({jobs:2,threads:3});
+        expect(localInferenceLimits(8,8)).toEqual({jobs:2,threads:2});
         expect(localInferenceLimits(4,8)).toEqual({jobs:1,threads:2});
-        expect(localInferenceLimits(16,4)).toEqual({jobs:1,threads:2});
+        expect(localInferenceLimits(16,4)).toEqual({jobs:1,threads:1});
         for(const n of [1,0,-1,NaN,Infinity])expect(localInferenceLimits(n,8)).toEqual({jobs:1,threads:1});
         vi.stubGlobal('navigator',undefined);expect(localInferenceLimits()).toEqual({jobs:1,threads:1});
         vi.stubGlobal('navigator',{hardwareConcurrency:8});expect(localInferenceLimits()).toEqual({jobs:2,threads:2});
@@ -52,7 +55,7 @@ describe('本地推理共享资源预算',()=>{
         vi.stubGlobal('navigator',{});
         expect(localInferenceLimits()).toEqual({jobs:1,threads:1});
         vi.stubGlobal('navigator',{hardwareConcurrency:8,deviceMemory:4});
-        expect(localInferenceLimits()).toEqual({jobs:1,threads:2});
+        expect(localInferenceLimits()).toEqual({jobs:1,threads:1});
         vi.stubGlobal('navigator',{hardwareConcurrency:8,deviceMemory:8});
         expect(localInferenceLimits()).toEqual({jobs:2,threads:2});
         expect(localInferenceLimits(3.9,8)).toEqual({jobs:1,threads:1});
@@ -194,5 +197,36 @@ describe('本地推理共享资源预算',()=>{
         await expect(pace(operation)).rejects.toBe(failure);expect(operation).not.toHaveBeenCalled();
         expect(await pace(operation)).toBe(2);
         expect(sleep.mock.calls).toEqual([[30],[30]]);expect(operation).toHaveBeenCalledOnce();
+    });
+
+    it('pacer 封顶长推理间歇，并支持 WebGPU 路径跳过人工休眠与自定义上限',async()=>{
+        let time=0;
+        const sleep=vi.fn(async(ms:number)=>{time+=ms;});
+        const pace=createInferencePacer(()=>time,sleep);
+        await pace(async()=>{time+=7_000;});
+        await pace(async()=>{time+=7_000;},{maxRestMs:500});
+        await pace(async()=>{time+=70;});
+        await pace(async()=>{time+=7_000;},{skipRest:true});
+        await pace(async()=>{time+=70;},{skipRest:true});
+        expect(sleep.mock.calls).toEqual([[1_500],[500]]);
+    });
+
+    it('WebGPU 探测拦截低于显存或工作组下限的适配器，满足阈值或缺少 limits 字段时正常通过',async()=>{
+        const safeLimits={
+            maxStorageBufferBindingSize:128*1024*1024,
+            maxBufferSize:256*1024*1024,
+            maxComputeWorkgroupStorageSize:16_384,
+        };
+        vi.stubGlobal('navigator',{gpu:{requestAdapter:async()=>({info:{vendor:'apple'},limits:safeLimits})}});
+        await expect(probeWebGpu()).resolves.toEqual({available:true,info:'apple'});
+
+        for(const limits of [
+            {...safeLimits,maxStorageBufferBindingSize:128*1024*1024-1},
+            {...safeLimits,maxBufferSize:256*1024*1024-1},
+            {...safeLimits,maxComputeWorkgroupStorageSize:16_383},
+        ]){
+            vi.stubGlobal('navigator',{gpu:{requestAdapter:async()=>({info:{vendor:'low-vram'},limits})}});
+            await expect(probeWebGpu()).resolves.toEqual({available:false,info:''});
+        }
     });
 });

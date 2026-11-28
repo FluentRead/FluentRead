@@ -59,6 +59,7 @@ export {
 
 /** 油猴没有扩展 OCR/offscreen 能力，悬浮球漫画入口始终不可用。 */
 export function toggleMangaTranslation(): boolean { return false; }
+export function setMangaPeekOriginal(_peeking?: boolean): void {}
 export function openMangaEntry(): boolean { return false; }
 export function openMangaReading(_event: MouseEvent): boolean { return false; }
 export function subscribeMangaReading(listener:(open:boolean)=>void):()=>void {listener(false);return ()=>undefined;}

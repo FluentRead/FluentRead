@@ -109,16 +109,10 @@ describe('content UI localization boundaries', () => {
         });
         for (const {value: language} of UI_LANGUAGE_OPTIONS) {
             ui.locale.value = language; config.service = defaultId; await tick();
-            const serviceSelect = mounted.host.querySelector(`[aria-label="${translateLegacyText('写作服务', language)}"]`)!;
-            const builtin = catalog.options.services.find(item => item.value === defaultId)!;
-            expect(serviceSelect.querySelector('[data-option-value=""]')?.textContent).toBe(translate('writing.experience.inheritService', language, {service: translateLegacyText(builtin.label, language)}));
-            expect(serviceSelect.querySelector('[data-option-value="custom:i18n"]')?.textContent).toBe(customName);
             const languageSelect = mounted.host.querySelector('.writing-default-language[data-i18n-ignore]')!;
             const target = writing.WRITING_LANGUAGES.find(item => item.value === writing.resolveWritingLanguage('target', config.to))!;
             expect(languageSelect.querySelector('[data-option-value="target"]')?.textContent).toBe(translate('writing.experience.inheritTargetLanguage', language, {language: catalog.getMultilingualTargetLanguageLabel(target.value, target.label, language)}));
             config.service = 'custom:i18n'; await tick();
-            expect(serviceSelect.querySelector('[data-option-value=""]')?.textContent).toBe(translate('writing.experience.inheritService', language, {service: customName}));
-            expect(serviceSelect.getAttribute('aria-label')).toBe(translateLegacyText('写作服务', language));
             const modelSelect = mounted.host.querySelector(`[aria-label="${translateLegacyText('写作模型', language)}"]`)!;
             expect(modelSelect.hasAttribute('data-i18n-ignore')).toBe(true);
             expect(modelSelect.querySelector(`[data-option-value="${customName}"]`)?.textContent).toBe(customName);

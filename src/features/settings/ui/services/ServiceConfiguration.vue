@@ -4,7 +4,7 @@
  * 主要内容：提示 MiMo 官方端点退役编号的请求兼容与新计费规则；Safari 免费连接检查只包含已授权线路，权限读取失败与未授权分别显示可响应语言包的安全状态；组件派生字段可见性与连接示例，密钥列表始终展示全部已保存的密钥并区分参与请求与备用的行，密钥要求放在接口兼容页签，提示词可在确认后一键同步到所有 AI 服务；原生支持多文本的服务在请求限制中独立编辑默认开启的合并请求开关，当前模型限额按自定义请求体覆盖后的真实模型显示、读取和保存，保留其他模型限额；将成对密钥 ID 同步到 apiKeys 和兼容 token，区分缺少必填 Key 与允许匿名的连接检查并管理等待超时；免费翻译检查完整目录中的已授权服务并逐服务展示结果，浏览器内置翻译用一行呈现当前语言对和状态，点击才准备模型；下载时追加进度条，失败时提示下一步，通过配置 store 提交修改；有效修复链接首次进入且未发生用户聚焦时直达连接按钮或当前标题；所有服务可手动停止等待；连接和接口字段的迟到输入只属于原服务、配置及活跃会话；错误只保留共享诊断分类与可操作下一步，禁止展示原始错误详情，手动重试与字段定位保留当前选择；隐藏、缓存停用或配置变化取消所属等待，Chrome 状态只在活跃服务订阅，恢复、同步模板和删除共用当前操作所属确认，同步复验来源并按确认时刻重算目标。
  * 状态本地化：逐密钥、逐免费服务及独立失败状态保留安全资源 key，在展示时响应语言选择与异步语言包更新，不重新请求服务或翻译供应商原始错误。
  * 免费线路：连接检查排除已从翻译服务目录移除的线路。
- * 模块边界：组合服务交给独立草稿表单编辑，不展示普通服务的模型或凭据页签；无成员禁止连接测试，组合与各成员配置修改使旧测试失效，测试等待不早于逐路预算与整轮上限；本地模型设置只在对应服务首次呈现时异步加载，实例归属与后台下载由子组件维持；ChatGPT 套餐公开构建不渲染配置或确认窗口、不加载登录子模块，并停用全部设置动作，显式开发模式才通过独立子组件连接本机助手，不显示通用凭据或接口覆写；本组件不执行网页正文翻译或保存公开配置中的明文凭据；浏览器内置翻译仅在当前点击页完成模型自检，其他连接测试经后台消息，字段规则来自 core/config，服务切换由 ServiceCatalog 和 SettingsSections 负责。
+ * 模块边界：组合服务交给独立草稿表单编辑，不展示普通服务的模型或凭据页签；无成员禁止连接测试，组合与各成员配置修改使旧测试失效，测试等待不早于逐路预算与整轮上限；本地模型设置只在对应服务首次呈现时异步加载，不渲染顶部连接检查按钮与状态，实例归属、就绪态与后台下载由子组件维持；ChatGPT 套餐公开构建不渲染配置或确认窗口、不加载登录子模块，并停用全部设置动作，显式开发模式才通过独立子组件连接本机助手，不显示通用凭据或接口覆写；本组件不执行网页正文翻译或保存公开配置中的明文凭据；浏览器内置翻译仅在当前点击页完成模型自检，其他连接测试经后台消息，字段规则来自 core/config，服务切换由 ServiceCatalog 和 SettingsSections 负责。
  -->
 <template>
   <template v-if="!publicPlanBlocked">
@@ -23,7 +23,7 @@
     <LocalTranslationModelSettings v-if="service === services.localTranslation" :active="active" :context="config" :config="config" :service="service" />
     <ChatGPTPlanSettings v-if="ChatGPTPlanSettings && service === services.chatgptPlan" :active="active" :config="config" />
 
-    <Teleport v-if="connectionActionTarget && !publicPlanBlocked && !browserTranslationUnavailable" :to="connectionActionTarget">
+    <Teleport v-if="connectionActionTarget && !publicPlanBlocked && !browserTranslationUnavailable && service !== services.localTranslation" :to="connectionActionTarget">
     <section class="service-connection-action">
     <div class="connection-test-inline">
 
@@ -43,7 +43,7 @@
     </div>
 
     <span
-      v-if="service === services.freeTranslation || service === services.localTranslation"
+      v-if="service === services.freeTranslation"
       class="header-connection-status"
       :class="`is-${connectionTestState}`"
       :title="connectionTestMessage"
@@ -487,7 +487,7 @@ import { resolveTranslationRequestModel } from '@/src/core/config/requestModel'
 import { getServiceRequestLimitPreference } from '@/src/core/config/requestLimits'
 import { isValidCustomHeaders } from '@/src/core/config/customHeaders'
 import { createApiKeyCheckRevision } from '@/src/core/config/apiKeyCheckIdentity'
-import { normalizeFreeTranslationOrder, normalizeMyMemoryEmail } from '@/src/core/config/freeTranslation'
+import { FREE_TRANSLATION_PROVIDERS, normalizeFreeTranslationOrder, normalizeMyMemoryEmail } from '@/src/core/config/freeTranslation'
 import { isNativeBatchTranslationService, isNativeTranslationBatchEnabled } from '@/src/core/config/nativeBatch'
 import { requiresDeepLXToken } from '@/src/core/config/deeplx'
 import { getDeepLEndpoint } from '@/src/core/config/deepl'
@@ -529,7 +529,6 @@ import {createServiceRepairFocus} from './serviceRepairFocus'
 const ChatGPTPlanSettings = chatGPTPlanDevelopmentEnabled ? defineAsyncComponent(() => import('./ChatGPTPlanSettings.vue')) : null
 import { checkAllFreeTranslationProviders, type FreeTranslationChecks } from './freeTranslationChecks'
 import {readFreePoolAccess} from '@/src/platform/browser/freeProviderPermissions'
-import {FREE_TRANSLATION_PROVIDERS} from '@/src/core/config/freeTranslation'
 import { listPromptTemplateSyncTargets, syncPromptTemplates as applyPromptTemplateSync } from './promptTemplateSync'
 import {waitForSettingsTask} from '../../model/taskWait'
 import {useSettingsActionContext} from '../../model/useSettingsActionContext'
@@ -1483,13 +1482,14 @@ watch(serviceActionOpen, open => {if (!open) pendingServiceAction.value = null},
 .header-connection-status.is-error { color: var(--el-color-danger); }
 .service-connection-action .connection-test-inline { width: 100%; margin: 0; align-items: stretch; }
 .connection-test-result { display: grid; gap: 4px; margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface-soft); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.chrome-preparation-status { padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
 .chrome-preparation-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
 .chrome-preparation-line strong { min-width: 0; font-weight: 650; }
-.chrome-preparation-badge { padding: 2px 8px; border-radius: 6px; color: var(--muted); background: var(--surface-soft); font-size: 12px; font-weight: 600; }
+.chrome-preparation-badge { padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--surface); font-size: 12px; font-weight: 600; }
 .chrome-preparation-status.is-success .chrome-preparation-badge,
-.chrome-preparation-status[data-availability='available'] .chrome-preparation-badge { color: var(--el-color-success-dark-2); background: var(--el-color-success-light-9); }
+.chrome-preparation-status[data-availability='available'] .chrome-preparation-badge { border-color: color-mix(in srgb, var(--fr-success, #147e5c) 26%, transparent); color: var(--fr-success, #147e5c); background: var(--fr-success-soft, #eaf7f3); }
 .chrome-preparation-status.is-error .chrome-preparation-badge,
-.chrome-preparation-status[data-availability='unavailable'] .chrome-preparation-badge { color: var(--el-color-danger-dark-2); background: var(--el-color-danger-light-9); }
+.chrome-preparation-status[data-availability='unavailable'] .chrome-preparation-badge { border-color: color-mix(in srgb, var(--fr-danger, #c62828) 26%, transparent); color: var(--fr-danger, #c62828); background: var(--fr-danger-soft, #fdecec); }
 .chrome-preparation-hint { color: var(--muted); font-size: 12px; }
 .chrome-preparation-status.is-error .chrome-preparation-hint { flex-basis: 100%; }
 .chrome-preparation-progress { max-width: 256px; margin-top: 6px; }

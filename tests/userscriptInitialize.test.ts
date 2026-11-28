@@ -40,7 +40,7 @@ describe('legacy userscript migration', () => {
             ['from', 'auto'],
             ['to', 'en'],
             ['hotkey', 'Alt'],
-            ['model_openai', 'gpt-4.1-mini'],
+            ['model_openai', 'gpt-5.4-mini'],
             ['token_openai', 'legacy-test-token'],
             ['openai_url', 'https://gateway.example.test/v1/chat/completions'],
         ]);
@@ -51,7 +51,7 @@ describe('legacy userscript migration', () => {
         expect(stored.service).toBe('openai');
         expect(stored.to).toBe('en');
         expect(stored.hotkey).toBe('Alt');
-        expect(stored.model.openai).toBe('gpt-4.1-mini');
+        expect(stored.model.openai).toBe('gpt-5.4-mini');
         expect(stored.token.openai).toBe('legacy-test-token');
         expect(stored.proxy.openai).toBe('https://gateway.example.test/v1/chat/completions');
         expect(stored.disableFloatingBall).toBe(false);

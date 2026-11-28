@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaReader.ts
  * 文件职责：把漫画站点的正文图片、超长图分段、可读画布、公开背景图和页面生命周期接入同一连续翻译会话。
- * 主要内容：按站点规则发现正文，圈选页发布区域入口；已确认的 GANMA 路径内页码和 Mangahub 正整数查询页码不视为换章，其他查询参数仍参与章节身份，来源授权保留完整地址；已开启的同章哔哩哔哩会话在可见的原站加载提示期间保留等待，不识别空像素；滚动及可见性移动后短暂停留才启动新识别，隐藏事件同步关闭调度闸，正文混合载体线性合并为 DOM 页序，变动通知同步关闸并在布局刷新后排队；任务交接等待后重新发现再排队；已完成结果仍按实际位置立即交接，普通图片滚动通过可见性通知减少全量测量；画布显式开启和重试先隐藏旧译层并要求完整来源验证，自动布局保留轻量指纹；当前页优先的有界队列与附近页共享像素预算，换章、隐藏和卸载清理监听器与停留计时器。
+ * 主要内容：按站点规则发现正文，圈选页发布区域入口；单次刷新帧内复用元素与祖先矩形测量并将本帧已算身份透传给画布、背景和分段更新，长图分段查询包裹帧缓存以消除重复布局读取；已确认的 GANMA 路径内页码和 Mangahub 正整数查询页码不视为换章，其他查询参数仍参与章节身份，来源授权保留完整地址；已开启的同章哔哩哔哩会话在可见的原站加载提示期间保留等待，不识别空像素；通用站点支持宽扁条漫切片并保持懒加载图片受 IntersectionObserver 观察；滚动及可见性移动后短暂停留才启动新识别，隐藏事件同步关闭调度闸，正文混合载体线性合并为 DOM 页序，变动通知同步关闸并在布局刷新后排队；已完成结果仍按实际位置立即交接，普通图片滚动通过可见性通知减少全量测量；画布显式开启和重试先隐藏旧译层并要求完整来源验证，自动布局保留轻量指纹；当前页优先的有界队列支持可选并发上限并与附近页共享一千六百万像素预算，换章、隐藏和卸载清理监听器与停留计时器。
  * 模块边界：只检查已展示正文，不抓取章节、不读取站点私有数据或绕过访问限制；图片与画布的读取、翻译、缓存和原图恢复通过注入端口复用图片运行时。
  */
 import {createMangaSession, type MangaTranslationStatus} from './mangaSession';
@@ -48,7 +48,7 @@ interface SurfacePorts<T> {
     restore: (surface: T) => void;
     release: (surface: T) => void;
     failed: (surface: T) => boolean;
-    update: () => void;
+    update: (knownIdentities?: ReadonlyMap<T, string | null>) => void;
     invalidate?: (surface: T) => void;
 }
 
@@ -59,6 +59,7 @@ export function mangaReaderSelector(href: string, rules: MangaSiteRule[] = []): 
 
 export function createMangaReader(ports: {
     enabled: () => boolean;
+    maxConcurrent?: number;
     siteRules?: () => MangaSiteRule[];
     prefetchPages?: () => number;
     cachePages?: () => number;
@@ -78,6 +79,7 @@ export function createMangaReader(ports: {
         prepare: (images: HTMLImageElement[]) => ReadonlyMap<HTMLImageElement, MangaImageSegment[]>;
         pixels: (segment: MangaImageSegment) => number;
         bounds: (segment: MangaImageSegment) => DOMRect;
+        withFrame?: <R>(operation: () => R) => R;
     };
     background?: SurfacePorts<HTMLElement> & {
         prepare: (elements: HTMLElement[]) => void;
@@ -93,6 +95,7 @@ export function createMangaReader(ports: {
     let settling = false;
     let needsScrollLayout = true;
     const observed = new Set<HTMLElement>();
+    const ioObserved = new Set<HTMLElement>();
     let discovered: HTMLImageElement[] = [];
     let discoveredCanvases: HTMLCanvasElement[] = [];
     let discoveredBackgrounds: HTMLElement[] = [];
@@ -105,6 +108,7 @@ export function createMangaReader(ports: {
     let opened:{source:MangaReadingSource<MangaSurface>;version:object;invalid:()=>void}|undefined;
     const decorate = (status: MangaTranslationStatus): MangaTranslationStatus => ({...status, pageCount: observed.size, areaFallback});
     const session = createMangaSession<MangaSurface>({
+        maxConcurrent: ports.maxConcurrent,
         translate: surface => isSegment(surface) ? ports.segments!.translate(surface) : isImage(surface) ? ports.translate(surface) : isCanvas(surface) ? ports.canvas!.translate(surface) : ports.background!.translate(surface),
         reuse: surface => isSegment(surface) ? ports.segments!.reuse(surface) : isImage(surface) ? ports.reuse?.(surface) === true : isCanvas(surface) ? ports.canvas!.reuse(surface) : ports.background!.reuse(surface),
         restore: surface => isSegment(surface) ? ports.segments!.restore(surface) : isImage(surface) ? ports.restore(surface) : isCanvas(surface) ? ports.canvas!.restore(surface) : ports.background!.restore(surface),
@@ -176,6 +180,7 @@ export function createMangaReader(ports: {
             intersection?.disconnect(); mutation?.disconnect();
             intersection = null; mutation = null;
             observed.clear();
+            ioObserved.clear();
             discovered = [];
             discoveredCanvases = [];
             discoveredBackgrounds = [];
@@ -205,29 +210,58 @@ export function createMangaReader(ports: {
             }
             images = discovered;
         }
-        if (site?.generic) images = images.filter(image => {
-            const rect = image.getBoundingClientRect();
-            return rect.width >= 240 && rect.height >= 240 && !image.closest('nav, header, footer, aside, [data-ad], [class*="recommend"], [class*="thumbnail"], [class*="avatar"]');
-        });
+        // 单帧内缓存刷新前的元素矩形，避免通用过滤、Pixiv 检测、祖先裁切和候选构造重复触发布局读取。
+        const frameRects = new Map<Element, DOMRect>();
+        const rectOf = (element: Element): DOMRect => {
+            let rect = frameRects.get(element);
+            if (!rect) { rect = element.getBoundingClientRect(); frameRects.set(element, rect); }
+            return rect;
+        };
+        const lazyImages: HTMLImageElement[] = [];
+        if (site?.generic) {
+            const sized: HTMLImageElement[] = [];
+            for (const image of images) {
+                if (image.closest('nav, header, footer, aside, [data-ad], [class*="recommend"], [class*="thumbnail"], [class*="avatar"]')) continue;
+                const rect = rectOf(image);
+                if (rect.width >= 240 && (rect.height >= 240 || (rect.height >= 120 && rect.width * rect.height >= 57_600))) {
+                    sized.push(image);
+                } else if (!image.complete && (image.getAttribute('src') || image.getAttribute('data-src'))) {
+                    lazyImages.push(image);
+                }
+            }
+            images = sized;
+        }
         if (site?.name === 'Pixiv') {
-            const expanded = images.filter(image => image.closest('.gtm-expand-full-size-illust') && image.getBoundingClientRect().width > 0);
+            const expanded = images.filter(image => image.closest('.gtm-expand-full-size-illust') && rectOf(image).width > 0);
             if (expanded.length) images = expanded;
         }
-        const canvases = discoveredCanvases.map(canvas => ({canvas, identity: ports.canvas!.identity(canvas)})).filter(page => page.identity !== null);
+        const canvasIdentities = new Map<HTMLCanvasElement, string | null>();
+        const canvases = discoveredCanvases.map(canvas => {
+            const id = ports.canvas!.identity(canvas);
+            canvasIdentities.set(canvas, id);
+            return {canvas, identity: id};
+        }).filter(page => page.identity !== null);
         ports.background?.prepare(discoveredBackgrounds);
-        const backgrounds = discoveredBackgrounds.map(element => ({element, identity: ports.background!.identity(element)})).filter(page => page.identity !== null);
-        const segmented = ports.segments?.prepare(images);
+        const backgroundIdentities = new Map<HTMLElement, string | null>();
+        const backgrounds = discoveredBackgrounds.map(element => {
+            const id = ports.background!.identity(element);
+            backgroundIdentities.set(element, id);
+            return {element, identity: id};
+        }).filter(page => page.identity !== null);
         const current = new Set<HTMLElement>([...images, ...canvases.map(page => page.canvas), ...backgrounds.map(page => page.element)]);
-        observed.forEach(image => {
-            if (current.has(image)) return;
+        const allObserved = new Set<HTMLElement>([...current, ...lazyImages]);
+        ioObserved.forEach(image => {
+            if (allObserved.has(image)) return;
             intersection?.unobserve(image);
-            observed.delete(image);
+            ioObserved.delete(image);
         });
-        current.forEach(image => {
-            if (observed.has(image)) return;
-            observed.add(image);
+        allObserved.forEach(image => {
+            if (ioObserved.has(image)) return;
+            ioObserved.add(image);
             intersection?.observe(image);
         });
+        observed.clear();
+        current.forEach(image => observed.add(image));
         // 同一帧共享祖先样式，避免连续图片在滚动时重复读取阅读器容器。
         const ancestorStyles = new Map<Element, CSSStyleDeclaration>();
         const inViewport = (image: Element, rect: DOMRect) => {
@@ -241,7 +275,7 @@ export function createMangaReader(ports: {
                 if (parent===document.documentElement || parent===document.scrollingElement) continue;
                 const x=/^(hidden|clip|auto|scroll)$/.test(style.overflowX),y=/^(hidden|clip|auto|scroll)$/.test(style.overflowY);
                 if (!x && !y) continue;
-                const clip=parent.getBoundingClientRect();
+                const clip=rectOf(parent);
                 if (x) {left=Math.max(left,clip.left);right=Math.min(right,clip.right);}
                 if (y) {top=Math.max(top,clip.top);bottom=Math.min(bottom,clip.bottom);}
             }
@@ -252,28 +286,34 @@ export function createMangaReader(ports: {
         if (available && images.length === 0 && canvases.length === 0 && backgrounds.length === 0 && site?.areaSelector) {
             try {areaFallback = Array.from(document.querySelectorAll(site.areaSelector)).some(element => {
                 if (element.closest('[data-fluent-read-ui]')) return false;
-                const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
+                const rect = rectOf(element), style = getComputedStyle(element);
                 return rect.width >= 240 && rect.height >= 80 && rect.bottom > 0 && rect.top < window.innerHeight
                     && rect.right > 0 && rect.left < window.innerWidth && style.display !== 'none' && style.visibility !== 'hidden' && inViewport(element, rect);
             });} catch { /* 无效选择器不影响宿主页面。 */ }
         }
-        const imageCandidates = images.flatMap<MangaCandidate>(image => {
-            const rect = image.getBoundingClientRect();
-            const style = getComputedStyle(image);
-            // 明确阅读器内的正文允许可点击图片和 presentation 角色，不能复用普通悬浮图标的装饰图排除。
-            const ready = image.complete && image.naturalWidth >= 80 && image.naturalHeight >= 40
-                && rect.width >= 80 && rect.height >= 40 && style.visibility !== 'hidden'
-                && style.visibility !== 'collapse' && style.display !== 'none';
-            const segments = segmented?.get(image);
-            if (segments) return segments.flatMap(segment => {
-                const identity = ports.segments!.identity(segment);
-                return identity ? [{image: segment, identity, ready, visible: ready && inViewport(image, ports.segments!.bounds(segment)), pixels: ports.segments!.pixels(segment)}] : [];
+        const segmentIdentities = new Map<MangaImageSegment, string | null>();
+        const buildImageCandidates = () => {
+            const segmented = ports.segments?.prepare(images);
+            return images.flatMap<MangaCandidate>(image => {
+                const rect = rectOf(image);
+                const style = getComputedStyle(image);
+                // 明确阅读器内的正文允许可点击图片和 presentation 角色，不能复用普通悬浮图标的装饰图排除。
+                const ready = image.complete && image.naturalWidth >= 80 && image.naturalHeight >= 40
+                    && rect.width >= 80 && rect.height >= 40 && style.visibility !== 'hidden'
+                    && style.visibility !== 'collapse' && style.display !== 'none';
+                const segments = segmented?.get(image);
+                if (segments) return segments.flatMap(segment => {
+                    const id = ports.segments!.identity(segment);
+                    segmentIdentities.set(segment, id);
+                    return id ? [{image: segment, identity: id, ready, visible: ready && inViewport(image, ports.segments!.bounds(segment)), pixels: ports.segments!.pixels(segment)}] : [];
+                });
+                return [{image, identity: `${ports.identity(image)}:${imageLoadTracker.revision(image)}`, ready, visible: ready
+                    && inViewport(image,rect), pixels: image.naturalWidth * image.naturalHeight}];
             });
-            return [{image, identity: `${ports.identity(image)}:${imageLoadTracker.revision(image)}`, ready, visible: ready
-                && inViewport(image,rect), pixels: image.naturalWidth * image.naturalHeight}];
-        });
+        };
+        const imageCandidates = ports.segments?.withFrame ? ports.segments.withFrame(buildImageCandidates) : buildImageCandidates();
         const canvasCandidates = canvases.map(({canvas, identity}) => {
-            const rect = canvas.getBoundingClientRect(), style = getComputedStyle(canvas);
+            const rect = rectOf(canvas), style = getComputedStyle(canvas);
             const ready = rect.width >= 80 && rect.height >= 40 && style.display !== 'none'
                 && style.visibility !== 'hidden' && style.visibility !== 'collapse';
             return {image: canvas, identity: identity!, ready, visible: ready && inViewport(canvas, rect), pixels: canvas.width * canvas.height};
@@ -297,7 +337,7 @@ export function createMangaReader(ports: {
             const page=candidates[index];
             if (nearby.has(page.image)) return true;
             const pixels=page.pixels;
-            if (!page.ready || retainedPixels+pixels>8_000_000) return false;
+            if (!page.ready || retainedPixels+pixels>16_000_000) return false;
             nearby.add(page.image);retainedPixels+=pixels;return true;
         };
         if(anchor>=0)for(let index=anchor+1;index<candidates.length && index<=anchor+ahead;index++) {
@@ -310,7 +350,7 @@ export function createMangaReader(ports: {
         // 仅已开启的同章会话等待已核对的可见原站加载提示，首次进入或真正离开正文不发布虚假入口。
         const waiting = available && sameChapter && session.status().active && current.size === 0 && !!site?.loadingSelector
             && Array.from(document.querySelectorAll(site.loadingSelector)).some(element => {
-                const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
+                const rect = rectOf(element), style = getComputedStyle(element);
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility === 'visible'
                     && style.opacity !== '0' && inViewport(element, rect);
             });
@@ -338,9 +378,9 @@ export function createMangaReader(ports: {
             nearbyPages.sort((a, b) => Number(b.visible) - Number(a.visible) || a.distance - b.distance);
             ports.warm(nearbyPages.slice(0, normalizeMangaCachePages(ports.cachePages?.())).map(page => page.image));
         }
-        ports.canvas?.update();
-        ports.background?.update();
-        ports.segments?.update();
+        ports.canvas?.update(canvasIdentities);
+        ports.background?.update(backgroundIdentities);
+        ports.segments?.update(segmentIdentities);
         reading.invalidate();readingHref=window.location?.href||'about:blank';readingPending=false;readingAllocated=false;
         checkOpened();
     }
@@ -420,6 +460,7 @@ export function createMangaReader(ports: {
         },
         deferForRefresh() { session.deferScheduling();schedule(); },
         schedule,
+        scheduleLayout: () => scheduleLayout(),
         retry(image: MangaSurface) { cancelSettling();refresh();const retried = session.retry(image);if (retried && isCanvas(image)) ports.canvas?.invalidate?.(image);
             if(retried&&opened?.source.surface===image){const current=opened;opened=undefined;try{current.invalid();}catch{/* 不影响重试 */}}return retried; },
         toggle() { cancelSettling();discoveryDirty = true; refresh(); if (areaFallback) return false; if (!session.status().active) selectedCanvases.forEach(canvas => ports.canvas?.invalidate?.(canvas));const toggled = session.toggle(); checkOpened();refresh(); return toggled; },
@@ -433,6 +474,7 @@ export function createMangaReader(ports: {
             intersection?.disconnect();
             mutation?.disconnect();
             observed.clear();
+            ioObserved.clear();
             discovered = [];
             discoveredCanvases = [];
             discoveredBackgrounds = [];

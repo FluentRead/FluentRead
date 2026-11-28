@@ -5840,6 +5840,35 @@ it('retries the dictionary from its rendered error, copies the selected word and
     await port.click(port.root.querySelector('.fr-word-heading-audio')!);expectAudioReset(fixture.state);expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
 });
 
+it('hides the redundant Chinese-support toolbar and uses compact single-sense rows for direct Chinese dictionary entries', async () => {
+    const fixture = mountSelection(false, {acceptsRange: () => true}, {}, true);
+    await Vue.nextTick();
+    const card = {
+        word: 'sequence',
+        normalizedWord: 'sequence',
+        phonetics: [{label: '美式', text: "/'si:kwəns/"}, {label: '英式', text: "/'si:kwəns/"}],
+        sources: [{id: 'youdao-web', label: '有道词典', url: 'https://dict.youdao.com/'}],
+        meanings: [
+            {partOfSpeech: '名词', definitions: [{definition: '顺序，次序；连续事件'}]},
+            {partOfSpeech: '动词', definitions: [{definition: '按顺序排列'}]},
+        ],
+    };
+    Object.assign(fixture.state, {
+        snapshot: fixture.selectedSnapshot('sequence'),
+        selectedText: 'sequence',
+        translationResult: '序列',
+        translationParts: [{kind: 'text', text: '序列'}],
+        wordCard: card,
+        showTooltip: true,
+    });
+    await Vue.nextTick();
+    const port = fixture.renderPort!;
+    expect(port.root.querySelector('.fr-word-meaning-toolbar')).toBeNull();
+    expect(port.root.querySelectorAll('.fr-word-meaning--single')).toHaveLength(2);
+    expect(port.root.querySelector('.fr-word-card-footer')?.textContent?.trim()).toBe('有道词典');
+    expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+});
+
 it('copies both sentence fields and plays the translated text through the real sentence toolbar',async()=>{
     const fixture=mountSelection(false,{acceptsRange:()=>true},{},true);await Vue.nextTick();const text='Read the entire sentence.';
     Object.assign(fixture.state,{snapshot:{text,parts:[{kind:'text',text}],range:{}},selectedText:text,translationResult:'阅读完整句子。',translationParts:[{kind:'text',text:'阅读完整句子。'}],showTooltip:true});await Vue.nextTick();

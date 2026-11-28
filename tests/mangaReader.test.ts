@@ -1243,11 +1243,11 @@ describe('漫画站点适配与 DOM 生命周期', () => {
         f.reader.schedule();f.run();await flush();expect(styles.mock.calls.filter(([e])=>e===parents)).toHaveLength(1);
         f.reader.dispose();
     });
-    it('提前页与附近历史页共用八百万像素预算，超预算页进入视口仍正常翻译',async()=>{
+    it('提前页与附近历史页共用一千六百万像素预算，高分扫描可满额预译且超预算页进入视口仍正常翻译',async()=>{
         const f=readerFixture(false,undefined,undefined,()=>5),images=[f.image];let anchor=0;
         for(let i=1;i<6;i++) {
             const image=f.document.createElement('img') as HTMLImageElement;image.className='zao-image';image.src=`blob:budget-${i}`;
-            Object.defineProperties(image,{complete:{value:true},naturalWidth:{value:2000},naturalHeight:{value:1500}});
+            Object.defineProperties(image,{complete:{value:true},naturalWidth:{value:2000},naturalHeight:{value:3000}});
             image.getBoundingClientRect=()=>({left:0,right:800,top:(i-anchor)*1300,bottom:(i-anchor)*1300+1200,width:800,height:1200}) as DOMRect;
             f.image.parentElement!.append(image);images.push(image);
         }
@@ -1388,5 +1388,221 @@ describe('漫画站点适配与 DOM 生命周期', () => {
         const f = readerFixture(false); (f.window as {location?: unknown}).location = undefined;
         f.mo.callback([{target: f.document} as unknown as MutationRecord], {} as MutationObserver); f.run();
         expect(f.reader.status().available).toBe(false); f.reader.dispose();
+    });
+
+    it('通用站点接受宽扁条漫切片，同时通过 IntersectionObserver 持续观察懒加载图片', async () => {
+        const f = readerFixture(true, 'https://mangadex.org/title/webtoon');
+        f.image.parentElement!.id = 'reader';
+        // 宽扁条漫切片：480x120 (57,600 px) 被接受，240x120 (28,800 px) 被排除。
+        f.setRect({left: 0, top: 0, right: 480, bottom: 120, width: 480, height: 120});
+        const lazy = f.document.createElement('img') as HTMLImageElement;
+        lazy.setAttribute('data-src', 'https://cdn.example/lazy-page.jpg');
+        Object.defineProperties(lazy, {complete: {value: false, writable: true}, naturalWidth: {value: 0, writable: true}, naturalHeight: {value: 0, writable: true}});
+        lazy.getBoundingClientRect = () => ({left: 0, top: 1500, right: 0, bottom: 1500, width: 0, height: 0}) as DOMRect;
+        f.image.parentElement!.append(lazy);
+        f.reader.schedule(); f.run();
+        expect(f.reader.status()).toMatchObject({available: true, pageCount: 1});
+        expect(f.io.observe).toHaveBeenCalledWith(lazy);
+        // 懒加载图片完成并具尺寸后无缝转为正文页，无需重复 observe。
+        Object.defineProperties(lazy, {complete: {value: true}, naturalWidth: {value: 800}, naturalHeight: {value: 1200}});
+        lazy.getBoundingClientRect = () => ({left: 0, top: 200, right: 800, bottom: 1400, width: 800, height: 1200}) as DOMRect;
+        f.reader.schedule(); f.run();
+        expect(f.reader.status().pageCount).toBe(2);
+        // 正文退回未加载状态再被移除时正确 unobserve。
+        Object.defineProperty(lazy, 'complete', {value: false});
+        lazy.getBoundingClientRect = () => ({left: 0, top: 1500, right: 0, bottom: 1500, width: 0, height: 0}) as DOMRect;
+        f.reader.schedule(); f.run();
+        expect(f.io.unobserve).not.toHaveBeenCalledWith(lazy);
+        lazy.remove();
+        f.reader.schedule(); f.run();
+        expect(f.io.unobserve).toHaveBeenCalledWith(lazy);
+        f.reader.dispose();
+    });
+
+    it('会话支持 maxConcurrent 并发流水重叠可见页与预译页，保持可见优先与状态准确', async () => {
+        const one = {id: 1} as unknown as HTMLImageElement;
+        const two = {id: 2} as unknown as HTMLImageElement;
+        const three = {id: 3} as unknown as HTMLImageElement;
+        const p1 = deferred(), p2 = deferred();
+        const ports = {
+            maxConcurrent: 2,
+            translate: vi.fn().mockReturnValueOnce(p1.promise).mockReturnValueOnce(p2.promise).mockResolvedValue(undefined),
+            restore: vi.fn(),
+            release: vi.fn(),
+            failed: vi.fn().mockReturnValue(false),
+            changed: vi.fn(),
+        };
+        const session = createMangaSession(ports);
+        const snapshot: MangaSnapshot = {
+            route: 'chapter-pipe',
+            available: true,
+            pages: [
+                {image: one, identity: '1', visible: true, ordinal: 1},
+                {image: two, identity: '2', visible: false, prefetch: true, ordinal: 2},
+                {image: three, identity: '3', visible: false, prefetch: true, ordinal: 3},
+            ],
+        };
+        session.refresh(snapshot);
+        session.toggle();
+        session.refresh(snapshot);
+        await flush();
+        // 可见页与首个预译页同时在途，但第 3 页受限于 maxConcurrent=2 尚未启动。
+        expect(ports.translate.mock.calls.map(([img]) => img)).toEqual([one, two]);
+        expect(session.status()).toMatchObject({pending: true, prefetching: false});
+        expect(session.retry(two)).toBe(false);
+        expect(session.readingWaiting(one, '1')).toBe('pending');
+        p1.resolve();
+        await flush();
+        // 可见页完成后，仍在途的为预译页，prefetching 变为 true，同时启动第 3 页。
+        expect(ports.translate.mock.calls.map(([img]) => img)).toEqual([one, two, three]);
+        expect(session.status()).toMatchObject({pending: true, prefetching: true, completed: 2});
+        p2.resolve();
+        await flush();
+        expect(session.status()).toMatchObject({pending: false, prefetching: false, completed: 3, ahead: 2});
+        session.dispose();
+    });
+
+    it('分段端口支持 withFrame 且刷新帧向画布和分段透传已算身份', async () => {
+        const values = new Map<HTMLImageElement, import('@/src/features/image-translation/content/mangaImageSegments').MangaImageSegment[]>();
+        let withFrameCalls = 0;
+        const withFrame = <R,>(fn: () => R): R => { withFrameCalls++; return fn(); };
+        const segments = {
+            identity: vi.fn((s: import('@/src/features/image-translation/content/mangaImageSegments').MangaImageSegment) => s.source),
+            translate: vi.fn().mockResolvedValue(undefined),
+            reuse: vi.fn(() => false),
+            restore: vi.fn(),
+            release: vi.fn(),
+            failed: vi.fn(() => false),
+            update: vi.fn(),
+            prepare: vi.fn(() => values),
+            pixels: vi.fn(() => 1_800_000),
+            bounds: vi.fn(() => ({left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600}) as DOMRect),
+            withFrame,
+        };
+        const f = readerFixture(true, undefined, undefined, undefined, undefined, undefined, {segments});
+        const seg = {image: f.image, top: 0, height: 600, width: 800, contextTop: 0, contextHeight: 600, source: 'seg-1'};
+        values.set(f.image, [seg]);
+        f.reader.schedule(); f.run();
+        expect(withFrameCalls).toBeGreaterThan(0);
+        const passed = segments.update.mock.calls.at(-1)?.[0] as ReadonlyMap<unknown, string | null> | undefined;
+        expect(passed?.get(seg)).toBe('seg-1');
+        f.reader.dispose();
+    });
+
+    it('并发会话停稳远跳时及时取消未保留旧任务，微任务前取消保留不留僵尸，快速切换不重入同图且 notify 关闸中止本轮', async () => {
+        const one = {id: 1} as unknown as HTMLImageElement;
+        const two = {id: 2} as unknown as HTMLImageElement;
+        const three = {id: 3} as unknown as HTMLImageElement;
+        const p1 = deferred(), p2 = deferred();
+        const ports = {
+            maxConcurrent: 2,
+            translate: vi.fn().mockReturnValueOnce(p1.promise).mockReturnValueOnce(p2.promise).mockResolvedValue(undefined),
+            restore: vi.fn(),
+            release: vi.fn(),
+            failed: vi.fn().mockReturnValue(false),
+            changed: vi.fn(),
+        };
+        const session = createMangaSession(ports);
+        // 1. maxConcurrent=2 但仅 1 个任务在途（running.size === 1 < concurrency），远跳到新可见页停稳后必须释放未保留旧任务。
+        const initial: MangaSnapshot = {route: 'jump', available: true, pages: [
+            {image: one, identity: '1', visible: true, ordinal: 1},
+            {image: two, identity: '2', visible: false, ordinal: 2},
+        ]};
+        session.refresh(initial);
+        session.toggle();
+        session.refresh(initial);
+        await flush();
+        expect(ports.translate.mock.calls.map(([img]) => img)).toEqual([one]);
+        // 先滚动中离屏：one 进入未保留状态但仍在途；随后停稳到 two，应立即 release(one)。
+        session.refresh({route: 'jump', available: true, deferNewWork: true, pages: [
+            {image: one, identity: '1', visible: false, ordinal: 1},
+            {image: two, identity: '2', visible: true, ordinal: 2},
+        ]});
+        expect(ports.release).not.toHaveBeenCalledWith(one);
+        session.refresh({route: 'jump', available: true, deferNewWork: false, pages: [
+            {image: one, identity: '1', visible: false, ordinal: 1},
+            {image: two, identity: '2', visible: true, ordinal: 2},
+        ]});
+        expect(ports.release).toHaveBeenCalledWith(one);
+        p1.resolve();
+        p2.resolve();
+        await flush();
+
+        // 2. 微任务执行前页面变为未保留：不启动 translate，finally 仍释放并清理 pages（不留僵尸）。
+        const p3 = deferred();
+        ports.translate.mockReset().mockReturnValueOnce(p3.promise).mockResolvedValue(undefined);
+        ports.release.mockClear();
+        session.refresh({route: 'jump', available: true, pages: [
+            {image: three, identity: '3', visible: true, ordinal: 3},
+        ]});
+        // 同步在微任务前把 three 移出保留窗口（仍在 snapshot.pages 中，触发 line 146 保留正在运行的未启动任务）。
+        session.refresh({route: 'jump', available: true, deferNewWork: true, pages: [
+            {image: three, identity: '3', visible: false, ordinal: 3},
+        ]});
+        await flush();
+        expect(ports.translate).not.toHaveBeenCalled();
+        expect(ports.release).toHaveBeenCalledWith(three);
+
+        // 3. 快速 toggle OFF->ON 时旧代任务仍在 running 中，isRunning(image) 禁止对同一图片启动第二个并发任务。
+        const oldRun = deferred(), newRun = deferred();
+        ports.translate.mockReset().mockReturnValueOnce(oldRun.promise).mockReturnValueOnce(newRun.promise);
+        session.refresh({route: 'jump', available: true, pages: [
+            {image: one, identity: '1', visible: true, ordinal: 1},
+        ]});
+        await flush();
+        expect(ports.translate).toHaveBeenCalledTimes(1);
+        session.toggle(); // OFF
+        session.toggle(); // ON（旧任务仍在 running，maxConcurrent=2 还有空槽，但不应并发重入同一 one）
+        await flush();
+        expect(ports.translate).toHaveBeenCalledTimes(1);
+        // 旧任务仍在 running 时同一图片换源再离屏，覆盖 isRunningPage(image, newPage) 的不同 page 实例分支。
+        session.refresh({route: 'jump', available: true, pages: [
+            {image: one, identity: '1-v2', visible: true, ordinal: 1},
+        ]});
+        session.refresh({route: 'jump', available: true, pages: [
+            {image: one, identity: '1-v2', visible: false, ordinal: 1},
+        ]});
+        session.refresh({route: 'jump', available: true, pages: [
+            {image: one, identity: '1', visible: true, ordinal: 1},
+        ]});
+        oldRun.resolve();
+        await flush();
+        // 旧任务退出 running 后自动启动新代的 one。
+        expect(ports.translate).toHaveBeenCalledTimes(2);
+        newRun.resolve();
+        await flush();
+
+        // 4. notify() 回调内同步关闸（deferScheduling）时，pump 循环立刻停止，不启动第二个并发槽。
+        ports.translate.mockReset().mockResolvedValue(undefined);
+        session.refresh({route: 'jump2', available: true, pages: [
+            {image: one, identity: '1', visible: true, ordinal: 1},
+            {image: two, identity: '2', visible: true, ordinal: 2},
+        ]});
+        session.toggle();
+        let pendingNotifications = 0;
+        ports.changed.mockImplementation(status => {
+            if (status.pending) { pendingNotifications++; session.deferScheduling(); }
+        });
+        session.refresh({route: 'jump2', available: true, pages: [
+            {image: one, identity: '1', visible: true, ordinal: 1},
+            {image: two, identity: '2', visible: true, ordinal: 2},
+        ]});
+        await flush();
+        expect(pendingNotifications).toBe(1);
+        expect(ports.translate).not.toHaveBeenCalled();
+        session.dispose();
+    });
+
+    it('reader.scheduleLayout 刷新布局时不强制重新扫描 DOM 候选', () => {
+        const f = readerFixture();
+        const querySpy = vi.spyOn(f.document, 'querySelectorAll');
+        querySpy.mockClear();
+        f.reader.scheduleLayout();
+        f.run();
+        expect(querySpy).not.toHaveBeenCalled();
+        f.reader.schedule();
+        f.run();
+        expect(querySpy).toHaveBeenCalled();
+        f.reader.dispose();
     });
 });

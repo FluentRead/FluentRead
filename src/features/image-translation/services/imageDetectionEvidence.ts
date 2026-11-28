@@ -25,7 +25,7 @@ export interface ImageDetectionSupport {
 }
 type Geometry=Omit<ImageDetectionFrame,'bits'>;
 const MAX_ATTEMPTS=128,MAX_SCAN=4*1024*1024,MAX_BYTES=512*1024;
-const MAX_PAGE_PIXELS=16*1024*1024,MAX_FRAME_SIDE=1536,HALO=2;
+const MAX_PAGE_PIXELS=16*1024*1024,MAX_FRAME_SIDE=1728,HALO=2;
 
 function validPage(width:number,height:number):boolean {
     return Number.isSafeInteger(width)&&Number.isSafeInteger(height)&&width>0&&height>0

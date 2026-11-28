@@ -16,7 +16,7 @@ vi.mock('webextension-polyfill', () => ({
     default: { runtime: { sendMessage: vi.fn() } },
 }));
 import {
-    getVideoSubtitleDownloadErrorMessage, isYouTubeVideoPage, isYouTubeEmbedPage, isXHostPage, isXVideoPage, isSupportedVideoPage,
+    getVideoSubtitleDownloadErrorMessage, isYouTubeVideoPage, isYouTubeEmbedPage, isHtmlMediaPage, isXHostPage, isXVideoPage, isSupportedVideoPage,
     normalizeVideoSubtitleDisplayMode, readVisibleCaptionText, VIDEO_CAPTION_SEGMENT_SELECTOR,
 } from '@/src/features/video-subtitle/content/ui';
 import {getVideoServiceLabel, getVideoPretranslationWindowMs} from '@/src/features/video-subtitle/content/serviceProfile';
@@ -53,7 +53,10 @@ describe('YouTube 视频字幕识别', () => {
         expect(reading.getAttribute('lang')).toBe('ja-Latn'); expect(reading.getAttribute('aria-label')).toBe('日语罗马音');
         expect(source.textContent).toBe('今日はいい天気です。'); expect(translation.textContent).toBe('今天天气真好。');
         expect(readVisibleCaptionText(native)).toBe('今日はいい天気です。');
+        const setAttrSpy = vi.spyOn(reading, 'setAttribute');
         expect(renderVideoReadingAnnotation(player, '<b>kyō</b> wa ii tenki desu.', 'ja')).toBe(false);
+        expect(setAttrSpy).not.toHaveBeenCalled();
+        setAttrSpy.mockRestore();
         clearRenderedVideoTranslation(document); expect(reading.textContent).toBe(''); expect(source.textContent).toBe('今日はいい天気です。');
     });
 
@@ -132,6 +135,18 @@ describe('YouTube 视频字幕识别', () => {
     it('只把 YouTube 视频页识别为视频字幕目标', () => {
         expect(isYouTubeVideoPage({ hostname: 'www.youtube.com', pathname: '/watch' })).toBe(true);
         expect(isYouTubeVideoPage({ hostname: 'youtube-nocookie.com', pathname: '/embed/abc123' })).toBe(false);
+        expect(isYouTubeVideoPage({ hostname: 'www.youtube-nocookie.com', pathname: '/embed/abcdefghijk' })).toBe(true);
+        expect(isYouTubeVideoPage({ hostname: 'youtube-nocookie.com', pathname: '/embed/abcdefghijk/' })).toBe(true);
+        expect(isYouTubeVideoPage({ hostname: 'www.youtube-nocookie.com', pathname: '/watch' })).toBe(false);
+        expect(isYouTubeVideoPage({ hostname: 'www.youtube-nocookie.com', pathname: '/live/abcdefghijk' })).toBe(false);
+        expect(isYouTubeEmbedPage({ hostname: 'www.youtube-nocookie.com', pathname: '/embed/abcdefghijk' })).toBe(true);
+        expect(isYouTubeEmbedPage({ hostname: 'youtube-nocookie.com.evil.test', pathname: '/embed/abcdefghijk' })).toBe(false);
+        expect(isHtmlMediaPage({ hostname: 'www.youtube-nocookie.com', pathname: '/embed/abcdefghijk' })).toBe(false);
+        expect(isYouTubeVideoPage({ hostname: 'www.youtube.com', pathname: '/live/abcdefghijk' })).toBe(true);
+        expect(isYouTubeVideoPage({ hostname: 'www.youtube.com', pathname: '/live/abcdefghijk/' })).toBe(true);
+        expect(isYouTubeVideoPage({ hostname: 'www.youtube.com', pathname: '/live/short' })).toBe(false);
+        expect(isYouTubeVideoPage({ hostname: 'www.youtube.com', pathname: '/live/abcdefghijk/more' })).toBe(false);
+        expect(isHtmlMediaPage({ hostname: 'www.youtube.com', pathname: '/live/abcdefghijk' })).toBe(false);
         expect(isYouTubeVideoPage({ hostname: 'www.youtube.com', pathname: '/shorts/abc123' })).toBe(true);
         expect(isYouTubeVideoPage({ hostname: 'www.youtube.com', pathname: '/shorts' })).toBe(false);
         expect(isYouTubeVideoPage({ hostname: 'www.youtube.com', pathname: '/results' })).toBe(false);
@@ -146,6 +161,12 @@ describe('YouTube 视频字幕识别', () => {
         expect(isXHostPage({ hostname: 'twitter.com' })).toBe(true);
         expect(isXHostPage({ hostname: 'example.com' })).toBe(false);
         expect(isSupportedVideoPage({ hostname: 'x.com', pathname: '/cerebras/status/2089870131291943228' })).toBe(true);
+        expect(isSupportedVideoPage({ hostname: 'www.douyin.com', pathname: '/jingxuan/search/demo' })).toBe(false);
+        expect(isSupportedVideoPage({ hostname: 'www.kuaishou.com', pathname: '/short-video/123' })).toBe(false);
+        expect(isSupportedVideoPage({ hostname: 'www.xiaohongshu.com', pathname: '/explore/123' })).toBe(false);
+        expect(isSupportedVideoPage({ hostname: 'live.bilibili.com', pathname: '/123' })).toBe(false);
+        expect(isSupportedVideoPage({ hostname: 'www.bilibili.com', pathname: '/video/BV1xx411c7mD' })).toBe(true);
+        expect(isSupportedVideoPage({ hostname: 'podcast.example', pathname: '/episode' })).toBe(true);
     });
 
     it('X 覆盖链接在 isolate 播放器外时提升到当前 post 的最近共同祖先', () => {
@@ -318,11 +339,11 @@ describe('YouTube 视频字幕识别', () => {
         first.getBoundingClientRect = firstRect;
         second.getBoundingClientRect = secondRect;
         expect(getVisibleCaptionSegments(container)).toEqual([first]);
-        expect(rollupRect).toHaveBeenCalledTimes(2);
+        expect(rollupRect).toHaveBeenCalledOnce();
         expect(firstRect).toHaveBeenCalledOnce(); expect(secondRect).toHaveBeenCalledOnce();
         windowTop = 140;
         expect(getVisibleCaptionSegments(container)).toEqual([second]);
-        expect(rollupRect).toHaveBeenCalledTimes(4);
+        expect(rollupRect).toHaveBeenCalledTimes(2);
         expect(firstRect).toHaveBeenCalledTimes(2); expect(secondRect).toHaveBeenCalledTimes(2);
     });
 

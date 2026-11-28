@@ -11,10 +11,10 @@ import {createUserscriptSettingsDataPlugin} from '@/userscript/settingsDataPlugi
 const root = process.cwd();
 const tables = [
     ['src/core/harness/promptLocales.ts', 'HARNESS_TRANSLATED_PROMPTS'],
-    ['src/core/config/catalog.ts', 'localizedTargetLanguageLabels'],
+    ['src/core/config/catalog/targetLanguageLabels.ts', 'localizedTargetLanguageLabels'],
     ['src/core/config/translationAppearance.ts', 'TRANSLATION_STYLE_PRESETS'],
-    ['src/core/config/catalog.ts', 'multilingualTargetLanguageLabels'],
-    ['src/core/config/catalog.ts', 'englishTargetLanguageLabels'],
+    ['src/core/config/catalog/targetLanguageLabels.ts', 'multilingualTargetLanguageLabels'],
+    ['src/core/config/catalog/targetLanguageLabels.ts', 'englishTargetLanguageLabels'],
     ['src/core/config/interfaceAppearance.ts', 'interfaceSkinOptions'],
     ['src/core/config/interfaceAppearance.ts', 'interfaceFontOptions'],
     ['src/core/config/interfaceAppearance.ts', 'popupModuleOptions'],
@@ -105,7 +105,7 @@ describe('standalone static settings data representation', () => {
             const config = configuration as {plugins: Array<{name?: string; transform?: unknown; resolveId?: unknown; load?: unknown}>};
             const plugin = config.plugins.find(item => item.name === 'standalone-settings-data')!;
             const run = plugin.transform as (code: string, id: string) => {code: string} | null;
-            const path = resolve(root, 'src/core/config/catalog.ts');
+            const path = resolve(root, 'src/core/config/catalog/targetLanguageLabels.ts');
             const original = readFileSync(path, 'utf8');
             const result = run(original, path);
             if (!enabled) expect(result).toBeNull();

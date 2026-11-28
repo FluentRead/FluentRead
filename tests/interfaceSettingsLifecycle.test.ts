@@ -8,8 +8,10 @@ vi.mock('@/src/platform/browser/translationSidepanel', () => ({canOpenTranslatio
 import * as runtime from 'vue'
 import InterfaceSettings from '@/src/features/settings/ui/InterfaceSettings.vue'
 import PopupPreview from '@/src/features/settings/ui/components/PopupPreview.vue'
+import PopupBrandIcon from '@/src/ui/components/PopupBrandIcon.vue'
 import SegmentedControl from '@/src/features/settings/ui/components/SegmentedControl.vue'
 import {Config} from '@/src/core/config/model'
+import {interfaceSkinOptions} from '@/src/core/config/interfaceAppearance'
 import {useUiI18n} from '@/src/ui/i18n'
 import {popupQuickFeatureIconPaths} from '@/src/ui/popupQuickFeatureIcons'
 import {compileVueInlineFixture} from './helpers/compiledVueFixture'
@@ -240,14 +242,14 @@ describe('实际界面字体设置与所属确认', () => {
   })
   it('皮肤控件失活或离开所属分类时不改配置、不抢焦点，恢复后仍可选择', async () => {
     const focus = vi.fn(), preventDefault = vi.fn()
-    const key = {key: 'End', preventDefault, currentTarget: {querySelectorAll: () => [{dataset: {skin: 'compact'}, focus}]}} as unknown as KeyboardEvent
+    const key = {key: 'End', preventDefault, currentTarget: {querySelectorAll: () => [{dataset: {skin: 'brutalist'}, focus}]}} as unknown as KeyboardEvent
     expect(state.selectInterfaceSkin).toBeTypeOf('function')
-    props.active = false;await settle();state.selectInterfaceSkin('compact');state.handleSkinKeydown(key)
+    props.active = false;await settle();state.selectInterfaceSkin('brutalist');state.handleSkinKeydown(key)
     expect(props.config.interfaceSkin).toBe('default');expect(focus).not.toHaveBeenCalled();expect(preventDefault).not.toHaveBeenCalled()
-    props.active = true;props.activePanel = 'layout';await settle();state.selectInterfaceSkin('compact');state.handleSkinKeydown(key)
+    props.active = true;props.activePanel = 'layout';await settle();state.selectInterfaceSkin('brutalist');state.handleSkinKeydown(key)
     expect(props.config.interfaceSkin).toBe('default')
-    props.activePanel = 'skin';await settle();state.selectInterfaceSkin('compact');expect(props.config.interfaceSkin).toBe('compact')
-    state.selectInterfaceSkin('unknown');expect(props.config.interfaceSkin).toBe('compact')
+    props.activePanel = 'skin';await settle();state.selectInterfaceSkin('brutalist');expect(props.config.interfaceSkin).toBe('brutalist')
+    state.selectInterfaceSkin('unknown');expect(props.config.interfaceSkin).toBe('brutalist')
     visible.value = false;await settle();state.handleSkinKeydown(key);expect(focus).not.toHaveBeenCalled()
   })
   it('扩展和 userscript 的 Popup 布局均隐藏历史高亮入口，不写回非法 id 或改动阅读偏好', async () => {
@@ -320,6 +322,40 @@ describe('实际界面字体设置与所属确认', () => {
       else delete globalThis.__FLUENTREAD_ICON_DATA__
     }
   })
+  it('全部 12 套皮肤完整保留原版官方图标，11 套工艺皮肤叠加专属趣味外缘装饰', async () => {
+    const component = PopupPreview as runtime.Component
+    for (const skin of interfaceSkinOptions) {
+      const previewApp = createTestRenderer().createApp({render: () => runtime.h(component, {skin})})
+      previewApp.config.warnHandler = () => {}
+      const root = mountPoint()
+      previewApp.mount(root)
+      await settle()
+      // 每一套皮肤都必须保留原版官方 <img> 图标不被替换
+      expect(root.querySelector('img.preview-logo'), skin.value).not.toBeNull()
+      if (skin.value === 'default') {
+        expect(root.querySelector('svg.popup-brand-charm')).toBeNull()
+      } else {
+        const charm = root.querySelector('svg.popup-brand-charm')
+        expect(charm, skin.value).not.toBeNull()
+        expect(charm?.getAttribute('data-brand-charm')).toBe(skin.value)
+      }
+      previewApp.unmount()
+    }
+    const pairApp = createTestRenderer().createApp({
+      render: () => runtime.h('div', [
+        runtime.h(PopupBrandIcon as runtime.Component, {skin: 'liquid-glass', src: '/icon/128.png'}),
+        runtime.h(PopupBrandIcon as runtime.Component, {skin: 'liquid-glass', src: '/icon/128.png'}),
+      ]),
+    })
+    pairApp.config.warnHandler = () => {}
+    const pairRoot = mountPoint()
+    pairApp.mount(pairRoot)
+    await settle()
+    const gradIds = [...pairRoot.querySelectorAll('linearGradient')].map((el) => el.getAttribute('id'))
+    expect(gradIds.length).toBe(2)
+    expect(new Set(gradIds).size).toBe(2)
+    pairApp.unmount()
+  })
 })
 
 async function dispatchUi(node: Element, type: string, values: Record<string, unknown> = {}) {
@@ -328,7 +364,8 @@ async function dispatchUi(node: Element, type: string, values: Record<string, un
 }
 it('selects a skin and font, retries a failed download, and confirms or cancels cache removal through rendered controls', async () => {
   props.activePanel = 'skin';await settle();
-  const skin = host.querySelector('[data-skin="compact"]')!;await dispatchUi(skin, 'click');expect(props.config.interfaceSkin).toBe('compact');expect(skin.getAttribute('aria-checked')).toBe('true');
+  const skin = host.querySelector('[data-skin="brutalist"]')!;await dispatchUi(skin, 'click');expect(props.config.interfaceSkin).toBe('brutalist');expect(skin.getAttribute('aria-checked')).toBe('true');
+  expect(document.documentElement.dataset.interfaceSkin).toBeUndefined();
   await dispatchUi(skin, 'keydown', {key: 'Home'});expect(props.config.interfaceSkin).toBe('default');
   props.activePanel = 'font';await settle();
   await dispatchUi(host.querySelector('[data-font="roboto"] input')!, 'change');expect(props.config.interfaceFont).toBe('roboto');

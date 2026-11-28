@@ -11,7 +11,7 @@
       <span>{{ sentenceEntry ? '听原句 · 看译文 · 留下解释' : '理解原句 → 学会用法 → 自己表达' }}</span>
     </header>
     <div class="study-source">
-      <div class="study-title"><h3 data-i18n-ignore>{{ entry.term }}</h3><button type="button" @click="emit('speak')">{{ playing ? '停止朗读' : '朗读原文' }}</button></div>
+      <div class="study-title"><h3 data-i18n-ignore>{{ entry.term }}</h3><button type="button" :aria-pressed="isSpeechActive" :aria-busy="isSpeechRequesting" @click="emit('speak')">{{ speakButtonLabel }}</button></div>
       <p v-if="sentenceEntry && reference" class="sentence-translation" data-i18n-ignore>{{ reference }}</p>
       <SavedExplanation :entry="entry" @updated="emit('updated', $event)" />
       <template v-if="context">
@@ -62,8 +62,14 @@ import VocabularySource from './VocabularySource.vue';
 import {vocabularySourceContext} from '../source';
 import {vocabularyStudyContext, isVocabularySentence, VOCABULARY_BOOK_MESSAGE, type VocabularyBookResponse, type VocabularyEntry} from '../learningModel';
 
-const props = defineProps<{entry: VocabularyEntry; reference: string; playing?: boolean}>();
+const props = withDefaults(
+  defineProps<{entry: VocabularyEntry; reference: string; playing?: boolean; speechPhase?: 'idle' | 'requesting' | 'playing'}>(),
+  {playing: false, speechPhase: 'idle'},
+);
 const emit = defineEmits<{close: []; speak: []; navigate: [section: string]; updated: [entry: VocabularyEntry]}>();
+const isSpeechRequesting = computed(() => props.speechPhase === 'requesting');
+const isSpeechActive = computed(() => props.playing || props.speechPhase !== 'idle');
+const speakButtonLabel = computed(() => isSpeechRequesting.value ? '正在合成…' : isSpeechActive.value ? '停止朗读' : '朗读原文');
 const sentenceEntry = computed(() => isVocabularySentence(props.entry));
 const context = computed(() => vocabularyStudyContext(props.entry));
 const sourceContext = computed(() => vocabularySourceContext(props.entry));

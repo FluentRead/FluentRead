@@ -3,13 +3,14 @@ import {createInformationHighlightBackgroundHandlers} from '@/src/features/infor
 import {createInformationHighlightOffscreenAdapter} from '@/src/features/information-highlight/background/offscreenAdapter';
 import {createInformationHighlightModelRuntime, createInformationHighlightModelsRuntime, probeInformationHighlightWebGpu} from '@/src/features/information-highlight/offscreen/runtime';
 import {getInformationHighlightArtifactStore} from '@/src/features/information-highlight/offscreen/artifacts';
-import {INFORMATION_HIGHLIGHT_MODEL_BYTES, type InformationHighlightModelId} from '@/src/core/config/informationHighlightModel';
+import {DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID, getInformationHighlightModel, type InformationHighlightModelId} from '@/src/core/config/informationHighlightModel';
 import * as modelCatalog from '@/src/core/config/informationHighlightModel';
 import type {InformationHighlightModelStatus, InformationHighlightResult} from '@/src/features/information-highlight/protocol';
 import type {OffscreenClient} from '@/src/platform/offscreen/client';
 
+const defaultModelBytes = getInformationHighlightModel(DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID).bytes;
 const result: InformationHighlightResult = {spans: [{start: 0, end: 1, score: 2}], engine: 'local'};
-const status: InformationHighlightModelStatus = {phase: 'ready', downloaded: true, initialized: false, downloadedBytes: INFORMATION_HIGHLIGHT_MODEL_BYTES, totalBytes: INFORMATION_HIGHLIGHT_MODEL_BYTES, downloadSizeBytes: INFORMATION_HIGHLIGHT_MODEL_BYTES, modelId: 'qwen2.5-0.5b', modelName: 'Qwen2.5 0.5B Base', supported: true};
+const status: InformationHighlightModelStatus = {phase: 'ready', downloaded: true, initialized: false, downloadedBytes: defaultModelBytes, totalBytes: defaultModelBytes, downloadSizeBytes: defaultModelBytes, modelId: 'qwen2.5-0.5b', modelName: 'Qwen2.5 0.5B Base', supported: true};
 type ModelId = InformationHighlightModelId;
 const uuid = '01234567-0123-4123-8123-012345678901';
 const flush = async () => {for (let i = 0; i < 30; i++) await Promise.resolve();};
@@ -240,7 +241,7 @@ describe('bounded model runtime and explicit downloads', () => {
     });
     it('uses only the fixed Base artifacts and identifies its worker requests and status', async () => {
         const value = fixture(false);
-        expect(await value.runtime.status()).toMatchObject({modelId: 'qwen2.5-0.5b', modelName: 'Qwen2.5 0.5B Base', downloaded: false, totalBytes: INFORMATION_HIGHLIGHT_MODEL_BYTES});
+        expect(await value.runtime.status()).toMatchObject({modelId: 'qwen2.5-0.5b', modelName: 'Qwen2.5 0.5B Base', downloaded: false, totalBytes: defaultModelBytes});
         await value.runtime.prepare(); await flush();
         expect(value.store.download).toHaveBeenCalledTimes(6);
         expect(value.store.download.mock.calls.every(([file]) => (file as {url?: string}).url?.includes('/onnx-community/Qwen2.5-0.5B/'))).toBe(true);
@@ -252,7 +253,7 @@ describe('bounded model runtime and explicit downloads', () => {
     });
     it('status does not create a worker/download, caches cheap capability, and rejects inference before prepare', async () => {
         const {runtime, createWorker, store, probe} = fixture(false);
-        expect(await runtime.status()).toMatchObject({phase: 'absent', downloaded: false, initialized: false, totalBytes: INFORMATION_HIGHLIGHT_MODEL_BYTES}); await runtime.status(); expect(probe).toHaveBeenCalledOnce();
+        expect(await runtime.status()).toMatchObject({phase: 'absent', downloaded: false, initialized: false, totalBytes: defaultModelBytes}); await runtime.status(); expect(probe).toHaveBeenCalledOnce();
         expect(store.complete).toHaveBeenCalledTimes(6); vi.advanceTimersByTime(1000); await runtime.status(); expect(store.complete).toHaveBeenCalledTimes(12);
         await expect(runtime.score('a', new AbortController().signal)).rejects.toThrow('NOT_DOWNLOADED'); expect(createWorker).not.toHaveBeenCalled(); expect(store.download).not.toHaveBeenCalled();
         const queued = await runtime.prepare(); expect(queued.phase).toBe('queued'); await flush(); expect(await runtime.status()).toMatchObject({phase: 'ready', downloaded: true}); expect(store.download).toHaveBeenCalledTimes(6);
@@ -336,6 +337,8 @@ describe('bounded model runtime and explicit downloads', () => {
         expect(await initialization.runtime.status()).toMatchObject({phase: 'error', errorCode: 'INFORMATION_HIGHLIGHT_MODEL_INITIALIZATION_FAILED', downloaded: true});
         expect(await initialization.runtime.prepare()).toMatchObject({phase: 'ready', errorCode: undefined}); expect(initialization.store.download).not.toHaveBeenCalled();
         const unavailable = fixture(false); unavailable.probe.mockResolvedValue({supported: false, reason: 'unsupported'} as never); await expect(unavailable.runtime.prepare()).rejects.toThrow('unsupported'); await expect(unavailable.runtime.score('a', new AbortController().signal)).rejects.toThrow('unsupported');
+        vi.stubGlobal('WebAssembly', {}); expect(await probeInformationHighlightWebGpu()).toEqual({supported: false, reason: 'ONNX_WASM_JSPI_UNSUPPORTED'});
+        vi.stubGlobal('WebAssembly', {...WebAssembly, Suspending: function () {}, promising: function () {}});
         vi.stubGlobal('navigator', {}); expect(await probeInformationHighlightWebGpu()).toMatchObject({supported: false});
         for (const adapter of [null, {features: new Set()}, {features: new Set(['shader-f16'])}]) {vi.stubGlobal('navigator', {gpu: {requestAdapter: async () => adapter}}); expect((await probeInformationHighlightWebGpu()).supported).toBe(Boolean(adapter?.features.has('shader-f16')));}
         vi.stubGlobal('navigator', {gpu: {requestAdapter: async () => {throw new Error('lost');}}}); expect(await probeInformationHighlightWebGpu()).toMatchObject({supported: false});

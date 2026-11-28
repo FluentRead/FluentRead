@@ -24,6 +24,7 @@ export interface SelectionTtsPlaybackRequest extends SelectionTtsRoute {
     readonly timings?: SpeechCue[];
     readonly contentType?: string;
     readonly sourceUrl?: string;
+    readonly rate?: number;
 }
 
 export type SelectionTtsPlaybackState = 'ended' | 'stopped' | 'error' | 'progress';

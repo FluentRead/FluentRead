@@ -9,18 +9,13 @@ import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {isLanguageCodeMatch} from '@/src/core/language/codes';
 import {acceptSupplementalLanguage, getSupplementalLanguageCandidate} from '@/src/core/language/supplement';
 import {detectBrowserLanguage} from '@/src/platform/browser/languageDetection';
+import {createTranslationAbortError as aborted} from './errors';
 
 type Detector = (text: string) => Promise<unknown> | undefined;
 const TIMEOUT_MS = 120;
 const CACHE_TTL_MS = 60_000;
 const CACHE_LIMIT = 128;
 const MAX_ACTIVE = 2;
-
-function aborted(): Error {
-    const error = new Error('翻译已取消');
-    error.name = 'AbortError';
-    return error;
-}
 
 /** 单个调用退出等待，不取消同文的其他订阅者；底层 i18n API 本身没有 abort 接口。 */
 function subscribe(work: Promise<string | undefined>, signal?: AbortSignal): Promise<string | undefined> {

@@ -6,7 +6,6 @@
  * 模块边界：本文件属于可独立测试的 core 候选领域；内置站点提供的应用外壳正文入口仍须经过显式目标、局部保护与去重检查，不改变通用发现守卫；可以读取传入 DOM 以计算结果，坐标命中栈与祖先守卫只在单次同步解析中复用，不跨手势缓存；不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
-import {isTranslationTooltip} from './dom';
 import {
     composedAncestors,
     evaluateElementHardGuard,
@@ -18,11 +17,11 @@ import {
     isDocumentSurface,
     isExtensionElementSelf,
     isTopLevelApplicationShell,
+    isTranslationTooltip,
     maxComposedAncestorDepth,
     safeMatches,
 } from './dom';
-import type {HardGuardResult} from './dom';
-import type {TranslationTextProtectionOptions} from './dom';
+import type {HardGuardResult, TranslationTextProtectionOptions} from './dom';
 import {
     classifyGenericCandidate,
     collectDoubleBrParagraphBarriers,

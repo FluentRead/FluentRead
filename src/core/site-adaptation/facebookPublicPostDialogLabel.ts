@@ -46,7 +46,7 @@ export function facebookOnlyNativeChild(element: Element, tag: string): Element 
     return nodes.length === 1 && nodes[0]!.localName === tag ? nodes[0]! : null;
 }
 
-export {isOwned as isFacebookOwned, nativeElements as facebookNativeElements, nativeText as facebookNativeText};
+export {isOwned as isFacebookOwned, nativeElements as facebookNativeElements};
 
 /** heading/span 的普通包装可变化，但不能因文字相同而吞掉链接、控件、换行或引用结构。 */
 function isPlainLabel(heading: Element): boolean {

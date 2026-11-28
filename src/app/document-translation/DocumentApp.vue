@@ -3,15 +3,15 @@
  协作入口：向已绑定标签页的弹窗公开 PDF 协作开关，回到阅读视图后复验文件身份，拒绝旧文件与卸载后的请求。
  PDF 批注：原文重排与标准 PDF 注释由阅读器呈现；本组合根把批注变更归入当前文件修订，沿用历史保存、冲突检测和隐私窗口边界，不另建存储。
  服务启用：关闭的服务不进入候选，保留独立选择并提示重新启用，翻译动作沿现有可用性检查阻止发送。
- 文件职责：实现独立文档翻译页面的完整 Vue 应用，提供按已提交段落计算的实时数字与进度条、暂停及等待重试状态，服务或模型变更时取消旧任务并保留已有译文供续译；未完成或设置待应用时突出翻译，完成后突出下载并保留次级、经确认重新请求服务的重译入口；任务提示按处理优先级在工具栏内显示，材料恢复与下载反馈保留独立位置，不覆盖正文；承载简短异常提示、技术详情、文件导入、格式化预览、分段翻译、人工校订、原文结构变化后旧校订的独立保留、保存原文件和双语文件导出的用户流程。
- 主要内容：相同译文保留原文且不重复展示；文档打开后按窗口宽度用一行或多行工具栏承载文件、阅读方式、页码缩放、翻译服务与目标语言、翻译与下载，窄窗口用翻译设置弹窗，矮小窗口用覆盖式侧栏保留正文高度；各种格式支持只缩放正文的触控板捏合与键盘操作，复用富文本预览并保持阅读位置；左侧可折叠的侧栏放文件列表与目录，其余空间留给正文；首页列出保存在本机的最近翻译，重新打开同一份文件时接着上次的译文继续；PDF 默认按原版排版左右对照，各种格式都从正在阅读的位置开始翻译，阅读锚点不变时复用批次顺序、翻页或滚动跨段后重排剩余片段；没有文字层的扫描版 PDF 在开始翻译时先逐页识别文字并显示进度；HTML、Markdown、纯文本与 ePub 的隔离预览只载入一次，译文逐段到达后原位更新并保留滚动位置，整篇译文几乎都与原文相同时状态里提示可换目标语言，带标题的文档（含 Word）在侧栏提供可按原文或译文显示的目录，Word 里的表格在阅读视图中仍按表格排版、只有一个部分时不显示部分切换，ePub 的全部章节列在侧栏目录里（按译文显示时用章内标题的译文）、当前章节下接着它其余的各级标题，正文上方不再占一行章节按钮，Word 与文本类预览在宽窗口左右对照；组织文档阅读与翻译、增量统计和人工校订；校订器首次打开才挂载，同一文档往返阅读保留搜索和页码，切换文件释放；人工译法确认只在当前文件阅读会话中参与篇章参考，按原文件身份和冻结语言隔离，重译时清空；导入与在线下载绑定独立取消所有权；PDF 清晰阅读流式显示完整段落和原图区域，源页文字层与译文更新分离，下载按原版布局左右配对，长译文以完整批注保留；切换、删除、重置及卸载释放 PDF 任务和 URL；PDF/ePub/DOCX/ZIP 导出显示进度、支持取消重试，迟到结果不得回写。
+ 文件职责：实现独立文档翻译页面的完整 Vue 应用与 Scheme C 工作台界面，提供按已提交段落计算的实时数字与进度条、暂停及等待重试状态、微任务批量提交译文、全局键盘快捷键与亮暗主题同步；服务或模型变更时取消旧任务并保留已有译文供续译；未完成或设置待应用时突出翻译，完成后突出下载并保留次级、经确认重新请求服务的重译入口；任务提示按处理优先级在工具栏内紧凑显示，材料恢复与下载反馈保留独立位置，不覆盖正文；承载文件导入、多格式结构化阅读预览、分段翻译、人工校订双向定位、原文结构变化后旧校订的独立保留、保存原文件和双语文件导出的用户流程。
+ 主要内容：相同译文保留原文且不重复展示；文档打开后以紧凑工具栏承载返回首页、文件名、状态、阅读方式、页码缩放、翻译服务与目标语言、翻译与下载，窄窗口用翻译设置弹窗，移动端侧栏采用抽屉覆盖层保留正文高度；富文本（HTML/Markdown/纯文本/ePub）提供共享阅读外观栏（双栏/上下对照、五套阅读配色、字体切换）与基于 data-segment-id 的原位增量补丁、滚动目录高亮追踪，ePub 惰性加载嵌套目录、章节内嵌图片与净化样式表并提供上下章导航与内部链接跳转；CSV/TSV 提供二维电子表格网格（固定表头/行号、列翻译开关、数值对齐与按行分页）与单元格列表双视图；DOCX 渲染行内粗斜下划线/删除线/代码/超链接、H1-H6 标题层级、列表缩进、不拆表分页与暗色页面；JSON 提供命名空间侧栏目录、占位符高亮分组表格与可折叠语法树；字幕修复 LRC 单时间戳显示、支持 LRC 歌曲元信息、时长与说话人/样式徽章、安全富文本行内样式、叠排/表格双视图与长字幕时间轴目录；阅读与校订器支持双向段落跳转；批量提交译文与懒刷新本地历史减少重排与 IndexedDB 开销；导入、OCR、导出与 PDF 资源均具独立取消所有权与卸载清理。
  OCR 续译：逐页保存识别检查点，暂停或失败后只补剩余扫描页；空结果保留重试入口且不计为全文完成。混合 PDF 按原页和块身份迁移已有译文与人工确认；新增段落继续翻译，明确确认重译后才清空校订。PDF 提取文字含异常控制字符时只提示核对原文，不改写原文或译文；扫描页数字脚标未确认时提供定位原页的核对入口，切换文件后不执行迟到定位。
  原文校订：扫描段落对照原图逐行修改，只使改变的译文失效，旧原文和译文进入既有修订列表；显式重新识别当前页跳过 OCR 缓存，保留唯一同框人工校订与未改页，取消或切换任务拒绝迟到提交。
  下载面板：紧邻工具栏用小幅版式示意选择双语或仅译文，在设置之后提供单一品牌下载主按钮；PDF 排版按需展开，复用现有分段控件并独立于阅读视图，原文件保留次级入口；不重复文件名，未完成时说明原文保留规则并确认一次，失败时保留校订、展示明确重试动作，技术详情默认收起。
  材料接入：按原文件内容指纹加入本机学习工作区，恢复文档页码与章节，重解析后只按唯一原句重新匹配位置；原文件记录缺失时重新选择并核对指纹，不把同名文件误认作原件。
  ePub 范围预览：章节目录在发起翻译前显示每章已译/总片段数；翻译运行中隐藏静态计数，避免显示过期进度。
- 请求依据：按本次实际发送批次显示有界篇章证据及本地术语命中来源；文档可单独覆盖全局 AI 上下文偏好，但不改变全局配置，摘要只保留在当前页面。
- 模块边界：ChatGPT 套餐模型选项保留全局和文档实际 slug，独立选择也直接保存，不经过自定义模型哨兵或新增发现请求；组件负责页面展示与交互，导入、OCR 与导出生命周期由 feature 控制器持有并经显式端口连接唯一任务模型；不自行解析二进制格式、不实现片段翻译队列、配置存储协议或导出编码；解析渲染来自 document-translation feature，配置协调来自 services/config，草稿共享设置编辑会话并保留文档字段与模型映射的原子补丁，运行时适配由本目录 runtime 注入。
+ 请求依据：按本次实际发送批次惰性计算有界篇章证据及本地术语命中来源；文档可单独覆盖全局 AI 上下文偏好，但不改变全局配置，摘要只保留在当前页面。
+ 模块边界：ChatGPT 套餐模型选项保留全局和文档实际 slug，独立选择也直接保存，不经过自定义模型哨兵或新增发现请求；组件负责页面展示与交互，导入、OCR 与导出生命周期由 feature 控制器持有并经显式端口连接唯一任务模型；所有内部依赖仅经由 src/app/document-translation 唯一出口导入，不自行解析二进制格式、不实现片段翻译队列、配置存储协议或导出编码。
 -->
 <!-- 文档页面归 app 层所有；WXT 入口只负责启动。 -->
 <template>
@@ -66,13 +66,15 @@
           <p v-if="batchNotice" class="notice" role="status">{{ batchNotice }}</p>
         </section>
         <div v-if="parsedDocument" v-show="activeSidebarTab === 'outline' && isPdfDocument" ref="outlineHost" class="sidebar-outline" @pointerdown.capture="markMaterialReadingIntent" @keydown.capture="markMaterialReadingIntent" />
+        <p v-if="parsedDocument && isPdfDocument" v-show="activeSidebarTab === 'outline'" class="sidebar-outline-empty sidebar-outline-pdf-empty">{{ t('document.pdfReading.outlineEmpty') }}</p>
         <nav v-if="parsedDocument && !isPdfDocument && outlineRows.length" v-show="activeSidebarTab === 'outline'" class="sidebar-outline document-outline" @pointerdown.capture="markMaterialReadingIntent" @keydown.capture="markMaterialReadingIntent" :aria-label="t('document.pdfReading.outline')">
-          <div class="document-outline-language" role="group" :aria-label="t('document.pdfReading.outline')">
+          <div v-if="outlineHasLanguageToggle" class="document-outline-language" role="group" :aria-label="t('document.pdfReading.outlineLanguageToggle')">
             <button type="button" :class="{selected: richOutlineLanguage === 'source'}" :aria-pressed="richOutlineLanguage === 'source'" @click="richOutlineLanguage = 'source'">{{ t('document.pdfReading.original') }}</button>
             <button type="button" :class="{selected: richOutlineLanguage === 'translated'}" :aria-pressed="richOutlineLanguage === 'translated'" @click="richOutlineLanguage = 'translated'">{{ t('document.pdfReading.translated') }}</button>
           </div>
-          <button v-for="row in outlineRows" :key="row.key" type="button" class="document-outline-item" :class="{chapter: row.chapter !== undefined, current: row.current}" :aria-current="row.current ? 'location' : undefined" :aria-label="row.coverage ? `${row.label}, ${t('document.progressSegments', row.coverage)}` : undefined" :style="{paddingLeft: `${12 + (row.level - 1) * 14}px`}" :title="row.title" data-i18n-ignore @click="row.item ? jumpOutline(row.item) : epubChapterIndex = row.chapter!"><span class="document-outline-label">{{ row.label }}</span><small :hidden="!row.coverage" class="document-outline-progress" aria-hidden="true">{{ row.coverage ? `${row.coverage.completed}/${row.coverage.total}` : '' }}</small></button>
+          <button v-for="row in outlineRows" :key="row.key" type="button" class="document-outline-item" :class="{chapter: row.isChapter, current: row.current}" :aria-current="row.current ? 'location' : undefined" :aria-label="row.coverage ? `${row.label}, ${t('document.progressSegments', row.coverage)}` : undefined" :style="{paddingLeft: `${12 + (row.level - 1) * 14}px`}" :title="row.title" data-i18n-ignore @click="activateOutlineRow(row)"><span class="document-outline-label">{{ row.label }}</span><small :hidden="!row.coverage" class="document-outline-progress" aria-hidden="true">{{ row.coverage ? `${row.coverage.completed}/${row.coverage.total}` : '' }}</small></button>
         </nav>
+        <p v-if="parsedDocument && !isPdfDocument && !outlineRows.length" v-show="activeSidebarTab === 'outline'" class="sidebar-outline-empty">{{ t('document.pdfReading.outlineEmpty') }}</p>
         <button v-if="parsedDocument" class="document-settings-button" type="button" aria-label="调整文档翻译设置" @click="openDocumentSettings"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 2-1 2 3h3l1-3 3-1 2-3-2-2 1-3-3-2-2 1-2-3H9Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="11.5" cy="11" r="3" stroke="currentColor" stroke-width="1.5"/></svg><strong>{{ translateLegacy('源语言与术语库') }}</strong><span data-i18n-ignore>{{ translationSettingsSummary }}</span><small>调整设置</small></button>
       </aside>
       <div class="document-content">
@@ -86,8 +88,13 @@
         <div
           class="file-drop-zone"
           :class="{ dragging: isDragging }"
+          role="button"
+          tabindex="0"
           :aria-busy="openingFile"
           aria-label="文档拖放区域"
+          @click="handleDropZoneClick"
+          @keydown.enter.prevent="openFilePicker"
+          @keydown.space.prevent="openFilePicker"
           @dragover.prevent="isDragging = true"
           @dragleave.prevent="isDragging = false"
           @drop.prevent="handleDrop"
@@ -135,11 +142,10 @@
       </section>
 
       <section v-else class="workspace-section">
-        <p v-if="importError" class="notice error" role="alert">{{ importError }}</p>
         <section class="document-taskbar" :class="{'has-pdf-controls': readerTab === 'read' && isPdfDocument}" aria-label="当前文档与翻译任务">
           <div class="workspace-heading">
             <button class="sidebar-toggle" type="button" :class="{active: sidebarOpen}" :aria-expanded="sidebarOpen" :aria-label="translateLegacy('文件与目录')" :title="translateLegacy('文件与目录')" @click="sidebarOpen = !sidebarOpen"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M7.5 3.5v13" stroke="currentColor" stroke-width="1.4"/></svg><small v-if="documentQueue.length > 1">{{ documentQueue.length }}</small></button>
-            <img class="taskbar-logo" src="/icon/128.png" alt="" />
+            <button class="taskbar-home-button" type="button" :aria-label="t('document.pdfReading.homeBack')" :title="t('document.pdfReading.homeBack')" :disabled="openingFile || preparingDownload || batchRunning" @click="requestReset"><img class="taskbar-logo" src="/icon/128.png" alt="" /></button>
             <div class="file-heading"><div><h1 data-i18n-ignore :title="documentHeading">{{ documentHeading }}</h1><p class="document-status" role="status">{{ statusLabel }}<span v-if="showTranslationProgress" class="document-translation-count" data-testid="document-translation-count">{{ translationProgressLabel }}</span></p>
               <a v-if="articleSourceUrl" class="article-source-link" :href="articleSourceUrl" target="_blank" rel="noopener noreferrer" data-testid="web-article-source">{{ translateLegacy('查看原网页') }}</a>
             </div></div>
@@ -192,9 +198,10 @@
             </div>
             </div>
           </div>
-          <div v-if="showTranslationProgress" class="task-progress" :class="{ complete: translationComplete }" role="progressbar" :aria-label="t('document.translationProgress.label')" :aria-valuetext="translationProgressLabel" :aria-valuenow="progress" :aria-valuemin="0" :aria-valuemax="100" data-testid="document-translation-progress"><i :style="{width: `${progress}%`}" /></div>
+          <div v-if="showTranslationProgress" class="task-progress" :class="{ complete: translationComplete, 'is-idle': progress === 0 && !translating }" role="progressbar" :aria-label="t('document.translationProgress.label')" :aria-valuetext="translationProgressLabel" :aria-valuenow="progress" :aria-valuemin="0" :aria-valuemax="100" data-testid="document-translation-progress"><i :style="{width: `${progress}%`}" /></div>
           <!-- 持续状态占据正常布局；当前翻译只显示最需要处理的一条，独立导入始终保留取消入口。 -->
           <div class="taskbar-notices" data-testid="document-task-notices">
+          <p v-if="importError" class="notice error task-notice" role="alert">{{ importError }}</p>
           <p v-if="activeTask?.historyReadUnavailable || activeTask?.historyConflict" class="notice warning task-notice" role="alert" data-testid="document-history-unavailable">{{ t(activeTask.historyConflict ? 'document.historyConflict' : 'document.historyReadUnavailable') }} <button type="button" :disabled="queueBusy" @click="retryDocumentHistory">{{ t('document.historyRetry') }}</button></p>
           <p v-if="openingFile || downloadingPdf" class="document-import-progress" role="status">{{ importProgress }} <button class="ghost-button" type="button" @click="cancelImport">{{ t('document.pdfReading.cancelImport') }}</button></p>
           <p v-if="pdfSourceCharacterWarning" class="notice warning task-notice" role="status" data-testid="document-pdf-source-warning">{{ t('document.pdfReading.sourceCharacterWarning') }}</p>
@@ -239,7 +246,7 @@
           </div>
         </section>
         <article class="document-reading-pane" aria-label="文档内容">
-        <DocumentSegmentEditor v-if="editorRequested" :key="activeDocumentId ?? 0" v-show="readerTab === 'edit'" :document="parsedDocument" :translations="translatedSegments" :scope-ids="columnScope" :retained-revisions="documentQueue.find(item => item.id === activeDocumentId)?.retainedRevisions" :disabled="queueBusy" @update="editSegment" @source-edit="openSourceEditor" />
+        <DocumentSegmentEditor v-if="editorRequested" :key="activeDocumentId ?? 0" v-show="readerTab === 'edit'" :active="readerTab === 'edit'" :focus-segment-id="editorFocusSegmentId" :document="parsedDocument" :translations="translatedSegments" :scope-ids="columnScope" :retained-revisions="documentQueue.find(item => item.id === activeDocumentId)?.retainedRevisions" :disabled="queueBusy" @update="editSegment" @source-edit="openSourceEditor" @locate-segment="locateSegmentInReader" @focus-handled="editorFocusSegmentId = null" />
         <div v-show="readerTab === 'read'" ref="readingContent" class="reading-content" :class="{'reading-pdf': isPdfDocument}" :data-fluentread-material-fingerprint="activeTask?.historyId || undefined" :data-fluentread-material-title="parsedDocument.fileName" :data-fluentread-material-source="activeTask?.sourceUrl || undefined" :data-fluentread-material-page="isPdfDocument ? pdfPage : readerPage" :data-fluentread-material-section="isEpubDocument ? `epub:${epubChapterIndex}` : isDocxDocument ? `docx:${docxPartIndex}` : isXlsxDocument ? `xlsx:${xlsxSheetIndex}` : undefined" :data-reader-zoom="isPdfDocument ? undefined : readerScale" :tabindex="isPdfDocument || isRichDocument ? undefined : 0" @pointerdown="materialReadingPointerDown" @wheel.passive="markMaterialReadingIntent" @keydown.capture="markMaterialReadingIntent">
         <PdfReader
           ref="materialPdfReader"
@@ -260,7 +267,8 @@
           :source-url="documentQueue.find(item => item.id === activeDocumentId)?.sourceUrl"
           @page-change="pdfPage = $event"
           @material-position-change="queueMaterialPositionCapture"
-          :information-highlight="{preferences: config.informationHighlight, scoreLocal: scoreDocumentInformation, available: config.on && hydrated && readerTab === 'read'}"
+          @source-edit="openSourceEditor"
+          :information-highlight="pdfInformationHighlight"
         />
 
         <section
@@ -271,6 +279,19 @@
           :data-segment-count="parsedDocument.segments.length"
           aria-label="排版文档双语阅读预览"
         >
+          <div class="rich-appearance-bar" role="toolbar" :aria-label="t('document.pdfReading.readingAppearance')">
+            <div v-if="effectivePreviewMode === 'bilingual'" class="appearance-group" role="group" :aria-label="t('document.pdfReading.presentationLabel')">
+              <button type="button" :class="{selected: richBilingualLayout === 'split'}" :aria-pressed="richBilingualLayout === 'split'" @click="richBilingualLayout = 'split'">{{ t('document.pdfReading.bilingualSplit') }}</button>
+              <button type="button" :class="{selected: richBilingualLayout === 'stacked'}" :aria-pressed="richBilingualLayout === 'stacked'" @click="richBilingualLayout = 'stacked'">{{ t('document.pdfReading.bilingualStacked') }}</button>
+            </div>
+            <div class="appearance-group appearance-themes" role="group" :aria-label="t('document.pdfReading.theme')">
+              <button v-for="theme in richThemeChoices" :key="theme.value" type="button" :class="{selected: richReadingTheme === theme.value}" :data-theme-swatch="theme.value" :aria-pressed="richReadingTheme === theme.value" @click="richReadingTheme = theme.value">{{ theme.label }}</button>
+            </div>
+            <div class="appearance-group" role="group" :aria-label="t('document.pdfReading.styleFont')">
+              <button type="button" :class="{selected: richFontFamily === 'sans'}" :aria-pressed="richFontFamily === 'sans'" @click="richFontFamily = 'sans'">{{ t('document.pdfReading.styleFont.sans') }}</button>
+              <button type="button" :class="{selected: richFontFamily === 'serif'}" :aria-pressed="richFontFamily === 'serif'" @click="richFontFamily = 'serif'">{{ t('document.pdfReading.styleFont.serif') }}</button>
+            </div>
+          </div>
           <iframe
             ref="richFrame"
             class="rich-preview-frame"
@@ -279,6 +300,11 @@
             @load="handleRichFrameLoad"
             :title="t('document.layoutPreview', {format: parsedDocument.label})"
           />
+          <nav v-if="isEpubDocument && epubChapters.length > 1" class="epub-chapter-nav" :aria-label="t('document.pdfReading.outline')">
+            <button type="button" class="ghost-button" :disabled="epubChapterIndex <= 0" @click="stepEpubChapter(-1)">{{ t('document.pdfReading.prevChapter') }}</button>
+            <span class="epub-chapter-counter">{{ epubChapterIndex + 1 }} / {{ epubChapters.length }}</span>
+            <button type="button" class="ghost-button" :disabled="epubChapterIndex >= epubChapters.length - 1" @click="stepEpubChapter(1)">{{ t('document.pdfReading.nextChapter') }}</button>
+          </nav>
         </section>
 
         <section
@@ -303,22 +329,35 @@
           <div class="docx-page-stage">
             <article class="docx-page" :style="readerZoomStyle">
               <span v-if="docxParts.length > 1" class="docx-page-label">{{ docxPartLabel(currentDocxPart?.path || '') }}</span>
-              <template v-for="block in currentDocxBlocks" :key="block.key">
-                <table v-if="block.table" class="docx-table">
-                  <tbody>
-                    <tr v-for="(cells, rowIndex) in block.table" :key="rowIndex">
-                      <td v-for="(cell, cellIndex) in cells" :key="cellIndex">
-                        <section v-for="row in cell" :key="row.index" class="docx-paragraph" :class="`docx-role-${row.role || 'paragraph'}`" :data-segment="row.index">
-                          <p v-if="docxShowsSource(row)" class="docx-source document-source" data-i18n-ignore>{{ row.source }}</p>
-                          <p v-if="docxShowsTranslation(row)" class="docx-translation document-translation" data-i18n-ignore>{{ row.translation || translateLegacy('等待翻译…') }}</p>
-                        </section>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                <section v-else class="docx-paragraph" :class="`docx-role-${block.row.role || 'paragraph'}`" :data-segment="block.row.index">
-                  <p v-if="docxShowsSource(block.row)" class="docx-source document-source" data-i18n-ignore>{{ block.row.source }}</p>
-                  <p v-if="docxShowsTranslation(block.row)" class="docx-translation document-translation" data-i18n-ignore>{{ block.row.translation || translateLegacy('等待翻译…') }}</p>
+              <template v-for="block in currentDocxPaginated.blocks" :key="block.key">
+                <div v-if="block.kind === 'table'" class="docx-table-scroll">
+                  <table class="docx-table">
+                    <thead v-if="block.rows.some(row => row.isHeader)">
+                      <tr v-for="row in block.rows.filter(item => item.isHeader)" :key="`h-${row.rowIndex}`">
+                        <th v-for="(cell, cellIndex) in row.cells" :key="cellIndex" :colspan="cell.colspan > 1 ? cell.colspan : undefined">
+                          <section v-for="p in cell.paragraphs" :key="p.segmentIndex" class="docx-paragraph" :class="[`docx-role-${p.role}`, {'is-list-ordered': p.listOrdered}]" :data-segment="p.segmentIndex" :data-heading-level="p.headingLevel" :data-list-level="p.listLevel" @dblclick="editSegmentInProofread(p.segmentIndex)">
+                            <p v-if="docxParagraphShowsSource(p)" class="docx-source document-source" data-i18n-ignore><template v-for="(run, ri) in p.sourceRuns" :key="ri"><a v-if="run.href" class="docx-inline-link" :class="docxRunClasses(run)" :href="run.href" :target="run.href.startsWith('#') ? undefined : '_blank'" :rel="run.href.startsWith('#') ? undefined : 'noopener noreferrer'">{{ run.text }}</a><code v-else-if="run.code" class="docx-inline-code" :class="docxRunClasses(run)">{{ run.text }}</code><strong v-else-if="run.bold" :class="docxRunClasses(run)">{{ run.text }}</strong><em v-else-if="run.italic" :class="docxRunClasses(run)">{{ run.text }}</em><u v-else-if="run.underline" :class="docxRunClasses(run)">{{ run.text }}</u><s v-else-if="run.strike" :class="docxRunClasses(run)">{{ run.text }}</s><template v-else>{{ run.text }}</template></template></p>
+                            <p v-if="docxParagraphShowsTranslation(p)" class="docx-translation document-translation" data-i18n-ignore><template v-if="p.translationRuns.length"><template v-for="(run, ri) in p.translationRuns" :key="ri"><a v-if="run.href" class="docx-inline-link" :class="docxRunClasses(run)" :href="run.href" :target="run.href.startsWith('#') ? undefined : '_blank'" :rel="run.href.startsWith('#') ? undefined : 'noopener noreferrer'">{{ run.text }}</a><code v-else-if="run.code" class="docx-inline-code" :class="docxRunClasses(run)">{{ run.text }}</code><strong v-else-if="run.bold" :class="docxRunClasses(run)">{{ run.text }}</strong><em v-else-if="run.italic" :class="docxRunClasses(run)">{{ run.text }}</em><u v-else-if="run.underline" :class="docxRunClasses(run)">{{ run.text }}</u><s v-else-if="run.strike" :class="docxRunClasses(run)">{{ run.text }}</s><template v-else>{{ run.text }}</template></template></template><template v-else>{{ p.translationText || t('document.pdfReading.waitingTranslation') }}</template></p>
+                          </section>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in block.rows.filter(item => !item.isHeader)" :key="`b-${row.rowIndex}`">
+                        <td v-for="(cell, cellIndex) in row.cells" :key="cellIndex" :colspan="cell.colspan > 1 ? cell.colspan : undefined">
+                          <section v-for="p in cell.paragraphs" :key="p.segmentIndex" class="docx-paragraph" :class="[`docx-role-${p.role}`, {'is-list-ordered': p.listOrdered}]" :data-segment="p.segmentIndex" :data-heading-level="p.headingLevel" :data-list-level="p.listLevel" @dblclick="editSegmentInProofread(p.segmentIndex)">
+                            <p v-if="docxParagraphShowsSource(p)" class="docx-source document-source" data-i18n-ignore><template v-for="(run, ri) in p.sourceRuns" :key="ri"><a v-if="run.href" class="docx-inline-link" :class="docxRunClasses(run)" :href="run.href" :target="run.href.startsWith('#') ? undefined : '_blank'" :rel="run.href.startsWith('#') ? undefined : 'noopener noreferrer'">{{ run.text }}</a><code v-else-if="run.code" class="docx-inline-code" :class="docxRunClasses(run)">{{ run.text }}</code><strong v-else-if="run.bold" :class="docxRunClasses(run)">{{ run.text }}</strong><em v-else-if="run.italic" :class="docxRunClasses(run)">{{ run.text }}</em><u v-else-if="run.underline" :class="docxRunClasses(run)">{{ run.text }}</u><s v-else-if="run.strike" :class="docxRunClasses(run)">{{ run.text }}</s><template v-else>{{ run.text }}</template></template></p>
+                            <p v-if="docxParagraphShowsTranslation(p)" class="docx-translation document-translation" data-i18n-ignore><template v-if="p.translationRuns.length"><template v-for="(run, ri) in p.translationRuns" :key="ri"><a v-if="run.href" class="docx-inline-link" :class="docxRunClasses(run)" :href="run.href" :target="run.href.startsWith('#') ? undefined : '_blank'" :rel="run.href.startsWith('#') ? undefined : 'noopener noreferrer'">{{ run.text }}</a><code v-else-if="run.code" class="docx-inline-code" :class="docxRunClasses(run)">{{ run.text }}</code><strong v-else-if="run.bold" :class="docxRunClasses(run)">{{ run.text }}</strong><em v-else-if="run.italic" :class="docxRunClasses(run)">{{ run.text }}</em><u v-else-if="run.underline" :class="docxRunClasses(run)">{{ run.text }}</u><s v-else-if="run.strike" :class="docxRunClasses(run)">{{ run.text }}</s><template v-else>{{ run.text }}</template></template></template><template v-else>{{ p.translationText || t('document.pdfReading.waitingTranslation') }}</template></p>
+                          </section>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <section v-else class="docx-paragraph" :class="[`docx-role-${block.paragraph.role}`, {'is-list-ordered': block.paragraph.listOrdered}]" :data-segment="block.paragraph.segmentIndex" :data-heading-level="block.paragraph.headingLevel" :data-list-level="block.paragraph.listLevel" @dblclick="editSegmentInProofread(block.paragraph.segmentIndex)">
+                  <p v-if="docxParagraphShowsSource(block.paragraph)" class="docx-source document-source" data-i18n-ignore><template v-for="(run, ri) in block.paragraph.sourceRuns" :key="ri"><a v-if="run.href" class="docx-inline-link" :class="docxRunClasses(run)" :href="run.href" :target="run.href.startsWith('#') ? undefined : '_blank'" :rel="run.href.startsWith('#') ? undefined : 'noopener noreferrer'">{{ run.text }}</a><code v-else-if="run.code" class="docx-inline-code" :class="docxRunClasses(run)">{{ run.text }}</code><strong v-else-if="run.bold" :class="docxRunClasses(run)">{{ run.text }}</strong><em v-else-if="run.italic" :class="docxRunClasses(run)">{{ run.text }}</em><u v-else-if="run.underline" :class="docxRunClasses(run)">{{ run.text }}</u><s v-else-if="run.strike" :class="docxRunClasses(run)">{{ run.text }}</s><template v-else>{{ run.text }}</template></template></p>
+                  <p v-if="docxParagraphShowsTranslation(block.paragraph)" class="docx-translation document-translation" data-i18n-ignore><template v-if="block.paragraph.translationRuns.length"><template v-for="(run, ri) in block.paragraph.translationRuns" :key="ri"><a v-if="run.href" class="docx-inline-link" :class="docxRunClasses(run)" :href="run.href" :target="run.href.startsWith('#') ? undefined : '_blank'" :rel="run.href.startsWith('#') ? undefined : 'noopener noreferrer'">{{ run.text }}</a><code v-else-if="run.code" class="docx-inline-code" :class="docxRunClasses(run)">{{ run.text }}</code><strong v-else-if="run.bold" :class="docxRunClasses(run)">{{ run.text }}</strong><em v-else-if="run.italic" :class="docxRunClasses(run)">{{ run.text }}</em><u v-else-if="run.underline" :class="docxRunClasses(run)">{{ run.text }}</u><s v-else-if="run.strike" :class="docxRunClasses(run)">{{ run.text }}</s><template v-else>{{ run.text }}</template></template></template><template v-else>{{ block.paragraph.translationText || t('document.pdfReading.waitingTranslation') }}</template></p>
+                  <button type="button" class="reader-edit-trigger" :aria-label="t('document.pdfReading.editInProofread')" :title="t('document.pdfReading.editInProofread')" @click.stop="editSegmentInProofread(block.paragraph.segmentIndex)">{{ t('document.pdfReading.editInProofread') }}</button>
                 </section>
               </template>
             </article>
@@ -328,21 +367,56 @@
         <section
           v-else-if="isSubtitleDocument"
           class="subtitle-document-reader"
-          :class="{single: effectivePreviewMode !== 'bilingual'}"
+          :class="{single: effectivePreviewMode !== 'bilingual', stacked: subtitleViewMode === 'stacked'}"
           data-document-reader="subtitle"
           :data-segment-count="parsedDocument.segments.length"
           aria-label="字幕时间轴翻译表格"
         >
-          <div class="subtitle-table-scroll">
+          <div class="format-reader-bar subtitle-format-bar">
+            <div class="appearance-group" role="group" :aria-label="t('document.pdfReading.presentationLabel')">
+              <button type="button" :class="{selected: subtitleViewMode === 'table'}" :aria-pressed="subtitleViewMode === 'table'" @click="subtitleViewMode = 'table'">{{ t('document.pdfReading.subtitleTableView') }}</button>
+              <button type="button" :class="{selected: subtitleViewMode === 'stacked'}" :aria-pressed="subtitleViewMode === 'stacked'" @click="subtitleViewMode = 'stacked'">{{ t('document.pdfReading.subtitleStackedView') }}</button>
+            </div>
+          </div>
+          <header v-if="subtitleLrcMeta" class="subtitle-lrc-header" data-i18n-ignore>
+            <strong v-if="subtitleLrcMeta.title">{{ subtitleLrcMeta.title }}</strong>
+            <span v-if="subtitleLrcMeta.artist">{{ subtitleLrcMeta.artist }}</span>
+            <small v-if="subtitleLrcMeta.album">{{ subtitleLrcMeta.album }}</small>
+          </header>
+          <div v-if="subtitleViewMode === 'stacked'" class="subtitle-stacked-list" :style="readerZoomStyle" data-native-zoom-content>
+            <article v-for="row in subtitleDisplayRows" :key="row.index" class="subtitle-cue-card" :data-segment="row.index" @dblclick="editSegmentInProofread(row.index)">
+              <div class="subtitle-cue-meta">
+                <span class="subtitle-index">#{{ row.index + 1 }}</span>
+                <span class="subtitle-timing"><time>{{ row.timeStart || '—' }}</time><template v-if="row.timeEnd"><span aria-hidden="true"> → </span><time>{{ row.timeEnd }}</time></template></span>
+                <span v-if="row.durationLabel" class="subtitle-duration-badge">{{ row.durationLabel }}</span>
+                <span v-if="row.speaker" class="subtitle-speaker-badge" data-i18n-ignore>{{ row.speaker }}</span>
+                <span v-if="row.style" class="subtitle-style-badge" data-i18n-ignore>{{ row.style }}</span>
+                <button type="button" class="reader-edit-trigger" :aria-label="t('document.pdfReading.editInProofread')" @click.stop="editSegmentInProofread(row.index)">{{ t('document.pdfReading.editInProofread') }}</button>
+              </div>
+              <p v-if="row.showSource" class="subtitle-source document-source" data-i18n-ignore><template v-for="(run, ri) in row.sourceRuns" :key="ri"><strong v-if="run.bold" :class="{italic: run.italic, underline: run.underline}">{{ run.text }}</strong><em v-else-if="run.italic" :class="{underline: run.underline}">{{ run.text }}</em><u v-else-if="run.underline">{{ run.text }}</u><template v-else>{{ run.text }}</template></template></p>
+              <p v-if="row.showTranslation" class="subtitle-translation document-translation" data-i18n-ignore><template v-if="row.translationRuns.length"><template v-for="(run, ri) in row.translationRuns" :key="ri"><strong v-if="run.bold" :class="{italic: run.italic, underline: run.underline}">{{ run.text }}</strong><em v-else-if="run.italic" :class="{underline: run.underline}">{{ run.text }}</em><u v-else-if="run.underline">{{ run.text }}</u><template v-else>{{ run.text }}</template></template></template><template v-else>{{ t('document.pdfReading.waitingTranslation') }}</template></p>
+            </article>
+          </div>
+          <div v-else class="subtitle-table-scroll">
             <table :style="readerZoomStyle" data-native-zoom-content>
               <thead><tr><th>#</th><th>时间范围</th><th v-if="effectivePreviewMode !== 'translated'">原文</th><th v-if="effectivePreviewMode !== 'source'">译文</th></tr></thead>
               <tbody>
-                <tr v-for="row in subtitleRows" :key="row.index">
+                <tr v-for="row in subtitleDisplayRows" :key="row.index" :data-segment="row.index" @dblclick="editSegmentInProofread(row.index)">
                   <td class="subtitle-index">{{ row.index + 1 }}</td>
-                  <td class="subtitle-timing"><time>{{ row.timeStart || '—' }}</time><span aria-hidden="true"> → </span><time>{{ row.timeEnd || '—' }}</time></td>
-                  <td v-if="effectivePreviewMode !== 'translated' || (row.translation && !hasDistinctTranslation(readerText(row.source), readerText(row.translation)))" :colspan="effectivePreviewMode === 'bilingual' && row.translation && !hasDistinctTranslation(readerText(row.source), readerText(row.translation)) ? 2 : 1"><p class="subtitle-source document-source" data-i18n-ignore>{{ readerText(row.source) }}</p></td>
-                  <td v-if="effectivePreviewMode !== 'source' && (!row.translation || hasDistinctTranslation(readerText(row.source), readerText(row.translation)))">
-                    <p class="subtitle-translation document-translation" data-i18n-ignore>{{ row.translation ? readerText(row.translation) : translateLegacy('等待翻译…') }}</p>
+                  <td class="subtitle-timing">
+                    <div class="subtitle-time-range"><time>{{ row.timeStart || '—' }}</time><template v-if="row.timeEnd"><span aria-hidden="true"> → </span><time>{{ row.timeEnd }}</time></template></div>
+                    <div v-if="row.durationLabel || row.speaker || row.style" class="subtitle-badges">
+                      <span v-if="row.durationLabel" class="subtitle-duration-badge">{{ row.durationLabel }}</span>
+                      <span v-if="row.speaker" class="subtitle-speaker-badge" data-i18n-ignore>{{ row.speaker }}</span>
+                      <span v-if="row.style" class="subtitle-style-badge" data-i18n-ignore>{{ row.style }}</span>
+                    </div>
+                  </td>
+                  <td v-if="row.showSource" :colspan="effectivePreviewMode === 'bilingual' && !row.showTranslation ? 2 : 1">
+                    <p class="subtitle-source document-source" data-i18n-ignore><template v-for="(run, ri) in row.sourceRuns" :key="ri"><strong v-if="run.bold" :class="{italic: run.italic, underline: run.underline}">{{ run.text }}</strong><em v-else-if="run.italic" :class="{underline: run.underline}">{{ run.text }}</em><u v-else-if="run.underline">{{ run.text }}</u><template v-else>{{ run.text }}</template></template></p>
+                  </td>
+                  <td v-if="row.showTranslation" class="subtitle-translation-cell">
+                    <p class="subtitle-translation document-translation" data-i18n-ignore><template v-if="row.translationRuns.length"><template v-for="(run, ri) in row.translationRuns" :key="ri"><strong v-if="run.bold" :class="{italic: run.italic, underline: run.underline}">{{ run.text }}</strong><em v-else-if="run.italic" :class="{underline: run.underline}">{{ run.text }}</em><u v-else-if="run.underline">{{ run.text }}</u><template v-else>{{ run.text }}</template></template></template><template v-else>{{ t('document.pdfReading.waitingTranslation') }}</template></p>
+                    <button type="button" class="reader-edit-trigger" :aria-label="t('document.pdfReading.editInProofread')" @click.stop="editSegmentInProofread(row.index)">{{ t('document.pdfReading.editInProofread') }}</button>
                   </td>
                 </tr>
               </tbody>
@@ -371,7 +445,7 @@
           </nav>
           <div :style="readerZoomStyle" data-native-zoom-content>
             <div class="json-table-header" :class="{ single: effectivePreviewMode !== 'bilingual' }"><span>{{ t('document.delimited.cell') }}</span><span v-if="effectivePreviewMode !== 'translated'">原字符串</span><span v-if="effectivePreviewMode !== 'source'">译文</span></div>
-            <article v-for="row in currentXlsxRows" :key="row.index" class="json-table-row" :class="{ single: effectivePreviewMode !== 'bilingual' || (row.translation && !hasDistinctTranslation(row.source, row.translation)) }">
+            <article v-for="row in currentXlsxRows" :key="row.index" class="json-table-row" :class="{ single: effectivePreviewMode !== 'bilingual' || (row.translation && !hasDistinctTranslation(row.source, row.translation)) }" :data-segment="row.index" @dblclick="editSegmentInProofread(row.index)">
               <code data-i18n-ignore>{{ row.cellRef }}</code>
               <p v-if="effectivePreviewMode !== 'translated' || (row.translation && !hasDistinctTranslation(row.source, row.translation))" class="json-source document-source" data-i18n-ignore>{{ row.source }}</p>
               <p v-if="effectivePreviewMode !== 'source' && (!row.translation || hasDistinctTranslation(row.source, row.translation))" class="json-translation document-translation" data-i18n-ignore>{{ row.translation || translateLegacy('等待翻译…') }}</p>
@@ -380,20 +454,99 @@
         </section>
 
         <section
-          v-else-if="isJsonDocument || parsedDocument.delimitedColumns"
-          class="json-document-reader"
-          :class="{'delimited-document-reader': !isJsonDocument}"
-          :data-document-reader="isJsonDocument ? 'json' : 'delimited'"
+          v-else-if="parsedDocument.delimitedColumns"
+          class="json-document-reader delimited-document-reader"
+          :class="{'delimited-grid-mode': delimitedViewMode === 'grid'}"
+          data-document-reader="delimited"
           :data-segment-count="activeSegments.length"
-          :aria-label="isJsonDocument ? translateLegacy('JSON 字符串路径翻译表格') : t('document.delimited.cells')"
+          :aria-label="t('document.delimited.cells')"
         >
-          <div :style="readerZoomStyle" data-native-zoom-content>
-          <div class="json-table-header" :class="{ single: effectivePreviewMode !== 'bilingual' }"><span>{{ isJsonDocument ? 'JSONPath' : t('document.delimited.cell') }}</span><span v-if="effectivePreviewMode !== 'translated'">原字符串</span><span v-if="effectivePreviewMode !== 'source'">译文</span></div>
-          <article v-for="row in previewRows" :key="row.index" class="json-table-row" :class="{ single: effectivePreviewMode !== 'bilingual' || (row.translation && !hasDistinctTranslation(row.source, row.translation)) }">
-            <code>{{ row.pathLabel || '$' }}</code>
-            <p v-if="effectivePreviewMode !== 'translated' || (row.translation && !hasDistinctTranslation(row.source, row.translation))" class="json-source document-source" data-i18n-ignore>{{ row.source }}</p>
-            <p v-if="effectivePreviewMode !== 'source' && (!row.translation || hasDistinctTranslation(row.source, row.translation))" class="json-translation document-translation" data-i18n-ignore>{{ row.translation || translateLegacy('等待翻译…') }}</p>
-          </article>
+          <div class="format-reader-bar delimited-format-bar">
+            <div class="appearance-group" role="group" :aria-label="t('document.pdfReading.presentationLabel')">
+              <button type="button" :class="{selected: delimitedViewMode === 'grid'}" :aria-pressed="delimitedViewMode === 'grid'" @click="delimitedViewMode = 'grid'">{{ t('document.pdfReading.spreadsheetView') }}</button>
+              <button type="button" :class="{selected: delimitedViewMode === 'list'}" :aria-pressed="delimitedViewMode === 'list'" @click="delimitedViewMode = 'list'">{{ t('document.pdfReading.cellListView') }}</button>
+            </div>
+            <span v-if="delimitedViewMode === 'grid'" class="format-bar-hint">{{ t('document.pdfReading.untranslatedColumnsHint') }}</span>
+          </div>
+          <div v-if="delimitedViewMode === 'grid' && delimitedGrid" class="delimited-table-scroll">
+            <table class="delimited-spreadsheet" :style="readerZoomStyle" data-native-zoom-content>
+              <thead>
+                <tr class="delimited-col-header-row">
+                  <th class="delimited-row-num" scope="col">#</th>
+                  <th v-for="col in delimitedGrid.columns" :key="col.index" scope="col" class="delimited-col-header" :class="{'is-selected': col.selected, 'is-untranslated': !col.selected}">
+                    <button type="button" class="delimited-col-toggle" :disabled="queueBusy || !col.translatable || (col.selected && selectedDelimitedColumns.length <= 1)" :aria-pressed="col.selected" :title="t('document.pdfReading.toggleColumnTranslate')" @click="toggleDelimitedColumn(col.index)">
+                      <span class="delimited-col-letter">{{ col.letter }}</span>
+                      <span class="delimited-col-name" data-i18n-ignore>{{ col.label }}</span>
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in delimitedVisibleRows" :key="row.rowIndex" class="delimited-grid-row json-table-row" :class="{'is-header-row': row.isHeader}">
+                  <th class="delimited-row-num" scope="row">{{ row.rowIndex + 1 }}</th>
+                  <td v-for="cell in row.cells" :key="cell.column" class="delimited-cell" :class="{'is-untranslated': !cell.selected || cell.segmentId === undefined, 'is-numeric': cell.isNumeric, 'is-formula': cell.isFormula}" :data-segment="cell.segmentId" @dblclick="cell.segmentId !== undefined && cell.selected && editSegmentInProofread(cell.segmentId)">
+                    <template v-if="cell.selected && cell.segmentId !== undefined">
+                      <code class="delimited-cell-coord visually-hidden">{{ delimitedCellCoord(cell) }}</code>
+                      <span v-if="delimitedCellShowsSource(cell)" class="delimited-cell-source document-source" data-i18n-ignore>{{ cell.raw }}</span>
+                      <span v-if="delimitedCellShowsTranslation(cell)" class="delimited-cell-translation json-translation document-translation" data-i18n-ignore>{{ cell.translation || t('document.pdfReading.waitingTranslation') }}</span>
+                      <button type="button" class="reader-edit-trigger" :aria-label="t('document.pdfReading.editInProofread')" @click.stop="editSegmentInProofread(cell.segmentId)">{{ t('document.pdfReading.editInProofread') }}</button>
+                    </template>
+                    <span v-else class="delimited-cell-raw" data-i18n-ignore>{{ cell.raw }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else :style="readerZoomStyle" data-native-zoom-content>
+            <div class="json-table-header" :class="{ single: effectivePreviewMode !== 'bilingual' }"><span>{{ t('document.delimited.cell') }}</span><span v-if="effectivePreviewMode !== 'translated'">原字符串</span><span v-if="effectivePreviewMode !== 'source'">译文</span></div>
+            <article v-for="row in previewRows" :key="row.index" class="json-table-row" :data-segment="row.index" :class="{ single: effectivePreviewMode !== 'bilingual' || (row.translation && !hasDistinctTranslation(row.source, row.translation)) }" @dblclick="editSegmentInProofread(row.index)">
+              <code>{{ row.pathLabel || '$' }}</code>
+              <p v-if="effectivePreviewMode !== 'translated' || (row.translation && !hasDistinctTranslation(row.source, row.translation))" class="json-source document-source" data-i18n-ignore>{{ row.source }}</p>
+              <p v-if="effectivePreviewMode !== 'source' && (!row.translation || hasDistinctTranslation(row.source, row.translation))" class="json-translation document-translation" data-i18n-ignore>{{ row.translation || t('document.pdfReading.waitingTranslation') }}</p>
+            </article>
+          </div>
+        </section>
+
+        <section
+          v-else-if="isJsonDocument"
+          class="json-document-reader"
+          data-document-reader="json"
+          :data-segment-count="activeSegments.length"
+          :aria-label="translateLegacy('JSON 字符串路径翻译表格')"
+        >
+          <div class="format-reader-bar json-format-bar">
+            <div class="appearance-group" role="group" :aria-label="t('document.pdfReading.presentationLabel')">
+              <button type="button" :class="{selected: jsonViewMode === 'table'}" :aria-pressed="jsonViewMode === 'table'" @click="jsonViewMode = 'table'">{{ t('document.pdfReading.jsonTableView') }}</button>
+              <button type="button" :class="{selected: jsonViewMode === 'tree'}" :aria-pressed="jsonViewMode === 'tree'" @click="jsonViewMode = 'tree'">{{ t('document.pdfReading.jsonTreeView') }}</button>
+            </div>
+          </div>
+          <div v-if="jsonViewMode === 'tree'" class="json-tree" :style="readerZoomStyle" data-native-zoom-content>
+            <div v-for="node in visibleJsonTreeNodes" :key="node.path" class="json-tree-row" :class="[`json-kind-${node.kind}`, {'is-muted': node.muted, 'is-translatable': node.translatable}]" :style="{paddingLeft: `${12 + node.depth * 18}px`}" :data-segment="node.segmentId" @dblclick="node.segmentId !== undefined && editSegmentInProofread(node.segmentId)">
+              <button v-if="node.kind === 'object' || node.kind === 'array'" type="button" class="json-tree-toggle" :aria-expanded="node.expanded" @click="toggleJsonTreePath(node.path)">{{ node.expanded ? '▾' : '▸' }}</button>
+              <span v-else class="json-tree-spacer" aria-hidden="true" />
+              <code class="json-tree-key" data-i18n-ignore>{{ node.key }}</code>
+              <span class="json-tree-colon" aria-hidden="true">:</span>
+              <span class="json-tree-value" data-i18n-ignore>{{ node.kind === 'string' ? `"${node.valueText}"` : node.valueText }}</span>
+              <span v-if="node.translatable && effectivePreviewMode !== 'source'" class="json-tree-translation json-translation" data-i18n-ignore>{{ node.translation || t('document.pdfReading.waitingTranslation') }}</span>
+              <button v-if="node.segmentId !== undefined" type="button" class="reader-edit-trigger" :aria-label="t('document.pdfReading.editInProofread')" @click.stop="editSegmentInProofread(node.segmentId)">{{ t('document.pdfReading.editInProofread') }}</button>
+            </div>
+            <div v-if="jsonTreeNodes.length > visibleJsonTreeNodes.length" class="json-tree-more">
+              <button type="button" class="ghost-button" @click="jsonTreeVisibleLimit += 200">{{ translateLegacy('显示更多') }}</button>
+            </div>
+          </div>
+          <div v-else-if="jsonGrouped" :style="readerZoomStyle" data-native-zoom-content>
+            <div class="json-table-header" :class="{ single: effectivePreviewMode !== 'bilingual' }"><span>JSONPath</span><span v-if="effectivePreviewMode !== 'translated'">原字符串</span><span v-if="effectivePreviewMode !== 'source'">译文</span></div>
+            <template v-for="group in jsonGrouped.groups" :key="group.parentPath">
+              <div v-if="group.parentPath !== '$'" class="json-group-header" data-i18n-ignore><code>{{ group.parentPath }}</code></div>
+              <article v-for="row in group.rows" :key="row.segmentId" class="json-table-row" :data-segment="row.segmentId" :class="{ single: effectivePreviewMode !== 'bilingual' || (row.translation && !row.hasDistinctTranslation) }" @dblclick="editSegmentInProofread(row.segmentId)">
+                <code :title="row.pathLabel">{{ row.pathLabel || '$' }}</code>
+                <p v-if="effectivePreviewMode !== 'translated' || (row.translation && !row.hasDistinctTranslation)" class="json-source document-source" data-i18n-ignore><template v-for="(token, ti) in row.sourceTokens" :key="ti"><mark v-if="token.kind === 'placeholder'" class="json-placeholder-token">{{ token.text }}</mark><template v-else>{{ token.text }}</template></template></p>
+                <div v-if="effectivePreviewMode !== 'source' && (!row.translation || row.hasDistinctTranslation)" class="json-translation-cell">
+                  <p class="json-translation document-translation" data-i18n-ignore><template v-if="row.translationTokens.length"><template v-for="(token, ti) in row.translationTokens" :key="ti"><mark v-if="token.kind === 'placeholder'" class="json-placeholder-token">{{ token.text }}</mark><template v-else>{{ token.text }}</template></template></template><template v-else>{{ t('document.pdfReading.waitingTranslation') }}</template></p>
+                  <button type="button" class="reader-edit-trigger" :aria-label="t('document.pdfReading.editInProofread')" @click.stop="editSegmentInProofread(row.segmentId)">{{ t('document.pdfReading.editInProofread') }}</button>
+                </div>
+              </article>
+            </template>
           </div>
         </section>
 
@@ -452,7 +605,7 @@
         </div>
         <label class="document-batch-translation"><input v-model="documentBatchTranslation" type="checkbox" :disabled="queueBusy" /><span><strong>{{ t('document.batchTranslation.label') }}</strong><small>{{ t('document.batchTranslation.hint') }}</small></span></label>
         <div class="document-context-choice">
-          <label class="document-batch-translation" data-testid="document-ai-context-toggle"><input v-model="documentAIContextPreference" type="checkbox" :disabled="queueBusy || !documentAIContextSupported" /><span><strong>{{ t('document.requestEvidence.contextToggle') }}</strong><small>{{ documentAIContextSupported ? t('document.requestEvidence.contextHint') : t('document.requestEvidence.contextUnavailable') }}</small></span></label>
+          <label class="document-ai-context-toggle" data-testid="document-ai-context-toggle"><input v-model="documentAIContextPreference" type="checkbox" :disabled="queueBusy || !documentAIContextSupported" /><span><strong>{{ t('document.requestEvidence.contextToggle') }}</strong><small>{{ documentAIContextSupported ? t('document.requestEvidence.contextHint') : t('document.requestEvidence.contextUnavailable') }}</small></span></label>
           <button v-if="documentAIContextOverride !== null" class="document-context-inherit" type="button" :disabled="queueBusy" @click="documentAIContextOverride = null; requestEvidence = null">{{ t('document.requestEvidence.inheritGlobal') }}</button>
         </div>
         <GlossaryLibrarySelect
@@ -582,11 +735,35 @@ import {
   useConfigEditor,
   PdfReader,
   syncRichPreview,
+  patchRichPreviewSegments,
   richPreviewInterval,
   collectRichOutline,
+  findActiveRichOutlineIndex,
   scrollRichOutline,
   markRichPreviewBusy,
   richPreviewPosition,
+  resolveEpubChapterAssets,
+  loadEpubNestedToc,
+  type EpubTocItem,
+  formatJsonPath,
+  buildDelimitedGrid,
+  paginateDelimitedRows,
+  type DelimitedGridCell,
+  buildDocxRichBlocks,
+  loadDocxPartMetadata,
+  paginateDocxBlocks,
+  findDocxBlockPage,
+  buildDocxOutline,
+  type DocxInlineRun,
+  type DocxPartMetadata,
+  type DocxRichParagraph,
+  buildJsonOutline,
+  buildJsonGroupedRows,
+  buildJsonTreeNodes,
+  formatSubtitleDuration,
+  extractSubtitleMetadata,
+  buildSubtitleTimelineOutline,
+  parseSubtitleRichText,
   trackWebArticleReading,
   normalizeWebArticleUrl,
   WEB_ARTICLE_PARAMETER,
@@ -668,8 +845,13 @@ import {
   supportsTranslationGlossary,
   useUiI18n,
   useDocumentTasks,
+  countCompletedTranslations,
   createDocumentTaskState,
+  type DocumentTranslationUpdate,
   type DocumentRenderMode,
+  type DocumentBilingualLayout,
+  type DocumentReadingTheme,
+  type DocumentReadingFontFamily,
   type DocumentHistorySummary,
   type DocumentQueueItem,
   type PdfReadingPresentation,
@@ -734,6 +916,7 @@ const downloadCopy = computed(() => getDocumentDownloadCopy(language.value));
 const fileInput = ref<HTMLInputElement | null>(null);
 const documentTasks = useDocumentTasks();
 const {documentQueue, activeDocumentId, activeTask, parsedDocument, translatedSegments,
+  completedCount: taskCompletedCount, hasTranslation: taskHasTranslation, setDocumentTranslationBatch,
   confirmedTranslationIds, taskFingerprint, runState, editRevision, downloadedRevision,
   errorMessage, documentBatchTranslation, bypassCache} = documentTasks;
 const taskSegments = (item: DocumentQueueItem) => item.document ? documentSegmentsInColumns(item.document, item.delimitedColumns) : [];
@@ -774,12 +957,107 @@ function setFocusMode(value: boolean): void {
     else if (window.document.fullscreenElement) void window.document.exitFullscreen?.()?.catch?.(() => undefined);
   } catch { /* 浏览器不允许全屏时仍然隐藏控件。 */ }
 }
-function leaveFocusOnEscape(event: KeyboardEvent): void {if (event.key === 'Escape' && focusMode.value) setFocusMode(false);}
+function leaveFocusOnEscape(event: KeyboardEvent): void {
+  if (event.defaultPrevented) return;
+  if (event.key === 'Escape' && focusMode.value) {
+    setFocusMode(false);
+    return;
+  }
+  if (!parsedDocument.value) return;
+  const active = window.document?.activeElement as HTMLElement | null;
+  const role = active?.getAttribute?.('role');
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable || role === 'textbox' || role === 'combobox')) return;
+  if (documentSettingsDialog.value?.open || downloadDialog.value?.open || confirmDialog.value?.open || Boolean(window.document?.querySelector?.('dialog[open]'))) return;
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b') {
+    event.preventDefault();
+    sidebarOpen.value = !sidebarOpen.value;
+    return;
+  }
+  const digit = event.code === 'Digit1' || event.key === '1' ? '1'
+    : event.code === 'Digit2' || event.key === '2' ? '2'
+      : event.code === 'Digit3' || event.key === '3' ? '3' : '';
+  if (event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && canCompare.value && digit) {
+    event.preventDefault();
+    previewMode.value = digit === '1' ? 'source' : digit === '2' ? 'bilingual' : 'translated';
+  }
+}
 function leaveFocusWithFullscreen(): void {if (!window.document.fullscreenElement && focusMode.value) focusMode.value = false;}
 const sidebarTab = ref<'files' | 'outline'>('outline');
 /** 文档级上下文覆盖只作用于当前打开文档，不写入全局设置或翻译历史。 */
 const documentAIContextOverride = ref<boolean | null>(null);
-const requestEvidence = ref<DocumentRequestEvidenceState | null>(null);
+interface RawRequestEvidence {
+  segments: readonly ParsedDocument['segments'][number][];
+  discourseContext?: string;
+  enableAIContext: boolean;
+  sourceLanguage: string;
+  targetLanguage: string;
+  glossaryIds: string[] | null;
+  glossaryEnabled: boolean;
+  glossarySupported: boolean;
+  glossaryLibraries: Config['glossaryLibraries'];
+}
+const rawRequestEvidence = shallowRef<RawRequestEvidence | null>(null);
+const requestEvidence = computed<DocumentRequestEvidenceState | null>({
+  get: () => {
+    const raw = rawRequestEvidence.value;
+    if (!raw) return null;
+    const {segments, discourseContext, enableAIContext, sourceLanguage, targetLanguage, glossaryIds, glossaryEnabled, glossarySupported, glossaryLibraries} = raw;
+    const kinds: readonly DocumentRequestEvidenceKind[] = ['definition', 'nearby', 'section_opening', 'previous_machine', 'user_confirmed'];
+    let section = segments.find(segment => segment.contextLabel?.trim())?.contextLabel?.slice(0, 160) ?? '';
+    let positions = [...new Set(segments.map(segment => [segment.contextLabel, segment.pathLabel, segment.timeStart, `段落 ${segment.id + 1}`]
+      .filter(Boolean).join(' · ')))].slice(0, 8);
+    let contextItems: DocumentRequestEvidenceItem[] = [];
+    if (discourseContext) {
+      try {
+        const parsed: unknown = JSON.parse(discourseContext);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const record = parsed as Record<string, unknown>;
+          if (record.version === 1) {
+            if (!section && typeof record.section === 'string' && !/^(?:document|section:\d+)$/u.test(record.section)) section = record.section.slice(0, 160);
+            const rawPositions = Array.isArray(record.positions) ? record.positions : [record.position];
+            positions = [...new Set([...positions, ...rawPositions.filter((position): position is string => typeof position === 'string' && Boolean(position.trim())).map(position => position.slice(0, 160))])].slice(0, 8);
+            if (Array.isArray(record.evidence)) {
+              contextItems = record.evidence.flatMap((value): DocumentRequestEvidenceItem[] => {
+                if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+                const item = value as Record<string, unknown>;
+                if (!kinds.includes(item.kind as DocumentRequestEvidenceKind)
+                  || typeof item.blockId !== 'string' || typeof item.section !== 'string' || typeof item.position !== 'string'
+                  || typeof item.source !== 'string' || !item.source.trim()
+                  || (item.translation !== undefined && typeof item.translation !== 'string')) return [];
+                return [{kind: item.kind as DocumentRequestEvidenceKind, blockId: item.blockId.slice(0, 160),
+                  section: item.section.slice(0, 160), position: item.position.slice(0, 160), source: item.source.slice(0, 480),
+                  ...(typeof item.translation === 'string' && item.translation ? {translation: item.translation.slice(0, 480)} : {})}];
+              }).slice(0, 8);
+            }
+          }
+        }
+      } catch { /* 不显示无法核对的上下文协议 */ }
+    }
+    const glossaryContext = {text: segments.map(segment => segment.source), sourceLanguage, targetLanguage, pageUrl: undefined, glossaryIds};
+    const glossaryTerms = glossaryEnabled && glossarySupported
+      ? resolveGlossaryEntries(glossaryLibraries, glossaryContext).terms.flatMap(term => {
+        const library = glossaryLibraries.find(candidate => getGlossaryScopeReason(candidate, glossaryContext) === 'eligible'
+          && candidate.entries.some(entry => entry.source === term.source && entry.target === term.target && entry.caseSensitive === term.caseSensitive));
+        return library ? [{...term, library: library.name}] : [];
+      }) : [];
+    const matchedTerms = new Map<string, DocumentRequestGlossaryTerm>();
+    let glossaryOccurrences = 0;
+    for (const segment of segments) {
+      for (const {entry} of findGlossaryMatches(segment.source.normalize('NFC'), glossaryTerms)) {
+        const key = JSON.stringify([entry.library, entry.source, entry.target]);
+        const existing = matchedTerms.get(key);
+        if (existing) existing.occurrences += 1;
+        else matchedTerms.set(key, {library: entry.library, source: entry.source, target: entry.target, occurrences: 1});
+        glossaryOccurrences += 1;
+      }
+    }
+    const allGlossaryTerms = [...matchedTerms.values()].sort((left, right) => right.occurrences - left.occurrences || left.source.localeCompare(right.source));
+    return {segmentCount: segments.length, contextEnabled: enableAIContext, section, positions, contextItems,
+      glossaryOccurrences, glossaryTermCount: matchedTerms.size, glossaryLibraryCount: new Set(allGlossaryTerms.map(term => term.library)).size,
+      glossaryTerms: allGlossaryTerms.slice(0, 8), omittedGlossaryTerms: Math.max(0, allGlossaryTerms.length - 8)};
+  },
+  set: value => {if (!value) rawRequestEvidence.value = null;},
+});
 const recognitionProgress = ref('');
 const retryWaiting = ref(0);
 const richOutline = ref<RichOutlineItem[]>([]);
@@ -792,12 +1070,59 @@ const canEditPdfSource = computed(() => {
   return document?.binary?.kind === 'pdf' && document.binary.pages.find(page => page.pageNumber === pdfPage.value)?.blocks.some((_, index) => pdfSourceEditTarget(document, pdfPage.value, index));
 });
 const readerTab = ref<'read' | 'edit'>('read');
+const editorFocusSegmentId = ref<number | null>(null);
 // 阅读时不构建隐藏校订器和全文占位符映射；首次打开后保留当前文档的搜索、页码和输入状态。
 const editorRequested = ref(false);
 watch([activeDocumentId, readerTab], ([documentId, tab], [previousDocumentId]) => {
-  if (documentId !== previousDocumentId) editorRequested.value = false;
+  if (documentId !== previousDocumentId) {
+    editorRequested.value = false;
+    editorFocusSegmentId.value = null;
+  }
   if (tab === 'edit') editorRequested.value = true;
+  else editorFocusSegmentId.value = null;
 });
+const APPEARANCE_STORAGE_KEY = 'fluentread.documentReader.appearance';
+function readSavedAppearance(): {bilingualLayout: DocumentBilingualLayout; readingTheme: DocumentReadingTheme; fontFamily: DocumentReadingFontFamily} {
+  try {
+    const raw = globalThis.localStorage?.getItem(APPEARANCE_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const bilingualLayout: DocumentBilingualLayout = parsed.bilingualLayout === 'stacked' ? 'stacked' : 'split';
+      const readingTheme: DocumentReadingTheme = parsed.readingTheme === 'light' || parsed.readingTheme === 'sepia' || parsed.readingTheme === 'green' || parsed.readingTheme === 'dark' ? parsed.readingTheme : 'auto';
+      const fontFamily: DocumentReadingFontFamily = parsed.fontFamily === 'serif' ? 'serif' : 'sans';
+      return {bilingualLayout, readingTheme, fontFamily};
+    }
+  } catch { /* 无法读取本地外观偏好时沿用默认值。 */ }
+  return {bilingualLayout: 'split', readingTheme: 'auto', fontFamily: 'sans'};
+}
+const savedAppearance = readSavedAppearance();
+const richBilingualLayout = ref<DocumentBilingualLayout>(savedAppearance.bilingualLayout);
+const richReadingTheme = ref<DocumentReadingTheme>(savedAppearance.readingTheme);
+const richFontFamily = ref<DocumentReadingFontFamily>(savedAppearance.fontFamily);
+watch([richBilingualLayout, richReadingTheme, richFontFamily], ([bilingualLayout, readingTheme, fontFamily]) => {
+  try {
+    globalThis.localStorage?.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({bilingualLayout, readingTheme, fontFamily}));
+  } catch { /* 存储不可用时仅保留当前会话外观。 */ }
+});
+const lightThemeLabel = computed(() => translateLegacy(options.theme.find(item => item.value === 'light')?.label || 'Light'));
+const richThemeChoices = computed<Array<{value: DocumentReadingTheme; label: string}>>(() => [
+  {value: 'auto', label: t('document.pdfReading.theme.auto')},
+  {value: 'light', label: lightThemeLabel.value},
+  {value: 'sepia', label: t('document.pdfReading.theme.sepia')},
+  {value: 'green', label: t('document.pdfReading.theme.mint')},
+  {value: 'dark', label: t('document.pdfReading.theme.dark')},
+]);
+const DELIMITED_PAGE_SIZE = 50;
+const delimitedViewMode = ref<'grid' | 'list'>('grid');
+const jsonViewMode = ref<'table' | 'tree'>('table');
+const jsonExpandedPaths = ref<Set<string>>(new Set(['$']));
+const jsonTreeVisibleLimit = ref(200);
+const subtitleViewMode = ref<'table' | 'stacked'>('table');
+const pdfInformationHighlight = computed(() => ({
+  preferences: config.informationHighlight,
+  scoreLocal: scoreDocumentInformation,
+  available: config.on && hydrated.value && readerTab.value === 'read',
+}));
 const readingContent = ref<HTMLElement | null>(null);
 const readerScale = ref(1);
 const readerZoomStyle = computed(() => ({zoom: String(readerScale.value)}));
@@ -855,7 +1180,14 @@ const glossaryDestinationId = ref('');
 const glossaryChoices = ref<(DocumentGlossaryChoice & {selected: boolean})[]>([]);
 let glossaryController: AbortController | null = null;
 const colorSchemeMedia = window.matchMedia('(prefers-color-scheme: dark)');
-const isDark = ref(colorSchemeMedia.matches);
+const systemDark = ref(colorSchemeMedia.matches);
+const isDark = computed({
+  get: () => config.theme === 'dark' ? true : config.theme === 'light' ? false : systemDark.value,
+  set: (value: boolean) => { systemDark.value = value; },
+});
+watch(isDark, dark => {
+  window.document?.documentElement?.classList?.toggle('dark', dark);
+}, {immediate: true});
 let abortController: AbortController | null = null;
 let translationRequestId = 0;
 let disposed = false;
@@ -870,7 +1202,7 @@ const completeItem = (item: DocumentQueueItem) => {
   return Boolean(segments.length
     && !pdfPagesNeedingOcr(item.document).length
     && !(item.id === activeDocumentId.value && translating.value)
-    && segments.every(segment => item.translations[segment.id]?.trim()));
+    && countCompletedTranslations(item.translations, segments) === segments.length);
 };
 const batchCompletedCount = computed(() => documentQueue.value.filter(completeItem).length);
 const batchPendingCount = computed(() => documentQueue.value.filter(item => item.document && !completeItem(item)).length);
@@ -887,6 +1219,7 @@ function selectDocument(item: DocumentQueueItem): void {
 /** 导入控制器只交接当前代次的完整任务，不撤销同一次多文件读取。 */
 function activateDocument(item: DocumentQueueItem): void {
   if (!item.document || item.id === activeDocumentId.value) return;
+  discardPendingTranslationBatch();
   releaseDocumentPreview(parsedDocument.value);
   recognitionProgress.value = '';
   activeDocumentId.value = item.id;
@@ -906,7 +1239,7 @@ function activateDocument(item: DocumentQueueItem): void {
 function queueProgress(item: DocumentQueueItem): number {
   if (item.id === activeDocumentId.value) return progress.value;
   const segments = taskSegments(item);
-  return segments.length ? Math.min(pdfPagesNeedingOcr(item.document).length ? 99 : 100, Math.floor(segments.filter(segment => item.translations[segment.id]?.trim()).length / segments.length * 100)) : 0;
+  return segments.length ? Math.min(pdfPagesNeedingOcr(item.document).length ? 99 : 100, Math.floor(countCompletedTranslations(item.translations, segments) / segments.length * 100)) : 0;
 }
 
 // 最近翻译：只在浏览器提供 IndexedDB 时启用；记录留在本机，重新打开同一份文件会接着上次的译文继续。
@@ -1058,10 +1391,11 @@ function queueMaterialPositionCapture(): void {
   const owner = materialEpoch;
   const timer = setTimeout(async () => {
     try {
-      if (owner !== materialEpoch || materialPositionTimer !== timer || !allowed() || !documentMaterialSelection()) return;
+      if (owner !== materialEpoch || materialPositionTimer !== timer || !allowed()) return;
+      const selection = documentMaterialSelection();
+      if (!selection) return;
       const generation = await materialGeneration();
       if (owner !== materialEpoch || materialPositionTimer !== timer || !allowed()) return;
-      const selection = documentMaterialSelection(); if (!selection) return;
       await materialCapture({...selection, positionOnly: true, generation, capturedAt: Date.now()});
     } catch { /* 已移除、归档、未布局或隐私禁用时保留原定位。 */ }
   }, 1000);
@@ -1085,10 +1419,10 @@ function persistHistory(): void {
   for (const item of documentQueue.value) {
     if (!item.document || !item.historyId || !item.bytes || item.historyReadUnavailable || item.historyConflict || item.revision === item.savedRevision) continue;
     const segments = taskSegments(item);
-    const completed = segments.filter(segment => item.translations[segment.id]?.trim()).length;
+    const completed = countCompletedTranslations(item.translations, segments);
     void historyCommitter.save(item, {id: item.historyId, name: item.name, format: item.document.format, size: item.bytes.byteLength, sourceUrl: item.sourceUrl, mimeType: item.mimeType || '',
       total: segments.length, completed, updatedAt: Date.now(), bytes: item.bytes, translations: [...item.translations],
-      ...(item.delimitedColumns ? {delimitedColumns: [...item.delimitedColumns]} : {}), ...(item.bypassCache ? {bypassCache: true} : {}), ...(item.pdfAnnotations ? {pdfAnnotations: toRaw(item.pdfAnnotations)} : {}), retainedRevisions: item.retainedRevisions ? toRaw(item.retainedRevisions) : undefined, fingerprint: item.fingerprint, parsed: toRaw(item.document), parsedVersion: PARSED_VERSION}).then(written => {if (written) void refreshHistory();});
+      ...(item.delimitedColumns ? {delimitedColumns: [...item.delimitedColumns]} : {}), ...(item.bypassCache ? {bypassCache: true} : {}), ...(item.pdfAnnotations ? {pdfAnnotations: toRaw(item.pdfAnnotations)} : {}), retainedRevisions: item.retainedRevisions ? toRaw(item.retainedRevisions) : undefined, fingerprint: item.fingerprint, parsed: toRaw(item.document), parsedVersion: PARSED_VERSION}).then(written => {if (written && !parsedDocument.value) void refreshHistory();});
   }
 }
 /** 批注沿用文件任务和历史版本校验；存储不可用时仍可下载本次副本。 */
@@ -1101,7 +1435,7 @@ function updatePdfAnnotations(annotations: PdfAnnotation[]): void {
 }
 function scheduleHistorySave(): void {
   if (!historyAvailable || historyTimer !== undefined) return;
-  historyTimer = setTimeout(persistHistory, 2000);
+  historyTimer = setTimeout(persistHistory, 5000);
 }
 // 刷新后回到正在阅读的文档：当前标签页记住它在本地历史里的标识，新开的标签页仍从首页开始。
 const SESSION_KEY = 'fluentread.document.open';
@@ -1241,7 +1575,7 @@ function queueStatus(item: DocumentQueueItem): string {
   if (item.id === activeDocumentId.value) return `${translateLegacy(statusLabel.value)} · ${progress.value}%`;
   if (completeItem(item)) return translateLegacy('翻译完成');
   const segments = taskSegments(item);
-  const done = segments.filter(segment => item.translations[segment.id]?.trim()).length;
+  const done = countCompletedTranslations(item.translations, segments);
   return `${translateLegacy(item.state === 'failed' ? '翻译中断' : item.state === 'paused' ? '已暂停' : '等待翻译')} · ${done}/${segments.length}`;
 }
 
@@ -1430,9 +1764,13 @@ const rowForSegment = (segment: ParsedDocument['segments'][number]) => ({
 });
 const pageRows = <T,>(rows: readonly T[]) => rows.slice((readerPage.value - 1) * READER_PAGE_SIZE, readerPage.value * READER_PAGE_SIZE);
 const previewRows = computed(() => pageRows(activeSegments.value).map(rowForSegment));
-const hasTranslation = computed(() => activeSegments.value.some(segment => Boolean(translatedSegments.value[segment.id]?.trim())));
+const hasTranslation = computed(() => activeTask.value?.delimitedColumns
+  ? countCompletedTranslations(translatedSegments.value, activeSegments.value) > 0
+  : taskHasTranslation.value);
 const completedSegments = computed(() => translating.value ? liveCompletedSegments.value
-  : activeSegments.value.filter(segment => translatedSegments.value[segment.id]?.trim()).length);
+  : activeTask.value?.delimitedColumns
+    ? countCompletedTranslations(translatedSegments.value, activeSegments.value)
+    : taskCompletedCount.value);
 const translationComplete = computed(() => Boolean(!translating.value && !needsOcr.value && activeSegments.value.length && completedSegments.value === activeSegments.value.length));
 // 只有已提交译文计入分子；请求和重试不增加进度，最后一段提交后仍等任务收敛才显示 100%。
 const progress = computed(() => activeSegments.value.length
@@ -1546,12 +1884,87 @@ const epubChapters = computed(() => parsedDocument.value?.binary?.kind === 'epub
   ? parsedDocument.value.binary.chapters
   : []);
 const currentEpubChapter = computed(() => epubChapters.value[epubChapterIndex.value]);
+const epubNestedToc = ref<EpubTocItem[]>([]);
+const epubResolvedHtml = ref<string | null>(null);
+let epubAssetsRevoke: (() => void) | null = null;
+let epubAssetRevision = 0;
+let epubAssetPending = false;
+let epubTocRevision = 0;
+let pendingEpubFragment = '';
+let pendingRichLocateSegmentId: number | null = null;
+
+function revokeEpubAssets(): void {
+  epubAssetRevision += 1;
+  epubAssetPending = false;
+  epubAssetsRevoke?.();
+  epubAssetsRevoke = null;
+  epubResolvedHtml.value = null;
+}
+
+function stepEpubChapter(delta: -1 | 1): void {
+  const next = epubChapterIndex.value + delta;
+  if (next >= 0 && next < epubChapters.value.length) epubChapterIndex.value = next;
+}
+
+function resolveEpubRelativeHref(basePath: string, href: string): {path: string; fragment: string} | null {
+  const trimmed = href.trim();
+  if (!trimmed || /^\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/iu.test(trimmed)) return null;
+  try {
+    const base = `https://epub.invalid/${basePath.split('/').map(encodeURIComponent).join('/')}`;
+    const url = new URL(trimmed, base);
+    return {path: decodeURIComponent(url.pathname.slice(1)), fragment: decodeURIComponent(url.hash.slice(1))};
+  } catch {
+    return null;
+  }
+}
+
+watch(parsedDocument, document => {
+  epubTocRevision += 1;
+  epubNestedToc.value = [];
+  pendingEpubFragment = '';
+  pendingRichLocateSegmentId = null;
+  revokeEpubAssets();
+  if (document?.binary?.kind !== 'epub' || !document.binary.bytes?.byteLength) return;
+  const revision = epubTocRevision;
+  const {bytes, chapters} = document.binary;
+  void loadEpubNestedToc(bytes, chapters).then(items => {
+    if (!disposed && revision === epubTocRevision && parsedDocument.value === document) epubNestedToc.value = items;
+  }).catch(() => undefined);
+}, {immediate: true});
+
+watch([parsedDocument, currentEpubChapter], ([document, chapter]) => {
+  revokeEpubAssets();
+  if (document?.binary?.kind !== 'epub' || !chapter || !document.binary.bytes?.byteLength) return;
+  const revision = epubAssetRevision;
+  epubAssetPending = true;
+  void resolveEpubChapterAssets(document.binary.bytes, chapter.path, chapter.source).then(resolved => {
+    if (disposed || revision !== epubAssetRevision || parsedDocument.value !== document || currentEpubChapter.value !== chapter) {
+      resolved.revoke();
+      return;
+    }
+    epubAssetPending = false;
+    epubAssetsRevoke = resolved.revoke;
+    if (resolved.blobUrls.length || resolved.inlineCss) {
+      epubResolvedHtml.value = resolved.html;
+    } else {
+      if (pendingEpubFragment) {const fragment = pendingEpubFragment; pendingEpubFragment = ''; scrollRichFragment(fragment);}
+      if (pendingRichLocateSegmentId !== null) {const targetId = pendingRichLocateSegmentId; pendingRichLocateSegmentId = null; scrollRichSegment(targetId);}
+    }
+  }).catch(() => {
+    if (revision === epubAssetRevision) {
+      epubAssetPending = false;
+      if (pendingEpubFragment) {const fragment = pendingEpubFragment; pendingEpubFragment = ''; scrollRichFragment(fragment);}
+      if (pendingRichLocateSegmentId !== null) {const targetId = pendingRichLocateSegmentId; pendingRichLocateSegmentId = null; scrollRichSegment(targetId);}
+    }
+  });
+}, {immediate: true});
+
 const richPreviewDocument = computed<ParsedDocument | null>(() => {
   const document = parsedDocument.value;
   if (!document) return null;
   if (document.binary?.kind === 'epub') {
     const chapter = currentEpubChapter.value;
-    return chapter ? parseDocument('chapter.html', chapter.source) : null;
+    return chapter ? parseDocument('chapter.html', epubResolvedHtml.value ?? chapter.source) : null;
   }
   return ['html', 'markdown', 'txt', 'tex'].includes(document.format) ? document : null;
 });
@@ -1565,24 +1978,32 @@ function buildRichPreview(): string {
     document,
     chapter ? translations.slice(chapter.segmentOffset, chapter.segmentOffset + chapter.segmentCount) : translations,
     effectivePreviewMode.value,
+    {
+      bilingualLayout: richBilingualLayout.value,
+      readingTheme: richReadingTheme.value,
+      fontFamily: richFontFamily.value,
+    },
   );
-  // 只为当前隔离阅读页补充固定主题规则；HTML 标签不区分大小写，并允许结束标签尾部空白，不改变原文件或导出内容。
-  return isDark.value ? html.replace(/<\/head\s*>/iu, `<style>
-    :root { color-scheme: dark; color: #e8edf7; background: #202632; }
-    h1,h2,h3,h4,h5,h6,.reader-source,.reader-translation,.fluentread-translation,[data-fluent-read-document-translation="true"] { color: #e8edf7; }
-    blockquote { color: #aab2c3; } a,.reader-link { color: #ff8bad; }
-    pre,code,.document-security-note { color: #e8edf7; background: #29303d; border-color: #434b5d; }
-    td,th { border-color: #434b5d; }
-    body[data-translating] article[data-reader-mode="bilingual"] .reader-unit:has(> .reader-source:only-child)::after { background-image: linear-gradient(90deg, #2c3442 25%, #384153 50%, #2c3442 75%); }
+  // 跟随界面且暗色时保留原有暗色阅读底色（#202632），同时覆写全部 --reader-* 语义变量，不改变原文件或导出内容。
+  return richReadingTheme.value === 'auto' && isDark.value ? html.replace(/<\/head\s*>/iu, `<style>
+    :root { color-scheme: dark; --reader-bg: #202632; --reader-ink: #e8edf7; --reader-source: #c3cede; --reader-muted: #9aa7bd; --reader-surface: #272f3d; --reader-code-bg: #1a202b; --reader-border: #364154; --reader-accent: #ff8bad; --reader-pending: #2f3848; color: var(--reader-ink); background: var(--reader-bg); }
+    html, body { background: var(--reader-bg); color: var(--reader-ink); }
+    h1,h2,h3,h4,h5,h6,.reader-source,.reader-translation,.fluentread-translation,[data-fluent-read-document-translation="true"] { color: var(--reader-ink); }
+    blockquote { color: var(--reader-muted); } a,.reader-link { color: var(--reader-accent); }
+    pre,code,.document-security-note { color: var(--reader-ink); background: var(--reader-surface); border-color: var(--reader-border); }
+    td,th { border-color: var(--reader-border); }
+    body[data-translating] article[data-reader-mode="bilingual"] .reader-unit.is-pending::after { background: var(--reader-pending); }
   </style></head>`) : html;
 }
 const richFrame = ref<HTMLIFrameElement | null>(null);
 const richFrameHtml = ref('');
+const activeRichHeadingIndex = ref(-1);
 type ReaderZoomPoint = {clientX: number; clientY: number};
 type ReaderZoomSurface = {content: HTMLElement; viewport: HTMLElement; xScroller: HTMLElement; yScroller: HTMLElement; document: Document; frame: boolean};
 let readerZoomDisposer: (() => void) | undefined;
 let loadedRichDocument: Document | null = null;
 let stopArticleReading: (() => void) | undefined;
+let stopRichFrameListeners: (() => void) | undefined;
 let readerZoomRevision = 0;
 
 /** 缩放只影响正文，工具栏和滚动视口保持原尺寸。 */
@@ -1673,15 +2094,99 @@ function focusNativeReader(event: PointerEvent): void {
   if (target?.closest('button,a,input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[data-fluent-read-ui]')) return;
   readingContent.value?.focus?.({preventScroll: true});
 }
+function scrollRichFragment(fragment: string): void {
+  const doc = richFrame.value?.contentDocument;
+  if (!doc || !fragment) return;
+  const target = doc.getElementById?.(fragment) ?? doc.getElementsByName?.(fragment)?.[0];
+  target?.scrollIntoView?.({block: 'start', behavior: 'smooth'});
+}
+
+function scrollRichSegment(segmentId: number): void {
+  const doc = richFrame.value?.contentDocument;
+  if (!doc) return;
+  const chapter = currentEpubChapter.value;
+  const localId = chapter ? segmentId - chapter.segmentOffset : segmentId;
+  doc.querySelector?.(`[data-segment-id="${localId}"]`)?.scrollIntoView?.({block: 'center', behavior: 'smooth'});
+}
+
 function handleRichFrameLoad(): void {
   stopArticleReading?.();
   stopArticleReading = undefined;
-  loadedRichDocument = richFrame.value?.contentDocument || null;
-  refreshRichPreview();
+  stopRichFrameListeners?.();
+  stopRichFrameListeners = undefined;
+  const frameDoc = richFrame.value?.contentDocument || null;
+  loadedRichDocument = frameDoc;
+  refreshRichPreview(true);
   bindReaderZoomGestures();
+  const frameWindow = richFrame.value?.contentWindow;
+  const cleanups: Array<() => void> = [];
+  if (frameWindow && typeof frameWindow.addEventListener === 'function') {
+    let active = true;
+    let scrollRaf = 0;
+    let scrollTimer: ReturnType<typeof setTimeout> | undefined;
+    const updateActiveHeading = () => {
+      scrollRaf = 0;
+      scrollTimer = undefined;
+      if (!active) return;
+      activeRichHeadingIndex.value = findActiveRichOutlineIndex(richFrame.value);
+    };
+    const onScroll = () => {
+      if (scrollRaf || scrollTimer !== undefined) return;
+      if (typeof requestAnimationFrame === 'function') scrollRaf = requestAnimationFrame(updateActiveHeading);
+      else scrollTimer = setTimeout(updateActiveHeading, 16);
+    };
+    frameWindow.addEventListener('scroll', onScroll, {passive: true});
+    cleanups.push(() => {
+      active = false;
+      frameWindow.removeEventListener('scroll', onScroll);
+      if (scrollRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(scrollRaf);
+      if (scrollTimer !== undefined) clearTimeout(scrollTimer);
+    });
+  }
+  if (isEpubDocument.value && frameDoc && typeof frameDoc.addEventListener === 'function') {
+    const onEpubLinkClick = (event: Event) => {
+      const target = (event.target as Element | null)?.closest?.('a[href]');
+      if (!target) return;
+      const href = target.getAttribute('href') || '';
+      if (!href) return;
+      if (href.startsWith('#')) {
+        event.preventDefault();
+        let decoded = href.slice(1);
+        try {decoded = decodeURIComponent(decoded);} catch { /* 保留原始锚点片段。 */ }
+        scrollRichFragment(decoded);
+        return;
+      }
+      const chapter = currentEpubChapter.value;
+      if (!chapter) return;
+      const resolved = resolveEpubRelativeHref(chapter.path, href);
+      if (!resolved) return;
+      event.preventDefault();
+      const targetIndex = epubChapters.value.findIndex(item => item.path === resolved.path || item.path.toLowerCase() === resolved.path.toLowerCase());
+      if (targetIndex < 0) return;
+      if (targetIndex === epubChapterIndex.value) {
+        if (resolved.fragment) scrollRichFragment(resolved.fragment);
+      } else {
+        pendingEpubFragment = resolved.fragment;
+        epubChapterIndex.value = targetIndex;
+      }
+    };
+    frameDoc.addEventListener('click', onEpubLinkClick);
+    cleanups.push(() => frameDoc.removeEventListener('click', onEpubLinkClick));
+  }
+  if (cleanups.length) stopRichFrameListeners = () => cleanups.forEach(fn => fn());
+  if (pendingEpubFragment) {
+    const fragment = pendingEpubFragment;
+    if (!epubAssetPending) pendingEpubFragment = '';
+    scrollRichFragment(fragment);
+  }
+  if (pendingRichLocateSegmentId !== null) {
+    const targetId = pendingRichLocateSegmentId;
+    if (!epubAssetPending) pendingRichLocateSegmentId = null;
+    scrollRichSegment(targetId);
+  }
   const id = activeTask.value?.historyId;
-  if (articleSourceUrl.value && id && loadedRichDocument) {
-    stopArticleReading = trackWebArticleReading(loadedRichDocument, id, history, url => {
+  if (articleSourceUrl.value && id && frameDoc) {
+    stopArticleReading = trackWebArticleReading(frameDoc, id, history, url => {
       void browser.tabs.create({url}).catch(() => {downloadNotice.value = translateLegacy('无法打开原网页');});
     });
   }
@@ -1693,49 +2198,94 @@ watch([parsedDocument, readerTab], ([document], [previousDocument]) => {
     loadedRichDocument = null;
     stopArticleReading?.();
     stopArticleReading = undefined;
+    stopRichFrameListeners?.();
+    stopRichFrameListeners = undefined;
+    activeRichHeadingIndex.value = -1;
   }
   const revision = readerZoomRevision;
   void nextTick().then(() => {if (revision === readerZoomRevision) bindReaderZoomGestures();});
 }, {flush: 'sync'});
-onUnmounted(clearReaderZoomGestures);
+onUnmounted(() => {
+  clearReaderZoomGestures();
+  stopRichFrameListeners?.();
+  stopRichFrameListeners = undefined;
+  revokeEpubAssets();
+});
 
 let richPreviewTimer: ReturnType<typeof setTimeout> | undefined;
-/** 译文或阅读方式变化时原位更新预览框，保留滚动位置；预览框不可访问时才整页重载。 */
-function refreshRichPreview(): void {
+const pendingRichSegmentIds = new Set<number>();
+/** 译文或阅读方式变化时原位更新预览框：流式译文优先按片段 ID 原位补丁，结构或模式切换再整页同步。 */
+function refreshRichPreview(forceFull = false): void {
   clearTimeout(richPreviewTimer);
   richPreviewTimer = undefined;
-  if (!richPreviewDocument.value) return;
+  const doc = richPreviewDocument.value;
+  if (!doc) return;
+  if (!forceFull && pendingRichSegmentIds.size > 0) {
+    const chapter = currentEpubChapter.value;
+    const rawTranslations = toRaw(translatedSegments.value);
+    const updates: Array<{id: number; source?: string; translation: string}> = [];
+    for (const globalId of pendingRichSegmentIds) {
+      if (chapter) {
+        if (globalId < chapter.segmentOffset || globalId >= chapter.segmentOffset + chapter.segmentCount) continue;
+        const localId = globalId - chapter.segmentOffset;
+        updates.push({id: localId, source: doc.segments[localId]?.source, translation: rawTranslations[globalId] || ''});
+      } else {
+        updates.push({id: globalId, source: doc.segments[globalId]?.source, translation: rawTranslations[globalId] || ''});
+      }
+    }
+    pendingRichSegmentIds.clear();
+    const format = parsedDocument.value?.format;
+    if (updates.length === 0) {
+      markRichPreviewBusy(richFrame.value, translating.value);
+      return;
+    }
+    if (patchRichPreviewSegments(richFrame.value, updates, {
+      mode: effectivePreviewMode.value,
+      format: format === 'markdown' || format === 'txt' || format === 'html' || format === 'epub' ? format : undefined,
+    })) {
+      markRichPreviewBusy(richFrame.value, translating.value);
+      return;
+    }
+  }
+  pendingRichSegmentIds.clear();
   const html = buildRichPreview();
   if (!syncRichPreview(richFrame.value, html)) {richFrameHtml.value = html; return;}
   applyRichReaderZoom();
   markRichPreviewBusy(richFrame.value, translating.value);
   richOutline.value = collectRichOutline(richFrame.value);
+  activeRichHeadingIndex.value = findActiveRichOutlineIndex(richFrame.value);
 }
 /** 翻译进行中逐段到达的译文按节流间隔刷新：先译完的先显示，不必等全文结束。 */
 function scheduleRichPreview(): void {
   if (richPreviewTimer !== undefined || !richPreviewDocument.value) return;
-  richPreviewTimer = setTimeout(refreshRichPreview, richPreviewInterval(richPreviewDocument.value.segments.length));
+  richPreviewTimer = setTimeout(() => refreshRichPreview(false), richPreviewInterval(richPreviewDocument.value.segments.length));
 }
-// 换文档、换章节或换主题时整页载入一次；之后的译文与阅读方式变化都原位更新。
-watch([richPreviewDocument, isDark], () => {
+// 换文档、换章节、换主题或阅读外观时整页载入一次；之后的译文与阅读方式变化都原位更新。
+watch([richPreviewDocument, isDark, richBilingualLayout, richReadingTheme, richFontFamily], () => {
   clearTimeout(richPreviewTimer);
   richPreviewTimer = undefined;
+  stopRichFrameListeners?.();
+  stopRichFrameListeners = undefined;
+  pendingRichSegmentIds.clear();
   richOutline.value = [];
+  activeRichHeadingIndex.value = -1;
   richFrameHtml.value = buildRichPreview();
 }, {immediate: true});
-watch([settledTranslations, effectivePreviewMode, translating], refreshRichPreview);
+watch([effectivePreviewMode, translating], () => refreshRichPreview(true));
+watch(settledTranslations, () => {
+  if (!translating.value) refreshRichPreview(true);
+});
 // 只有带目录的文档才有“目录”页；其余文档始终显示文件页，避免停在不存在的页签上。
-/** Word 文档的目录取自标题样式的段落；翻译停下后显示它们的译文。 */
+/** Word 文档的多级目录取自标题样式与大纲层级；翻译停下后显示它们的译文。 */
 const docxOutline = computed<RichOutlineItem[]>(() => {
   const document = parsedDocument.value;
   if (document?.binary?.kind !== 'docx') return [];
-  return document.binary.parts.flatMap(part => part.paragraphSegments).flatMap(({segmentIndex}) => {
-    const segment = document.segments[segmentIndex];
-    return segment?.role === 'title' || segment?.role === 'heading'
-      ? [{index: segmentIndex, level: segment.role === 'title' ? 1 : 2,
-        source: formatDocumentReaderText('docx', segment.source, segment.docxInline),
-        translation: formatDocumentReaderText('docx', settledTranslations.value[segmentIndex] || '', segment.docxInline)}] : [];
-  });
+  return buildDocxOutline(document.binary.parts, document.segments, settledTranslations.value).map(item => ({
+    index: item.segmentIndex,
+    level: item.level,
+    source: item.source,
+    translation: item.translation,
+  }));
 });
 const documentOutline = computed(() => isDocxDocument.value ? docxOutline.value : richOutline.value);
 /** 跳到目录项：富文本预览滚动到对应标题；Word 先切到标题所在的部分和分页，再滚动到该段落。 */
@@ -1745,7 +2295,7 @@ async function jumpOutline(item: RichOutlineItem): Promise<void> {
   if (partIndex < 0) return;
   docxPartIndex.value = partIndex;
   await nextTick();
-  readerPage.value = Math.floor(docxParts.value[partIndex].paragraphSegments.findIndex(paragraph => paragraph.segmentIndex === item.index) / READER_PAGE_SIZE) + 1;
+  readerPage.value = findDocxBlockPage(currentDocxAllBlocks.value, item.index, READER_PAGE_SIZE);
   await nextTick();
   window.document.querySelector?.(`.docx-paragraph[data-segment="${item.index}"]`)?.scrollIntoView({block: 'start', behavior: 'smooth'});
 }
@@ -1769,69 +2319,339 @@ async function reviewPdfOcrSource() {
   if (parsedDocument.value !== document) return;
   await materialPdfReader.value?.resumePage?.(page);
 }
+interface DocumentOutlineRow {
+  key: string;
+  level: number;
+  label: string;
+  title: string;
+  item?: RichOutlineItem;
+  chapter?: number;
+  fragment?: string;
+  isChapter?: boolean;
+  page?: number;
+  segmentId?: number;
+  coverage?: {completed: number; total: number};
+  current: boolean;
+}
+const jsonOutlineEntries = computed(() => isJsonDocument.value && parsedDocument.value && typeof buildJsonOutline === 'function'
+  ? buildJsonOutline(parsedDocument.value, settledTranslations.value, READER_PAGE_SIZE) : []);
+const subtitleTimelineBuckets = computed(() => isSubtitleDocument.value && parsedDocument.value && typeof buildSubtitleTimelineOutline === 'function'
+  ? buildSubtitleTimelineOutline(activeSegments.value, settledTranslations.value, {pageSize: READER_PAGE_SIZE}) : []);
+const outlineHasLanguageToggle = computed(() => isRichDocument.value || isDocxDocument.value);
+
 /**
- * 侧栏目录的行。ePub 列出全部章节，当前章节下面接着它的各级标题：章节多的书也能一眼看到位置并直接跳转，
- * 正文上方不再占一行章节按钮；其他格式就是文档自己的标题。
+ * 侧栏目录的行。ePub 列出全部章节（融合嵌套 TOC 层级与锚点），当前章节下接着各级标题；
+ * Markdown/HTML/DOCX 展示标题目录并高亮视口活跃项；JSON 展示命名空间目录，长字幕展示时间轴分段。
  */
-const outlineRows = computed(() => {
+const outlineRows = computed<DocumentOutlineRow[]>(() => {
   const label = (item: RichOutlineItem) => richOutlineLanguage.value === 'translated' && item.translation ? item.translation : item.source;
-  type Coverage = {completed: number; total: number};
-  const headings = (offset: number) => documentOutline.value.map(item => ({key: `h${item.index}`, level: item.level + offset, label: label(item), title: item.source, item, chapter: undefined as number | undefined, coverage: undefined as Coverage | undefined, current: false}));
+  const headings = (offset: number): DocumentOutlineRow[] => documentOutline.value.map(item => ({
+    key: `h${item.index}`, level: item.level + offset, label: label(item), title: item.source, item,
+    current: !isDocxDocument.value && activeRichHeadingIndex.value === item.index,
+  }));
+  if (isJsonDocument.value) {
+    return jsonOutlineEntries.value.map((entry, idx) => ({
+      key: `j${idx}-${entry.path}`, level: 1, label: entry.key, title: entry.path,
+      page: entry.page, segmentId: entry.startSegmentIndex,
+      coverage: !translating.value ? {completed: entry.completed, total: entry.total} : undefined,
+      current: readerPage.value === entry.page && idx === jsonOutlineEntries.value.findIndex(item => item.page === readerPage.value),
+    }));
+  }
+  if (isSubtitleDocument.value) {
+    if (subtitleTimelineBuckets.value.length <= 1) return [];
+    const activeIdx = subtitleTimelineBuckets.value.findIndex(item => item.page === readerPage.value);
+    return subtitleTimelineBuckets.value.map((bucket, idx) => ({
+      key: bucket.id, level: 1, label: bucket.label, title: bucket.label,
+      page: bucket.page, segmentId: bucket.firstSegmentId,
+      coverage: !translating.value ? {completed: bucket.completed, total: bucket.total} : undefined,
+      current: idx === activeIdx,
+    }));
+  }
   if (!isEpubDocument.value) return headings(0);
   const segments = parsedDocument.value!.segments, wanted = richOutlineLanguage.value === 'translated';
+  const tocByChapter = new Map<number, EpubTocItem[]>();
+  for (const tocItem of epubNestedToc.value) {
+    if (tocItem.chapterIndex < 0) continue;
+    const list = tocByChapter.get(tocItem.chapterIndex) ?? [];
+    list.push(tocItem);
+    tocByChapter.set(tocItem.chapterIndex, list);
+  }
   return epubChapters.value.flatMap((chapter, index) => {
     const current = index === epubChapterIndex.value;
-    // 章节名取自章内开头的标题；按译文显示时用那个标题的译文（翻译停下后），没有就仍显示原名。
-    const name = chapter.title.toLocaleLowerCase();
+    const tocEntries = tocByChapter.get(index) ?? [];
+    const primaryToc = tocEntries[0];
+    const displayTitle = primaryToc?.title || chapter.title;
+    const name = displayTitle.toLocaleLowerCase();
     const heading = segments.slice(chapter.segmentOffset, chapter.segmentOffset + Math.min(3, chapter.segmentCount)).find(segment => segment.source.toLocaleLowerCase().includes(name));
     const chapterSegments = segments.slice(chapter.segmentOffset, chapter.segmentOffset + chapter.segmentCount);
     const coverage = !translating.value && chapter.segmentCount > 0
-      ? {completed: chapterSegments.reduce((count, segment) => count + Number(Boolean(settledTranslations.value[segment.id]?.trim())), 0), total: chapter.segmentCount}
+      ? {completed: countCompletedTranslations(settledTranslations.value, chapterSegments), total: chapter.segmentCount}
       : undefined;
-    const row = {key: `c${index}`, level: 1, label: (wanted && heading && settledTranslations.value[heading.id]) || chapter.title, title: chapter.title, item: undefined as RichOutlineItem | undefined, chapter: index, coverage, current};
-    // 当前章节下面不重复列出作为章节名的那个标题。
-    return [row, ...(current ? headings(1).filter(entry => entry.title !== row.title && entry.title !== heading?.source) : [])];
+    const baseLevel = Math.max(1, primaryToc?.level ?? 1);
+    const row: DocumentOutlineRow = {
+      key: `c${index}`, level: baseLevel,
+      label: (wanted && heading && settledTranslations.value[heading.id]) || displayTitle,
+      title: displayTitle, chapter: index, fragment: primaryToc?.fragment || undefined,
+      isChapter: true, coverage, current,
+    };
+    const subTocRows: DocumentOutlineRow[] = tocEntries.slice(1).map((sub, subIdx) => ({
+      key: `c${index}-t${subIdx}`, level: Math.max(baseLevel + 1, sub.level ?? baseLevel + 1),
+      label: sub.title, title: sub.title, chapter: index, fragment: sub.fragment || undefined,
+      isChapter: false, current: false,
+    }));
+    const currentHeadings = current && !subTocRows.length
+      ? headings(baseLevel).filter(entry => entry.title !== row.title && entry.title !== heading?.source)
+      : [];
+    return [row, ...subTocRows, ...currentHeadings];
   });
 });
+
+function expandJsonAncestorsForSegment(segmentId: number): void {
+  const entries = parsedDocument.value?.jsonEntries;
+  const entry = entries?.find(item => item.segmentIndex === segmentId) ?? entries?.[segmentId];
+  if (!entry?.path) return;
+  const next = new Set(jsonExpandedPaths.value);
+  next.add('$');
+  for (let depth = 1; depth < entry.path.length; depth += 1) {
+    next.add(formatJsonPath(entry.path.slice(0, depth)));
+  }
+  jsonExpandedPaths.value = next;
+  const targetIndex = jsonTreeNodes.value.findIndex(node => node.segmentId === segmentId);
+  if (targetIndex >= jsonTreeVisibleLimit.value) jsonTreeVisibleLimit.value = targetIndex + 50;
+}
+
+async function activateOutlineRow(row: DocumentOutlineRow): Promise<void> {
+  if (window.matchMedia('(max-width: 760px)').matches) sidebarOpen.value = false;
+  if (row.item) {
+    await jumpOutline(row.item);
+    return;
+  }
+  if (row.chapter !== undefined) {
+    if (row.chapter === epubChapterIndex.value) {
+      if (row.fragment) scrollRichFragment(row.fragment);
+    } else {
+      pendingEpubFragment = row.fragment || '';
+      epubChapterIndex.value = row.chapter;
+    }
+    return;
+  }
+  if (row.page !== undefined) {
+    if (isJsonDocument.value && jsonViewMode.value === 'tree' && row.segmentId !== undefined) {
+      expandJsonAncestorsForSegment(row.segmentId);
+    } else {
+      readerPage.value = row.page;
+    }
+    await nextTick();
+    if (row.segmentId !== undefined) {
+      window.document.querySelector?.(`[data-segment="${row.segmentId}"]`)?.scrollIntoView?.({block: 'start', behavior: 'smooth'});
+    }
+  }
+}
+
 const hasOutline = computed(() => isPdfDocument.value || outlineRows.value.length > 0);
 const activeSidebarTab = computed(() => hasOutline.value ? sidebarTab.value : 'files');
 onUnmounted(() => clearTimeout(richPreviewTimer));
+
 const docxParts = computed(() => parsedDocument.value?.binary?.kind === 'docx'
   ? parsedDocument.value.binary.parts
   : []);
 const currentDocxPart = computed(() => docxParts.value[docxPartIndex.value]);
-const currentDocxRows = computed(() => {
-  const document = parsedDocument.value;
-  const part = currentDocxPart.value;
-  if (!document || !part) return [];
-  return pageRows(part.paragraphSegments).map(({segmentIndex, table}) => {
-    const segment = document.segments[segmentIndex];
+const currentDocxPartMeta = shallowRef<DocxPartMetadata | null>(null);
+let docxMetaGeneration = 0;
+watch([parsedDocument, currentDocxPart], ([doc, part]) => {
+  const generation = ++docxMetaGeneration;
+  currentDocxPartMeta.value = null;
+  if (!doc || doc.binary?.kind !== 'docx' || !part || typeof loadDocxPartMetadata !== 'function') return;
+  void loadDocxPartMetadata(doc.binary.bytes, part.path).then(meta => {
+    if (generation !== docxMetaGeneration || disposed || parsedDocument.value !== doc || currentDocxPart.value !== part) return;
+    currentDocxPartMeta.value = meta;
+  }).catch(() => {});
+}, {immediate: true});
+const currentDocxAllBlocks = computed(() => isDocxDocument.value && readerTab.value === 'read' && parsedDocument.value && currentDocxPart.value && typeof buildDocxRichBlocks === 'function'
+  ? buildDocxRichBlocks(currentDocxPart.value, parsedDocument.value.segments, translatedSegments.value, currentDocxPartMeta.value ?? undefined) : []);
+const currentDocxPaginated = computed(() => typeof paginateDocxBlocks === 'function'
+  ? paginateDocxBlocks(currentDocxAllBlocks.value, readerPage.value, READER_PAGE_SIZE)
+  : {page: 1, pageSize: READER_PAGE_SIZE, totalPages: 1, totalBlocks: 0, blocks: [], pageRanges: []});
+const docxParagraphShowsSource = (paragraph: DocxRichParagraph) => effectivePreviewMode.value !== 'translated' || Boolean(paragraph.translationText && !paragraph.hasDistinctTranslation);
+const docxParagraphShowsTranslation = (paragraph: DocxRichParagraph) => effectivePreviewMode.value !== 'source' && (!paragraph.translationText || paragraph.hasDistinctTranslation);
+function docxRunClasses(run: DocxInlineRun): Record<string, boolean> {
+  return {
+    'docx-run-bold': Boolean(run.bold),
+    'docx-run-italic': Boolean(run.italic),
+    'docx-run-underline': Boolean(run.underline),
+    'docx-run-strike': Boolean(run.strike),
+    'docx-run-code': Boolean(run.code),
+  };
+}
+
+const delimitedGrid = computed(() => parsedDocument.value?.delimitedColumns && delimitedViewMode.value === 'grid' && readerTab.value === 'read' && typeof buildDelimitedGrid === 'function'
+  ? buildDelimitedGrid(parsedDocument.value, translatedSegments.value, {selectedColumns: selectedDelimitedColumns.value}) : null);
+const delimitedPaginated = computed(() => delimitedGrid.value && typeof paginateDelimitedRows === 'function'
+  ? paginateDelimitedRows(delimitedGrid.value, readerPage.value, DELIMITED_PAGE_SIZE) : null);
+const delimitedVisibleRows = computed(() => {
+  const grid = delimitedGrid.value, paged = delimitedPaginated.value;
+  if (!grid || !paged) return [];
+  return paged.page === 1 && grid.headerRow ? [grid.headerRow, ...paged.rows] : paged.rows;
+});
+function delimitedCellCoord(cell: DelimitedGridCell): string {
+  return `R${cell.row + 1}C${cell.column + 1}`;
+}
+function delimitedCellShowsSource(cell: DelimitedGridCell): boolean {
+  return effectivePreviewMode.value !== 'translated' || Boolean(cell.translation && !hasDistinctTranslation(cell.raw, cell.translation));
+}
+function delimitedCellShowsTranslation(cell: DelimitedGridCell): boolean {
+  return effectivePreviewMode.value !== 'source' && (!cell.translation || hasDistinctTranslation(cell.raw, cell.translation));
+}
+function toggleDelimitedColumn(columnIndex: number): void {
+  const current = selectedDelimitedColumns.value;
+  if (current.includes(columnIndex)) {
+    if (current.length <= 1) return;
+    updateDelimitedColumns(current.filter(index => index !== columnIndex));
+  } else {
+    updateDelimitedColumns([...current, columnIndex]);
+  }
+}
+
+const jsonGrouped = computed(() => isJsonDocument.value && jsonViewMode.value === 'table' && readerTab.value === 'read' && parsedDocument.value
+  ? buildJsonGroupedRows(parsedDocument.value, translatedSegments.value, readerPage.value, READER_PAGE_SIZE) : null);
+const jsonTreeNodes = computed(() => isJsonDocument.value && jsonViewMode.value === 'tree' && readerTab.value === 'read' && parsedDocument.value
+  ? buildJsonTreeNodes(parsedDocument.value, translatedSegments.value, jsonExpandedPaths.value) : []);
+const visibleJsonTreeNodes = computed(() => jsonTreeNodes.value.slice(0, jsonTreeVisibleLimit.value));
+function toggleJsonTreePath(path: string): void {
+  const next = new Set(jsonExpandedPaths.value);
+  if (next.has(path)) next.delete(path);
+  else next.add(path);
+  jsonExpandedPaths.value = next;
+}
+watch(parsedDocument, document => {
+  jsonTreeVisibleLimit.value = 200;
+  if (document?.format !== 'json' || document.jsonValue === undefined) {
+    jsonExpandedPaths.value = new Set(['$']);
+    return;
+  }
+  const expanded = new Set<string>(['$']);
+  if (document.jsonValue && typeof document.jsonValue === 'object' && !Array.isArray(document.jsonValue)) {
+    for (const key of Object.keys(document.jsonValue as Record<string, unknown>).slice(0, 10)) {
+      expanded.add(/^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(key) ? `$.${key}` : `$[${JSON.stringify(key)}]`);
+    }
+  }
+  jsonExpandedPaths.value = expanded;
+}, {immediate: true});
+
+const subtitleMetadata = computed(() => isSubtitleDocument.value && parsedDocument.value
+  ? extractSubtitleMetadata(parsedDocument.value) : null);
+const subtitleLrcMeta = computed(() => {
+  const lrc = subtitleMetadata.value?.lrc;
+  return lrc && (lrc.title || lrc.artist || lrc.album) ? lrc : null;
+});
+const subtitleRows = computed(() => previewRows.value);
+const subtitleDisplayRows = computed(() => {
+  const format = parsedDocument.value?.format;
+  const cues = subtitleMetadata.value?.cues;
+  return subtitleRows.value.map(row => {
+    const plainSource = readerText(row.source);
+    const plainTranslation = row.translation ? readerText(row.translation) : '';
+    const distinct = Boolean(plainTranslation) && hasDistinctTranslation(plainSource, plainTranslation);
+    const showSource = effectivePreviewMode.value !== 'translated' || (Boolean(plainTranslation) && !distinct);
+    const showTranslation = effectivePreviewMode.value !== 'source' && (!plainTranslation || distinct);
+    const metrics = formatSubtitleDuration(row.timeStart, row.timeEnd, plainSource);
+    const sourceRich = parseSubtitleRichText(format, row.source);
+    const translationRich = distinct ? parseSubtitleRichText(format, row.translation) : {runs: []};
+    const cueMeta = cues?.get(row.index);
     return {
-      index: segmentIndex,
-      source: formatDocumentReaderText('docx', segment?.source || '', segment?.docxInline),
-      role: segment?.role,
-      translation: formatDocumentReaderText('docx', translatedSegments.value[segmentIndex] || '', segment?.docxInline),
-      table,
+      ...row,
+      showSource,
+      showTranslation,
+      durationLabel: metrics.durationLabel,
+      speaker: cueMeta?.actor || sourceRich.speaker || '',
+      style: cueMeta?.style || '',
+      sourceRuns: sourceRich.runs.length ? sourceRich.runs : [{text: plainSource}],
+      translationRuns: translationRich.runs.length ? translationRich.runs : (distinct ? [{text: plainTranslation}] : []),
     };
   });
 });
-type DocxRow = (typeof currentDocxRows.value)[number];
-/** 相同译文只显示原文；只看译文时，没有不同译文的段落仍显示原文。 */
-const docxShowsSource = (row: DocxRow) => effectivePreviewMode.value !== 'translated' || Boolean(row.translation && !hasDistinctTranslation(row.source, row.translation));
-const docxShowsTranslation = (row: DocxRow) => effectivePreviewMode.value !== 'source' && (!row.translation || hasDistinctTranslation(row.source, row.translation));
-/** 把连续属于同一张表格的段落收成“行 → 单元格 → 段落”，其余段落各自成块；阅读视图里表格仍是表格。 */
-const currentDocxBlocks = computed(() => {
-  const blocks: Array<{key: string; row: DocxRow; table?: DocxRow[][][]; id?: number}> = [];
-  for (const row of currentDocxRows.value) {
-    const place = row.table, last = blocks.at(-1);
-    if (!place) {blocks.push({key: `p${row.index}`, row}); continue;}
-    const block = last?.table && last.id === place.table ? last : blocks[blocks.push({key: `t${row.index}`, row, table: [], id: place.table}) - 1];
-    ((block.table![place.row] ??= [])[place.cell] ??= []).push(row);
+
+function editSegmentInProofread(segmentId: number): void {
+  editorFocusSegmentId.value = segmentId;
+  readerTab.value = 'edit';
+}
+
+async function locateSegmentInReader(segmentId: number): Promise<void> {
+  const doc = parsedDocument.value;
+  if (!doc) return;
+  readerTab.value = 'read';
+  editorFocusSegmentId.value = null;
+  await nextTick();
+  if (isPdfDocument.value) {
+    const pageEntry = doc.binary?.kind === 'pdf'
+      ? doc.binary.pages.find(page => page.segmentIndexes.includes(segmentId))
+      : undefined;
+    if (typeof materialPdfReader.value?.resumeLocation === 'function') {
+      const ok = await materialPdfReader.value.resumeLocation(segmentId);
+      if (ok) return;
+    }
+    if (pageEntry) await materialPdfReader.value?.resumePage?.(pageEntry.pageNumber);
+    return;
   }
-  // 分页或空单元格会留下空位：补成空单元格、去掉空行，表格的列才能对齐。
-  for (const block of blocks) if (block.table) block.table = block.table.filter(Boolean).map(cells => Array.from(cells, cell => cell ?? []));
-  return blocks;
-});
+  if (isEpubDocument.value) {
+    const targetChapter = epubChapters.value.findIndex(chapter => segmentId >= chapter.segmentOffset && segmentId < chapter.segmentOffset + chapter.segmentCount);
+    if (targetChapter < 0) return;
+    if (targetChapter === epubChapterIndex.value) {
+      scrollRichSegment(segmentId);
+    } else {
+      pendingRichLocateSegmentId = segmentId;
+      epubChapterIndex.value = targetChapter;
+    }
+    return;
+  }
+  if (isRichDocument.value) {
+    scrollRichSegment(segmentId);
+    return;
+  }
+  if (isDocxDocument.value) {
+    const partIndex = docxParts.value.findIndex(part => part.paragraphSegments.some(item => item.segmentIndex === segmentId));
+    if (partIndex >= 0) {
+      docxPartIndex.value = partIndex;
+      await nextTick();
+      readerPage.value = findDocxBlockPage(currentDocxAllBlocks.value, segmentId, READER_PAGE_SIZE);
+      await nextTick();
+      window.document.querySelector?.(`.docx-paragraph[data-segment="${segmentId}"]`)?.scrollIntoView?.({block: 'center', behavior: 'smooth'});
+    }
+    return;
+  }
+  if (isXlsxDocument.value) {
+    const sheetIndex = xlsxSheets.value.findIndex(sheet => sheet.cellSegments.some(item => item.segmentIndex === segmentId));
+    if (sheetIndex >= 0) {
+      xlsxSheetIndex.value = sheetIndex;
+      await nextTick();
+      const cellIdx = xlsxSheets.value[sheetIndex].cellSegments.findIndex(item => item.segmentIndex === segmentId);
+      readerPage.value = cellIdx >= 0 ? Math.floor(cellIdx / READER_PAGE_SIZE) + 1 : 1;
+      await nextTick();
+      window.document.querySelector?.(`[data-segment="${segmentId}"]`)?.scrollIntoView?.({block: 'center', behavior: 'smooth'});
+    }
+    return;
+  }
+  if (doc.delimitedColumns && delimitedViewMode.value === 'grid' && delimitedGrid.value) {
+    const rowIdx = delimitedGrid.value.rows.findIndex(row => row.cells.some(cell => cell.segmentId === segmentId));
+    readerPage.value = rowIdx >= 0 ? Math.floor(rowIdx / DELIMITED_PAGE_SIZE) + 1 : 1;
+    await nextTick();
+    window.document.querySelector?.(`[data-segment="${segmentId}"]`)?.scrollIntoView?.({block: 'center', behavior: 'smooth'});
+    return;
+  }
+  if (isJsonDocument.value && jsonViewMode.value === 'tree') {
+    expandJsonAncestorsForSegment(segmentId);
+    await nextTick();
+    window.document.querySelector?.(`[data-segment="${segmentId}"]`)?.scrollIntoView?.({block: 'center', behavior: 'smooth'});
+    return;
+  }
+  const activeIdx = activeSegments.value.findIndex(segment => segment.id === segmentId);
+  if (activeIdx >= 0) {
+    readerPage.value = Math.floor(activeIdx / READER_PAGE_SIZE) + 1;
+    await nextTick();
+    window.document.querySelector?.(`[data-segment="${segmentId}"]`)?.scrollIntoView?.({block: 'center', behavior: 'smooth'});
+  }
+}
+
 const xlsxSheets = computed(() => parsedDocument.value?.binary?.kind === 'xlsx'
   ? parsedDocument.value.binary.sheets
   : []);
@@ -1850,9 +2670,19 @@ const currentXlsxRows = computed(() => {
     };
   });
 });
-const subtitleRows = computed(() => previewRows.value);
+
 const emptyReaderHint = computed(() => isPdfDocument.value ? t(parsedDocument.value?.segments.length ? 'document.pdfReading.startHint' : 'document.pdfReading.selectableSource') : getDocumentEmptyReaderHint(parsedDocument.value));
-const readerPageCount = computed(() => isPdfDocument.value || isRichDocument.value ? 1 : Math.max(1, Math.ceil((isDocxDocument.value ? currentDocxPart.value?.paragraphSegments.length || 0 : isXlsxDocument.value ? currentXlsxSheet.value?.cellSegments.length || 0 : activeSegments.value.length) / READER_PAGE_SIZE)));
+const readerPageCount = computed(() => {
+  if (isPdfDocument.value || isRichDocument.value) return 1;
+  if (isDocxDocument.value) return currentDocxPaginated.value.totalPages;
+  if (isXlsxDocument.value) return Math.max(1, Math.ceil((currentXlsxSheet.value?.cellSegments.length || 0) / READER_PAGE_SIZE));
+  if (parsedDocument.value?.delimitedColumns && delimitedViewMode.value === 'grid') return delimitedPaginated.value?.totalPages ?? 1;
+  if (isJsonDocument.value && jsonViewMode.value === 'tree') return 1;
+  return Math.max(1, Math.ceil(activeSegments.value.length / READER_PAGE_SIZE));
+});
+watch(readerPageCount, count => {
+  if (readerPage.value > count) readerPage.value = count;
+});
 
 const pdfSegmentPages = computed(() => {
   const binary = parsedDocument.value?.binary;
@@ -1912,7 +2742,14 @@ function readerText(value: string): string {
 }
 
 function applyTheme(): void {
-  isDark.value = colorSchemeMedia.matches;
+  systemDark.value = colorSchemeMedia.matches;
+}
+
+function handleDropZoneClick(event: MouseEvent): void {
+  if (queueBusy.value) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest?.('button, a, input, label')) return;
+  openFilePicker();
 }
 
 const configEditor = useConfigEditor({
@@ -2004,8 +2841,15 @@ function handleDrop(event: DragEvent): void {
 }
 
 function resetDocument(): void {
+  const hadDocument = Boolean(parsedDocument.value);
+  pendingEpubFragment = '';
+  pendingRichLocateSegmentId = null;
+  discardPendingTranslationBatch();
   stopArticleReading?.();
   stopArticleReading = undefined;
+  stopRichFrameListeners?.();
+  stopRichFrameListeners = undefined;
+  revokeEpubAssets();
   persistHistory();
   documentAIContextOverride.value = null;
   requestEvidence.value = null;
@@ -2039,6 +2883,7 @@ function resetDocument(): void {
   epubChapterIndex.value = 0;
   docxPartIndex.value = 0;
   xlsxSheetIndex.value = 0;
+  if (hadDocument && historyAvailable && !disposed) void refreshHistory();
 }
 
 function changeDocument(): void {
@@ -2197,7 +3042,60 @@ function clearConfirmation(): void {
   pendingRemoval = null;
 }
 
+let pendingTranslationBatch: DocumentTranslationUpdate[] = [];
+let pendingTranslationById = new Map<number, string>();
+let translationFlushQueued = false;
+let translationBatchOwnerId: number | null = null;
+let translationBatchRequestId = 0;
+
+function discardPendingTranslationBatch(): void {
+  pendingTranslationBatch = [];
+  pendingTranslationById.clear();
+  pendingRichSegmentIds.clear();
+  translationFlushQueued = false;
+  translationBatchOwnerId = null;
+  translationBatchRequestId = 0;
+}
+
+function flushTranslationBatch(): void {
+  translationFlushQueued = false;
+  if (disposed || !pendingTranslationBatch.length) return;
+  const ownerId = translationBatchOwnerId;
+  const batchRequestId = translationBatchRequestId;
+  const batch = pendingTranslationBatch;
+  pendingTranslationBatch = [];
+  pendingTranslationById.clear();
+  translationBatchOwnerId = null;
+  translationBatchRequestId = 0;
+  if ((ownerId !== null && ownerId !== activeDocumentId.value) || (batchRequestId !== 0 && batchRequestId !== translationRequestId)) return;
+  setDocumentTranslationBatch(batch);
+  scheduleHistorySave();
+  scheduleRichPreview();
+}
+
+function enqueueTranslationSegment(id: number, translation: string, requestId: number): void {
+  const ownerId = activeDocumentId.value;
+  if ((translationBatchOwnerId !== null && translationBatchOwnerId !== ownerId) || (translationBatchRequestId !== 0 && translationBatchRequestId !== requestId)) {
+    discardPendingTranslationBatch();
+  }
+  translationBatchOwnerId = ownerId;
+  translationBatchRequestId = requestId;
+  const previous = pendingTranslationById.has(id)
+    ? pendingTranslationById.get(id)!
+    : (toRaw(translatedSegments.value)[id] ?? '');
+  liveCompletedSegments.value += Number(Boolean(translation.trim())) - Number(Boolean(previous.trim()));
+  pendingTranslationById.set(id, translation);
+  pendingTranslationBatch.push({id, translation});
+  if (richPreviewDocument.value) pendingRichSegmentIds.add(id);
+  editRevision.value += 1;
+  if (!translationFlushQueued) {
+    translationFlushQueued = true;
+    queueMicrotask(flushTranslationBatch);
+  }
+}
+
 function pauseTranslation(): void {
+  flushTranslationBatch();
   retryNotice.value = '';
   retryWaiting.value = 0;
   recognitionProgress.value = '';
@@ -2325,61 +3223,11 @@ async function startTranslation(restart = false, glossaryTask?: GlossaryRetransl
       },
       onRequestPrepared: ({segments, discourseContext}) => {
         if (requestId !== translationRequestId || parsedDocument.value !== current || controller.signal.aborted) return;
-        const kinds: readonly DocumentRequestEvidenceKind[] = ['definition', 'nearby', 'section_opening', 'previous_machine', 'user_confirmed'];
-        let section = segments.find(segment => segment.contextLabel?.trim())?.contextLabel?.slice(0, 160) ?? '';
-        let positions = [...new Set(segments.map(segment => [segment.contextLabel, segment.pathLabel, segment.timeStart, `段落 ${segment.id + 1}`]
-          .filter(Boolean).join(' · ')))].slice(0, 8);
-        let contextItems: DocumentRequestEvidenceItem[] = [];
-        if (discourseContext) {
-          try {
-            const parsed: unknown = JSON.parse(discourseContext);
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              const record = parsed as Record<string, unknown>;
-              if (record.version === 1) {
-                if (!section && typeof record.section === 'string' && !/^(?:document|section:\d+)$/u.test(record.section)) section = record.section.slice(0, 160);
-                const rawPositions = Array.isArray(record.positions) ? record.positions : [record.position];
-                positions = [...new Set([...positions, ...rawPositions.filter((position): position is string => typeof position === 'string' && Boolean(position.trim())).map(position => position.slice(0, 160))])].slice(0, 8);
-                if (Array.isArray(record.evidence)) {
-                  contextItems = record.evidence.flatMap((value): DocumentRequestEvidenceItem[] => {
-                    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
-                    const item = value as Record<string, unknown>;
-                    if (!kinds.includes(item.kind as DocumentRequestEvidenceKind)
-                      || typeof item.blockId !== 'string' || typeof item.section !== 'string' || typeof item.position !== 'string'
-                      || typeof item.source !== 'string' || !item.source.trim()
-                      || (item.translation !== undefined && typeof item.translation !== 'string')) return [];
-                    return [{kind: item.kind as DocumentRequestEvidenceKind, blockId: item.blockId.slice(0, 160),
-                      section: item.section.slice(0, 160), position: item.position.slice(0, 160), source: item.source.slice(0, 480),
-                      ...(typeof item.translation === 'string' && item.translation ? {translation: item.translation.slice(0, 480)} : {})}];
-                  }).slice(0, 8);
-                }
-              }
-            }
-          } catch { /* 不显示无法核对的上下文协议 */ }
-        }
-
-        const glossaryContext = {text: segments.map(segment => segment.source), sourceLanguage: settings.sourceLanguage || '',
-          targetLanguage: settings.targetLanguage || '', pageUrl: undefined, glossaryIds};
-        const glossaryTerms = glossaryEnabled && glossarySupported
-          ? resolveGlossaryEntries(glossaryLibraries, glossaryContext).terms.flatMap(term => {
-            const library = glossaryLibraries.find(candidate => getGlossaryScopeReason(candidate, glossaryContext) === 'eligible'
-              && candidate.entries.some(entry => entry.source === term.source && entry.target === term.target && entry.caseSensitive === term.caseSensitive));
-            return library ? [{...term, library: library.name}] : [];
-          }) : [];
-        const matchedTerms = new Map<string, DocumentRequestGlossaryTerm>();
-        let glossaryOccurrences = 0;
-        for (const segment of segments) {
-          for (const {entry} of findGlossaryMatches(segment.source.normalize('NFC'), glossaryTerms)) {
-            const key = JSON.stringify([entry.library, entry.source, entry.target]);
-            const existing = matchedTerms.get(key);
-            if (existing) existing.occurrences += 1;
-            else matchedTerms.set(key, {library: entry.library, source: entry.source, target: entry.target, occurrences: 1});
-            glossaryOccurrences += 1;
-          }
-        }
-        const allGlossaryTerms = [...matchedTerms.values()].sort((left, right) => right.occurrences - left.occurrences || left.source.localeCompare(right.source));
-        requestEvidence.value = {segmentCount: segments.length, contextEnabled: settings.enableAIContext, section, positions, contextItems,
-          glossaryOccurrences, glossaryTermCount: matchedTerms.size, glossaryLibraryCount: new Set(allGlossaryTerms.map(term => term.library)).size,
-          glossaryTerms: allGlossaryTerms.slice(0, 8), omittedGlossaryTerms: Math.max(0, allGlossaryTerms.length - 8)};
+        rawRequestEvidence.value = {
+          segments, discourseContext, enableAIContext: settings.enableAIContext,
+          sourceLanguage: settings.sourceLanguage || '', targetLanguage: settings.targetLanguage || '',
+          glossaryIds, glossaryEnabled, glossarySupported, glossaryLibraries,
+        };
       },
       // 默认合并多段，使用 feature 的有界批量与并发；开关只作用于当前文档。
       prioritize: prioritizeReadingPosition,
@@ -2392,13 +3240,10 @@ async function startTranslation(restart = false, glossaryTask?: GlossaryRetransl
           confirmedTranslationIds.value = confirmedTranslationIds.value.filter(confirmed => confirmed !== id);
         }
         if (!retryWaiting.value) retryNotice.value = '';
-        liveCompletedSegments.value += Number(Boolean(translation.trim())) - Number(Boolean(translatedSegments.value[id]?.trim()));
-        translatedSegments.value[id] = translation;
-        editRevision.value += 1;
-        scheduleHistorySave();
-        scheduleRichPreview();
+        enqueueTranslationSegment(id, translation, requestId);
       },
     });
+    flushTranslationBatch();
     if (glossaryTask && !glossaryTask.pending.size && requestId === translationRequestId && parsedDocument.value === current) {
       taskFingerprint.value = glossaryTask.fingerprint;
       glossaryRetranslation.value = null;
@@ -2406,6 +3251,7 @@ async function startTranslation(restart = false, glossaryTask?: GlossaryRetransl
       editRevision.value += 1;
     }
   } catch (error) {
+    flushTranslationBatch();
     if (requestId !== translationRequestId || parsedDocument.value !== document) return;
     if (error instanceof TranslationRequestError && error.code === 'TRANSLATION_DISABLED') {
       pauseTranslation();
@@ -2415,6 +3261,7 @@ async function startTranslation(restart = false, glossaryTask?: GlossaryRetransl
     showError(error instanceof Error ? error.message : String(error));
   } finally {
     if (requestId === translationRequestId) {
+      flushTranslationBatch();
       activeGlossaryRetranslation = null;
       translating.value = false;
       retryNotice.value = '';
@@ -2503,7 +3350,8 @@ async function rerecognizePdfPage(): Promise<void> {
 function editSegment(index: number, value: string): void {
   if (queueBusy.value || !activeSegments.value.some(segment => segment.id === index)) return;
   if (!taskFingerprint.value) taskFingerprint.value = currentFingerprint.value;
-  translatedSegments.value[index] = value;
+  setDocumentTranslationBatch([{id: index, translation: value}]);
+  if (richPreviewDocument.value) pendingRichSegmentIds.add(index);
   confirmedTranslationIds.value = confirmedTranslationIds.value.filter(id => id !== index);
   if (value.trim()) confirmedTranslationIds.value.push(index);
   editRevision.value += 1;
@@ -2655,6 +3503,7 @@ onUnmounted(() => {
   recognitionWorkflow.dispose();
   exportWorkflow.dispose();
   resetDocument();
+  window.document?.documentElement?.classList?.remove('dark');
   colorSchemeMedia.removeEventListener?.('change', applyTheme);
   window.removeEventListener('pagehide', resetDocument);
   window.removeEventListener('beforeunload', guardBeforeUnload);

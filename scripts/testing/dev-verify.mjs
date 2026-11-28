@@ -70,7 +70,8 @@ export function buildSteps(options, artifactsDir) {
         {id: 'affected', label: '受影响测试与改动覆盖', command: process.execPath, args: affectedArgs},
     ];
     if (options.compile) {
-        steps.push({id: 'compile', label: 'TypeScript/Vue 增量类型检查', command: 'pnpm', args: ['compile']});
+        const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+        steps.push({id: 'compile', label: 'TypeScript/Vue 增量类型检查', command: pnpmCommand, args: ['compile']});
     }
     return steps;
 }
@@ -84,7 +85,7 @@ function runCaptured(step, cwd, logPath) {
         const append = chunk => {
             const text = chunk.toString('utf8');
             stream.write(text);
-            tail = (tail + text).slice(-6000);
+            tail = (tail + text).slice(-12000);
         };
         child.stdout.on('data', append);
         child.stderr.on('data', append);
@@ -109,10 +110,34 @@ function runCaptured(step, cwd, logPath) {
     });
 }
 
-function failureExcerpt(tail, maxLines = 18) {
+const GENERAL_FAILURE_LINE = /(?:FAIL|AssertionError|Error:|✗|缺口|退出码|TS\d{4}|重复测试名|未归类|缺少导出|多余声明|禁止提交|覆盖率忽略|已归类但文件不存在|同时出现在|缺少 skip:)/u;
+const COVERAGE_GAP_LINE = /^(?:覆盖率产物：|文件：.+未达 100%|门禁：|\s*语句\s+\d+\/\d+\s+分支\s+|\s*\[\d+\]\s+\S+:\d+|\s*\d+\s*│|\s*…还有\s+\d+\s+处)/u;
+const COVERAGE_GAP_START = /(?:\[affected-tests\]\s*严格覆盖率缺口|^覆盖率产物：)/u;
+
+export function failureExcerpt(tail, maxLines = 35) {
     const lines = tail.split(/\r?\n/u).map(line => line.trimEnd()).filter(Boolean);
-    const interesting = lines.filter(line => /(?:FAIL|AssertionError|Error:|✗|缺口|退出码|TS\d{4}|重复测试名|未归类)/u.test(line));
-    const chosen = interesting.length ? interesting.slice(0, maxLines) : lines.slice(-maxLines);
+    const interesting = lines.filter(line => GENERAL_FAILURE_LINE.test(line) || COVERAGE_GAP_LINE.test(line));
+    let chosen;
+    if (!interesting.length) {
+        chosen = lines.slice(-maxLines);
+    } else if (interesting.length <= maxLines) {
+        chosen = interesting;
+    } else {
+        const gapStartIndex = interesting.findIndex(line => COVERAGE_GAP_START.test(line));
+        const firstMetricGapIndex = interesting.findIndex(line => /^\s*语句\s+\d+\/\d+\s+分支\s+/u.test(line));
+        const blockStart = gapStartIndex >= 0
+            ? gapStartIndex
+            : (firstMetricGapIndex > 0 && interesting[firstMetricGapIndex - 1].startsWith('✗ ')
+                ? firstMetricGapIndex - 1
+                : firstMetricGapIndex);
+        if (blockStart > 0) {
+            const headBudget = Math.min(blockStart, Math.max(4, Math.floor(maxLines / 3)));
+            const gapBudget = Math.max(0, maxLines - headBudget);
+            chosen = [...interesting.slice(0, headBudget), ...interesting.slice(blockStart, blockStart + gapBudget)];
+        } else {
+            chosen = interesting.slice(0, maxLines);
+        }
+    }
     return chosen.map(line => (line.length > 160 ? `${line.slice(0, 157)}...` : line));
 }
 

@@ -18,13 +18,39 @@ import {
 } from '@/src/core/i18n';
 import {
     EXTENSION_I18N_BASE_CACHE,
+    EXTENSION_I18N_BASE_REVISION,
     getRemoteLanguageBaseUrls,
     isDeltaUiLanguageBundle,
     mergeDeltaUiLanguageBundle,
+    REMOTE_LANGUAGE_BASE_ASSETS,
     type DeltaUiLanguageBundle,
+    type RemoteDeltaUiLanguage,
 } from '@/src/core/i18n/remoteLanguagePacks';
 import {detectPreferredMirrorLocale} from '@/src/core/assets/mirrors';
 import {fetchVerifiedAsset} from '@/src/platform/assets/verifiedAssetCache';
+
+export const UI_LANGUAGE_BASE_MESSAGE_TYPE = 'loadUiLanguageBase' as const;
+
+export interface UiLanguageBaseRequest {
+    readonly type: typeof UI_LANGUAGE_BASE_MESSAGE_TYPE;
+    readonly language: RemoteDeltaUiLanguage;
+}
+
+export type UiLanguageBaseResponse =
+    | {readonly success: true; readonly bundle: UiLanguageBundle}
+    | {readonly success: false; readonly error?: string};
+
+const EXTENSION_ORIGIN_PROTOCOLS = new Set(['chrome-extension:', 'moz-extension:', 'safari-web-extension:']);
+const pinnedBaseMemoryCache = new Map<RemoteDeltaUiLanguage, UiLanguageBundle>();
+
+export function isExtensionOriginContext(protocol = globalThis.location?.protocol): boolean {
+    return typeof protocol === 'string' && EXTENSION_ORIGIN_PROTOCOLS.has(protocol);
+}
+
+/** 仅供测试清理后台内存中的远程语言基线缓存。 */
+export function clearPinnedRemoteUiLanguageBaseCache(): void {
+    pinnedBaseMemoryCache.clear();
+}
 
 interface BundleResponse {
     readonly ok: boolean;
@@ -61,20 +87,62 @@ export function isUiLanguageBundle(value: unknown): value is UiLanguageBundle {
         && isLegacyPatternList(value.legacyPatterns.late);
 }
 
-async function defaultLoadRemoteBase(delta: DeltaUiLanguageBundle): Promise<UiLanguageBundle> {
+async function loadVerifiedRemoteBase(
+    spec: Pick<DeltaUiLanguageBundle, 'language' | 'baseRevision' | 'basePath' | 'baseBytes' | 'baseSha256'>,
+): Promise<UiLanguageBundle> {
     const bytes = await fetchVerifiedAsset({
-        id: `i18n-base:${delta.language}`,
+        id: `i18n-base:${spec.language}`,
         cacheName: EXTENSION_I18N_BASE_CACHE,
-        cacheKey: `https://fluentread.app/__optional_assets__/i18n/${delta.language}/${delta.baseSha256}.json`,
-        bytes: delta.baseBytes,
-        sha256: delta.baseSha256,
+        cacheKey: `https://fluentread.app/__optional_assets__/i18n/${spec.language}/${spec.baseSha256}.json`,
+        bytes: spec.baseBytes,
+        sha256: spec.baseSha256,
         contentType: 'application/json',
-        urls: getRemoteLanguageBaseUrls(delta, detectPreferredMirrorLocale()),
+        urls: getRemoteLanguageBaseUrls(spec, detectPreferredMirrorLocale()),
         timeoutMs: 15_000,
     });
     const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
-    if (!isUiLanguageBundle(parsed)) throw new TypeError(`远程语言基线格式无效：${delta.language}`);
+    if (!isUiLanguageBundle(parsed)) throw new TypeError(`远程语言基线格式无效：${spec.language}`);
     return parsed;
+}
+
+/** 供后台在扩展自有安全源下按固定哈希加载并内存复用远程语言基线，不接受来自内容脚本的外部 URL/哈希参数。 */
+export async function loadPinnedRemoteUiLanguageBase(language: RemoteDeltaUiLanguage): Promise<UiLanguageBundle> {
+    const cached = pinnedBaseMemoryCache.get(language);
+    if (cached) return cached;
+    const asset = REMOTE_LANGUAGE_BASE_ASSETS[language];
+    const bundle = await loadVerifiedRemoteBase({
+        language,
+        baseRevision: EXTENSION_I18N_BASE_REVISION,
+        basePath: asset.path,
+        baseBytes: asset.bytes,
+        baseSha256: asset.sha256,
+    });
+    pinnedBaseMemoryCache.set(language, bundle);
+    return bundle;
+}
+
+async function requestRemoteBaseFromBackground(language: RemoteDeltaUiLanguage): Promise<UiLanguageBundle> {
+    const extensionGlobal = globalThis as ExtensionRuntimeGlobal;
+    const runtime = extensionGlobal.browser?.runtime ?? extensionGlobal.chrome?.runtime;
+    if (typeof runtime?.sendMessage !== 'function') {
+        throw new Error('扩展后台消息通道不可用，无法加载界面语言基线');
+    }
+    const reply: unknown = await runtime.sendMessage({
+        type: UI_LANGUAGE_BASE_MESSAGE_TYPE,
+        language,
+    } satisfies UiLanguageBaseRequest);
+    if (!isPlainRecord(reply) || reply.success !== true || !isUiLanguageBundle(reply.bundle)) {
+        const reason = isPlainRecord(reply) && typeof reply.error === 'string' ? reply.error : '后台返回无效界面语言基线';
+        throw new Error(reason);
+    }
+    return reply.bundle;
+}
+
+async function defaultLoadRemoteBase(delta: DeltaUiLanguageBundle): Promise<UiLanguageBundle> {
+    // 扩展自有页与后台直接读写扩展唯一 CacheStorage；内容脚本处于宿主网页 Origin，统一经后台拉取，
+    // 彻底避免 http:// 非安全上下文缺少 crypto.subtle/caches 失败以及跨站重复下载和宿主 CacheStorage 污染。
+    if (isExtensionOriginContext()) return loadVerifiedRemoteBase(delta);
+    return requestRemoteBaseFromBackground(delta.language);
 }
 
 /** 返回的函数只在资源包可用时解析为 true；任何失败都降级为中文界面，而不是阻断页面功能。 */
@@ -119,8 +187,8 @@ export function createUiLanguageBundleLoader(dependencies: UiLanguageBundleLoade
 }
 
 type ExtensionRuntimeGlobal = typeof globalThis & {
-    browser?: {runtime?: {getURL?: (path: string) => string}};
-    chrome?: {runtime?: {getURL?: (path: string) => string}};
+    browser?: {runtime?: {getURL?: (path: string) => string; sendMessage?: (message: unknown) => Promise<unknown>}};
+    chrome?: {runtime?: {getURL?: (path: string) => string; sendMessage?: (message: unknown) => Promise<unknown>}};
 };
 
 function resolveExtensionUrl(path: string): string {

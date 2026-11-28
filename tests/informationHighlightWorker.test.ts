@@ -14,6 +14,7 @@ describe('static model worker uses prepared files and serial cooperative cancell
     let listener: (event: {data: InformationHighlightWorkerRequest}) => void, post: Mock, model: Mock;
     beforeEach(() => {
         vi.clearAllMocks(); mocks.tensors.length = 0;
+        vi.stubGlobal('WebAssembly', {...WebAssembly, Suspending: function () {}, promising: function () {}});
         mocks.env.backends.onnx.wasm = {};
         const tensor = (dims: number[], data: number[]) => {const value = {dims, type: 'float32', data, dispose: vi.fn()}; mocks.tensors.push(value); return value;};
         model = vi.fn(async ({input_ids, attention_mask}) => ({logits: tensor([1,input_ids.dims[1],2], Array(input_ids.dims[1] * 2).fill(0)), 'present.0.key': tensor([1,1,attention_mask.dims[1],1], [0])}));
@@ -94,5 +95,17 @@ describe('static model worker uses prepared files and serial cooperative cancell
         send({type: 'cancel', requestId: 1}); loaded(model); await flush(); expect(post).toHaveBeenLastCalledWith(expect.objectContaining({success: false, initialized: true})); expect(model).not.toHaveBeenCalled();
         send({type: 'score', requestId: 2, text: 'a'}); await flush(); expect(post).toHaveBeenLastCalledWith(expect.objectContaining({success: true})); expect(mocks.model).toHaveBeenCalledOnce(); expect(model).toHaveBeenCalledOnce();
         send({type: 'score', requestId: 3, text: 'a'}); await flush(); expect(model).toHaveBeenCalledOnce();
+    });
+    it('fails fast with ONNX_WASM_JSPI_UNSUPPORTED when WebAssembly JSPI is missing', async () => {
+        vi.stubGlobal('WebAssembly', {});
+        startInformationHighlightWorker();
+        send({type: 'score', requestId: 9, text: 'a'}); await flush();
+        expect(post).toHaveBeenLastCalledWith(expect.objectContaining({
+            requestId: 9,
+            success: false,
+            initialized: false,
+            error: 'ONNX_WASM_JSPI_UNSUPPORTED',
+        }));
+        expect(mocks.model).not.toHaveBeenCalled();
     });
 });

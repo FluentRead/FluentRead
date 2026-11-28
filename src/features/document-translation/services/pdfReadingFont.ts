@@ -5,7 +5,7 @@
  * 模块边界：属于文档二进制服务；远程仅下载无用户内容或凭据的字体数据，不执行远程 JS/WASM，不进入内容脚本字体或界面字体注册链路。不保存字体解析器或导出文档的全局引用。
  */
 import type {PDFDocument, PDFFont, PDFPage, PDFPageDrawTextOptions} from 'pdf-lib';
-import {buildGithubAssetMirrorUrls, rememberPreferredMirrorOrigin} from '@/src/core/assets/mirrors';
+import {buildGithubAssetMirrorUrls, demoteMirrorOrigin, orderMirrorUrls, rememberPreferredMirrorOrigin} from '@/src/core/assets/mirrors';
 import {isPdfReadingVariationSelector} from '../core/pdfTextLayout';
 import {cancelUnreadResponseBody} from '@/src/platform/http/runtime';
 
@@ -96,7 +96,7 @@ export function createPdfReadingFontLoader(overrides: Partial<PdfReadingFontLoad
             }
         }
         let failure: unknown;
-        for (const source of getPdfReadingFontSources(deps.locale())) {
+        for (const source of orderMirrorUrls(getPdfReadingFontSources(deps.locale()))) {
             signal.throwIfAborted();
             const controller = new AbortController();
             const abort = () => controller.abort(signal.reason);
@@ -113,7 +113,7 @@ export function createPdfReadingFontLoader(overrides: Partial<PdfReadingFontLoad
                     new Response(bytes, {headers: {'Content-Type': 'font/woff2'}})), signal).catch(() => undefined);
                 signal.throwIfAborted();
                 return bytes;
-            } catch (error) {signal.throwIfAborted(); failure = error;}
+            } catch (error) {signal.throwIfAborted(); demoteMirrorOrigin(source); failure = error;}
             finally {clearTimeout(timer); controller.abort(); signal.removeEventListener('abort', abort);}
         }
         throw new Error('PDF 导出字体下载失败，请检查网络后重试', {cause: failure});

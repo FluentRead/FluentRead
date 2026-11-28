@@ -70,25 +70,26 @@ function contrastRatio(foreground, background) {
 const expectedNavigation = [
   ['settings-general', '通用设置'],
   ['settings-services', '翻译服务'],
-  ['settings-translation', '翻译设置'],
-  ['settings-interface', '界面风格'],
+  ['settings-interface', '外观与界面'],
+  ['settings-translation', '网页翻译'],
+  ['settings-interactions', '悬浮球与右键'],
   ['settings-selection', '划词翻译'],
-  ['settings-image-translation', '图片/漫画翻译'],
-  ['settings-video', '视频字幕翻译'],
-  ['settings-writing', '写作助手'],
+  ['settings-writing', '输入与写作'],
+  ['settings-image-translation', '图片与漫画'],
+  ['settings-video', '视频字幕'],
+  ['settings-sites', '网站规则'],
+  ['settings-glossary', '术语库'],
   ['settings-translation-center', '翻译中心'],
   ['settings-vocabulary', '学习中心'],
-  ['settings-glossary', '术语库'],
-  ['settings-sites', '网站规则'],
   ['settings-translation-stats', '翻译统计'],
-  ['settings-advanced', '高级选项'],
+  ['settings-advanced', '高级与隐私'],
   ['settings-data', '备份与恢复'],
   ['settings-about', '关于流畅阅读'],
 ];
 const expectedNavigationGroups = [
-  ['基础配置', ['settings-general', 'settings-services', 'settings-translation', 'settings-interface']],
-  ['专项翻译', ['settings-selection', 'settings-image-translation', 'settings-video']],
-  ['工具与学习', ['settings-writing', 'settings-translation-center', 'settings-vocabulary', 'settings-glossary', 'settings-sites', 'settings-translation-stats']],
+  ['基础配置', ['settings-general', 'settings-services', 'settings-interface']],
+  ['翻译与交互', ['settings-translation', 'settings-interactions', 'settings-selection', 'settings-writing', 'settings-image-translation', 'settings-video']],
+  ['规则与工具', ['settings-sites', 'settings-glossary', 'settings-translation-center', 'settings-vocabulary', 'settings-translation-stats']],
   ['系统与数据', ['settings-advanced', 'settings-data', 'settings-about']],
 ];
 const settingsNavigationSelector = 'nav[aria-label="设置分类"] button[data-section]';
@@ -131,12 +132,12 @@ function resolveSolidBackground(layers) {
   }
   return null;
 }
-const expectedGeneralGroups = ['基础配置', '网页辅助', '基本偏好'];
+const expectedGeneralGroups = ['基础配置', '基本偏好'];
 const expectedGeneralSubgroups = [];
-const expectedInterfacePanelOrder = ['translation', 'skin', 'motion', 'layout', 'video-learning', 'font'];
-const expectedInterfaceGroups = ['译文样式', '逐句高亮样式', '界面与弹窗', '翻译加载样式', '菜单栏布局', '完整句学习外观', '界面字体'];
-// 划词触发、翻译卡片与朗读均在划词页；阅读辅助保留在翻译设置首项。
-const expectedTranslationGroups = ['阅读辅助', '智能高亮', '鼠标悬浮翻译', '输入框翻译', '全文翻译', '右键菜单', '悬浮球设置', '段落复制', '局部翻译', '不翻译的语言'];
+const expectedInterfacePanelOrder = ['translation', 'skin', 'motion', 'layout', 'font'];
+const expectedInterfaceGroups = ['译文样式', '界面与弹窗', '翻译加载样式', '菜单栏布局', '界面字体'];
+// 网页翻译聚焦全文、悬浮与局部、阅读辅助与不翻译的语言；悬浮球与右键独立分区。
+const expectedTranslationGroups = ['全文翻译', '鼠标悬浮翻译', '局部翻译', '双语逐句高亮', '智能高亮', '段落复制', '不翻译的语言'];
 const expectedLoadingStyles = [
   ['ring', '柔和圆环'],
   ['minimal', '简洁'],

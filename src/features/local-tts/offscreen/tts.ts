@@ -1,7 +1,7 @@
 /**
  * @file src/features/local-tts/offscreen/tts.ts
  * 文件职责：编排本地 Kokoro TTS 模型缓存、Worker 生命周期、下载状态和合成请求。
- * 主要内容：朗读不自动下载模型，串行复用一个 Worker，并按设备内存保留有界空闲会话；GPU 生命周期失败按总预算重建一次 CPU Worker，资源重建与显式取消分别校验代次；释放时取消在途及排队任务，模型操作互斥，真实下载字节进度原样发布。
+ * 主要内容：朗读不自动下载模型，串行复用一个 Worker，并按设备内存保留有界空闲会话；支持可选语速与 keepWarm 预热；GPU 生命周期失败按总预算重建一次 CPU Worker 并在会话内记住 GPU 不可用状态，资源重建与显式取消分别校验代次；释放时取消在途及排队任务，模型操作互斥，真实下载字节进度原样发布。
  * 模块边界：只负责扩展自有 Offscreen 运行时，Worker 回复先经共享协议校验；不决定在线/本地策略，也不直接操作网页 UI。
  */
 
@@ -59,6 +59,14 @@ let synthesisLifetime = new AbortController();
 let activeSyntheses = 0;
 let preparingModels = 0;
 let removingModel = false;
+// 记录当前离屏会话内已证实的 GPU 不可用状态，避免空闲回收重建 Worker 后重复消耗 60 秒探测。
+let sessionGpuUnavailable = false;
+
+function normalizeLocalTtsSpeed(speed: number): number {
+    return typeof speed === 'number' && Number.isFinite(speed)
+        ? Math.min(2, Math.max(0.5, speed))
+        : 1;
+}
 
 function createWorkerLifecycleError(message: string): WorkerLifecycleError {
     const error = new Error(message) as WorkerLifecycleError;
@@ -155,6 +163,7 @@ function getWorker(): Worker {
         catch (error) { pending.reject(error); return; }
         if (response.success) pending.resolve(response);
         else if (response.retryWithCpu === true) {
+            sessionGpuUnavailable = true;
             const error = createWorkerLifecycleError(response.error || '本地 TTS GPU Worker 失败，准备使用 CPU 重试');
             // The current request was removed above, so terminateWorker cannot
             // lose its reject path; reject it explicitly after tearing down.
@@ -219,16 +228,23 @@ async function requestWorkerWithCpuFallback(
     timeoutMs: number,
     signal: AbortSignal,
 ): Promise<WorkerResponse> {
+    const effectiveMessage = sessionGpuUnavailable && message.device === undefined
+        ? {...message, device: 'wasm' as const}
+        : message;
     const deadlineAt = Date.now() + timeoutMs;
     const generation = cancellationGeneration;
-    const firstAttemptTimeout = Math.max(1, Math.floor(timeoutMs / 2));
+    const firstAttemptTimeout = effectiveMessage.device === 'wasm'
+        ? timeoutMs
+        : Math.max(1, Math.floor(timeoutMs / 2));
     try {
-        return await requestWorker(message, firstAttemptTimeout, signal);
+        return await requestWorker(effectiveMessage, firstAttemptTimeout, signal);
     } catch (error) {
         if (signal.aborted || generation !== cancellationGeneration) throw createAbortError();
         const remainingMs = deadlineAt - Date.now();
-        if (!isWorkerLifecycleError(error) || message.device === 'wasm' || remainingMs <= 0) throw error;
-        return requestWorker({...message, device: 'wasm'}, remainingMs, signal);
+        if (!isWorkerLifecycleError(error) || effectiveMessage.device === 'wasm' || remainingMs <= 0) throw error;
+        const result = await requestWorker({...effectiveMessage, device: 'wasm'}, remainingMs, signal);
+        sessionGpuUnavailable = true;
+        return result;
     }
 }
 
@@ -246,7 +262,7 @@ function runSerial<T>(operation: (signal: AbortSignal) => Promise<T>, signal: Ab
 }
 
 export async function prepareLocalTtsModel(
-    _keepWarm = false,
+    keepWarm = false,
     onProgress?: (progress: DownloadProgress) => void,
 ): Promise<{
     model: typeof LOCAL_TTS_MODEL_ID;
@@ -260,13 +276,35 @@ export async function prepareLocalTtsModel(
     try {
         await cacheLocalTtsModelFiles(onProgress);
         if (!(await isLocalTtsModelCached())) throw new Error('本地 TTS 模型缓存不完整');
-        return {
-            model: LOCAL_TTS_MODEL_ID,
-            dtype: LOCAL_TTS_MODEL_DTYPE,
-            revision: LOCAL_TTS_MODEL_REVISION,
-            // 设置页的下载动作只确认文件完整性；首次真正朗读时再加载推理 Worker。
-            warm: false,
-        };
+        if (!keepWarm) {
+            return {
+                model: LOCAL_TTS_MODEL_ID,
+                dtype: LOCAL_TTS_MODEL_DTYPE,
+                revision: LOCAL_TTS_MODEL_REVISION,
+                // 设置页的下载动作只确认文件完整性；首次真正朗读时再加载推理 Worker。
+                warm: false,
+            };
+        }
+        clearIdleDispose();
+        const lifetime = synthesisLifetime.signal;
+        activeSyntheses += 1;
+        try {
+            const response = await runSerial(
+                linkedSignal => requestWorkerWithCpuFallback({type: 'prepare'}, SYNTHESIS_TIMEOUT_MS, linkedSignal),
+                undefined,
+                lifetime,
+            );
+            return {
+                model: LOCAL_TTS_MODEL_ID,
+                dtype: LOCAL_TTS_MODEL_DTYPE,
+                revision: LOCAL_TTS_MODEL_REVISION,
+                warm: true,
+                backend: response.backend,
+            };
+        } finally {
+            activeSyntheses -= 1;
+            if (worker && pendingRequests.size === 0 && activeSyntheses === 0) scheduleIdleDispose();
+        }
     } finally {
         preparingModels -= 1;
     }
@@ -297,6 +335,7 @@ export async function synthesizeLocalTts(
     language: string,
     preferredVoice: unknown,
     signal?: AbortSignal,
+    speed = 1,
 ): Promise<LocalTtsAudio> {
     if (signal?.aborted) throw createAbortError();
     if (removingModel) throw new Error('正在清除本地 TTS 模型，请稍后重试');
@@ -311,12 +350,13 @@ export async function synthesizeLocalTts(
         if (signal?.aborted || generation !== cancellationGeneration) throw createAbortError();
 
         const voice = localTtsVoiceForLanguage(language, preferredVoice);
+        const normalizedSpeed = normalizeLocalTtsSpeed(speed);
         const response = await runSerial(linkedSignal => {
             return requestWorkerWithCpuFallback({
                 type: 'synthesize',
                 text,
                 voice,
-                speed: 1,
+                speed: normalizedSpeed,
             }, SYNTHESIS_TIMEOUT_MS, linkedSignal);
         }, signal, lifetime);
         if (signal?.aborted || generation !== cancellationGeneration) throw createAbortError();
@@ -340,6 +380,7 @@ export async function removeLocalTtsModel(): Promise<void> {
     if (removingModel) throw new Error('正在清除本地 TTS 模型，请稍后重试');
     removingModel = true;
     try {
+        sessionGpuUnavailable = false;
         terminateWorker();
         await removeLocalTtsModelFiles();
     } finally {

@@ -93,7 +93,18 @@
               <span class="translation-style-card-check" aria-hidden="true"><i /></span>
             </button>
           </div>
-          <p class="translation-style-apply-hint">{{ t('settings.translationStyle.applyHint') }}</p>
+          <div class="translation-style-order" data-testid="translation-bilingual-order">
+            <span>{{ t('settings.paragraph.order') }}</span>
+            <SegmentedControl
+              :model-value="config.translationBeforeOriginal ? 'translation-first' : 'original-first'"
+              :options="bilingualOrderOptions"
+              :label="t('settings.paragraph.order')"
+              :disabled="config.display !== 1"
+              compact
+              data-page-translation-order
+              @update:model-value="config.translationBeforeOriginal = $event === 'translation-first'"
+            />
+          </div>
         </section>
       </div>
 
@@ -317,6 +328,10 @@ watch(() => [config.value.activeTranslationStyleProfileId, activeProfile.value?.
   profileNameDraft.value = activeProfile.value?.name ?? ''
 }, {immediate: true})
 const categoryOptions = computed(() => TRANSLATION_STYLE_CATEGORIES.map((category) => ({value: category.value, label: t(category.labelKey)})))
+const bilingualOrderOptions = computed(() => [
+  {value: 'original-first', label: t('settings.paragraph.originalFirst')},
+  {value: 'translation-first', label: t('settings.paragraph.translationFirstOption')},
+])
 const fontWeightOptions = computed(() => TRANSLATION_FONT_WEIGHT_OPTIONS.map((option) => ({value: option.value, label: t(option.labelKey)})))
 const fontFamilyOptions = computed(() => TRANSLATION_FONT_FAMILY_OPTIONS.map((option) => ({value: option.value, label: t(option.labelKey)})))
 
@@ -598,11 +613,23 @@ function resetAppearance(): void {
 .translation-style-card.selected .translation-style-card-check > i,
 .translation-style-saved-card.selected .translation-style-card-check > i { opacity: 1; }
 
-.translation-style-apply-hint {
-  margin: 0;
-  color: var(--muted);
-  font-size: 10.5px;
-  line-height: 1.55;
+.translation-style-order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.translation-style-order > span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.translation-style-order :deep(.segmented-control) {
+  width: auto;
+  min-width: 196px;
 }
 
 .translation-appearance-panel {
@@ -797,5 +824,17 @@ function resetAppearance(): void {
 .translation-style-card-check { right: 9px; bottom: 9px; }
 .translation-style-categories.segmented-control { display: flex; flex-wrap: wrap; min-width: min(100%, 220px); max-width: 400px; }
 .translation-style-categories :deep(button) { flex: 1 0 auto; white-space: nowrap; }
-@container (max-width: 480px) { .translation-style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.translation-style-order {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+}
+@container (max-width: 480px) { .translation-style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .translation-style-order { flex-wrap: wrap; } }
 </style>

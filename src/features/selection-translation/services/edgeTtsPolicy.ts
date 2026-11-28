@@ -1,10 +1,11 @@
 /**
  * @file src/features/selection-translation/services/edgeTtsPolicy.ts
- * 文件职责：提供 Edge TTS 不依赖网络的语言、声音、SSML、文本分段、音频拼接和 token 过期计算策略。
- * 主要内容：定义字符与分段上限、语言到候选 voice 的映射，兼容普通话统计语言码，导出声音选择、XML 转义 SSML 构建、智能断句、ArrayBuffer 拼接及 JWT expiry 解析。
- * 模块边界：该模块保持纯策略，不请求 endpoint、不缓存 token 也不播放音频；edgeTts.ts 消费这些规则完成网络合成，调用方决定超时、路由和用户反馈。
+ * 文件职责：提供 Edge TTS 与在线多源合成复用的纯策略规则，包括语言归一化、多语种音色候选链、语速格式化、XML 转义 SSML 构建、智能断句分段、音频拼接与 JWT 过期解析。
+ * 主要内容：定义字符与分段上限及 22+ 常用语种音色目录，兼容普通话统计别名与无地区语言码的方言偏好回退，导出 formatEdgeTtsRate、edgeTtsVoiceCandidatesForLanguage、buildEdgeTtsSsml、splitEdgeTtsText、splitTtsTextByChars、concatEdgeTtsAudio 与 edgeTtsTokenExpiry。
+ * 模块边界：本文件保持纯策略，不发起网络请求、不缓存 token 也不操作浏览器存储或音频播放；edgeTts.ts、youdaoTts.ts 与 googleTts.ts 消费这些规则完成远程合成，调用方负责熔断与错误展示。
  */
 import {
+    normalizeSelectionTtsRate,
     normalizeSelectionTtsVoiceOrder,
     selectionTtsVoiceLocale,
 } from '@/src/core/config/selectionTts';
@@ -19,16 +20,32 @@ export const edgeTtsLimits = Object.freeze({
 const VOICE_CANDIDATES_BY_LANGUAGE: Readonly<Record<string, readonly string[]>> = {
     'en-US': ['en-US-AvaMultilingualNeural', 'en-US-AriaNeural', 'en-US-JennyNeural', 'en-US-GuyNeural'],
     'en-GB': ['en-GB-SoniaNeural', 'en-GB-RyanNeural'],
+    'en-AU': ['en-AU-NatashaNeural', 'en-AU-WilliamNeural'],
     'zh-CN': ['zh-CN-XiaoxiaoMultilingualNeural', 'zh-CN-XiaoyiNeural', 'zh-CN-YunxiNeural', 'zh-CN-YunyangNeural'],
     'zh-TW': ['zh-TW-YunJheMultilingualNeural', 'zh-TW-HsiaoChenNeural', 'zh-TW-HsiaoYuNeural'],
-    'ja-JP': ['ja-JP-MasaruMultilingualNeural', 'ja-JP-NanamiNeural'],
-    'ko-KR': ['ko-KR-HyunsuMultilingualNeural', 'ko-KR-SunHiNeural'],
+    'zh-HK': ['zh-HK-HiuMaanNeural', 'zh-HK-WanLungNeural'],
+    'ja-JP': ['ja-JP-MasaruMultilingualNeural', 'ja-JP-NanamiNeural', 'ja-JP-KeitaNeural'],
+    'ko-KR': ['ko-KR-HyunsuMultilingualNeural', 'ko-KR-SunHiNeural', 'ko-KR-InJoonNeural'],
     'fr-FR': ['fr-FR-RemyMultilingualNeural'],
-    'de-DE': ['de-DE-FlorianMultilingualNeural'],
-    'es-ES': ['es-ES-TristanMultilingualNeural'],
-    'it-IT': ['it-IT-AlessioMultilingualNeural'],
-    'pt-BR': ['pt-BR-MacerioMultilingualNeural'],
+    'de-DE': ['de-DE-FlorianMultilingualNeural', 'de-DE-KatjaNeural'],
+    'es-ES': ['es-ES-TristanMultilingualNeural', 'es-ES-ElviraNeural'],
+    'es-MX': ['es-MX-DaliaNeural'],
+    'it-IT': ['it-IT-AlessioMultilingualNeural', 'it-IT-ElsaNeural'],
+    'pt-BR': ['pt-BR-MacerioMultilingualNeural', 'pt-BR-FranciscaNeural'],
+    'ru-RU': ['ru-RU-SvetlanaNeural', 'ru-RU-DmitryNeural'],
+    'ar-SA': ['ar-SA-ZariyahNeural'],
+    'hi-IN': ['hi-IN-SwaraNeural'],
+    'vi-VN': ['vi-VN-HoaiMyNeural'],
+    'th-TH': ['th-TH-PremwadeeNeural'],
+    'id-ID': ['id-ID-GadisNeural'],
+    'nl-NL': ['nl-NL-ColetteNeural'],
+    'pl-PL': ['pl-PL-ZofiaNeural'],
+    'tr-TR': ['tr-TR-EmelNeural'],
+    'uk-UA': ['uk-UA-PolinaNeural'],
 };
+
+const SENTENCE_BOUNDARIES = ['\n', '。', '！', '？', '.', '!', '?'] as const;
+const CLAUSE_BOUNDARIES = ['；', '，', ';', ','] as const;
 
 export function normalizeEdgeTtsLanguage(language: string): string {
     const normalized = String(language || '').replace(/_/gu, '-').trim();
@@ -41,19 +58,39 @@ export function normalizeEdgeTtsLanguage(language: string): string {
     return normalized;
 }
 
-/** 用户音色优先，同语言的内置候选随后兜底，并保持稳定顺序与去重。 */
+/** 将倍率语速（0.5~2.0）格式化为 SSML prosody rate 百分比字符串（如 1 -> +0%、1.25 -> +25%）。 */
+export function formatEdgeTtsRate(rate?: number): string {
+    const normalized = normalizeSelectionTtsRate(rate);
+    const percentDelta = Math.round((normalized - 1) * 100);
+    return percentDelta >= 0 ? `+${percentDelta}%` : `${percentDelta}%`;
+}
+
+/**
+ * 用户音色优先，同语言的内置候选随后兜底，并保持稳定顺序与去重。
+ * 当调用方仅传入基础语言码（如 en 或 auto，未显式指定地区子标签）且没有精确地区偏好音色时，
+ * 允许用户已选的同主语种方言音色（如 en-GB / en-AU）排在自动候选之前。
+ */
 export function edgeTtsVoiceCandidatesForLanguage(
     language: string,
     preferredVoices: unknown = [],
 ): string[] {
-    const normalized = normalizeEdgeTtsLanguage(language);
-    const base = normalized.split('-')[0];
-    const automatic = (Object.hasOwn(VOICE_CANDIDATES_BY_LANGUAGE, normalized) ? VOICE_CANDIDATES_BY_LANGUAGE[normalized] : undefined)
+    const raw = String(language || '').replace(/_/gu, '-').trim();
+    const targetLocale = raw.toLowerCase() === 'zh-hk' ? 'zh-HK' : normalizeEdgeTtsLanguage(raw);
+    const targetLower = targetLocale.toLowerCase();
+    const baseLower = targetLower.split('-')[0];
+    const exactAutomatic = Object.entries(VOICE_CANDIDATES_BY_LANGUAGE)
+        .find(([locale]) => locale.toLowerCase() === targetLower)?.[1];
+    const automatic = exactAutomatic
         || Object.entries(VOICE_CANDIDATES_BY_LANGUAGE)
-            .find(([locale]) => locale.startsWith(`${base}-`))?.[1]
+            .find(([locale]) => locale.toLowerCase().startsWith(`${baseLower}-`))?.[1]
         || [];
-    const preferred = normalizeSelectionTtsVoiceOrder(preferredVoices)
-        .filter((voice) => selectionTtsVoiceLocale(voice) === normalized);
+    const orderedPreferred = normalizeSelectionTtsVoiceOrder(preferredVoices);
+    const exactPreferred = orderedPreferred
+        .filter((voice) => selectionTtsVoiceLocale(voice).toLowerCase() === targetLower);
+    const hasExplicitSubtag = raw.includes('-');
+    const preferred = exactPreferred.length > 0 || hasExplicitSubtag
+        ? exactPreferred
+        : orderedPreferred.filter((voice) => selectionTtsVoiceLocale(voice).split('-')[0]?.toLowerCase() === baseLower);
     return [...new Set([...preferred, ...automatic])];
 }
 
@@ -77,7 +114,28 @@ export function buildEdgeTtsSsml(
     return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${escapeXml(locale)}"><voice name="${escapeXml(voice)}"><prosody rate="${escapeXml(rate)}" pitch="${escapeXml(pitch)}" volume="${escapeXml(volume)}">${escapeXml(text.trim())}</prosody></voice></speak>`;
 }
 
-/** 按 UTF-8 字节预算切分，优先在句号或空格处断开。 */
+function lastIndexOfAny(text: string, needles: readonly string[], fromIndex: number): number {
+    let best = -1;
+    for (const needle of needles) {
+        const index = text.lastIndexOf(needle, fromIndex);
+        if (index > best) best = index;
+    }
+    return best;
+}
+
+/** 优先在句末标点断开，其次子句标点，再次空格，保证每段停顿自然。 */
+function findPreferredTtsBoundary(text: string, end: number): number {
+    const minBoundary = Math.floor(end * 0.6);
+    const sentence = lastIndexOfAny(text, SENTENCE_BOUNDARIES, end - 1);
+    if (sentence > minBoundary) return sentence + 1;
+    const clause = lastIndexOfAny(text, CLAUSE_BOUNDARIES, end - 1);
+    if (clause > minBoundary) return clause + 1;
+    const space = text.lastIndexOf(' ', end - 1);
+    if (space > minBoundary) return space + 1;
+    return end;
+}
+
+/** 按 UTF-8 字节预算切分，优先在句界、子句或空格处断开。 */
 export function splitEdgeTtsText(text: string): string[] {
     const chunks: string[] = [];
     let remaining = text.trim();
@@ -95,12 +153,33 @@ export function splitEdgeTtsText(text: string): string[] {
             end += point.length;
         }
         if (end < remaining.length) {
-            const boundary = Math.max(
-                remaining.lastIndexOf(' ', end - 1),
-                remaining.lastIndexOf('。', end - 1),
-                remaining.lastIndexOf('.', end - 1),
-            );
-            if (boundary > Math.floor(end * 0.6)) end = boundary + 1;
+            end = findPreferredTtsBoundary(remaining, end);
+        }
+        chunks.push(remaining.slice(0, end).trim());
+        remaining = remaining.slice(end).trim();
+    }
+    return chunks;
+}
+
+/** 按字符预算与分段上限智能断句（不拆代理对），供有道与 Google TTS 复用。 */
+export function splitTtsTextByChars(
+    text: string,
+    maxChars: number,
+    maxChunks: number,
+    createTooLongError: () => Error,
+): string[] {
+    const chunks: string[] = [];
+    let remaining = text.trim();
+    while (remaining) {
+        if (chunks.length >= maxChunks) throw createTooLongError();
+        let end = 0;
+        for (const point of remaining) {
+            if (end + point.length > maxChars) break;
+            end += point.length;
+        }
+        if (end === 0) end = Array.from(remaining)[0]!.length;
+        if (end < remaining.length) {
+            end = findPreferredTtsBoundary(remaining, end);
         }
         chunks.push(remaining.slice(0, end).trim());
         remaining = remaining.slice(end).trim();

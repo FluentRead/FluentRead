@@ -305,7 +305,6 @@ const userscriptUnavailableSections = new Set([
   'settings-image-translation',
   'settings-area-translation',
   'settings-video',
-  'settings-writing',
   'settings-translation-stats',
   'settings-model-usage',
 ])

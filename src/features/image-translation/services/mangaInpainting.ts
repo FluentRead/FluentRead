@@ -12,7 +12,7 @@ import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources'
 import {mangaInferenceClient, mangaExtensionUrl, type MangaPatch} from './mangaInferenceClient';
 import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 import {protectMangaSession} from './mangaSessionFallback';
-import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
+import {assertOnnxWasmRuntimeSupported, configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
 import {assertMangaOcrActive, loadMangaInpaintAsset, MANGA_INPAINT_ASSET, withMangaModelAdmission} from './mangaOcrAssets';
 import {mangaRegionBackground, type MangaBackground} from './mangaRendering';
 import type {MangaRegion} from './mangaRegions';
@@ -200,6 +200,7 @@ export function createMangaInpaintingRuntime(create: (signal?: AbortSignal,progr
 }
 
 export async function createBrowserMangaInpainter(signal?:AbortSignal,progress?:(percent?:number,initializing?:boolean)=>void):Promise<InpaintPort> {
+    assertOnnxWasmRuntimeSupported();
     let lastPercent = -1;
     const model=await loadMangaInpaintAsset(signal,bytes=>{
         const percent=Math.min(99,Math.floor(bytes*100/MANGA_INPAINT_ASSET.bytes));

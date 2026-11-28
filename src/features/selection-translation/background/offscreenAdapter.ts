@@ -1,10 +1,11 @@
 /**
  * @file src/features/selection-translation/background/offscreenAdapter.ts
- * 文件职责：适配划词 TTS 的 Offscreen 播放控制与扩展页在线音频获取，把 AbortSignal 和稳定路由身份传到平台边界。
- * 主要内容：定义响应与默认适配器，先读取接收端实例/版本、领取一次性播放许可，再携带取消信号发送 PLAY；支持停止、跳转及为无 tabId 的扩展页下载 Google 音频，并保留服务端 HTTP 错误状态、取消未消费的错误响应体。
+ * 文件职责：适配划词 TTS 的 Offscreen 播放控制（播放、停止、跳转、暂停、继续、变速）与扩展页在线音频获取，把 AbortSignal 和稳定路由身份传到平台边界。
+ * 主要内容：定义响应与默认适配器，先读取接收端实例/版本、领取一次性播放许可，再携带取消信号发送 PLAY；支持停止、5 秒跳转、暂停、继续、实时变速及带超时的扩展页 Google 音频下载，并保留服务端 HTTP 错误状态、取消未消费的错误响应体。
  * 模块边界：不合成音频、不创建 Audio 或 Offscreen document；音频解码与播放归调用页面，实际传输由 runtimeFetch 和平台 Offscreen client 执行。
  */
-import {cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
+import {cancelUnreadResponseBody, createRuntimeAbortContext, runtimeFetch} from '@/src/platform/http/runtime';
+import {readRetryAfterMs} from '@/src/platform/http/errors';
 import {extensionDomClient} from '@/src/platform/offscreen/extensionClient';
 import {parseSelectionTtsRoute} from '@/src/features/selection-translation/protocol';
 import type {
@@ -15,10 +16,15 @@ import {
     type OffscreenClient,
 } from '@/src/platform/offscreen/client';
 
+const PAGE_AUDIO_FETCH_TIMEOUT_MS = 10_000;
+
 interface SelectionTtsOffscreenResponse {
     readonly success?: boolean;
     readonly error?: string;
     readonly seeked?: boolean;
+    readonly paused?: boolean;
+    readonly resumed?: boolean;
+    readonly updated?: boolean;
     readonly revision?: string;
     readonly playbackToken?: string;
     readonly conflict?: boolean;
@@ -30,12 +36,21 @@ interface SelectionTtsOffscreenResponse {
 export function createSelectionTtsOffscreenAdapter(client: OffscreenClient = extensionDomClient) {
     return {
         async fetchPageAudio(url: string, signal: AbortSignal): Promise<{audio: ArrayBuffer; contentType: string}> {
-            const response = await runtimeFetch(url, {signal});
-            if (!response.ok) {
-                cancelUnreadResponseBody(response);
-                throw new Error(`Google TTS failed: ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`);
+            const abort = createRuntimeAbortContext(PAGE_AUDIO_FETCH_TIMEOUT_MS, signal);
+            try {
+                const response = await runtimeFetch(url, {signal: abort.signal});
+                if (!response.ok) {
+                    cancelUnreadResponseBody(response);
+                    const retryAfterMs = readRetryAfterMs(response.headers);
+                    throw Object.assign(
+                        new Error(`Google TTS failed: ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`),
+                        {statusCode: response.status, ...(retryAfterMs ? {retryAfterMs} : {})},
+                    );
+                }
+                return {audio: await response.arrayBuffer(), contentType: response.headers.get('content-type') || 'audio/mpeg'};
+            } finally {
+                abort.cleanup();
             }
-            return {audio: await response.arrayBuffer(), contentType: response.headers.get('content-type') || 'audio/mpeg'};
         },
         async play(payload: SelectionTtsPlaybackRequest, signal?: AbortSignal): Promise<void> {
             const route = parseSelectionTtsRoute(payload);
@@ -91,6 +106,30 @@ export function createSelectionTtsOffscreenAdapter(client: OffscreenClient = ext
             });
             if (response && !response.success) throw new Error(response.error || '语音跳转失败');
             return response?.seeked === true;
+        },
+
+        async pause(route: SelectionTtsRoute): Promise<boolean> {
+            const response = await client.sendIfPresent<SelectionTtsOffscreenResponse>({
+                type: 'PAUSE_SELECTION_TTS', ...route,
+            });
+            if (response && !response.success) throw new Error(response.error || '语音暂停失败');
+            return response?.paused === true;
+        },
+
+        async resume(route: SelectionTtsRoute): Promise<boolean> {
+            const response = await client.sendIfPresent<SelectionTtsOffscreenResponse>({
+                type: 'RESUME_SELECTION_TTS', ...route,
+            });
+            if (response && !response.success) throw new Error(response.error || '语音继续失败');
+            return response?.resumed === true;
+        },
+
+        async setRate(route: SelectionTtsRoute, rate: number): Promise<boolean> {
+            const response = await client.sendIfPresent<SelectionTtsOffscreenResponse>({
+                type: 'SET_RATE_SELECTION_TTS', ...route, rate,
+            });
+            if (response && !response.success) throw new Error(response.error || '语音倍速设置失败');
+            return response?.updated === true;
         },
     };
 }

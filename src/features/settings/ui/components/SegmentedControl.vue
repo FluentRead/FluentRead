@@ -122,7 +122,8 @@ function handleKeydown(event: KeyboardEvent, currentIndex: number) {
   font-size: var(--fr-text-sm, 12px);
   font-weight: 500;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
   line-height: 1.4;
   transition: color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), box-shadow var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease);
 }

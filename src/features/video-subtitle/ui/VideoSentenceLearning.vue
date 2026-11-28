@@ -360,7 +360,7 @@ function toggleMode(next: SentencePlaybackMode): void {
 }
 function normal(): void { controller?.stop(); }
 function openLibrary(): void { void sendRuntimeMessage({type: 'openOptionsPage', section: 'settings-vocabulary'}).catch(() => undefined); }
-function openAppearance(): void { void sendRuntimeMessage({type: 'openOptionsPage', section: 'settings-interface', target: 'video-sentence-learning-appearance'}).catch(() => undefined); }
+function openAppearance(): void { void sendRuntimeMessage({type: 'openOptionsPage', section: 'settings-video', target: 'video-sentence-learning-appearance'}).catch(() => undefined); }
 function videoMaterial(): MaterialSelection | undefined {
   const selected = sentence.value;
   return props.sourceUrl && selected ? {source: {kind: 'video', url: props.sourceUrl, title: props.title}, locator: {kind: 'video', quote: selected.text, startMs: Math.floor(selected.startMs), endMs: Math.ceil(selected.endMs)}} : undefined;

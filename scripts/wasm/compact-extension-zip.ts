@@ -210,15 +210,19 @@ export async function verifyExtensionZipPreservation(original: Buffer, output: B
     requireZip(end.equals(original.subarray(layout.endOffset)), '重打包改变了 EOCD 元数据');
     requireZip(original.subarray(0, layout.localStart).equals(output.subarray(0, next.localStart)), '重打包改变了 ZIP 前缀');
     const before = await JSZip.loadAsync(original, {checkCRC32: true}), after = await JSZip.loadAsync(output, {checkCRC32: true});
+    const targetSet = new Set(layout.targetWasmFiles);
     for (let index = 0; index < layout.entries.length; index += 1) {
         const entry = layout.entries[index]!, rebuilt = next.entries[index]!;
         const metadata = Buffer.from(rebuilt.central); metadata.writeUInt32LE(entry.compressedSize, 20); metadata.writeUInt32LE(entry.localOffset, 42);
         requireZip(metadata.equals(entry.central), '重打包改变了 ZIP 元数据');
         const local = Buffer.from(output.subarray(rebuilt.localOffset, rebuilt.dataOffset)); local.writeUInt32LE(entry.compressedSize, 18);
         requireZip(local.equals(original.subarray(entry.localOffset, entry.dataOffset)), '重打包改变了本地元数据');
-        if (!layout.targetWasmFiles.includes(entry.name)) requireZip(
-            original.subarray(entry.localOffset, entry.spanEnd).equals(output.subarray(rebuilt.localOffset, rebuilt.spanEnd)),
-            '重打包改变了非 WASM 条目字节');
+        if (!targetSet.has(entry.name)) {
+            requireZip(
+                original.subarray(entry.localOffset, entry.spanEnd).equals(output.subarray(rebuilt.localOffset, rebuilt.spanEnd)),
+                '重打包改变了非 WASM 条目字节');
+            continue;
+        }
         requireZip(original.subarray(entry.dataOffset + entry.compressedSize, entry.spanEnd).equals(
             output.subarray(rebuilt.dataOffset + rebuilt.compressedSize, rebuilt.spanEnd)), '重打包改变了条目尾部字节');
         requireZip(Buffer.from(await after.files[entry.name]!.async('uint8array')).equals(Buffer.from(await before.files[entry.name]!.async('uint8array'))),

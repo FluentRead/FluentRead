@@ -14,6 +14,7 @@
  * 模块边界：该组件负责设置 UI 编排但不实现 provider 网络、配置仓库或 feature 运行时；校验与迁移来自 core/config，持久化经 services/config，复杂子界面保持在各自 feature/组件内；ChatGPT 登录模块在公开构建中隐藏，旧默认或深链接只回退编辑目标，不迁移或删除用户数据；脚本入口已拦截的扩展专属分区在构建期不引入其子 UI，原入口提示与数据接口保持。
  -->
 <template>
+  <!-- 通用设置：单一核心配置 + 基本偏好 + 按需展开的功能服务分配 -->
   <section v-if="hasVisitedSection('settings-general')" v-show="props.activeSection === 'settings-general'" id="settings-general" class="settings-section general-settings-section">
     <SettingsGroup class="plugin-master-setting" data-testid="plugin-master-setting">
       <FeatureEnableCard v-model="config.on" :title="t('settings.general.masterTitle')" :description="t('settings.general.masterHelp')" @update:model-value="handlePluginStateChange" />
@@ -23,11 +24,6 @@
       data-testid="translation-display-settings"
       data-settings-anchor="basics" data-settings-anchor-label="基础配置"
     >
-      <template #heading-extra>
-        <button type="button" class="settings-navigation-link settings-heading-link" data-testid="open-translation-style-settings" @click="openSettingsSection('settings-interface')">
-          <span>{{ t('settings.translationStyle.title') }}</span><el-icon aria-hidden="true"><ArrowRight /></el-icon>
-        </button>
-      </template>
       <SettingsItem label="默认网页翻译服务" :description="t('quickTranslation.defaultServiceDescription')">
         <div
           class="service-default-control general-service-control"
@@ -70,94 +66,140 @@
       <strong>{{ defaultTextServiceLabel }}</strong>
       <p>{{ selectedTextServiceUnavailableMessage }}请在上方选择可用服务。</p>
     </div>
+    <SettingsGroup :title="t('settings.general.preferences')" data-settings-anchor="preferences" :data-settings-anchor-label="t('settings.general.preferences')">
+      <SettingsItem data-testid="ui-language-setting" :label="t('settings.general.language')">
+        <template #copy>
+          <strong data-i18n-ignore>{{ t('settings.general.language') }}<span v-if="language !== 'en-US'" lang="en"> / Language</span></strong>
+        </template>
+        <UiLanguageSelector compact :active="viewActive && props.activeSection === 'settings-general'" />
+      </SettingsItem>
+      <SettingsItem :label="t('settings.general.theme')" :description="t('settings.general.themeDescription')">
+        <SegmentedControl v-model="config.theme" :options="options.theme" :label="t('settings.general.theme')" />
+      </SettingsItem>
+      <ToolbarClickSetting v-if="ToolbarClickSetting" :config="config" />
+    </SettingsGroup>
     <FeatureServiceSettings id="feature-services" data-settings-anchor="services" :data-settings-anchor-label="t('featureServices.assignments')" :active="viewActive && props.activeSection === 'settings-general'" :config="config" :service-options="availableServiceOptions" @configure-service="openInputServiceSettings" />
   </section>
+
+  <!-- 网站规则 -->
   <section v-if="hasVisitedSection('settings-sites')" v-show="props.activeSection === 'settings-sites'" id="settings-sites" class="settings-section site-settings-section">
     <SettingsPanel name="rules">
       <SitePreferencesSettings :settings="config" :save-preferences="persistConfigPatch" />
-</SettingsPanel>
+    </SettingsPanel>
     <SettingsPanel name="adaptation">
       <ServiceRepairReturn :active="viewActive && props.activeSection === 'settings-sites'" :context="siteRepairContext" context-key="settings-sites:adaptation" />
       <SiteAdaptationSettings :model-value="config.siteAdaptation" :save-settings="saveSiteAdaptationSettings" :inspect-rule-id="siteRuleInspectId" :active="viewActive && props.activeSection === 'settings-sites'"
         :official-release="officialSiteRuleRelease" :official-updates-enabled="officialSiteRuleUpdatesEnabled" :checking-official-rules="checkingOfficialSiteRules"
         @refresh-official="updateOfficialSiteRules(true)" />
-</SettingsPanel>
+    </SettingsPanel>
     <SettingsPanel name="preview">
       <SiteRulePreview :settings="config" :adaptation="config.siteAdaptation" :scope="config.translationScope"
         :official-pack="officialSiteRuleRelease?.pack" @inspect-rule="inspectSiteRule" />
     </SettingsPanel>
   </section>
+
+  <!-- 翻译中心 -->
   <section v-if="hasVisitedSection('settings-translation-center')" v-show="props.activeSection === 'settings-translation-center'" id="settings-translation-center" class="settings-section translation-center-section">
     <TranslationCenter @configure-service="openInputServiceSettings" />
   </section>
+
+  <!-- 输入与写作 -->
   <section v-if="hasVisitedSection('settings-writing')" v-show="props.activeSection === 'settings-writing'" id="settings-writing" class="settings-section">
-    <WritingSettings :config="config" @configure-service="openWritingServiceSettings()" />
+    <SettingsPanel name="input" :active="props.activePanel">
+      <InputTranslationSettings
+        id="input-translation-settings"
+        :active="viewActive && props.activeSection === 'settings-writing' && (!props.activePanel || props.activePanel === 'input')"
+        :config="config"
+        :service-options="availableServiceOptions"
+        @trigger-change="handleInputBoxTranslationTriggerChange"
+      />
+    </SettingsPanel>
+    <SettingsPanel name="writing" :active="props.activePanel">
+      <SettingsGroup
+        v-if="browserCapabilities.browser === 'userscript' || !WritingSettings"
+        data-userscript-unavailable="writing"
+        :title="t('options.panel.writing')"
+        :description="t('options.userscriptUnavailableDescription')"
+      />
+      <WritingSettings v-else :config="config" />
+    </SettingsPanel>
   </section>
+
+  <!-- 划词翻译 -->
   <section v-if="hasVisitedSection('settings-selection')" v-show="props.activeSection === 'settings-selection'" id="settings-selection" class="settings-section">
     <ServiceRepairReturn :active="viewActive && props.activeSection === 'settings-selection'" :context="config" context-key="settings-selection" :show-repair-hint="false" />
-    <SelectionSettings :config="config" @navigate="openSettingsSection($event)">
-    <SettingsGroup v-if="config.selectionTranslatorMode !== 'disabled'" title="触发与显示" data-settings-anchor="trigger" data-settings-anchor-label="触发与显示" description="推荐选择“点击图标”，选中文字后点击入口再翻译；选择快捷键或仅右键菜单时不显示浮动入口">
-    <SettingsItem v-if="config.selectionTranslatorMode !== 'disabled'" label="显示内容" description="保留原文对照，或只显示译文">
-      <SegmentedControl v-model="config.selectionTranslatorMode" :options="selectionTranslatorModeOptions.filter(item => item.value !== 'disabled')" label="划词显示内容" />
-    </SettingsItem>
-    <SettingsItem v-if="config.selectionTranslatorMode !== 'disabled'" label="划词触发方式" :help="t('selectionTrigger.modeDescription')">
-      <template #description>
-        <small v-if="config.selectionTranslatorTrigger === 'direct'" class="selection-context-menu-hint">直接弹出会在每次划词后打开译文，容易打断阅读</small>
-        <small v-if="config.selectionTranslatorTrigger === 'contextMenu'" class="selection-context-menu-hint" :class="{ 'is-unavailable': config.contextMenuEnabled === false || config.contextMenuEntries?.translateSelection === false }">
-          {{ t(config.contextMenuEnabled === false || config.contextMenuEntries?.translateSelection === false ? 'selectionTrigger.contextMenuUnavailable' : 'selectionTrigger.contextMenuHint') }}
-        </small>
-      </template>
-      <div class="hotkey-config">
-        <el-select :model-value="config.selectionTranslatorTrigger" aria-label="划词翻译触发方式" placeholder="选择触发方式" @change="handleSelectionTriggerChange">
-          <el-option v-for="item in options.selectionTranslatorTriggers" :key="item.value" :label="item.value === 'contextMenu' ? t('selectionTrigger.contextMenu') : item.label" :value="item.value" />
-        </el-select>
-        <div v-if="config.selectionTranslatorTrigger === 'custom'" class="custom-hotkey-display">
-          <span class="hotkey-text" v-if="config.customSelectionTranslatorHotkey">
-            {{ getCustomSelectionHotkeyDisplayName() }}
-          </span>
-          <span class="hotkey-text placeholder-text" v-else>
-            点击设置自定义快捷键
-          </span>
-          <el-button size="small" type="text" class="edit-button" aria-label="编辑划词翻译快捷键" title="编辑划词翻译快捷键" @click="openCustomSelectionHotkeyDialog">
-            <el-icon><Edit /></el-icon>
-          </el-button>
-        </div>
-      </div>
-    </SettingsItem>
-    <ClickSelectionSettings :config="config" :active="viewActive && props.activeSection === 'settings-selection'" />
-    <SettingsItem v-if="config.selectionTranslatorMode !== 'disabled'" label="继续阅读时自动收起" description="滚动页面或复制原文时自动收起，鼠标移开后隐藏未点击的入口；卡片内的滚动和复制不受影响">
-      <el-switch v-model="config.selectionTranslatorAutoDismiss" class="settings-toggle" aria-label="继续阅读时自动收起" />
-    </SettingsItem>
-    <SettingsItem v-if="config.selectionTranslatorMode !== 'disabled'" label="划词显示延迟" help="从选区稳定后开始计时，再显示图标、小点或翻译面板；快捷键在等待结束后按下会立即显示">
-      <SettingsNumberInput
-        :key="selectionDelayContext.revision.value"
-        :model-value="config.selectionTranslatorDelay"
-        :disabled="!selectionDelayContext.active.value"
-        unit="ms"
-        aria-label="划词翻译显示延迟"
-        :min="SELECTION_TRANSLATOR_DELAY_MIN"
-        :max="SELECTION_TRANSLATOR_DELAY_MAX"
-        :step="SELECTION_TRANSLATOR_DELAY_STEP"
-        :onChange="selectionDelayChange"
-      />
-    </SettingsItem>
-    <SettingsItem
-      v-if="config.selectionTranslatorMode !== 'disabled' && ['en', 'zh-Hans', 'zh-Hant'].includes(config.to)"
-      label="中英双向划词"
-      description="选中中文或英文时，即使与目标语言相同也会显示划词入口，并自动译成另一种语言；卡片内可临时切换语言，默认设置保持不变"
-    >
-      <el-switch v-model="config.selectionTranslatorBidirectional" class="settings-toggle" aria-label="中英双向划词" />
-    </SettingsItem>
-    <SettingsItem v-if="config.selectionTranslatorTrigger === 'hover'" label="悬停等待" description="将鼠标停在划词图标上，等待设定时间后打开译文；移开鼠标则取消">
-      <SettingsNumberInput v-model="config.harness.hoverDelay" unit="ms" :min="200" :max="3000" :step="100" aria-label="悬停等待时间" />
-    </SettingsItem>
-    </SettingsGroup>
-    <template #advanced><LocalTtsSettings :config="config" :active="viewActive && props.activeSection === 'settings-selection'" :context="config" /></template>
+    <SelectionSettings :config="config">
+      <SettingsGroup title="触发与显示" data-settings-anchor="trigger" data-settings-anchor-label="触发与显示">
+        <SettingsItem label="显示内容">
+          <SegmentedControl v-model="config.selectionTranslatorMode" :options="selectionTranslatorModeOptions.filter(item => item.value !== 'disabled')" label="划词显示内容" />
+        </SettingsItem>
+        <SettingsItem label="划词触发方式" :help="t('selectionTrigger.modeDescription')">
+          <template #description>
+            <small v-if="config.selectionTranslatorTrigger === 'direct'" class="selection-context-menu-hint">直接弹出会在每次划词后打开译文，容易打断阅读</small>
+            <small v-if="config.selectionTranslatorTrigger === 'contextMenu'" class="selection-context-menu-hint" :class="{ 'is-unavailable': config.contextMenuEnabled === false || config.contextMenuEntries?.translateSelection === false }">
+              {{ t(config.contextMenuEnabled === false || config.contextMenuEntries?.translateSelection === false ? 'selectionTrigger.contextMenuUnavailable' : 'selectionTrigger.contextMenuHint') }}
+            </small>
+          </template>
+          <div class="hotkey-config">
+            <el-select :model-value="config.selectionTranslatorTrigger" aria-label="划词翻译触发方式" placeholder="选择触发方式" @change="handleSelectionTriggerChange">
+              <el-option v-for="item in options.selectionTranslatorTriggers" :key="item.value" :label="item.value === 'contextMenu' ? t('selectionTrigger.contextMenu') : item.label" :value="item.value" />
+            </el-select>
+            <div v-if="config.selectionTranslatorTrigger === 'custom'" class="custom-hotkey-display">
+              <span class="hotkey-text" v-if="config.customSelectionTranslatorHotkey">
+                {{ getCustomSelectionHotkeyDisplayName() }}
+              </span>
+              <span class="hotkey-text placeholder-text" v-else>
+                点击设置自定义快捷键
+              </span>
+              <el-button size="small" type="text" class="edit-button" aria-label="编辑划词翻译快捷键" title="编辑划词翻译快捷键" @click="openCustomSelectionHotkeyDialog">
+                <el-icon><Edit /></el-icon>
+              </el-button>
+            </div>
+          </div>
+        </SettingsItem>
+        <ClickSelectionSettings :config="config" :active="viewActive && props.activeSection === 'settings-selection'" />
+        <SettingsItem label="继续阅读时自动收起" description="滚动页面或复制原文时自动收起卡片外入口">
+          <el-switch v-model="config.selectionTranslatorAutoDismiss" class="settings-toggle" aria-label="继续阅读时自动收起" />
+        </SettingsItem>
+        <SettingsItem
+          v-if="['en', 'zh-Hans', 'zh-Hant'].includes(config.to)"
+          label="中英双向划词"
+          description="选中中英文时自动互译"
+        >
+          <el-switch v-model="config.selectionTranslatorBidirectional" class="settings-toggle" aria-label="中英双向划词" />
+        </SettingsItem>
+        <details class="settings-inline-disclosure" data-testid="selection-timing-advanced">
+          <summary>
+            <span>{{ t('settings.selection.triggerAdvanced') }}</span>
+            <small>{{ config.selectionTranslatorDelay }} ms</small>
+          </summary>
+          <SettingsItem label="划词显示延迟" help="从选区稳定后开始计时，再显示图标、小点或翻译面板；快捷键在等待结束后按下会立即显示">
+            <SettingsNumberInput
+              :key="selectionDelayContext.revision.value"
+              :model-value="config.selectionTranslatorDelay"
+              :disabled="!selectionDelayContext.active.value"
+              unit="ms"
+              aria-label="划词翻译显示延迟"
+              :min="SELECTION_TRANSLATOR_DELAY_MIN"
+              :max="SELECTION_TRANSLATOR_DELAY_MAX"
+              :step="SELECTION_TRANSLATOR_DELAY_STEP"
+              :onChange="selectionDelayChange"
+            />
+          </SettingsItem>
+          <SettingsItem v-if="config.selectionTranslatorTrigger === 'hover'" label="悬停等待" description="鼠标停在划词图标上达到设定时间后打开译文">
+            <SettingsNumberInput v-model="config.harness.hoverDelay" unit="ms" :min="200" :max="3000" :step="100" aria-label="悬停等待时间" />
+          </SettingsItem>
+        </details>
+      </SettingsGroup>
+      <template #advanced><LocalTtsSettings :config="config" :active="viewActive && props.activeSection === 'settings-selection'" :context="config" /></template>
     </SelectionSettings>
   </section>
+
+  <!-- 术语库 -->
   <section v-if="hasVisitedSection('settings-glossary')" v-show="props.activeSection === 'settings-glossary'" id="settings-glossary" class="settings-section">
     <GlossarySettings :active="viewActive && props.activeSection === 'settings-glossary'" />
   </section>
+
   <div class="settings-main-sections">
     <!-- 翻译服务 -->
     <section v-if="hasVisitedSection('settings-services')" v-show="props.activeSection === 'settings-services'" id="settings-services" class="settings-section">
@@ -214,281 +256,238 @@
       </ServiceCatalog>
       </SettingsPanel>
     </section>
+
+    <!-- 外观与界面 -->
+    <section v-if="hasVisitedSection('settings-interface')" v-show="props.activeSection === 'settings-interface'" id="settings-interface" class="settings-section">
+      <InterfaceSettings :config="config" :active-panel="props.activePanel" :active="viewActive && props.activeSection === 'settings-interface'" />
+    </section>
+
+    <!-- 网页翻译：全文 / 悬浮与局部 / 阅读辅助 / 排除语言 -->
+    <section v-if="hasVisitedSection('settings-translation')" v-show="props.activeSection === 'settings-translation'" id="settings-translation" class="settings-section">
+      <SettingsPanel name="page" id="full-page-settings" :active="props.activePanel">
+        <SettingsGroup title="全文翻译">
+          <SettingsItem :label="t('quickTranslation.commonFullPageShortcut')">
+            <div class="hotkey-config">
+              <el-select :model-value="config.floatingBallHotkey" aria-label="全文翻译快捷键" placeholder="选择快捷键" @change="handleHotkeyChange">
+                <el-option v-for="item in options.floatingBallHotkeys" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+              <div v-if="config.floatingBallHotkey === 'custom'" class="custom-hotkey-display">
+                <span v-if="config.customFloatingBallHotkey" class="hotkey-text">{{ getCustomHotkeyDisplayName() }}</span>
+                <span v-else class="hotkey-text placeholder-text">点击设置自定义快捷键</span>
+                <el-button size="small" type="text" class="edit-button" aria-label="编辑全文翻译快捷键" title="编辑全文翻译快捷键" @click="openCustomHotkeyDialog">
+                  <el-icon><Edit /></el-icon>
+                </el-button>
+              </div>
+            </div>
+          </SettingsItem>
+          <SettingsItem label="全文翻译范围" help="“按阅读进度”预翻译可视区域附近的内容；“立即翻译到网页底部”处理已加载的整页及后续新增内容，可能增加无限滚动页面的请求量和费用；下次启动全文翻译时生效">
+            <SegmentedControl v-model="config.fullPageTranslationMode" :options="fullPageTranslationModeOptions" label="全文翻译范围" />
+          </SettingsItem>
+          <SettingsItem :label="t('popup.aiContext.settingsTitle')" :description="t('popup.aiContext.how')" :help="t('settings.general.aiContextHelp')">
+            <el-switch v-model="config.enableAIContext" class="settings-toggle" :aria-label="t('popup.aiContext.settingsTitle')" />
+          </SettingsItem>
+          <SettingsItem :label="t('settings.general.progressPanel')" :description="t('settings.general.progressPanelDescription')">
+            <el-switch v-model="config.translationProgressPanelEnabled" class="settings-toggle" :aria-label="t('settings.general.progressPanel')" @change="handleTranslationProgressPanelChange" />
+          </SettingsItem>
+          <details id="page-recognition-settings" class="settings-inline-disclosure" data-testid="full-page-strategy-advanced">
+            <summary>
+              <span>{{ t('settings.translation.advancedStrategy') }}</span>
+            </summary>
+            <AiMultiSegmentSettings :config="config" :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'page')"
+              @update:limits="setAIMultiSegmentLimits" />
+            <SettingsItem :label="t('settings.pageRecognition.allNodes')" :description="t('settings.pageRecognition.description')">
+              <el-switch v-model="config.translationScope" active-value="all" inactive-value="content" class="settings-toggle" :aria-label="t('settings.pageRecognition.allNodes')" />
+            </SettingsItem>
+            <SettingsItem :label="t('settings.pageRecognition.pageTitle')" :description="t('settings.pageRecognition.pageTitleDescription')">
+              <el-switch v-model="config.pageTitleTranslationEnabled" class="settings-toggle" :aria-label="t('settings.pageRecognition.pageTitle')" />
+            </SettingsItem>
+            <SettingsItem :label="t('settings.pageRecognition.sidebar')" :description="t('settings.pageRecognition.sidebarDescription')">
+              <el-switch v-model="config.sidebarTranslationEnabled" class="settings-toggle" :aria-label="t('settings.pageRecognition.sidebar')" />
+            </SettingsItem>
+            <ParagraphHandlingSettings :config="config" />
+            <QuickTranslationProfiles :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'page')" :config="config" action="full-page" :profiles="config.quickTranslationProfiles"
+              @update:profiles="config.quickTranslationProfiles = $event" />
+          </details>
+        </SettingsGroup>
+      </SettingsPanel>
+
+      <SettingsPanel name="hover" id="hover-translation-settings" :active="props.activePanel">
+        <SettingsGroup title="鼠标悬浮翻译" description="按住快捷键并移到段落上即可翻译">
+          <SettingsItem :label="t('quickTranslation.commonHoverShortcut')">
+            <div class="hotkey-config">
+              <el-select :model-value="config.hotkey" aria-label="鼠标悬浮快捷键" placeholder="请选择快捷键" @change="handleMouseHotkeyChange">
+                <el-option v-for="item in options.keys" :key="item.value" :label="item.label" :value="item.value" :disabled="item.disabled" :class="{ 'select-divider': item.disabled }" />
+              </el-select>
+              <div v-if="config.hotkey === 'custom'" class="custom-hotkey-display">
+                <span class="hotkey-text" v-if="config.customHotkey">
+                  {{ getCustomMouseHotkeyDisplayName() }}
+                </span>
+                <span class="hotkey-text placeholder-text" v-else>
+                  点击设置自定义快捷键
+                </span>
+                <el-button size="small" type="text" class="edit-button" aria-label="编辑鼠标悬浮快捷键" title="编辑鼠标悬浮快捷键" @click="openCustomMouseHotkeyDialog">
+                  <el-icon><Edit /></el-icon>
+                </el-button>
+              </div>
+            </div>
+          </SettingsItem>
+          <details class="settings-inline-disclosure" data-testid="hover-translation-advanced">
+            <summary>
+              <span>{{ t('settings.translation.hoverAdvanced') }}</span>
+              <small>{{ config.mouseHoverTranslationDelay }} ms</small>
+            </summary>
+            <SettingsItem label="悬浮翻译延迟" help="按住悬浮快捷键并移动鼠标后，等待设定时间再翻译；增加延迟可减少 Ctrl+C 等组合键的误触">
+              <SettingsNumberInput
+                :key="hoverDelayContext.revision.value"
+                :model-value="config.mouseHoverTranslationDelay"
+                :disabled="!hoverDelayContext.active.value"
+                unit="ms"
+                aria-label="悬浮翻译延迟"
+                :min="MOUSE_HOVER_TRANSLATION_DELAY_MIN"
+                :max="MOUSE_HOVER_TRANSLATION_DELAY_MAX"
+                :step="MOUSE_HOVER_TRANSLATION_DELAY_STEP"
+                :onChange="hoverDelayChange"
+              />
+            </SettingsItem>
+            <QuickTranslationProfiles :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'hover')" :config="config" action="hover" :profiles="config.quickTranslationProfiles"
+              @update:profiles="config.quickTranslationProfiles = $event" />
+          </details>
+        </SettingsGroup>
+        <div id="section-translation-settings">
+          <SectionTranslationSettings :config="config" :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'hover')" />
+        </div>
+      </SettingsPanel>
+
+      <SettingsPanel name="reading" :active="props.activePanel">
+        <SentenceHighlightStyleSettings :config="config" />
+        <InformationHighlightSettings v-if="browserCapabilities.browser !== 'userscript' && props.activeSection === 'settings-translation'" :config="config" :active="viewActive && props.activeSection === 'settings-translation'" />
+        <SettingsGroup v-if="browserCapabilities.browser !== 'userscript'" id="personal-corrections-settings">
+          <SettingsItem :label="t('settings.personalCorrections.title')" :description="t('settings.personalCorrections.description')" :help="t('settings.personalCorrections.help')">
+            <el-switch v-model="config.personalCorrectionsEnabled" class="settings-toggle" data-testid="personal-corrections-enabled" :aria-label="t('settings.personalCorrections.title')" />
+          </SettingsItem>
+        </SettingsGroup>
+        <div id="paragraph-copy-settings">
+          <ParagraphCopySettings :config="config" :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'reading')" />
+        </div>
+      </SettingsPanel>
+
+      <SettingsPanel name="excluded-languages" id="excluded-language-settings" :active="props.activePanel">
+        <ExcludedLanguageSettings v-model="config.excludedLanguages" />
+      </SettingsPanel>
+      <SettingsPanel name="excluded-tags" id="excluded-tag-settings" :active="props.activePanel">
+        <ExcludedTagSettings v-model="config.excludedTags" />
+      </SettingsPanel>
+    </section>
+
+    <!-- 悬浮球与右键 -->
+    <section v-if="hasVisitedSection('settings-interactions')" v-show="props.activeSection === 'settings-interactions'" id="settings-interactions" class="settings-section">
+      <SettingsPanel name="floating-ball" id="floating-ball-settings" :active="props.activePanel">
+        <FloatingBallSettings :config="config" @toggle="broadcastFeatureState(['toggleFloatingBall'])" />
+      </SettingsPanel>
+      <SettingsPanel name="context-menu" id="context-menu-settings" :active="props.activePanel">
+        <SettingsGroup
+          v-if="browserCapabilities.browser === 'userscript'"
+          data-userscript-unavailable="context-menu"
+          :title="t('contextMenuSettings.title')"
+          :description="t('options.userscriptUnavailableDescription')"
+        />
+        <ContextMenuSettings v-else :active="viewActive && props.activeSection === 'settings-interactions' && (!props.activePanel || props.activePanel === 'context-menu')" :config="config" />
+      </SettingsPanel>
+    </section>
+
+    <!-- 图片与漫画 -->
     <section v-if="hasVisitedSection('settings-image-translation')" v-show="props.activeSection === 'settings-image-translation'" id="settings-image-translation" class="settings-section image-translation-settings">
       <MangaSettings v-if="props.activeSection === 'settings-image-translation'" v-model:image-enabled="imageTranslationEnabled" :settings="config" :available="browserCapabilities.imageTranslation" :service-options="availableServiceOptions">
         <div id="settings-area-translation" data-settings-anchor="area" :data-settings-anchor-label="t('area.settings.title')">
           <AreaTranslationSettings :config="config" :service-options="availableServiceOptions" :enabled="selectionAreaTranslationEnabled" :active="viewActive && props.activeSection === 'settings-image-translation'" :show-ocr="false" compact @update:enabled="selectionAreaTranslationEnabled = $event" />
         </div>
-      <template #resources><ImageOcrSettings v-if="viewActive && props.activeSection === 'settings-image-translation'" compact embedded :active="config.imageTranslationOcrEngine === 'tesseract'" v-model:source-language="config.from" /></template>
+        <template #resources><ImageOcrSettings v-if="viewActive && props.activeSection === 'settings-image-translation'" compact embedded :active="config.imageTranslationOcrEngine === 'tesseract'" v-model:source-language="config.from" /></template>
       </MangaSettings>
     </section>
+
+    <!-- 视频字幕 -->
     <section v-if="hasVisitedSection('settings-video')" v-show="props.activeSection === 'settings-video'" id="settings-video" class="settings-section">
       <SettingsPanel name="general" :active="props.activePanel">
-      <SettingsGroup>
-        <FeatureEnableCard v-model="config.videoTranslationEnabled" title="视频字幕翻译" :description="t('video.description')" />
-        <SettingsItem :label="t('video.course.auto')" :disabled="!config.videoTranslationEnabled">
-          <div class="video-course-auto-sites" role="group" :aria-label="t('video.course.auto')">
-            <div v-for="site in VIDEO_COURSE_PLATFORMS" :key="site" class="video-course-auto-site">
-              <span>{{ courseSiteLabels[site] }}</span>
-              <el-switch v-model="config.videoCourseAutoStart[site]" size="small" class="settings-toggle" :aria-label="`${courseSiteLabels[site]} ${t('video.course.auto')}`" :data-video-course-auto="site" :disabled="!config.videoTranslationEnabled" />
-            </div>
-          </div>
-        </SettingsItem>
-        <SettingsItem label="会议平台自动开启双语字幕" description="在 Teams、Zoom、Google Meet 网页会议中自动开启可用字幕；平台或主持人需允许字幕" :disabled="!config.videoTranslationEnabled">
-          <el-switch v-model="config.videoMeetingAutoEnabled" class="settings-toggle" aria-label="会议平台自动开启双语字幕" :disabled="!config.videoTranslationEnabled" />
-        </SettingsItem>
-        <SettingsItem label="优先使用人工字幕" description="YouTube、Udemy、Disney+ 有目标语言人工字幕时优先使用；不可用时继续翻译原字幕" :disabled="!config.videoTranslationEnabled">
-          <el-switch v-model="config.videoPreferHumanSubtitles" class="settings-toggle" aria-label="优先使用人工字幕" :disabled="!config.videoTranslationEnabled" />
-        </SettingsItem>
-        <SettingsItem label="视频翻译服务" description="默认跟随网页翻译服务，也可单独选择；AI 服务会提前预取字幕" :disabled="!config.videoTranslationEnabled">
-          <el-select v-model="config.videoService" :empty-values="[null, undefined]" aria-label="视频字幕翻译服务" :disabled="!config.videoTranslationEnabled" placeholder="请选择服务" filterable>
-            <el-option :label="t('featureServices.followDefault')" value="" />
-            <el-option v-if="config.videoService && selectedVideoServiceUnavailableMessage" :label="selectedVideoServiceLabel" :value="config.videoService" disabled />
-            <el-option v-for="item in videoServiceOptions" :key="item.value" class="select-left" :label="item.label" :value="item.value" />
-          </el-select>
-          <p v-if="selectedVideoServiceUnavailableMessage" class="capability-warning">{{ selectedVideoServiceUnavailableMessage }}</p>
-        </SettingsItem>
-        <SettingsItem
-          v-if="config.glossaryLibraries.length || config.glossaryEnabled"
-          :label="t('glossary.title')"
-          :description="videoGlossaryDescription"
-          :disabled="!config.videoTranslationEnabled"
-        >
-          <GlossaryLibrarySelect
-            v-model="config.videoGlossaryIds"
-            :libraries="config.glossaryLibraries"
-            :enabled="config.glossaryEnabled"
-            :disabled="!config.videoTranslationEnabled"
-            :show-copy="false"
-          >
-            <template #mode-control="{mode, changeMode}">
-              <el-select
-                :model-value="mode"
-                :aria-label="t('glossary.mode')"
-                :disabled="!config.videoTranslationEnabled"
-                @update:model-value="changeMode"
+        <SettingsGroup>
+          <FeatureEnableCard v-model="config.videoTranslationEnabled" title="视频字幕翻译" :description="t('video.description')" />
+          <template v-if="config.videoTranslationEnabled">
+            <p v-if="selectedVideoServiceUnavailableMessage" class="video-service-warning" role="status">{{ selectedVideoServiceLabel }} · {{ selectedVideoServiceUnavailableMessage }}</p>
+            <SettingsItem :label="t('video.course.auto')">
+              <div class="video-course-auto-sites" role="group" :aria-label="t('video.course.auto')">
+                <div v-for="site in VIDEO_COURSE_PLATFORMS" :key="site" class="video-course-auto-site">
+                  <span>{{ courseSiteLabels[site] }}</span>
+                  <el-switch v-model="config.videoCourseAutoStart[site]" size="small" class="settings-toggle" :aria-label="`${courseSiteLabels[site]} ${t('video.course.auto')}`" :data-video-course-auto="site" />
+                </div>
+              </div>
+            </SettingsItem>
+            <SettingsItem label="会议平台自动开启双语字幕" description="在 Teams、Zoom、Google Meet 网页会议中自动开启可用字幕">
+              <el-switch v-model="config.videoMeetingAutoEnabled" class="settings-toggle" aria-label="会议平台自动开启双语字幕" />
+            </SettingsItem>
+            <SettingsItem label="优先使用人工字幕" description="YouTube、Udemy、Disney+ 有目标语言人工字幕时优先使用">
+              <el-switch v-model="config.videoPreferHumanSubtitles" class="settings-toggle" aria-label="优先使用人工字幕" />
+            </SettingsItem>
+            <SettingsItem
+              v-if="config.glossaryLibraries.length || config.glossaryEnabled"
+              :label="t('glossary.title')"
+              :description="videoGlossaryDescription"
+            >
+              <GlossaryLibrarySelect
+                v-model="config.videoGlossaryIds"
+                :libraries="config.glossaryLibraries"
+                :enabled="config.glossaryEnabled"
+                :show-copy="false"
               >
-                <el-option value="inherit" :label="t('glossary.inherit')" />
-                <el-option value="none" :label="t('glossary.none')" />
-                <el-option value="selected" :label="t('glossary.choose')" :disabled="!config.glossaryLibraries.length" />
-              </el-select>
-            </template>
-          </GlossaryLibrarySelect>
-        </SettingsItem>
-      </SettingsGroup>
-      <VideoSubtitleShortcutSettings
-        v-if="VideoSubtitleShortcutSettings"
-        :config="config"
-        :active="viewActive && props.activeSection === 'settings-video' && (!props.activePanel || props.activePanel === 'general')"
-      />
+                <template #mode-control="{mode, changeMode}">
+                  <el-select
+                    :model-value="mode"
+                    :aria-label="t('glossary.mode')"
+                    @update:model-value="changeMode"
+                  >
+                    <el-option value="inherit" :label="t('glossary.inherit')" />
+                    <el-option value="none" :label="t('glossary.none')" />
+                    <el-option value="selected" :label="t('glossary.choose')" :disabled="!config.glossaryLibraries.length" />
+                  </el-select>
+                </template>
+              </GlossaryLibrarySelect>
+            </SettingsItem>
+          </template>
+        </SettingsGroup>
+        <VideoSubtitleShortcutSettings
+          v-if="config.videoTranslationEnabled && VideoSubtitleShortcutSettings"
+          :config="config"
+          :active="viewActive && props.activeSection === 'settings-video' && (!props.activePanel || props.activePanel === 'general')"
+        />
       </SettingsPanel>
-      <SettingsPanel name="appearance" :active="props.activePanel">
-<VideoSubtitleAppearanceSettings :config="config" />
-</SettingsPanel>
-      <SettingsPanel name="local" :active="props.activePanel">
-<SettingsGroup title="X 本地 AI 字幕" :description="translateLegacy('为没有原生字幕的 X 视频生成字幕')">
-        <SettingsItem label="视频原语言" :description="translateLegacy('自动检测适合大多数视频')" :help="translateLegacy('仅用于 X 没有原生字幕时的本地识别；模型和音频留在当前浏览器，下载后可离线识别')" :disabled="!config.videoTranslationEnabled || !browserCapabilities.extensionDom">
-          <el-select v-model="config.videoSourceLanguage" aria-label="视频原语言" :disabled="!config.videoTranslationEnabled || !browserCapabilities.extensionDom" placeholder="请选择视频原语言">
-            <el-option v-for="item in VIDEO_SOURCE_LANGUAGE_OPTIONS" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </SettingsItem>
-        <VideoLocalModelSettings :config="config" :active="viewActive && props.activeSection === 'settings-video' && (!props.activePanel || props.activePanel === 'local')" :context="config" />
-      </SettingsGroup>
-</SettingsPanel>
+      <SettingsPanel v-if="config.videoTranslationEnabled" name="appearance" :active="props.activePanel">
+        <VideoSubtitleAppearanceSettings :config="config" />
+      </SettingsPanel>
+      <SettingsPanel v-if="config.videoTranslationEnabled" name="video-learning" :active="props.activePanel">
+        <VideoSentenceLearningAppearanceSettings :config="config" />
+      </SettingsPanel>
+      <SettingsPanel v-if="config.videoTranslationEnabled" name="local" :active="props.activePanel">
+        <SettingsDisclosure :title="t('settings.video.localAiSummary')" :description="translateLegacy('为没有原生字幕的 X 视频生成字幕')" :status="config.videoTranscriptionProvider === 'native-qwen' ? 'Qwen3 ASR' : 'Whisper'">
+          <SettingsGroup class="video-local-group">
+            <SettingsItem label="视频原语言" :help="translateLegacy('仅用于 X 没有原生字幕时的本地识别；模型和音频留在当前浏览器，下载后可离线识别')" :disabled="!browserCapabilities.extensionDom">
+              <el-select v-model="config.videoSourceLanguage" aria-label="视频原语言" :disabled="!browserCapabilities.extensionDom" placeholder="请选择视频原语言">
+                <el-option v-for="item in VIDEO_SOURCE_LANGUAGE_OPTIONS" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </SettingsItem>
+            <VideoLocalModelSettings :config="config" :active="viewActive && props.activeSection === 'settings-video' && (!props.activePanel || props.activePanel === 'local')" :context="config" />
+          </SettingsGroup>
+        </SettingsDisclosure>
+      </SettingsPanel>
     </section>
-    <!-- 鼠标悬浮快捷键 -->
-    <section v-if="hasVisitedSection('settings-translation')" v-show="props.activeSection === 'settings-translation'" id="settings-translation" class="settings-section">
-<SettingsPanel name="reading" :active="props.activePanel">
-  <ReadingAssistanceSettings :config="config" @configure-style="openSettingsSection('settings-interface', 'translation-sentence-highlight-style')" />
-</SettingsPanel>
-<SettingsPanel name="information-highlight" :active="props.activePanel">
-  <InformationHighlightSettings v-if="browserCapabilities.browser !== 'userscript' && props.activeSection === 'settings-translation'" :config="config" :active="viewActive && props.activeSection === 'settings-translation'" />
-</SettingsPanel>
-<SettingsPanel name="hover" :active="props.activePanel">
-    <SettingsGroup title="鼠标悬浮翻译" description="按住快捷键并把鼠标移到文本上，等待设定时间后开始翻译">
-    <SettingsItem :label="t('quickTranslation.commonHoverShortcut')">
-      <div class="hotkey-config">
-        <el-select :model-value="config.hotkey" aria-label="鼠标悬浮快捷键" placeholder="请选择快捷键" @change="handleMouseHotkeyChange">
-          <el-option v-for="item in options.keys" :key="item.value" :label="item.label" :value="item.value" :disabled="item.disabled" :class="{ 'select-divider': item.disabled }" />
-        </el-select>
-        <div v-if="config.hotkey === 'custom'" class="custom-hotkey-display">
-          <span class="hotkey-text" v-if="config.customHotkey">
-            {{ getCustomMouseHotkeyDisplayName() }}
-          </span>
-          <span class="hotkey-text placeholder-text" v-else>
-            点击设置自定义快捷键
-          </span>
-          <el-button size="small" type="text" class="edit-button" aria-label="编辑鼠标悬浮快捷键" title="编辑鼠标悬浮快捷键" @click="openCustomMouseHotkeyDialog">
-            <el-icon><Edit /></el-icon>
-          </el-button>
-        </div>
-      </div>
-    </SettingsItem>
-    <SettingsItem label="悬浮翻译延迟" help="按住悬浮快捷键并移动鼠标后，等待设定时间再翻译；增加延迟可减少 Ctrl+C 等组合键的误触，松开快捷键触发的单次翻译不受影响">
-      <SettingsNumberInput
-        :key="hoverDelayContext.revision.value"
-        :model-value="config.mouseHoverTranslationDelay"
-        :disabled="!hoverDelayContext.active.value"
-        unit="ms"
-        aria-label="悬浮翻译延迟"
-        :min="MOUSE_HOVER_TRANSLATION_DELAY_MIN"
-        :max="MOUSE_HOVER_TRANSLATION_DELAY_MAX"
-        :step="MOUSE_HOVER_TRANSLATION_DELAY_STEP"
-        :onChange="hoverDelayChange"
-      />
-    </SettingsItem>
-    <QuickTranslationProfiles :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'hover')" :config="config" action="hover" :profiles="config.quickTranslationProfiles"
-      @update:profiles="config.quickTranslationProfiles = $event" />
-    </SettingsGroup>
-    </SettingsPanel>
-</section>
 
-
-
-    <!-- 高级选项 -->
+    <!-- 高级与隐私 -->
     <section v-if="hasVisitedSection('settings-advanced')" v-show="props.activeSection === 'settings-advanced'" id="settings-advanced" class="settings-section">
       <SettingsPanel name="privacy" :active="props.activePanel">
         <PrivacyProtectionSettings id="privacy-protection-settings" :config="config" :active="viewActive && props.activeSection === 'settings-advanced' && (!props.activePanel || props.activePanel === 'privacy')" />
       </SettingsPanel>
-      <SettingsPanel name="recognition" :active="props.activePanel">
-<SettingsGroup :title="t('settings.pageRecognition.title')">
-        <SettingsItem :label="t('settings.pageRecognition.allNodes')" :description="t('settings.pageRecognition.description')">
-          <el-switch v-model="config.translationScope" active-value="all" inactive-value="content" class="settings-toggle" :aria-label="t('settings.pageRecognition.allNodes')" />
-        </SettingsItem>
-        <SettingsItem :label="t('settings.pageRecognition.pageTitle')" :description="t('settings.pageRecognition.pageTitleDescription')">
-          <el-switch v-model="config.pageTitleTranslationEnabled" class="settings-toggle" :aria-label="t('settings.pageRecognition.pageTitle')" />
-        </SettingsItem>
-        <SettingsItem :label="t('settings.pageRecognition.sidebar')" :description="t('settings.pageRecognition.sidebarDescription')">
-          <el-switch v-model="config.sidebarTranslationEnabled" class="settings-toggle" :aria-label="t('settings.pageRecognition.sidebar')" />
-        </SettingsItem>
-      </SettingsGroup>
-      <ParagraphHandlingSettings :config="config" />
-</SettingsPanel>
-      <SettingsPanel name="cache" :active="props.activePanel">
-<TranslationCacheSettings :config="config" :active="viewActive && props.activeSection === 'settings-advanced' && (!props.activePanel || props.activePanel === 'cache')" />
-</SettingsPanel>
-    </section>
-
-    <section v-if="hasVisitedSection('settings-general')" v-show="props.activeSection === 'settings-general'" class="settings-section settings-section-continuation">
-      <SettingsGroup :title="t('settings.general.assistance')" data-settings-anchor="assistance" :data-settings-anchor-label="t('settings.general.assistance')">
-        <template #heading-extra>
-          <button
-            type="button"
-            class="settings-navigation-link settings-heading-link"
-            data-testid="open-translation-settings"
-            @click="openSettingsSection('settings-translation')"
-          >
-            <span>{{ t('settings.general.translationSettingsShortcut') }}</span>
-            <el-icon aria-hidden="true"><ArrowRight /></el-icon>
-          </button>
-        </template>
-        <SettingsItem :label="t('popup.aiContext.settingsTitle')" :description="t('popup.aiContext.how')" :help="t('settings.general.aiContextHelp')">
-          <el-switch v-model="config.enableAIContext" class="settings-toggle" :aria-label="t('popup.aiContext.settingsTitle')" />
-        </SettingsItem>
-        <SettingsItem id="floating-ball-toggle" :label="t('settings.general.floatingBall')">
-          <template #description>
-            <small>{{ t('settings.general.floatingBallDescription') }} <button type="button" class="settings-inline-link" data-testid="open-floating-ball-settings" @click="openSettingsSection('settings-translation', 'floating-ball-settings')">{{ t('settings.general.floatingBallSettingsAction') }}</button></small>
-          </template>
-          <el-switch v-model="floatingBallEnabled" class="settings-toggle" :aria-label="t('settings.general.floatingBall')" />
-        </SettingsItem>
-        <ToolbarClickSetting v-if="ToolbarClickSetting" :config="config" />
-        <SettingsItem :label="t('settings.general.progressPanel')" :description="t('settings.general.progressPanelDescription')">
-          <el-switch v-model="config.translationProgressPanelEnabled" class="settings-toggle" :aria-label="t('settings.general.progressPanel')" @change="handleTranslationProgressPanelChange" />
-        </SettingsItem>
-      </SettingsGroup>
-      <SettingsGroup :title="t('settings.general.preferences')" data-settings-anchor="preferences" :data-settings-anchor-label="t('settings.general.preferences')">
-        <SettingsItem data-testid="ui-language-setting" :label="t('settings.general.language')">
-          <template #copy>
-            <strong data-i18n-ignore>{{ t('settings.general.language') }}<span v-if="language !== 'en-US'" lang="en"> / Language</span></strong>
-          </template>
-          <UiLanguageSelector compact :active="viewActive && props.activeSection === 'settings-general'" />
-        </SettingsItem>
-        <SettingsItem :label="t('settings.general.theme')" :description="t('settings.general.themeDescription')">
-          <SegmentedControl v-model="config.theme" :options="options.theme" :label="t('settings.general.theme')" />
-        </SettingsItem>
-      </SettingsGroup>
-    </section>
-
-    <section v-if="hasVisitedSection('settings-interface')" v-show="props.activeSection === 'settings-interface'" id="settings-interface" class="settings-section">
-      <InterfaceSettings :config="config" :active-panel="props.activePanel" :active="viewActive && props.activeSection === 'settings-interface'" />
-    </section>
-
-    <section v-if="hasVisitedSection('settings-translation')" v-show="props.activeSection === 'settings-translation'" class="settings-section settings-section-continuation">
-<SettingsPanel name="input" :active="props.activePanel">
-      <InputTranslationSettings
-        :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'input')"
-        :config="config"
-        :service-options="availableServiceOptions"
-        @trigger-change="handleInputBoxTranslationTriggerChange"
-      />
-    </SettingsPanel>
-</section>
-
-    <section v-if="hasVisitedSection('settings-translation')" v-show="props.activeSection === 'settings-translation'" class="settings-section settings-section-continuation">
-<SettingsPanel name="page" :active="props.activePanel">
-      <SettingsGroup title="全文翻译" description="设置启动全文翻译的方式、处理范围和网页内入口">
-        <SettingsItem :label="t('quickTranslation.commonFullPageShortcut')" description="设置快捷键，用于在全文翻译和原文之间切换">
-          <div class="hotkey-config">
-            <el-select :model-value="config.floatingBallHotkey" aria-label="全文翻译快捷键" placeholder="选择快捷键" @change="handleHotkeyChange">
-              <el-option v-for="item in options.floatingBallHotkeys" :key="item.value" :label="item.label" :value="item.value" />
-            </el-select>
-            <div v-if="config.floatingBallHotkey === 'custom'" class="custom-hotkey-display">
-              <span v-if="config.customFloatingBallHotkey" class="hotkey-text">{{ getCustomHotkeyDisplayName() }}</span>
-              <span v-else class="hotkey-text placeholder-text">点击设置自定义快捷键</span>
-              <el-button size="small" type="text" class="edit-button" aria-label="编辑全文翻译快捷键" title="编辑全文翻译快捷键" @click="openCustomHotkeyDialog">
-                <el-icon><Edit /></el-icon>
-              </el-button>
-            </div>
-          </div>
-        </SettingsItem>
-        <AiMultiSegmentSettings :config="config" :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'page')"
-          @update:limits="setAIMultiSegmentLimits" />
-        <SettingsItem label="全文翻译范围" help="“按阅读进度”预翻译可视区域附近的内容；“立即翻译到网页底部”处理已加载的整页及后续新增内容，无需自动滚动，可能增加无限滚动页面的请求量和费用；下次启动全文翻译时生效">
-          <SegmentedControl v-model="config.fullPageTranslationMode" :options="fullPageTranslationModeOptions" label="全文翻译范围" />
-        </SettingsItem>
-
-        <QuickTranslationProfiles :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'page')" :config="config" action="full-page" :profiles="config.quickTranslationProfiles"
-          @update:profiles="config.quickTranslationProfiles = $event" />
-      </SettingsGroup>
-    </SettingsPanel>
-    <SettingsPanel name="context-menu" id="context-menu-settings" :active="props.activePanel">
-      <SettingsGroup
-        v-if="browserCapabilities.browser === 'userscript'"
-        data-userscript-unavailable="context-menu"
-        :title="t('contextMenuSettings.title')"
-        :description="t('options.userscriptUnavailableDescription')"
-      />
-      <ContextMenuSettings v-else :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'context-menu')" :config="config" />
-    </SettingsPanel>
-</section>
-
-    <section v-if="hasVisitedSection('settings-translation')" v-show="props.activeSection === 'settings-translation'" id="floating-ball-settings" class="settings-section settings-section-continuation">
-<SettingsPanel name="floating-ball" :active="props.activePanel">
-      <FloatingBallSettings :config="config" />
-    </SettingsPanel>
-</section>
-
-    <section v-if="hasVisitedSection('settings-translation')" v-show="props.activeSection === 'settings-translation'" class="settings-section settings-section-continuation">
-<SettingsPanel name="paragraph-copy" id="paragraph-copy-settings" :active="props.activePanel">
-      <ParagraphCopySettings :config="config" :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'paragraph-copy')" />
-    </SettingsPanel>
-    <SettingsPanel name="section-translation" id="section-translation-settings" :active="props.activePanel">
-      <SectionTranslationSettings :config="config" :active="viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'section-translation')" />
-    </SettingsPanel>
-    <SettingsPanel name="excluded-languages" id="excluded-language-settings" :active="props.activePanel">
-      <ExcludedLanguageSettings v-model="config.excludedLanguages" />
-    </SettingsPanel>
-    <SettingsPanel name="excluded-tags" id="excluded-tag-settings" :active="props.activePanel">
-      <ExcludedTagSettings v-model="config.excludedTags" />
-    </SettingsPanel>
-</section>
-
-    <section v-if="hasVisitedSection('settings-advanced')" v-show="props.activeSection === 'settings-advanced'" class="settings-section settings-section-continuation">
       <SettingsPanel name="requests" :active="props.activePanel">
-<SettingsGroup :title="t('settings.requestLimits.globalTitle')" :description="t('settings.requestLimits.globalHelp')">
-        <div data-testid="translation-scheduler-settings">
-          <RequestLimitFields :active="viewActive && props.activeSection === 'settings-advanced'" :model-value="config" @update:model-value="Object.assign(config, $event)" />
-          <SettingsItem data-testid="ai-request-timeout-settings" :label="t('settings.requestLimits.aiTimeout')" :description="t('settings.requestLimits.aiTimeoutHelp')">
+        <SettingsGroup :title="t('settings.requestLimits.globalTitle')" :description="t('settings.requestLimits.globalHelp')">
+          <div data-testid="translation-scheduler-settings">
+            <RequestLimitFields :active="viewActive && props.activeSection === 'settings-advanced'" :model-value="config" @update:model-value="Object.assign(config, $event)" />
+            <SettingsItem data-testid="ai-request-timeout-settings" :label="t('settings.requestLimits.aiTimeout')" :description="t('settings.requestLimits.aiTimeoutHelp')">
               <SettingsNumberInput
                 :key="requestSettingsContext.revision.value"
                 :model-value="aiRequestTimeoutSeconds"
@@ -500,40 +499,43 @@
                 :step="1"
                 :onChange="requestSettingsActions.timeout"
               />
-          </SettingsItem>
-          <SettingsItem label="失败后最多重试">
-            <SettingsNumberInput :key="requestSettingsContext.revision.value" :model-value="config.translationMaxRetries" :disabled="!requestSettingsContext.active.value" aria-label="失败后最多重试" :min="0" :max="10" :onChange="requestSettingsActions.retries" />
-          </SettingsItem>
-          <SettingsItem
-            :label="t('settings.requestLimits.apiKeyRecovery')"
-            :description="t('settings.requestLimits.apiKeyRecoveryHelp')"
-          >
-            <div data-testid="api-key-recovery-setting">
-              <SettingsNumberInput
-              :key="requestSettingsContext.revision.value"
-              :disabled="!requestSettingsContext.active.value"
-              :model-value="apiKeyRecoveryMinutes"
-              :unit="t('settings.requestLimits.minutes')"
-              :aria-label="t('settings.requestLimits.apiKeyRecovery')"
-              :min="MIN_API_KEY_RECOVERY_MINUTES"
-              :max="MAX_API_KEY_RECOVERY_MINUTES"
-              :step="1"
-              :onChange="requestSettingsActions.keyRecovery"
-              />
-            </div>
-          </SettingsItem>
-          <details class="request-retry-settings" data-testid="translation-retry-settings">
-            <summary>{{ t('settings.requestLimits.retryIntervals') }}</summary>
-            <SettingsItem :label="t('settings.requestLimits.initialRetryWait')">
-              <SettingsNumberInput :key="requestSettingsContext.revision.value" :disabled="!requestSettingsContext.active.value" :model-value="config.translationBackoffBaseMs" unit="ms" :aria-label="t('settings.requestLimits.initialRetryWait')" :min="MIN_TRANSLATION_BACKOFF_BASE_MS" :max="MAX_TRANSLATION_BACKOFF_BASE_MS" :step="100" :onChange="requestSettingsActions.backoffBase" />
             </SettingsItem>
-            <SettingsItem :label="t('settings.requestLimits.maximumRetryWait')">
-              <SettingsNumberInput :key="requestSettingsContext.revision.value" :disabled="!requestSettingsContext.active.value" :model-value="config.translationBackoffMaxMs" unit="ms" :aria-label="t('settings.requestLimits.maximumRetryWait')" :min="Math.max(MIN_TRANSLATION_BACKOFF_MAX_MS, config.translationBackoffBaseMs)" :max="MAX_TRANSLATION_BACKOFF_MAX_MS" :step="1000" :onChange="requestSettingsActions.backoffMax" />
+            <SettingsItem label="失败后最多重试">
+              <SettingsNumberInput :key="requestSettingsContext.revision.value" :model-value="config.translationMaxRetries" :disabled="!requestSettingsContext.active.value" aria-label="失败后最多重试" :min="0" :max="10" :onChange="requestSettingsActions.retries" />
             </SettingsItem>
-          </details>
-        </div>
-      </SettingsGroup>
-</SettingsPanel>
+            <SettingsItem
+              :label="t('settings.requestLimits.apiKeyRecovery')"
+              :description="t('settings.requestLimits.apiKeyRecoveryHelp')"
+            >
+              <div data-testid="api-key-recovery-setting">
+                <SettingsNumberInput
+                  :key="requestSettingsContext.revision.value"
+                  :disabled="!requestSettingsContext.active.value"
+                  :model-value="apiKeyRecoveryMinutes"
+                  :unit="t('settings.requestLimits.minutes')"
+                  :aria-label="t('settings.requestLimits.apiKeyRecovery')"
+                  :min="MIN_API_KEY_RECOVERY_MINUTES"
+                  :max="MAX_API_KEY_RECOVERY_MINUTES"
+                  :step="1"
+                  :onChange="requestSettingsActions.keyRecovery"
+                />
+              </div>
+            </SettingsItem>
+            <details class="request-retry-settings" data-testid="translation-retry-settings">
+              <summary>{{ t('settings.requestLimits.retryIntervals') }}</summary>
+              <SettingsItem :label="t('settings.requestLimits.initialRetryWait')">
+                <SettingsNumberInput :key="requestSettingsContext.revision.value" :disabled="!requestSettingsContext.active.value" :model-value="config.translationBackoffBaseMs" unit="ms" :aria-label="t('settings.requestLimits.initialRetryWait')" :min="MIN_TRANSLATION_BACKOFF_BASE_MS" :max="MAX_TRANSLATION_BACKOFF_BASE_MS" :step="100" :onChange="requestSettingsActions.backoffBase" />
+              </SettingsItem>
+              <SettingsItem :label="t('settings.requestLimits.maximumRetryWait')">
+                <SettingsNumberInput :key="requestSettingsContext.revision.value" :disabled="!requestSettingsContext.active.value" :model-value="config.translationBackoffMaxMs" unit="ms" :aria-label="t('settings.requestLimits.maximumRetryWait')" :min="Math.max(MIN_TRANSLATION_BACKOFF_MAX_MS, config.translationBackoffBaseMs)" :max="MAX_TRANSLATION_BACKOFF_MAX_MS" :step="1000" :onChange="requestSettingsActions.backoffMax" />
+              </SettingsItem>
+            </details>
+          </div>
+        </SettingsGroup>
+      </SettingsPanel>
+      <SettingsPanel name="cache" :active="props.activePanel">
+        <TranslationCacheSettings :config="config" :active="viewActive && props.activeSection === 'settings-advanced' && (!props.activePanel || props.activePanel === 'cache')" />
+      </SettingsPanel>
     </section>
 
     <div v-if="hasVisitedSection('settings-translation-stats')" v-show="props.activeSection === 'settings-translation-stats'">
@@ -651,7 +653,7 @@ import {
   normalizeTranslationBackoffBaseMs,
   normalizeTranslationBackoffMaxMs,
 } from '@/src/core/config/model';
-import { ArrowRight, Edit } from '@element-plus/icons-vue'
+import { Edit } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import browser from 'webextension-polyfill';
 import {isBrowserTabId} from '@/src/platform/browser/ids';
@@ -679,7 +681,6 @@ const CustomOpenAIProviderDialog = defineAsyncComponent(async () => {
 });
 const TranslationCenter = defineAsyncComponent(() => import('@/src/features/translation-center/public').then(module => module.TranslationCenter));
 const openInputServiceSettings = (service: string) => { setConfigurationService(service); openSettingsSection('settings-services', 'connections'); };
-const openWritingServiceSettings = () => openInputServiceSettings(config.value.writing.service || config.value.service);
 const WritingSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./WritingSettings.vue'));
 // 单文件 userscript 没有扩展模型端口，构建期移除不可用组件与下载 UI。
 const InformationHighlightSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./InformationHighlightSettings.vue'));
@@ -719,6 +720,8 @@ const VideoLocalModelSettings = import.meta.env.BROWSER === 'userscript' ? null 
 const VideoSubtitleShortcutSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSubtitleShortcutSettings.vue'));
 const LocalTtsSettings = defineAsyncComponent(() => import('./LocalTtsSettings.vue'));
 const VideoSubtitleAppearanceSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSubtitleAppearanceSettings.vue'));
+const VideoSentenceLearningAppearanceSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSentenceLearningAppearanceSettings.vue'));
+const SentenceHighlightStyleSettings = defineAsyncComponent(() => import('./SentenceHighlightStyleSettings.vue'));
 const ModelUsageDashboard = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/model-usage/public').then(module => module.ModelUsageDashboard));
 const TranslationStatsDashboard = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/translation-stats/public').then(module => module.TranslationStatsDashboard));
 const InterfaceSettings = defineAsyncComponent(() => import('./InterfaceSettings.vue'));
@@ -732,9 +735,9 @@ const TranslationCacheSettings = defineAsyncComponent(() => import('./Translatio
 import AiMultiSegmentSettings from './AiMultiSegmentSettings.vue';
 import type {AiMultiSegmentLimits} from '@/src/core/config/aiMultiSegment';
 import SettingsGroup from './components/SettingsGroup.vue';
+import SettingsDisclosure from './components/SettingsDisclosure.vue';
 import ExcludedLanguageSettings from './ExcludedLanguageSettings.vue';
 import ExcludedTagSettings from './ExcludedTagSettings.vue';
-import ReadingAssistanceSettings from './ReadingAssistanceSettings.vue';
 import SettingsItem from './components/SettingsItem.vue';
 import SettingsNumberInput from './components/SettingsNumberInput.vue';
 import RequestLimitFields from './services/RequestLimitFields.vue';
@@ -930,7 +933,11 @@ const {
   validateCustomMouseHotkey,
   validateCustomSelectionHotkey,
 } = useTranslationShortcutSettings(config,
-  kind => viewActive.value && props.activeSection === (kind === 'selection' ? 'settings-selection' : 'settings-translation'),
+  kind => viewActive.value && props.activeSection === (
+    kind === 'selection' ? 'settings-selection'
+      : kind === 'input' ? 'settings-writing'
+        : 'settings-translation'
+  ),
   () => configEditor.applying);
 const customProviderDialogOpen = ref(false);
 const customProviderDialogRequested = ref(false);
@@ -1141,7 +1148,6 @@ const selectedVideoServiceLabel = computed(() => {
 const configuredServiceIds = computed(() => platformAvailableServiceOptions.value
   .filter(item => !item.disabled && hasSavedServiceConfiguration(item.value, config.value))
   .map(item => item.value));
-const videoServiceOptions = computed(() => availableServiceOptions.value.filter((item: any) => !item.disabled));
 const videoGlossaryDescription = computed(() => {
   if (!config.value.glossaryEnabled) return t('glossary.disabledHint');
   const service = config.value.videoService || config.value.service;
@@ -1442,13 +1448,6 @@ function broadcastFeatureState(types: readonly SettingsBroadcastType[]): void {
   });
 }
 
-const floatingBallEnabled = computed({
-  get: () => !config.value.disableFloatingBall,
-  set: (value) => {
-    config.value.disableFloatingBall = !value;
-    broadcastFeatureState(['toggleFloatingBall']);
-  },
-});
 const imageTranslationEnabled = computed({
   get: () => !config.value.disableImageTranslator,
   set: (value) => {

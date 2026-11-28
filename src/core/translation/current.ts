@@ -8,12 +8,12 @@
 
 import {normalizeExcludedTags} from '@/src/core/config/pageTranslation';
 import {TranslationCandidateCore} from './engine';
-import {defaultTranslationAdapters} from './registry';
+import {getDefaultTranslationAdapters} from './registry';
 import type {TranslationCandidate, TranslationScope, TranslationSiteAdapter} from './types';
 
 let cachedHref = '';
 const cachedCores = new Map<TranslationScope, TranslationCandidateCore>();
-let currentAdapters: readonly TranslationSiteAdapter[] = defaultTranslationAdapters;
+let currentAdapters: readonly TranslationSiteAdapter[] | null = null;
 let currentIncludeSidebarRegions = false;
 let currentExcludedSelectors: readonly string[] = [];
 
@@ -71,7 +71,7 @@ export function getCurrentTranslationCore(scope: TranslationScope = 'content'): 
     if (!core) {
         core = new TranslationCandidateCore({
             url: new URL(href),
-            adapters: currentAdapters,
+            adapters: currentAdapters ?? getDefaultTranslationAdapters(),
             scope,
             includeSidebarRegions: currentIncludeSidebarRegions,
             excludedSelectors: currentExcludedSelectors,

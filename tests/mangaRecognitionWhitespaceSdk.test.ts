@@ -25,6 +25,7 @@ import * as spacing from '@/src/features/image-translation/services/mangaRecogni
 const localRequire=createRequire(import.meta.url),sdkRequire=createRequire(localRequire.resolve('ppu-paddle-ocr/web'));
 const canvasRequire=createRequire(sdkRequire.resolve('ppu-ocv/canvas-web')),native=canvasRequire('@napi-rs/canvas');
 beforeEach(()=>{
+    vi.stubGlobal('WebAssembly',{...WebAssembly,Suspending:function(){},promising:function(){}});
     state.dictionary=Array.from({length:18710},(_,index)=>index===0||index===18709?'':`unused-${index}`);
     state.dictionary[1]='A';state.dictionary[2]='B';state.dictionary[3]='C';state.raw=[];
     vi.stubGlobal('document',{createElement:()=>native.createCanvas(1,1)});vi.stubGlobal('OffscreenCanvas',undefined);

@@ -5,8 +5,8 @@
  * 模块边界：本文件属于 platform 层，只处理固定哈希纯数据（JSON、字体、字形映射、词典等），绝不加载或执行远程 JavaScript 或 WASM。
  */
 
-import {orderMirrorUrls, rememberPreferredMirrorOrigin} from '@/src/core/assets/mirrors';
-import {cancelResponseReader, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
+import {demoteMirrorOrigin, orderMirrorUrls, rememberPreferredMirrorOrigin} from '@/src/core/assets/mirrors';
+import {abortErrorFromSignal, cancelResponseReader, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
 
 export interface VerifiedAssetSpec {
     readonly id: string;
@@ -54,15 +54,19 @@ export function canUseVerifiedAssetCache(): boolean {
         && typeof globalThis.crypto?.subtle?.digest === 'function';
 }
 
+function throwIfAborted(signal?: AbortSignal): void {
+    if (signal?.aborted) throw abortErrorFromSignal(signal);
+}
+
 function withAbort<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     if (!signal) return Promise.resolve().then(operation);
-    signal.throwIfAborted();
+    throwIfAborted(signal);
     return new Promise<T>((resolve, reject) => {
-        const abort = () => reject(signal.reason);
+        const abort = () => reject(abortErrorFromSignal(signal));
         signal.addEventListener('abort', abort, {once: true});
         void Promise.resolve()
             .then(() => {
-                signal.throwIfAborted();
+                throwIfAborted(signal);
                 return operation();
             })
             .then(resolve, reject)
@@ -86,7 +90,7 @@ async function readBoundedAndVerified(
     signal?: AbortSignal,
 ): Promise<Uint8Array<ArrayBuffer>> {
     const contentType = response.headers?.get?.('Content-Type') || '';
-    if (!response.ok || !response.body || /text\/html/iu.test(contentType)) {
+    if (response.status !== 200 || !response.body || /text\/html/iu.test(contentType)) {
         cancelUnreadResponseBody(response);
         throw new Error(`Asset ${spec.id} unavailable: HTTP ${response.status}`);
     }
@@ -101,7 +105,7 @@ async function readBoundedAndVerified(
     let offset = 0;
     try {
         while (true) {
-            signal?.throwIfAborted();
+            throwIfAborted(signal);
             const chunk = await withAbort(() => reader.read(), signal);
             if (chunk.done) break;
             if (offset + chunk.value.byteLength > spec.bytes) {
@@ -120,7 +124,7 @@ async function readBoundedAndVerified(
     if (actualSha256 !== spec.sha256) {
         throw new Error(`Asset ${spec.id} integrity mismatch`);
     }
-    signal?.throwIfAborted();
+    throwIfAborted(signal);
     return bytes;
 }
 
@@ -170,7 +174,7 @@ export async function downloadVerifiedAsset(
     signal?: AbortSignal,
 ): Promise<Uint8Array<ArrayBuffer>> {
     assertSafeAssetSpec(spec);
-    signal?.throwIfAborted();
+    throwIfAborted(signal);
 
     const digest = deps.digest ?? (typeof globalThis.crypto?.subtle?.digest === 'function'
         ? (data: ArrayBuffer) => globalThis.crypto.subtle.digest('SHA-256', data)
@@ -185,36 +189,46 @@ export async function downloadVerifiedAsset(
     const timeoutMs = spec.timeoutMs ?? DEFAULT_SOURCE_TIMEOUT_MS;
     let lastError: unknown;
     for (const url of orderMirrorUrls(spec.urls)) {
-        signal?.throwIfAborted();
+        throwIfAborted(signal);
         const controller = new AbortController();
         const abort = () => controller.abort(signal?.reason);
         signal?.addEventListener('abort', abort, {once: true});
         const timer = setTimeout(() => controller.abort(new DOMException(`Asset ${spec.id} timeout`, 'TimeoutError')), timeoutMs);
         try {
-            const response = await withAbort(() => fetchImpl(url, {
+            const fetchPromise = Promise.resolve().then(() => fetchImpl(url, {
                 credentials: 'omit',
                 referrerPolicy: 'no-referrer',
                 cache: 'no-store',
                 signal: controller.signal,
-            }), controller.signal);
+            }));
+            void fetchPromise.then(
+                (lateResponse) => { if (controller.signal.aborted) cancelUnreadResponseBody(lateResponse); },
+                () => undefined,
+            );
+            const response = await withAbort(() => fetchPromise, controller.signal);
             const bytes = await readBoundedAndVerified(response, spec, digest, controller.signal);
+            clearTimeout(timer);
             rememberPreferredMirrorOrigin(url);
+            throwIfAborted(signal);
             if (openCache) {
                 try {
-                    const cache = await openCache(spec.cacheName);
-                    await cache.put(spec.cacheKey, new Response(bytes, {
+                    const cache = await withAbort(() => openCache(spec.cacheName), signal);
+                    await withAbort(() => cache.put(spec.cacheKey, new Response(bytes, {
                         headers: {
                             'Content-Type': spec.contentType,
                             'Content-Length': String(spec.bytes),
                         },
-                    }));
-                } catch {
+                    })), signal);
+                } catch (cacheError) {
+                    if (signal?.aborted) throw cacheError;
                     // 持久化失败不影响本次已校验数据的使用。
                 }
             }
+            throwIfAborted(signal);
             return bytes;
         } catch (error) {
             if (signal?.aborted) throw error;
+            demoteMirrorOrigin(url);
             lastError = error;
         } finally {
             clearTimeout(timer);
@@ -225,27 +239,33 @@ export async function downloadVerifiedAsset(
     throw new Error(`Asset ${spec.id} sources unavailable`, {cause: lastError});
 }
 
-/** 读取缓存或按国内/海外多镜像顺序下载固定版本纯数据并校验后持久化；同一资产的并发下载自动合并。 */
+/** 读取缓存或按国内/海外多镜像顺序下载固定版本纯数据并校验后持久化；同一资产的并发读取与下载自动合并并返回独立字节副本。 */
 export async function fetchVerifiedAsset(
     spec: VerifiedAssetSpec,
     deps: VerifiedAssetCacheDependencies = {},
     signal?: AbortSignal,
 ): Promise<Uint8Array<ArrayBuffer>> {
     assertSafeAssetSpec(spec);
-    signal?.throwIfAborted();
-    const cached = await readVerifiedCachedAsset(spec, deps, signal);
-    if (cached) return cached;
+    throwIfAborted(signal);
 
     // 仅在默认依赖且无私有取消信号时跨调用方共享在途请求，避免自定义 mock/取消信号互相干扰。
     const canDeduplicate = !deps.fetch && !deps.openCache && !deps.digest && !signal;
-    if (!canDeduplicate) return downloadVerifiedAsset(spec, deps, signal);
+    if (!canDeduplicate) {
+        const cached = await readVerifiedCachedAsset(spec, deps, signal);
+        if (cached) return cached;
+        return downloadVerifiedAsset(spec, deps, signal);
+    }
 
     const dedupeKey = `${spec.cacheName}::${spec.cacheKey}`;
     const existing = inFlightDownloads.get(dedupeKey);
-    if (existing) return existing;
-    const pending = downloadVerifiedAsset(spec, deps, signal).finally(() => {
+    if (existing) return existing.then(bytes => bytes.slice());
+    const pending = (async () => {
+        const cached = await readVerifiedCachedAsset(spec, deps);
+        if (cached) return cached;
+        return downloadVerifiedAsset(spec, deps);
+    })().finally(() => {
         inFlightDownloads.delete(dedupeKey);
     });
     inFlightDownloads.set(dedupeKey, pending);
-    return pending;
+    return pending.then(bytes => bytes.slice());
 }

@@ -24,7 +24,7 @@ import {
     CODE,
     DEPENDENCY_CONTENT,
     TEST_FILE_PATTERN,
-    analyzeDependencyGraph,
+    analyzeProjectDependencyGraph,
     collectAffectedClosure,
     explainDependencies,
 } from './dependency-graph.mjs';
@@ -58,7 +58,7 @@ const VIA_RANK = {
 };
 
 function parseArguments(argv) {
-    const options = {explain: null, why: null, hubs: false, forPaths: null, base: 'origin/main', limit: 12, json: false};
+    const options = {explain: null, why: null, hubs: false, forPaths: null, base: 'origin/main', limit: 12, json: false, noCache: false};
     for (let index = 0; index < argv.length; index++) {
         const argument = argv[index];
         if (argument === '--') continue;
@@ -69,6 +69,10 @@ function parseArguments(argv) {
         }
         if (argument === '--json') {
             options.json = true;
+            continue;
+        }
+        if (argument === '--no-cache') {
+            options.noCache = true;
             continue;
         }
         if (!['--explain', '--why', '--for', '--base', '--limit'].includes(argument)) {
@@ -98,18 +102,8 @@ function git(...args) {
         stdio: ['ignore', 'pipe', 'pipe']});
 }
 
-function loadWorkspace() {
-    const files = {};
-    const tracked = git('ls-files', '-z').split('\0');
-    const untracked = git('ls-files', '--others', '--exclude-standard', '-z').split('\0');
-    for (const file of [...new Set([...tracked, ...untracked])]) {
-        if (!file) continue;
-        const absolute = path.join(PROJECT_ROOT, file);
-        if (!existsSync(absolute)) continue;
-        files[file] = CODE.test(file) && (SCANNED.test(file) || !file.includes('/'))
-            ? readFileSync(absolute, 'utf8') : '';
-    }
-    return {files, ...analyzeDependencyGraph(files)};
+function loadWorkspace(options = {}) {
+    return analyzeProjectDependencyGraph(PROJECT_ROOT, {noCache: Boolean(options.noCache)});
 }
 
 function upstreamOf(reverse, node, cache) {
@@ -191,9 +185,13 @@ function explain(graph, reverse, target, limit) {
     return {data, text: lines.join('\n')};
 }
 
-function explainEdges(files, graph, known, target, limit) {
+function explainEdges(infoMap, graph, known, target, limit) {
     if (!graph.has(target)) throw new Error(`依赖图中没有 ${target}（是否路径写错或文件未被引用）`);
-    const rows = explainDependencies(target, files[target] ?? '', known, files);
+    const absolute = path.join(PROJECT_ROOT, target);
+    const source = existsSync(absolute) && CODE.test(target) && (SCANNED.test(target) || !target.includes('/'))
+        ? readFileSync(absolute, 'utf8')
+        : '';
+    const rows = explainDependencies(target, source, known, infoMap);
     rows.sort((left, right) => (VIA_RANK[left.via] ?? 9) - (VIA_RANK[right.via] ?? 9) || right.files.length - left.files.length);
     const lines = [`${target} 解析出 ${rows.length} 条依赖（目录回退与模板匹配排在前）`];
     for (const row of rows.slice(0, limit)) {
@@ -273,17 +271,17 @@ function changedFiles(base) {
 function main(argv = process.argv.slice(2)) {
     const options = parseArguments(argv);
     if (options.help) {
-        console.log('node scripts/testing/test-impact.mjs [--explain <file>] [--why <file>] [--hubs] [--for <p1,p2>] [--base <git-ref>] [--limit <n>] [--json]');
+        console.log('node scripts/testing/test-impact.mjs [--explain <file>] [--why <file>] [--hubs] [--for <p1,p2>] [--base <git-ref>] [--limit <n>] [--no-cache] [--json]');
         return;
     }
-    const {files, graph, reverse, barrels, known} = loadWorkspace();
+    const {infoMap, graph, reverse, barrels, known} = loadWorkspace(options);
     if (options.explain) {
         const result = explain(graph, reverse, normalizePath(options.explain), options.limit);
         console.log(options.json ? JSON.stringify(result.data, null, 2) : `依赖图：${graph.size} 个节点（${barrels.size} 个纯 barrel）\n\n${result.text}`);
         return;
     }
     if (options.why) {
-        const result = explainEdges(files, graph, known, normalizePath(options.why), options.limit);
+        const result = explainEdges(infoMap, graph, known, normalizePath(options.why), options.limit);
         console.log(options.json ? JSON.stringify(result.data, null, 2) : `依赖图：${graph.size} 个节点\n\n${result.text}`);
         return;
     }

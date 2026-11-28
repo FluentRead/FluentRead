@@ -12,7 +12,15 @@
  */
 import {imageTranslationFailureCode, imageLocalFailureMessage, type ImageLocalFailure} from '../failure';
 import {sendRuntimeMessage} from '@/src/platform/browser/runtimeMessages';
-import type {ImageTranslationStage} from '../progress';
+import {
+    IMAGE_LOADING_MESSAGE,
+    IMAGE_PREPARING_MESSAGE,
+    IMAGE_PREPARING_REVEAL_DELAY_MS,
+    IMAGE_QUEUED_MESSAGE,
+    imageLoadingProgress,
+    normalizeImageProgress,
+    type ImageTranslationStage,
+} from '../progress';
 import { config, subscribeConfig } from '@/src/services/config/store';
 import {watch} from 'vue';
 import {getCompositeTranslationConfigFingerprint} from '@/src/core/config/compositeTranslation';
@@ -1290,12 +1298,19 @@ function loadImage(dataUrl: string, signal: AbortSignal): Promise<HTMLImageEleme
     });
 }
 
-function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, message: string, progress?: number, stage?: ImageTranslationStage): void {
+function setButtonState(
+    state: ImageTranslationState,
+    phase: ImageControlPhase,
+    message: string,
+    progress?: number,
+    stage?: ImageTranslationStage,
+    showPercent?: boolean,
+): void {
     const phaseChanged = state.phase !== phase;
     state.phase = phase;
     if (state.manga && phase === 'loading') publishMangaStatus({...mangaStatus, message, progress, stage});
     state.controls.update(phase, message, {
-        prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress, quiet: state.manga === true,
+        prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress, showPercent, quiet: state.manga === true,
         warning: phase === 'translated' && (state.layoutFallback || state.lines.some(line => line.renderSkipped)
             || (!state.translatedImage && state.lines.length > 0)),
         warningAction: phase === 'translated' && (state.layoutFallback || state.lines.some(line => line.renderSkipped)
@@ -1305,8 +1320,8 @@ function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, 
         modelSettings: phase === 'error' && Boolean(state.localFailure),
         serviceSettings: phase === 'error' && !state.needsPreparation, errorDetails: state.errorDetails,
     });
-    // 状态改变本身未必触发下一帧布局；仅阶段切换时布置边缘提示，进度百分比不重复测量图片。
-    if (state.manga && phaseChanged && (phase === 'loading' || phase === 'error')) updateOverlayPosition(state);
+    // 状态改变本身未必触发下一帧布局；仅阶段切换时布置边角/居中提示，进度百分比不重复测量图片。
+    if (phaseChanged && (phase === 'loading' || phase === 'error')) updateOverlayPosition(state);
 }
 
 function ownsHiddenImage(state: ImageTranslationState): boolean {
@@ -1448,7 +1463,7 @@ function translateImage(state: ImageTranslationState, prepareLanguages = false):
             };
             queued.promise = previous.promise.then(start, start);
             state.queuedTranslation = queued;
-            setButtonState(state, 'loading', '等待上一项任务结束…');
+            setButtonState(state, 'loading', IMAGE_QUEUED_MESSAGE);
             return queued.promise;
         }
     }
@@ -1490,7 +1505,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         setImageReaderLines(state);
         const controller = new AbortController();
         state.abortController = controller;
-        setButtonState(state, 'loading', '正在读取图片…');
+        setButtonState(state, 'loading', IMAGE_LOADING_MESSAGE, imageLoadingProgress(), undefined, false);
         try {
             retryWithResource = await probeOptionalSegmentationReady(controller.signal).catch(error => {
                 // 临时译图可用时，状态读取异常仍可复用它。原图保留分支继续显示可重试的错误。
@@ -1525,7 +1540,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         return;
     }
     if (!prepareLanguages && state.manga && lightResult(state.image)) {
-        setButtonState(state, 'loading', '正在生成译图…');
+        setButtonState(state, 'loading', IMAGE_LOADING_MESSAGE, imageLoadingProgress('rendering'), 'rendering', false);
         await warmMangaPage(state.image);
         return;
     }
@@ -1540,16 +1555,32 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
     const controller = new AbortController();
     state.abortController = controller;
     let preparingLanguages = prepareLanguages;
-    setButtonState(state, 'loading', prepareLanguages ? '正在准备识别语言包…' : '正在读取图片…');
+    let loadingProgress = imageLoadingProgress();
+    let preparingRevealed = false;
+    let preparingProgress: number | undefined;
+    let preparingTimer: number | null = null;
+    const clearPreparingReveal = () => {
+        if (preparingTimer !== null) {
+            window.clearTimeout(preparingTimer);
+            preparingTimer = null;
+        }
+        preparingRevealed = false;
+        preparingProgress = undefined;
+    };
+    controller.signal.addEventListener('abort', clearPreparingReveal, {once: true});
+    setButtonState(state, 'loading', prepareLanguages ? IMAGE_PREPARING_MESSAGE : IMAGE_LOADING_MESSAGE,
+        prepareLanguages ? undefined : loadingProgress, prepareLanguages ? 'preparing' : undefined, prepareLanguages);
     try {
         if (prepareLanguages) {
             await prepareImageOcrLanguages(sourceLanguage, controller.signal, (percent) => {
-                if (requestIsCurrent(state, controller)) setButtonState(state, 'loading', '正在准备识别语言包…', percent, 'preparing');
+                if (requestIsCurrent(state, controller)) {
+                    setButtonState(state, 'loading', IMAGE_PREPARING_MESSAGE, percent, 'preparing', true);
+                }
             });
             preparingLanguages = false;
             if (!requestIsCurrent(state, controller)) return;
             if (configurationIdentity(state.manga) !== identity) throw new Error('翻译设置已更改，请重试');
-            setButtonState(state, 'loading', '正在读取图片…');
+            setButtonState(state, 'loading', IMAGE_LOADING_MESSAGE, loadingProgress, undefined, false);
         }
         state.waitingForImage = !state.image.complete;
         await withTimeout(waitForImageReady(state.image, controller.signal), IMAGE_READ_TIMEOUT_MS, '图片加载超时', controller.signal);
@@ -1560,18 +1591,36 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
             IMAGE_READ_TIMEOUT_MS, '图片读取超时', controller.signal,
         );
         if (!requestIsCurrent(state, controller)) return;
-        setButtonState(state, 'loading', '正在识别并翻译…');
         const result = await translateImageInExtension(imageData, sourceLanguage, document.title, {
             ...(state.manga ? {manga: true} : {}),
             signal: controller.signal,
             timeoutMs: state.manga ? 300_000 : IMAGE_TRANSLATION_TIMEOUT_MS,
             onProgress: (stage, progress) => {
                 if (!requestIsCurrent(state, controller)) return;
-                setButtonState(state, 'loading', stage === 'preparing' ? (state.manga ? '正在准备漫画处理模型…' : '正在准备图片识别模型…') : stage === 'initializing' ? '正在初始化本地模型…' : stage === 'recognizing' ? '正在识别图片文字…'
-                    : stage === 'cleaning' ? '正在清除原文…'
-                    : stage === 'translating' ? '正在翻译文字…' : '正在生成译图…', stage === 'recognizing' || stage === 'preparing' || stage === 'cleaning' ? progress : undefined, stage);
+                if (stage === 'preparing') {
+                    preparingProgress = normalizeImageProgress(progress);
+                    if (preparingRevealed) {
+                        setButtonState(state, 'loading', IMAGE_PREPARING_MESSAGE, preparingProgress, stage, true);
+                        return;
+                    }
+                    if (preparingTimer === null) {
+                        preparingTimer = window.setTimeout(() => {
+                            preparingTimer = null;
+                            if (!requestIsCurrent(state, controller)) return;
+                            preparingRevealed = true;
+                            setButtonState(state, 'loading', IMAGE_PREPARING_MESSAGE, preparingProgress, 'preparing', true);
+                        }, IMAGE_PREPARING_REVEAL_DELAY_MS);
+                    }
+                    loadingProgress = imageLoadingProgress(stage, progress, loadingProgress);
+                    setButtonState(state, 'loading', IMAGE_LOADING_MESSAGE, loadingProgress, stage, false);
+                    return;
+                }
+                clearPreparingReveal();
+                loadingProgress = imageLoadingProgress(stage, progress, loadingProgress);
+                setButtonState(state, 'loading', IMAGE_LOADING_MESSAGE, loadingProgress, stage, false);
             },
         });
+        clearPreparingReveal();
         if (!requestIsCurrent(state, controller)) return;
         if (state.manga && result.lines.length === 0 && configurationIdentity(state.manga) === identity) {
             restoreOriginalImage(state);
@@ -1582,7 +1631,8 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
             showTranslatedImage(state);
             return;
         }
-        setButtonState(state, 'loading', '正在生成译图…');
+        loadingProgress = imageLoadingProgress('rendering', undefined, loadingProgress);
+        setButtonState(state, 'loading', IMAGE_LOADING_MESSAGE, loadingProgress, 'rendering', false);
         const page = state.manga && result.mangaPatches ? compressMangaPage(result.mangaPatches, result.lines) : undefined;
         const translatedImage = page ? (page.patches.length ? await composeMangaPage(state.image, page, controller.signal) : null)
             : result.imageUnchanged ? null : await withTimeout(loadImage(result.image, controller.signal), IMAGE_READ_TIMEOUT_MS, '译图加载超时', controller.signal);
@@ -1616,6 +1666,8 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
             : `图片翻译失败：${message}`);
         scheduleIdleStateRemoval(state);
     } finally {
+        clearPreparingReveal();
+        controller.signal.removeEventListener('abort', clearPreparingReveal);
         if (state.abortController === controller) {
             state.waitingForImage = false;
             state.abortController = null;
@@ -1693,9 +1745,29 @@ function imageAtPointer(event: Pick<MouseEvent, 'target' | 'clientX' | 'clientY'
     return null;
 }
 
+/** 仅在指针落入图片可见左下角热区或已在控件内时显示悬浮入口，避免浏览图片主体时弹出干扰。 */
+function pointerInImageCornerZone(image: HTMLImageElement, x: number, y: number, target?: EventTarget | null): boolean {
+    const state = states.get(image);
+    if (state && target instanceof Node && (state.controls.element.contains(target) || state.controls.reader.contains(target))) return true;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return true;
+    const rect = image.getBoundingClientRect();
+    const visibleLeft = Math.max(0, rect.left);
+    const visibleTop = Math.max(0, rect.top);
+    const visibleRight = Math.min(window.innerWidth, rect.right);
+    const visibleBottom = Math.min(window.innerHeight, rect.bottom);
+    if (visibleRight <= visibleLeft || visibleBottom <= visibleTop) return false;
+    const visibleWidth = visibleRight - visibleLeft;
+    const visibleHeight = visibleBottom - visibleTop;
+    const hotWidth = Math.min(visibleWidth, Math.max(72, Math.min(136, visibleWidth * 0.28)));
+    const hotHeight = Math.min(visibleHeight, Math.max(48, Math.min(84, visibleHeight * 0.28)));
+    return x >= visibleLeft && x <= visibleLeft + hotWidth
+        && y >= visibleBottom - hotHeight && y <= visibleBottom;
+}
+
 function handlePointerOver(event: PointerHitEvent): void {
     if (!event.isTrusted || event.pointerType === 'touch' || !imageTranslationAllowed(false) || config.imageTranslationHoverEnabled === false) return;
-    const image = imageAtPointer(event);
+    const rawImage = imageAtPointer(event);
+    const image = rawImage && pointerInImageCornerZone(rawImage, event.clientX, event.clientY, event.target) ? rawImage : null;
     // 在安排计时器之前过滤；明确发起的翻译仍保留进度、取消和恢复入口。
     const existing = image && states.get(image);
     if (image && (!existing || existing.phase === 'idle') && !isImageHoverEligible(image)) {
@@ -1718,18 +1790,16 @@ function handlePointerOver(event: PointerHitEvent): void {
     }
     const source = sourceIdentity(image);
     pointerRevealPoint = {x: event.clientX, y: event.clientY};
-    // 同一张图片停留后再显示；快速扫过不创建 DOM、观察器或请求。
+    // 同一张图片左下角停留后再显示；快速扫过或浏览图片主体时不创建 DOM、观察器或请求。
     pointerRevealTimer = window.setTimeout(() => {
         const pointer = pointerRevealPoint;
         pointerRevealTimer = null;
         pointerRevealPoint = null;
         if (mounted && pointerImage === image && image.isConnected && sourceIdentity(image) === source
             && config.on && !config.disableImageTranslator && config.imageTranslationHoverEnabled !== false) {
-            const rect = image.getBoundingClientRect();
-            const pointerStillInside = !pointer || !Number.isFinite(pointer.x) || !Number.isFinite(pointer.y)
-                || (pointer.x >= rect.left && pointer.x < rect.right && pointer.y >= rect.top && pointer.y < rect.bottom);
+            const pointerStillInCorner = !pointer || pointerInImageCornerZone(image, pointer.x, pointer.y);
             const style = getComputedStyle(image);
-            if (pointerStillInside && style.display !== 'none' && style.visibility !== 'hidden'
+            if (pointerStillInCorner && style.display !== 'none' && style.visibility !== 'hidden'
                 && isImageHoverEligible(image)) showImageButton(image);
         }
     }, 600);

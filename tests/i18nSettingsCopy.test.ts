@@ -30,6 +30,7 @@ async function mountFloatingSettings(userscript = false) {
   const language = Vue.ref<UiLanguage>('zh-CN');
   const t = (key: string) => translate(key, language.value);
   const config = Vue.reactive(new configModel.Config());
+  config.disableFloatingBall = false;
   const parsed = parseHTML('<html><body><main></main></body></html>');
   const document = parsed.document;
   const display = Vue.defineComponent({props: ['title', 'label', 'description', 'help'], setup: (props, {slots}) => () => Vue.h('section', [
@@ -40,6 +41,10 @@ async function mountFloatingSettings(userscript = false) {
       onClick: () => emit('update:modelValue', option.value)}, option.label)))});
   const number = Vue.defineComponent({inheritAttrs: false, setup: (_, {attrs}) => () => Vue.h('input', {...attrs, onChange: (event: Event) =>
     (attrs.onChange as (value: number | undefined) => void)((event.target as HTMLInputElement).value === '' ? undefined : Number((event.target as HTMLInputElement).value))})});
+  const enableCard = Vue.defineComponent({props: ['modelValue', 'title', 'description'], emits: ['update:modelValue'], setup: (props, {emit}) => () => Vue.h('div', {class: 'feature-enable-card'}, [
+    Vue.h('strong', props.title), props.description && Vue.h('p', props.description),
+    Vue.h('button', {type: 'button', role: 'switch', 'aria-checked': props.modelValue, onClick: () => emit('update:modelValue', !props.modelValue)}, '○'),
+  ])});
   const fixture = compileVueInlineFixture('src/features/settings/ui/FloatingBallSettings.vue', {id: 'floating-settings-i18n',
     scriptReplacements: [["import.meta.env.BROWSER === 'userscript'", String(userscript)]]});
   expect(fixture.parseErrors).toEqual([]);
@@ -47,9 +52,9 @@ async function mountFloatingSettings(userscript = false) {
   const dependencies: Record<string, any> = {
     vue: Vue, '@/src/core/config/model': configModel,
     '@/src/ui/i18n': {useUiI18n: () => ({t, translateLegacy: () => {throw new Error('Legacy scanner must not localize this component');}})},
+    '@/src/ui/components/FeatureEnableCard.vue': {default: enableCard},
     './components/SettingsGroup.vue': {default: display}, './components/SettingsItem.vue': {default: display},
     './components/SegmentedControl.vue': {default: segmented}, './components/SettingsNumberInput.vue': {default: number},
-    './AlwaysTranslateSites.vue': {default: Vue.defineComponent({setup: () => () => null})},
   };
   new Function('require', 'exports', fixture.code)((name: string) => {
     if (!dependencies[name]) throw new Error('Unexpected fixture dependency: ' + name);
@@ -109,7 +114,7 @@ describe('设置文案七语一致性', () => {
     for (const language of languages) {
       ui.language.value = language;await Vue.nextTick();
       const text = ui.document.querySelector('main')!.textContent!;
-      for (const key of ['settings.floatingBall.title', 'settings.floatingBall.toolsDisplayDescription', 'settings.floatingBall.hoverDelayHelp', 'settings.floatingBall.tools.hover', 'settings.floatingBall.tools.hidden',
+      for (const key of ['settings.general.floatingBall', 'settings.floatingBall.toolsDisplayDescription', 'settings.floatingBall.hoverDelayHelp', 'settings.floatingBall.tools.hover', 'settings.floatingBall.tools.hidden',
         'settings.floatingBall.defaultMargin', 'settings.floatingBall.defaultMarginDescription', 'settings.floatingBall.popoutMargin', 'settings.floatingBall.popoutMarginDescription',
         userscript ? 'settings.floatingBall.click.settings' : 'settings.floatingBall.click.quickPanel',
         userscript ? 'settings.floatingBall.clickDescriptionUserscript' : 'settings.floatingBall.clickDescription']) expect(text).toContain(ui.t(key));
@@ -144,8 +149,7 @@ describe('设置文案七语一致性', () => {
     await ui.click('[data-value="always"]');expect(ui.document.querySelectorAll('input').length).toBe(1);
     expect(ui.config.floatingBallPopoutMargin).toBe(200);
     ui.config.disableFloatingBall = true;await Vue.nextTick();
-    expect(ui.document.querySelector('main')!.textContent).toContain(ui.t('settings.floatingBall.disabledNote'));
-    for (const control of ui.document.querySelectorAll('button')) expect(control.hasAttribute('disabled')).toBe(true);
-    for (const control of ui.document.querySelectorAll('input')) expect(control.hasAttribute('disabled')).toBe(true);
+    expect(ui.document.querySelectorAll('input').length).toBe(0);
+    expect(ui.document.querySelector('.floating-ball-advanced')).toBeNull();
   });
 });

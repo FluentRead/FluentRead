@@ -14,7 +14,7 @@ import {
     getTranslationArtifacts, invalidateTranslationArtifactReceipt, removeTranslationArtifact,
 } from './artifactStore';
 import {isLocalTranslationModelCached, removeLocalTranslationModelFiles} from './modelCache';
-import {supportsHunyuanTranslation} from '@/src/platform/browser/localTranslationSupport';
+import {supportsHunyuanTranslation, supportsOpusTranslation} from '@/src/platform/browser/localTranslationSupport';
 
 const STATE_URL = 'https://fluentread.invalid/local-translation-downloads-v2';
 type StoredDownloadState = LocalTranslationDownloadState & {needsReverification?: boolean};
@@ -181,8 +181,10 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
         async start(value: unknown): Promise<LocalTranslationDownloadSnapshot> {
             await initialize();
             const model = requireModel(value);
-            if (getLocalTranslationModel(model).legacy) throw new Error('LOCAL_TRANSLATION_LEGACY_MODEL');
-            if (getLocalTranslationModel(model).engine === 'hunyuan' && !supportsHunyuanTranslation()) {
+            const descriptor = getLocalTranslationModel(model);
+            if (descriptor.legacy) throw new Error('LOCAL_TRANSLATION_LEGACY_MODEL');
+            if ((descriptor.engine === 'hunyuan' && !supportsHunyuanTranslation())
+                || (descriptor.engine === 'opus' && !supportsOpusTranslation())) {
                 throw new Error('LOCAL_TRANSLATION_BROWSER_UNSUPPORTED');
             }
             if (removals.has(model)) throw new Error('LOCAL_TRANSLATION_REMOVING');

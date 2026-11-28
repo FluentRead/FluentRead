@@ -5,6 +5,7 @@ import {resolve} from 'node:path';
 import {
     buildGithubAssetMirrorUrls,
     buildNpmAssetMirrorUrls,
+    demoteMirrorOrigin,
     detectPreferredMirrorLocale,
     isChinaPreferredLocale,
     orderMirrorUrls,
@@ -26,6 +27,7 @@ import pdfBinaryDataManifest from '@/src/features/document-translation/services/
 import {createUiLanguageBundleFiles} from '@/src/core/i18n/bundles';
 import {
     createDeltaUiLanguageBundle,
+    EXTENSION_I18N_BASE_REVISION,
     getRemoteLanguageBaseUrls,
     isDeltaUiLanguageBundle,
     mergeDeltaUiLanguageBundle,
@@ -34,14 +36,23 @@ import {
     type RemoteDeltaUiLanguage,
 } from '@/src/core/i18n/remoteLanguagePacks';
 import {createExtensionUiLanguageBundleFiles} from '@/scripts/i18n/extensionLanguageBundles';
-import {createUiLanguageBundleLoader} from '@/src/platform/i18n/uiLanguageBundles';
+import {
+    clearPinnedRemoteUiLanguageBaseCache,
+    createUiLanguageBundleLoader,
+    isExtensionOriginContext,
+    loadPinnedRemoteUiLanguageBase,
+    UI_LANGUAGE_BASE_MESSAGE_TYPE,
+} from '@/src/platform/i18n/uiLanguageBundles';
+import {createUiLanguageBaseHandler} from '@/src/app/background/handlers/uiLanguageBase';
 import {hasUiLanguageBundle, translate, translateLegacyText, type UiLanguageBundle} from '@/src/core/i18n';
 import * as fullDomain from '@/src/core/site-rules/domain';
 import * as subframeDomain from '@/src/core/site-rules/subframeDomain';
 import {scopedChineseCatalogBuildPlugin, selectReachableChineseMessages} from '@/scripts/i18n/scopedChineseCatalogPlugin';
 import {
     extendScopedChineseCatalogBuildConfig,
+    extendSubframeSiteCatalogBuildConfig,
     extendSubframeSiteRulesBuildConfig,
+    subframeSiteCatalogBuildPlugin,
     subframeSiteRulesBuildPlugin,
 } from '@/wxt.config';
 
@@ -701,6 +712,7 @@ describe('deep slim Layer 1 + Layer 2 edge branches and contracts', () => {
             legacyPatterns: {early: [], late: []},
         };
         const {openCache} = makeCacheStub();
+        vi.stubGlobal('location', {protocol: 'chrome-extension:'});
         vi.stubGlobal('caches', {open: openCache});
         vi.stubGlobal('crypto', webcrypto);
         vi.stubGlobal('fetch', vi.fn(async () => new Response(koBaseBytes)));
@@ -792,5 +804,326 @@ describe('deep slim Layer 1 + Layer 2 edge branches and contracts', () => {
         matcher.update({on: true, autoTranslate: false, alwaysTranslateDomains: ['other.com'], disabledExtensionDomains: ['blocked.com']});
         expect(matcher.shouldAutoTranslate('https://sub.other.com/')).toBe(true);
         expect(matcher.isExtensionDisabled('https://sub.blocked.com/')).toBe(true);
+    });
+
+    it('demotes failing mirror origins with cooldown, caps demotion history, and restores on success', () => {
+        resetPreferredMirrorOrigins();
+        const urls = ['https://m1.example/a', 'https://m2.example/a', 'https://m3.example/a'];
+        demoteMirrorOrigin('not-a-url');
+        demoteMirrorOrigin(urls[0]!);
+        expect(orderMirrorUrls(urls)).toEqual([urls[1], urls[2], urls[0]]);
+
+        // Remembering a demoted origin restores it to preferred.
+        rememberPreferredMirrorOrigin(urls[0]!);
+        expect(orderMirrorUrls(urls)[0]).toBe(urls[0]);
+
+        // Cooldown expiry automatically restores origin priority.
+        demoteMirrorOrigin(urls[1]!, 0);
+        expect(orderMirrorUrls(urls)).toEqual([urls[0], urls[1], urls[2]]);
+
+        // Demoting > 16 distinct origins evicts the oldest entry.
+        for (let i = 0; i < 20; i += 1) {
+            demoteMirrorOrigin(`https://dead-${i}.example/asset`, 60_000);
+        }
+        expect(orderMirrorUrls(['https://dead-0.example/x', 'https://dead-19.example/x']))
+            .toEqual(['https://dead-0.example/x', 'https://dead-19.example/x']);
+        resetPreferredMirrorOrigins();
+    });
+
+    it('covers verifiedAssetCache deduplication, 206 rejection, abort-during-cache, and late-response cancel', async () => {
+        resetPreferredMirrorOrigins();
+        const payload = new TextEncoder().encode('verified-dedup-payload');
+        const sha = sha256Hex(payload);
+        const {openCache} = makeCacheStub();
+        vi.stubGlobal('caches', {open: openCache});
+        vi.stubGlobal('crypto', webcrypto);
+
+        // Concurrent default-dependency fetches for the same cacheKey share one network fetch and return independent byte copies.
+        let releaseFetch: ((r: Response) => void) | undefined;
+        const fetchMock = vi.fn(() => new Promise<Response>(r => { releaseFetch = r; }));
+        vi.stubGlobal('fetch', fetchMock);
+        const spec = {
+            id: 'dedup-test',
+            cacheName: 'dedup-cache',
+            cacheKey: 'https://fluentread.app/__optional_assets__/dedup-test',
+            bytes: payload.byteLength,
+            sha256: sha,
+            contentType: 'application/octet-stream',
+            urls: ['https://primary.test/file.bin', 'https://secondary.test/file.bin'],
+        };
+        const first = fetchVerifiedAsset(spec);
+        const second = fetchVerifiedAsset(spec);
+        await vi.waitFor(() => expect(releaseFetch).toBeTypeOf('function'));
+        releaseFetch!(new Response(payload));
+        const [b1, b2] = await Promise.all([first, second]);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        b1[0] ^= 0xff;
+        expect(b2[0]).toBe(payload[0]);
+        // Subsequent call hits CacheStorage through the deduplicated fast path without network fetch.
+        const b3 = await fetchVerifiedAsset(spec);
+        expect(b3).toEqual(payload);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // HTTP 206 partial content is rejected and demotes primary mirror.
+        const partialThenOk = vi.fn()
+            .mockResolvedValueOnce(new Response(payload, {status: 206}))
+            .mockResolvedValueOnce(new Response(payload, {status: 200}));
+        await expect(fetchVerifiedAsset({
+            ...spec,
+            cacheKey: 'https://fluentread.app/__optional_assets__/partial-test',
+        }, {openCache, fetch: partialThenOk})).resolves.toEqual(payload);
+        expect(partialThenOk).toHaveBeenCalledTimes(2);
+
+        // Abort while openCache is pending during persistence rejects with AbortError without hanging.
+        const abortController = new AbortController();
+        const hangingOpen = vi.fn(() => new Promise<never>(() => {}));
+        const abortedPromise = downloadVerifiedAsset({
+            ...spec,
+            cacheKey: 'https://fluentread.app/__optional_assets__/abort-open',
+        }, {openCache: hangingOpen, fetch: vi.fn(async () => new Response(payload))}, abortController.signal);
+        await vi.waitFor(() => expect(hangingOpen).toHaveBeenCalled());
+        abortController.abort('user-cancelled');
+        await expect(abortedPromise).rejects.toMatchObject({name: 'AbortError'});
+
+        // Late response arriving after abort cancels its body cleanly.
+        const lateController = new AbortController();
+        const cancelSpy = vi.fn(async () => undefined);
+        let resolveLate: ((r: Response) => void) | undefined;
+        const lateFetch = vi.fn(() => new Promise<Response>(r => { resolveLate = r; }));
+        const latePromise = downloadVerifiedAsset({
+            ...spec,
+            cacheKey: 'https://fluentread.app/__optional_assets__/late-cancel',
+        }, {openCache, fetch: lateFetch}, lateController.signal);
+        await vi.waitFor(() => expect(resolveLate).toBeTypeOf('function'));
+        lateController.abort();
+        resolveLate!({ok: true, status: 200, headers: new Headers(), body: {cancel: cancelSpy}} as unknown as Response);
+        await expect(latePromise).rejects.toMatchObject({name: 'AbortError'});
+        expect(cancelSpy).toHaveBeenCalled();
+
+        // Late rejection after abort is silently absorbed without unhandled rejection.
+        const lateRejectController = new AbortController();
+        let rejectLate: ((reason: unknown) => void) | undefined;
+        const lateRejectFetch = vi.fn(() => new Promise<Response>((_res, rej) => { rejectLate = rej; }));
+        const lateRejectPromise = downloadVerifiedAsset({
+            ...spec,
+            cacheKey: 'https://fluentread.app/__optional_assets__/late-reject',
+        }, {openCache, fetch: lateRejectFetch}, lateRejectController.signal);
+        await vi.waitFor(() => expect(rejectLate).toBeTypeOf('function'));
+        lateRejectController.abort();
+        rejectLate!(new Error('late network error'));
+        await expect(lateRejectPromise).rejects.toMatchObject({name: 'AbortError'});
+    });
+
+    it('covers pdfBinaryDataFactory chrome:// XHR fallback, LRU eviction, and concurrent in-flight dedup', async () => {
+        clearPdfBinaryDataMemoryCache();
+        // 1. Zotero chrome:// XHR fallback: success, HTTP error, network error.
+        const sampleBytes = new Uint8Array([10, 20, 30, 40]);
+        const xhrCalls: string[] = [];
+        let xhrMode: 'ok' | 'http404' | 'networkError' = 'ok';
+        class FakeXhr {
+            responseType = '';
+            status = 200;
+            response: unknown = null;
+            onload: (() => void) | null = null;
+            onerror: (() => void) | null = null;
+            open(_method: string, url: string) { xhrCalls.push(url); }
+            send() {
+                queueMicrotask(() => {
+                    if (xhrMode === 'networkError') { this.onerror?.(); return; }
+                    if (xhrMode === 'http404') { this.status = 404; this.onload?.(); return; }
+                    this.status = 0;
+                    this.response = sampleBytes.buffer.slice(0);
+                    this.onload?.();
+                });
+            }
+        }
+        vi.stubGlobal('XMLHttpRequest', FakeXhr);
+        const ZoteroFactory = createPdfBinaryDataFactory({preferLocalDataAssets: true});
+        const zoteroInstance = new ZoteroFactory({wasmUrl: 'chrome://fluentread/content/pdfjs/wasm/'});
+        const loaded = await zoteroInstance.fetch({kind: 'wasmUrl', filename: 'openjpeg.wasm'});
+        expect(loaded).toEqual(sampleBytes);
+        expect(xhrCalls).toEqual(['chrome://fluentread/content/pdfjs/wasm/openjpeg.wasm']);
+
+        xhrMode = 'http404';
+        await expect(zoteroInstance.fetch({kind: 'wasmUrl', filename: 'missing.wasm'})).rejects.toThrow('HTTP 404');
+        xhrMode = 'networkError';
+        await expect(zoteroInstance.fetch({kind: 'wasmUrl', filename: 'broken.wasm'})).rejects.toThrow('chrome://fluentread/content/pdfjs/wasm/broken.wasm');
+
+        // 2. Concurrent in-flight dedup & bounded LRU (> 64 entries) returning independent byte copies.
+        clearPdfBinaryDataMemoryCache();
+        const cmapEntries = Object.entries(pdfBinaryDataManifest.cmaps).slice(0, 67);
+        expect(cmapEntries.length).toBeGreaterThan(64);
+        const [firstName, firstMeta] = cmapEntries[0]!;
+        let releaseFirst: ((r: Response) => void) | undefined;
+        let fetchCount = 0;
+        const localFetch = vi.fn((input: string | URL | Request) => {
+            const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+            const fileName = url.split('/').pop()!;
+            const expectedBytes = (pdfBinaryDataManifest.cmaps as Record<string, {bytes: number}>)[fileName]!.bytes;
+            fetchCount += 1;
+            if (fileName === firstName) {
+                return new Promise<Response>(r => { releaseFirst = r; });
+            }
+            return Promise.resolve(new Response(new Uint8Array(expectedBytes).fill(fetchCount & 0xff)));
+        });
+        const LocalFactory = createPdfBinaryDataFactory({preferLocalDataAssets: true, localFetch});
+        const local = new LocalFactory({cMapUrl: 'chrome-extension://id/pdfjs/cmaps/'});
+        const p1 = local.fetch({kind: 'cMapUrl', filename: firstName});
+        const p2 = local.fetch({kind: 'cMapUrl', filename: firstName});
+        await vi.waitFor(() => expect(releaseFirst).toBeTypeOf('function'));
+        releaseFirst!(new Response(new Uint8Array(firstMeta.bytes).fill(7)));
+        const [r1, r2] = await Promise.all([p1, p2]);
+        expect(fetchCount).toBe(1);
+        r1[0] = 99;
+        expect(r2[0]).toBe(7);
+
+        // Fill past 64-entry LRU cap so oldest entry evicts cleanly.
+        for (let i = 1; i < cmapEntries.length; i += 1) {
+            await local.fetch({kind: 'cMapUrl', filename: cmapEntries[i]![0]});
+        }
+        const beforeHotRead = fetchCount;
+        await local.fetch({kind: 'cMapUrl', filename: cmapEntries[cmapEntries.length - 1]![0]});
+        expect(fetchCount).toBe(beforeHotRead);
+        clearPdfBinaryDataMemoryCache();
+    });
+
+    it('delegates remote UI language base loading via background IPC in content scripts and validates handler security', async () => {
+        clearPinnedRemoteUiLanguageBaseCache();
+        vi.stubGlobal('location', {protocol: 'chrome-extension:'});
+        expect(isExtensionOriginContext()).toBe(true);
+        vi.stubGlobal('location', {protocol: 'moz-extension:'});
+        expect(isExtensionOriginContext()).toBe(true);
+        vi.stubGlobal('location', {protocol: 'safari-web-extension:'});
+        expect(isExtensionOriginContext()).toBe(true);
+        vi.stubGlobal('location', {protocol: 'http:'});
+        expect(isExtensionOriginContext()).toBe(false);
+        vi.stubGlobal('location', {protocol: 'https:'});
+        expect(isExtensionOriginContext()).toBe(false);
+        vi.stubGlobal('location', undefined);
+        expect(isExtensionOriginContext()).toBe(false);
+
+        const baseBundle: UiLanguageBundle = {
+            messages: {'common.brand': 'FluentRead'},
+            legacyText: {'确定': '確定'},
+            legacyPatterns: {early: [], late: []},
+        };
+        const baseBytes = new TextEncoder().encode(JSON.stringify(baseBundle));
+        const delta: DeltaUiLanguageBundle = {
+            format: 'delta-v1',
+            language: 'es-ES',
+            baseRevision: EXTENSION_I18N_BASE_REVISION,
+            basePath: REMOTE_LANGUAGE_BASE_ASSETS['es-ES'].path,
+            baseBytes: baseBytes.byteLength,
+            baseSha256: sha256Hex(baseBytes),
+            messages: {'common.ok': 'OK'},
+            legacyText: {},
+            legacyPatterns: {early: [], late: []},
+        };
+
+        // Background handler enforces sender.id === runtimeId and language allowlist.
+        const mockLoadBase = vi.fn(async () => baseBundle);
+        const handler = createUiLanguageBaseHandler({runtimeId: 'ext-123', loadBase: mockLoadBase});
+        expect(handler.type).toBe(UI_LANGUAGE_BASE_MESSAGE_TYPE);
+        await expect(handler.handle({type: UI_LANGUAGE_BASE_MESSAGE_TYPE, language: 'es-ES'}, {sender: {id: 'other-ext'}} as never))
+            .resolves.toEqual({success: false, error: '当前上下文无权加载界面语言基线'});
+        await expect(handler.handle({type: UI_LANGUAGE_BASE_MESSAGE_TYPE, language: 'en-US' as never}, {sender: {id: 'ext-123'}} as never))
+            .resolves.toEqual({success: false, error: '不支持的远程界面语言'});
+        await expect(handler.handle({type: UI_LANGUAGE_BASE_MESSAGE_TYPE, language: 'es-ES'}, {sender: {id: 'ext-123'}} as never))
+            .resolves.toEqual({success: true, bundle: baseBundle});
+
+        // Content script on http:// delegates remote base loading through browser.runtime.sendMessage.
+        vi.stubGlobal('location', {protocol: 'http:'});
+        const sendMessage = vi.fn(async (msg: {type: string; language: RemoteDeltaUiLanguage}) =>
+            handler.handle(msg as never, {sender: {id: 'ext-123'}} as never));
+        vi.stubGlobal('browser', {runtime: {sendMessage}});
+        const contentLoader = createUiLanguageBundleLoader({
+            resolveUrl: p => `chrome-extension://id/${p}`,
+            fetch: async () => ({ok: true, status: 200, json: async () => delta}),
+            warn: vi.fn(),
+        });
+        await expect(contentLoader('es-ES')).resolves.toBe(true);
+        expect(sendMessage).toHaveBeenCalledWith({type: UI_LANGUAGE_BASE_MESSAGE_TYPE, language: 'es-ES'});
+
+        // Failed / malformed IPC responses return false without crashing.
+        vi.stubGlobal('browser', {runtime: {sendMessage: vi.fn(async () => ({success: false, error: 'offline'}))}});
+        const failLoader = createUiLanguageBundleLoader({
+            resolveUrl: p => `chrome-extension://id/${p}`,
+            fetch: async () => ({ok: true, status: 200, json: async () => ({...delta, language: 'fr-FR'})}),
+            warn: vi.fn(),
+        });
+        await expect(failLoader('fr-FR')).resolves.toBe(false);
+
+        vi.stubGlobal('browser', {runtime: {sendMessage: vi.fn(async () => ({success: true, bundle: {bad: true}}))}});
+        const invalidIpcLoader = createUiLanguageBundleLoader({
+            resolveUrl: p => `chrome-extension://id/${p}`,
+            fetch: async () => ({ok: true, status: 200, json: async () => ({...delta, language: 'ru-RU'})}),
+            warn: vi.fn(),
+        });
+        await expect(invalidIpcLoader('ru-RU')).resolves.toBe(false);
+
+        vi.stubGlobal('browser', undefined);
+        vi.stubGlobal('chrome', undefined);
+        const noSendLoader = createUiLanguageBundleLoader({
+            resolveUrl: p => `chrome-extension://id/${p}`,
+            fetch: async () => ({ok: true, status: 200, json: async () => ({...delta, language: 'ru-RU'})}),
+            warn: vi.fn(),
+        });
+        await expect(noSendLoader('ru-RU')).resolves.toBe(false);
+
+        // Background handler with default loadBase loads & caches pinned bundle in memory.
+        const pinnedAsset = REMOTE_LANGUAGE_BASE_ASSETS['ja-JP'];
+        const realPinnedBytes = readFileSync(resolve(PROJECT_ROOT, pinnedAsset.path));
+        const {openCache} = makeCacheStub();
+        vi.stubGlobal('caches', {open: openCache});
+        vi.stubGlobal('crypto', webcrypto);
+        const pinnedFetch = vi.fn(async () => new Response(realPinnedBytes));
+        vi.stubGlobal('fetch', pinnedFetch);
+        const defaultHandler = createUiLanguageBaseHandler({runtimeId: 'ext-123'});
+        const firstReply = await defaultHandler.handle({type: UI_LANGUAGE_BASE_MESSAGE_TYPE, language: 'ja-JP'}, {sender: {id: 'ext-123'}} as never);
+        const secondPinned = await loadPinnedRemoteUiLanguageBase('ja-JP');
+        expect(firstReply.success).toBe(true);
+        if (firstReply.success) expect(firstReply.bundle).toBe(secondPinned);
+        expect(pinnedFetch).toHaveBeenCalledTimes(1);
+        clearPinnedRemoteUiLanguageBaseCache();
+    });
+
+    it('extracts Chinese messages & dynamic template keys cleanly via AST even after quote-containing regex literals', () => {
+        const code = [
+            "const re = /['\"<>]/gu;",
+            'function copy(kind) { return t(`paragraphCopy.notice.copied${kind}`); }',
+            "const label = 'common.' + 'brand';",
+            "const escaped = '\\u7ffb\\u8bd1';",
+        ].join('\n');
+        const selected = selectReachableChineseMessages(code);
+        expect(selected).toHaveProperty('paragraphCopy.notice.copiedOriginal');
+        expect(selected).toHaveProperty('paragraphCopy.notice.copiedTranslation');
+        expect(selected).toHaveProperty('paragraphCopy.notice.copiedBilingual');
+        expect(selected).toHaveProperty('common.brand');
+    });
+
+    it('prunes site-adaptation catalog JSON for subframe entrypoints without dropping matching rules', () => {
+        expect(subframeSiteCatalogBuildPlugin('content')).toBeNull();
+        const neteasePlugin = subframeSiteCatalogBuildPlugin('neteaseMailFrame', PROJECT_ROOT)!;
+        const catalogImporter = resolve(PROJECT_ROOT, 'src/core/site-adaptation/catalog.ts');
+        expect(neteasePlugin.resolveId('./catalog/established.json', catalogImporter)).toContain('established.js');
+        expect(neteasePlugin.resolveId('./other.json', catalogImporter)).toBeNull();
+        const neteaseWebsites = JSON.parse(neteasePlugin.load(neteasePlugin.resolveId('./catalog/websites.json', catalogImporter)!)!.replace(/^export default /u, '').replace(/;$/u, ''));
+        const neteaseEstablished = JSON.parse(neteasePlugin.load(neteasePlugin.resolveId('./catalog/established.json', catalogImporter)!)!.replace(/^export default /u, '').replace(/;$/u, ''));
+        expect(neteaseWebsites).toHaveLength(0);
+        expect(neteaseEstablished).toHaveLength(0);
+
+        const supportedPlugin = subframeSiteCatalogBuildPlugin('supportedFrame', PROJECT_ROOT)!;
+        const supportedWebsites = JSON.parse(supportedPlugin.load(supportedPlugin.resolveId('./catalog/websites.json', catalogImporter)!)!.replace(/^export default /u, '').replace(/;$/u, ''));
+        const supportedEstablished = JSON.parse(supportedPlugin.load(supportedPlugin.resolveId('./catalog/established.json', catalogImporter)!)!.replace(/^export default /u, '').replace(/;$/u, ''));
+        const totalSupported = supportedWebsites.length + supportedEstablished.length;
+        expect(totalSupported).toBeGreaterThan(0);
+        expect(totalSupported).toBeLessThan(10);
+
+        const cfg: {plugins?: unknown[]} = {plugins: []};
+        extendSubframeSiteCatalogBuildConfig([{type: 'content-script', name: 'supportedFrame'}], cfg);
+        expect(cfg.plugins).toHaveLength(1);
+        const multiCfg: {plugins?: unknown[]} = {plugins: []};
+        extendSubframeSiteCatalogBuildConfig([{type: 'content-script', name: 'content'}], multiCfg);
+        expect(multiCfg.plugins).toHaveLength(0);
     });
 });

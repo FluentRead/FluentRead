@@ -42,7 +42,7 @@ beforeEach(async () => {
       if (id === '\0prompt-element') return "import {h, getCurrentInstance} from 'vue';export const ElPopover = {setup(_, {attrs, slots}) {const instance = getCurrentInstance();return () => h('div', {...attrs, 'data-timing-port-key': instance.vnode.key}, [slots.reference?.(), slots.default?.()])}}"
       if (id === '\0feature-menu-capabilities') return 'export const browserCapabilities = globalThis.__featureMenuCapabilities;'
       if (id === '\0prompt-icons') return 'export const ArrowDown = {}, WarningFilled = {}'
-      if (id === '\0prompt-display') return "import {h} from 'vue';export default {setup(_, {slots}) {return () => h('div', null, [slots.copy?.(), slots.default?.()])}}"
+      if (id === '\0prompt-display') return "import {h} from 'vue';export default {setup(_, {slots}) {return () => h('div', null, [slots['heading-extra']?.(), slots.copy?.(), slots.default?.()])}}"
       return null
     }}, vue()]})
 })
@@ -200,23 +200,23 @@ describe('右键入口实际缓存模板与能力门禁', () => {
     change(false);page(false);image(false);expect(snapshot(props.config)).toEqual(before)
   })
   it('总开关关闭后旧入口事件不能改偏好，重新开启保留已保存的入口', async () => {
-    await mountMenu();const change = eventOf(menuControl('translatePage'));eventOf(master())(false);await settle();change(false);expect(props.config.contextMenuEntries.translatePage).toBeUndefined();expect(document.querySelectorAll('[data-context-menu-action]').length).toBe(0)
-    eventOf(master())(true);await settle();expect(document.querySelector('[data-context-menu-action="translatePage"]')).not.toBeNull()
+    await mountMenu();const change = eventOf(menuControl('translatePage'));eventOf(master())(false);await settle();change(false);expect(props.config.contextMenuEntries.translatePage).toBeUndefined();expect(document.querySelectorAll('[data-context-menu-entry]').length).toBe(0)
+    eventOf(master())(true);await settle();expect(document.querySelector('[data-context-menu-entry="translatePage"]')).not.toBeNull()
   })
   it.each(['selection','image','area'])('%s 的前置条件在事件发出前再校验', async kind => {
     const config = runtime.reactive(new Config());config.disableImageTranslator = false;config.disableSelectionTranslator = false;config.selectionTranslatorMode = 'bilingual';config.selectionAreaEnabled = true;config.contextMenuEntries.translateArea = true;await mountMenu(config);const id = kind === 'selection' ? 'translateSelection' : kind === 'image' ? 'translateImage' : 'translateArea', old = eventOf(menuControl(id))
     if (kind === 'selection') config.disableSelectionTranslator = true;if (kind === 'image') capabilities.imageTranslation = false;if (kind === 'area') config.selectionAreaEnabled = false;await settle();old(false)
     expect(kind === 'image' ? config.imageTranslationContextMenuEnabled : config.contextMenuEntries[id]).not.toBe(false);expect(menuControl(id).hasAttribute('disabled')).toBe(true)
   })
-  it('未知 ID、非布尔值不写，图片开关保持单一来源且恢复后预览完整', async () => {
+  it('未知 ID、非布尔值不写，图片开关保持单一来源且恢复后列表完整', async () => {
     await mountMenu();eventOf(master())('false');eventOf(menuControl('translatePage'))('false');state.writeEntryPreference('unknown',true);expect(props.config.contextMenuEnabled).toBe(true);expect(props.config.contextMenuEntries).toEqual({})
-    eventOf(menuControl('translateImage'))(false);await settle();expect(props.config.imageTranslationContextMenuEnabled).toBe(false);expect(props.config.contextMenuEntries.translateImage).toBeUndefined();expect(document.querySelector('[data-context-menu-action="translateImage"]')).toBeNull()
-    eventOf(menuControl('translateImage'))(true);await settle();expect(document.querySelectorAll('[data-context-menu-entry]').length).toBe(5);expect(document.querySelector('[data-context-menu-action="translateImage"]')).not.toBeNull()
+    eventOf(menuControl('translateImage'))(false);await settle();expect(props.config.imageTranslationContextMenuEnabled).toBe(false);expect(props.config.contextMenuEntries.translateImage).toBeUndefined();expect(menuControl('translateImage').getAttribute('data-model-value')).toBe('false')
+    eventOf(menuControl('translateImage'))(true);await settle();expect(document.querySelectorAll('[data-context-menu-entry]').length).toBe(5);expect(menuControl('translateImage').getAttribute('data-model-value')).toBe('true')
   })
   it.each(['translatePage','translateImage'])('%s 偏好被外部更新后，旧事件不能借用新控件', async id => {
     await mountMenu();const old = eventOf(menuControl(id));if(id==='translateImage') props.config.imageTranslationContextMenuEnabled = false;else props.config.contextMenuEntries = {[id]:false};await settle();old(true);expect(menuControl(id).getAttribute('data-model-value')).toBe('false');eventOf(menuControl(id))(true);await settle();expect(menuControl(id).getAttribute('data-model-value')).toBe('true')
   })
   it('入口名全部保留，普通默认调用允许开关且前置不可用时保留用户偏好', async () => {
-    const config = runtime.reactive(new Config());config.selectionAreaEnabled = true;await mountMenu(config,{active:undefined});eventOf(menuControl('translateArea'))(true);await settle();expect(config.contextMenuEntries.translateArea).toBe(true);expect(document.querySelector('[data-context-menu-action="translateArea"]')).not.toBeNull();config.selectionAreaEnabled = false;await settle();expect(config.contextMenuEntries.translateArea).toBe(true);expect(document.querySelector('[data-context-menu-action="translateArea"]')).toBeNull()
+    const config = runtime.reactive(new Config());config.selectionAreaEnabled = true;await mountMenu(config,{active:undefined});eventOf(menuControl('translateArea'))(true);await settle();expect(config.contextMenuEntries.translateArea).toBe(true);expect(menuControl('translateArea').hasAttribute('disabled')).toBe(false);config.selectionAreaEnabled = false;await settle();expect(config.contextMenuEntries.translateArea).toBe(true);expect(menuControl('translateArea').hasAttribute('disabled')).toBe(true)
   })
 })

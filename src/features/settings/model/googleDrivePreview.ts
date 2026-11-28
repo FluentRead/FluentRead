@@ -18,7 +18,9 @@ export interface DrivePreviewRow {
 export function initialDriveDirection(preview: DriveSyncPreview): DriveSyncDirection | '' {
     if (!preview.hasRemote) return 'upload';
     if (preview.canUpload === false) return 'download';
-    if (!preview.changes.length) return 'download';
+    const hasLearningChanges = Boolean(preview.learningSummary?.hasAnyChanges);
+    const upgradingEncryption = preview.keyMode === 'custom' && preview.remoteKeyMode === 'app';
+    if (!preview.changes.length && !hasLearningChanges && !upgradingEncryption) return 'download';
     return preview.hasBaseline ? 'merge' : '';
 }
 export function localizeDrivePreviewLanguage(value: string, uiLanguage: string): string {

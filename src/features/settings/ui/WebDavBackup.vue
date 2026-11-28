@@ -48,7 +48,7 @@ import {ElAlert, ElMessage, ElMessageBox} from 'element-plus';
 import 'element-plus/es/components/alert/style/css';
 import {useUiI18n} from '@/src/ui/i18n';
 import {webDavBackupClient as connectionClient} from '@/src/services/config/webDavBackupClient';
-import {CloudBackupRequestError} from '@/src/services/config/cloudBackupClient';
+import {CloudBackupRequestError, type CloudBackupPrepareOptions} from '@/src/services/config/cloudBackupClient';
 import {WEBDAV_DEFAULT_BACKUP_PATH, type WebDavConnectionSummary} from '@/src/platform/webdav/connection';
 import RemoteConfigSync from './RemoteConfigSync.vue';
 import {useSettingsActionContext} from '../model/useSettingsActionContext';
@@ -80,9 +80,11 @@ const client = {
     await refreshConnection();
     return result;
   },
-  async prepare(includeSensitive = false) {
+  async prepare(includeSensitive = false, options?: CloudBackupPrepareOptions) {
     await refreshConnection();
-    const result = await connectionClient.prepare(includeSensitive);
+    const result = options === undefined
+      ? await connectionClient.prepare(includeSensitive)
+      : await connectionClient.prepare(includeSensitive, options);
     try {
       const saved = await refreshConnection();
       if (!saved || result.account.id !== `webdav:${saved.revision}`) throw new CloudBackupRequestError('同步连接已变化，请重新生成预览', 'settings.cloud.connectionChanged');

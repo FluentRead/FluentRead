@@ -29,6 +29,7 @@ import {localTranslationChineseMessages} from './localTranslation';
 
 import {personalCorrectionChineseMessages} from './personalCorrections';
 import {task7ChineseMessages} from './task7Features';
+import {toolbarActionChineseMessages} from './toolbarAction';
 
 import countForms from './count-forms.json';
 
@@ -38,6 +39,7 @@ export const zhCNMessages = {
     "toolbar.click.popup": "打开快捷面板",
     "toolbar.click.translate": "翻译 / 显示原文",
     "toolbar.openPopup": "打开快捷面板",
+    ...toolbarActionChineseMessages,
     "settings.backup.includeContext": "包含单词上下文",
     "feedback.serviceHint": "检查所选服务的连接或模型配置后再试。",
     "feedback.retryHint": "稍后重试，原文和当前选区会继续保留。",

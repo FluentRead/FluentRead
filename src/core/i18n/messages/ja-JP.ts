@@ -33,6 +33,7 @@ import {localTranslationJapaneseMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
 import {task7Messages, task7LegacyText} from './task7Features';
+import {toolbarActionMessages} from './toolbarAction';
 
 import countForms from './count-forms.json';
 
@@ -42,6 +43,7 @@ export const jaJPMessages = {
     "toolbar.click.popup": "クイックパネルを開く",
     "toolbar.click.translate": "翻訳 / 原文を表示",
     "toolbar.openPopup": "クイックパネルを開く",
+    ...toolbarActionMessages['ja-JP'],
     "settings.backup.includeContext": "単語の文脈を含める",
     "feedback.serviceHint": "選択したサービスの接続やモデル設定を確認して、もう一度お試しください。",
     "feedback.retryHint": "少し待って再試行してください。原文と現在の選択範囲は保持されます。",

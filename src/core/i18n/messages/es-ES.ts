@@ -33,6 +33,7 @@ import {localTranslationSpanishMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
 import {task7Messages, task7LegacyText} from './task7Features';
+import {toolbarActionMessages} from './toolbarAction';
 
 import countForms from './count-forms.json';
 
@@ -42,6 +43,7 @@ export const esESMessages = {
     "toolbar.click.popup": "Abrir panel rápido",
     "toolbar.click.translate": "Traducir / Restaurar",
     "toolbar.openPopup": "Abrir panel rápido",
+    ...toolbarActionMessages['es-ES'],
     "settings.backup.includeContext": "Incluir el contexto del vocabulario",
     "feedback.serviceHint": "Revisa la conexión o el modelo del servicio seleccionado e inténtalo de nuevo.",
     "feedback.retryHint": "Vuelve a intentarlo en un momento. Se conservarán el texto original y la selección.",

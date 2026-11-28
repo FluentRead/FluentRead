@@ -15,6 +15,7 @@ import {
     createTranslationQueueSession,
     type TranslationQueueSession,
 } from '@/src/services/translation/queue';
+import {getPageSourceTitle} from './pageTitleSource';
 import {copyFullPageTranslationConfigSnapshot, type FullPageTranslationConfigSnapshot} from './translationConfigSnapshot';
 import {
     captureFullPageTranslationConfig,
@@ -86,7 +87,7 @@ async function translateTextSlotsInternal(
     // 缓存身份、微任务合批、协议回退与跳过槽回填都必须使用同一次调用的值。
     origins = Array.from(origins);
     snapshot = copyFullPageTranslationConfigSnapshot(snapshot);
-    const requestContext = document.title;
+    const requestContext = getPageSourceTitle();
     // Codeforces 在 MathJax 排版前使用 $$$...$$$。公式源码留在本地，
     // 只把两侧正文交给现有槽请求；回填不依赖模型保留占位符，也不改宿主 DOM。
     // 仅处理完整的三美元定界符，不把普通价格或未闭合片段猜成公式。

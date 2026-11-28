@@ -3,6 +3,7 @@
  * 文件职责：封装翻译 broker 的页面摘要复用、单条与批量翻译持久缓存读写、在途 pending 去重及共享超时恢复逻辑。
  * 主要内容：提供 createBrokerCachedExecution 工厂，统筹短参考直通与页面摘要缓存、单条/批量缓存命中与上下文泄漏复核、AI 多段整包重算及批内去重回填落库。
  * 模块边界：仅负责缓存与在途合并执行层，底层传输调度归 providerTransport，上下文/回显恢复归 recoveryPipeline，高层请求校验与组合路由留在 broker.ts。
+ * 摘要共享：同一页面摘要跨取消归属共用一次调用，最后一个可取消等待者离开才中止。
  */
 import type {
     TranslationBatchRequestMessage,
@@ -55,6 +56,32 @@ export function createBrokerCachedExecution(ctx: BrokerCachedExecutionDependenci
     const {deps, now, warn, identity, cacheStore, providerTransport, recoveryPipeline} = ctx;
     const {isAIContextEnabled, buildCacheKey} = identity;
 
+    type SharedPageSummary = {controller: AbortController; waiters: number; release: () => void};
+    const sharedPageSummaryWaiters = new WeakMap<Promise<PageSummaryResult>, SharedPageSummary>();
+
+    async function waitForSharedPageSummary(
+        request: Promise<PageSummaryResult>,
+        entry: SharedPageSummary,
+        signal: AbortSignal | undefined,
+        requestDeadline: number,
+    ): Promise<PageSummaryResult> {
+        // 不可取消的等待者永久计数，保证共享调用不会被其他请求的取消中止。
+        entry.waiters += 1;
+        if (!signal) return runWithinDeadline(() => request, requestDeadline, now);
+        const leave = () => {
+            entry.waiters -= 1;
+            if (entry.waiters > 0) return;
+            entry.release();
+            entry.controller.abort();
+        };
+        signal.addEventListener('abort', leave, {once: true});
+        try {
+            return await runWithinDeadline(() => request, requestDeadline, now, signal);
+        } finally {
+            signal.removeEventListener('abort', leave);
+        }
+    }
+
     async function addPageSummary(
         execution: TranslationRequestExecution,
         pageContext: string,
@@ -76,10 +103,14 @@ export function createBrokerCachedExecution(ctx: BrokerCachedExecutionDependenci
         }
 
         const summaryTimeoutMs = normalizeDeadlineTimeoutMs(requestTimeoutMs as number);
-        const pendingKey = `${buildPendingRequestKey(key, summaryTimeoutMs, requestGeneration)}:cache:${useCache ? 'on' : 'off'}${cacheStore.pendingIdentitySuffix(execution, modelOverride)}`;
+        // 摘要跨取消归属共享：各请求只登记等待，最后一个可取消等待者离开时才中止共享调用。
+        const pendingKey = `${buildPendingRequestKey(key, summaryTimeoutMs, requestGeneration)}:cache:${useCache ? 'on' : 'off'}${cacheStore.pendingIdentitySuffix({...execution, ownershipKey: undefined}, modelOverride)}`;
         const existing = cacheStore.pendingPageSummaries.get(pendingKey);
-        if (existing) return runWithinDeadline(() => existing, requestDeadline, now, execution.abortSignal);
+        if (existing) return waitForSharedPageSummary(existing, sharedPageSummaryWaiters.get(existing)!, execution.abortSignal, requestDeadline);
 
+        const controller = new AbortController();
+        const abortSignal = execution.abortSignal;
+        execution = {...execution, ownershipKey: undefined, abortSignal: controller.signal};
         const request = (async () => {
             const fallback: PageSummaryResult = {context: pageContext, summarized: false};
             try {
@@ -140,7 +171,10 @@ export function createBrokerCachedExecution(ctx: BrokerCachedExecutionDependenci
             }
         })();
 
-        return cacheStore.trackPending(cacheStore.pendingPageSummaries, pendingKey, request);
+        // 共享调用被中止后立即让出 pending 位，后续请求重新发起摘要而不是加入已中止的调用。
+        const entry = {controller, waiters: 0, release: () => { cacheStore.pendingPageSummaries.delete(pendingKey); }};
+        sharedPageSummaryWaiters.set(request, entry);
+        return waitForSharedPageSummary(cacheStore.trackPending(cacheStore.pendingPageSummaries, pendingKey, request), entry, abortSignal, requestDeadline);
     }
 
     async function translateSingleWithCache(

@@ -167,7 +167,8 @@ const artifactBytes = Buffer.byteLength(source);
 // 新增第 4 套 Popup 专属皮肤系列「极简与视界」（素净极简、落日熔金、建筑蓝图、星穹漫游：皮肤令牌、微缩展台、品牌图标外缘挂件与 8 语言本地化）后实测 2,222,709 字节，相对基线 0fa492f33（2,216,325 字节）净增 6,384 字节（0.2880%）；利用原余量后按既有 1 KB 步长最小增加 6 KB 至 2,223,100，余 391 字节；保留全部协议、资源、排除项和 VM 断言。
 // 新增翻译隐私防护 *** 脱敏展示格式与设置页交互优化（扩展专属折叠记录面板与 privacy.log.* 词条已在油猴构建期裁剪，0 字节进入脚本），合入最新 main 267e38a4b 后实测 2,226,781 字节，相对基线 267e38a4b（2,222,709 字节）净增 4,072 字节（0.1832%），无新增依赖；利用原余量后按既有 1 KB 步长最小增加 4 KB 至 2,227,100，余 319 字节；保留全部协议、资源、排除项和 VM 断言。
 // 优化视频原始字幕与字幕显示模式快捷键共享底座（PageNotice 全屏 Top Layer 适配、hotkey Process/AltGr/4-bit 位掩码、editingTarget 非文本输入与开放 ShadowRoot 放行、videoSubtitleShortcut 新增听力练习/显示开关动作与单键防护、ParagraphCopySettings 冲突解锁及 userscript 初始化禁用态热键清理，不含视频运行时与新依赖），合入最新 main ee9f2d0d9 后实测 2,228,827 字节，相对基线 2,226,781 字节净增 2,046 字节（0.0919%）；利用原余量后按既有 1 KB 步长最小增加 2 KB 至 2,229,100，余 273 字节；保留全部协议、资源、排除项和 VM 断言。
-const MAX_USERSCRIPT_BYTES = 2_229_100;
+// 性能与缺陷修复（AI 摘要跨归属共享、源标题上下文保护、快捷键输入态防护、悬浮球/划词/路由/安全区缓存与术语修订复用）合入最新 main 8197e1ec4 后实测 2,230,690 字节，相对基线 2,228,827 字节净增 1,863 字节（0.0836%），超出原预算 1,590 字节；按既有 1 KB 步长最小增加 2 KB 至 2,231,100，余 410 字节；保留全部协议、资源、排除项和 VM 断言。
+const MAX_USERSCRIPT_BYTES = 2_231_100;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

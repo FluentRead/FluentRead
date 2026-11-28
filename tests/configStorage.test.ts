@@ -553,12 +553,20 @@ describe('配置 IndexedDB storage port', () => {
         await storage.setItem('local:config', {on: false});
         await storage.removeItem('local:config');
 
-        expect(listener).toHaveBeenNthCalledWith(1, {on: true}, null);
-        expect(listener).toHaveBeenNthCalledWith(2, {on: false}, {on: true});
-        expect(listener).toHaveBeenNthCalledWith(3, null, {on: false});
+        // 非凭据键不需要旧值，写入前不再额外解密读取。
+        expect(listener).toHaveBeenNthCalledWith(1, {on: true}, undefined);
+        expect(listener).toHaveBeenNthCalledWith(2, {on: false}, undefined);
+        expect(listener).toHaveBeenNthCalledWith(3, null, undefined);
         unsubscribe();
         await storage.setItem('local:config', {on: true});
         expect(listener).toHaveBeenCalledTimes(3);
+
+        const credentialListener = vi.fn();
+        storage.watch('local:credentials', credentialListener);
+        await storage.setItem('local:credentials', {token: 'a'});
+        await storage.removeItem('local:credentials');
+        expect(credentialListener).toHaveBeenNthCalledWith(1, {token: 'a'}, null);
+        expect(credentialListener).toHaveBeenNthCalledWith(2, null, {token: 'a'});
     });
 
     it('批量端口在一次提交后发布每个写入与删除键的最终值', async () => {
@@ -579,8 +587,8 @@ describe('配置 IndexedDB storage port', () => {
 
         await expect(storage.getItem('local:config')).resolves.toEqual({revision: 3});
         await expect(storage.getItem('local:credentials')).resolves.toBeNull();
-        expect(configListener).toHaveBeenNthCalledWith(1, {revision: 2}, null);
-        expect(configListener).toHaveBeenNthCalledWith(2, {revision: 3}, {revision: 2});
+        expect(configListener).toHaveBeenNthCalledWith(1, {revision: 2}, undefined);
+        expect(configListener).toHaveBeenNthCalledWith(2, {revision: 3}, undefined);
         expect(credentialListener).toHaveBeenCalledWith(null, {token: 'old'});
     });
 

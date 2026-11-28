@@ -6,7 +6,8 @@
  */
 import type {ContextMenuActionId} from '@/src/core/context-menu/domain';
 import {getSiteBaseDomain, isExtensionDisabledOnSite, normalizeDisabledExtensionDomains} from '@/src/core/site-rules/domain';
-import {config} from '@/src/services/config/store';
+import {config, configReady, saveConfig} from '@/src/services/config/store';
+import {backgroundConfigMutations} from './configMutationQueue';
 import {createPdfReaderUrl, getPdfSourceUrl} from '@/src/features/document-translation/core/pdfSource';
 import type {FullPageStateResponse} from './tabTranslationQuery';
 import type {ContextMenuFailureReason} from '@/src/core/context-menu/feedback';
@@ -46,17 +47,23 @@ async function sendToFrame(tabId: number, info: ContextMenuClickInfo, message: R
 /**
  * 切换当前网站的扩展开关，并回传切换之后的禁用状态。
  *
- * 与弹窗一致，只写入基础域名单；内容脚本通过配置订阅感知变化，不需要额外广播。
+ * 与弹窗一致，只写入基础域名单；必须经后台配置队列 saveConfig 持久化并广播，
+ * 直接改写内存 config 既不会落盘也不会通知内容脚本，Service Worker 重启后即丢失。
  */
-export function toggleSiteExtensionDisabled(info: ContextMenuClickInfo, tab: ContextMenuClickTab): ContextMenuActionResult {
+export async function toggleSiteExtensionDisabled(info: ContextMenuClickInfo, tab: ContextMenuClickTab): Promise<ContextMenuActionResult> {
     const domain = getSiteBaseDomain(info.pageUrl || tab.url || '');
     if (!domain) return {handled: false};
-    const domains = normalizeDisabledExtensionDomains(config.disabledExtensionDomains);
-    const disabled = domains.includes(domain);
-    config.disabledExtensionDomains = disabled
-        ? domains.filter((item) => item !== domain)
-        : [...domains, domain];
-    return {handled: true, isSiteDisabled: !disabled, isTranslated: disabled ? undefined : false};
+    return backgroundConfigMutations.run(async () => {
+        await configReady;
+        // 在队列内读取最新名单，避免与并发保存交叉时回写旧值。
+        const domains = normalizeDisabledExtensionDomains(config.disabledExtensionDomains);
+        const disabled = domains.includes(domain);
+        const disabledExtensionDomains = disabled
+            ? domains.filter((item) => item !== domain)
+            : [...domains, domain];
+        await saveConfig({...config, disabledExtensionDomains}, {recordHistory: true});
+        return {handled: true, isSiteDisabled: !disabled, isTranslated: disabled ? undefined : false};
+    });
 }
 
 /** 执行一次菜单动作；isTranslated 表示页面在动作之后的全文翻译状态，未知时返回 undefined。 */

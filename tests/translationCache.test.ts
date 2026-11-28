@@ -541,6 +541,20 @@ describe('translation cache delayed operation races', () => {
     await expect(translationCache.get('victim', 2_001)).resolves.toBeNull();
   });
 
+  it('keeps batch cold hits that land after an unrelated write', async () => {
+    await translationCacheDb.entries.bulkPut([record('batch-a'), record('batch-b')]);
+    let resolveRead!: (value: (TranslationCacheRecord | undefined)[]) => void;
+    vi.spyOn(translationCacheDb.entries, 'bulkGet').mockReturnValueOnce(new Promise((resolve) => {
+      resolveRead = resolve;
+    }) as never);
+    const pending = translationCache.getMany(['batch-a', 'batch-b', 'missing'], 2_000);
+    await translationCache.set('unrelated', 'value', 2_000);
+    resolveRead([record('batch-a'), record('batch-b'), undefined]);
+    await expect(pending).resolves.toEqual([record('batch-a').translation, record('batch-b').translation, null]);
+    await translationCache.getStats(2_000);
+    await expect(translationCacheDb.entries.get('batch-a')).resolves.toMatchObject({ lastAccessedAt: 2_000 });
+  });
+
   it.each(['evicted', 'replaced', 'cleared'])('does not revive a committed write whose return is delayed until it is %s', async (state) => {
     await translationCacheDb.entries.bulkPut(Array.from({ length: 99 }, (_, index) => (
       record(`keep-${index}`, { lastAccessedAt: 2_000 + index })

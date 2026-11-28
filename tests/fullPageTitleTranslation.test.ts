@@ -22,6 +22,7 @@ import {
     startFullPageTitleTranslation,
     stopFullPageTitleTranslation,
 } from '@/src/features/full-page-translation/content/titleTranslation';
+import {getPageSourceTitle, registerPageTitleTranslationView} from '@/src/features/full-page-translation/content/pageTitleSource';
 
 const snapshot = {targetLanguage: 'zh-Hans', service: 'openai'} as never;
 const ORIGINAL = 'Breaking News Today';
@@ -79,6 +80,31 @@ afterEach(() => {
 });
 
 describe('全文翻译的页面标题', () => {
+    it('过期的标题读取器注销时不影响后来登记的读取器', () => {
+        const unregisterOld = registerPageTitleTranslationView(() => ({originalTitle: 'Old', appliedTitle: ORIGINAL}));
+        const unregisterNew = registerPageTitleTranslationView(() => ({originalTitle: 'Source', appliedTitle: ORIGINAL}));
+        unregisterOld();
+        expect(getPageSourceTitle()).toBe('Source');
+        unregisterNew();
+        expect(getPageSourceTitle()).toBe(ORIGINAL);
+    });
+
+    it('标题被替换为译文后，正文请求仍以页面原始标题作为上下文；恢复后跟随真实标题', async () => {
+        hooks.translateText.mockResolvedValue('今日要闻');
+        expect(getPageSourceTitle()).toBe(ORIGINAL);
+        startFullPageTitleTranslation(snapshot);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(currentTitle).toBe('今日要闻');
+        expect(getPageSourceTitle()).toBe(ORIGINAL);
+        // 页面自己换了标题：正文上下文立即跟随页面新值，而不是旧原始标题。
+        pageSetsTitle('Second Story');
+        expect(getPageSourceTitle()).toBe('Second Story');
+        stopFullPageTitleTranslation();
+        pageSetsTitle('今日要闻');
+        // 会话结束后不再改写，任何标题都按页面真实值返回。
+        expect(getPageSourceTitle()).toBe('今日要闻');
+    });
+
     it('整棵 head 被 SPA 替换后跟随新标题，且旧 head 的后续写入不再触发请求', async () => {
         const {document, MutationObserver} = parseHTML('<html><head><title>First Article</title></head><body></body></html>');
         vi.stubGlobal('document', document);

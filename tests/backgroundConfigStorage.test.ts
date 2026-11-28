@@ -9,6 +9,23 @@ import {
 } from '@/src/platform/storage/configStorage';
 
 describe('后台配置 IndexedDB 读取 handler', () => {
+    it('网页快照去除仅供后台去重的计数幂等日志，扩展页面保持原始记录', async () => {
+        const record = {marker: 'value', count: 3, __fluentCountOperations: [{id: 'count-1', delta: 1, count: 3}]};
+        const handler = createConfigStorageReadHandler({
+            ready: Promise.resolve(),
+            read: vi.fn(async () => record),
+            isExtensionUrl: url => url.startsWith('chrome-extension://fluentread/'),
+        });
+        await expect(handler.handle(
+            {type: CONFIG_STORAGE_READ_MESSAGE, key: 'local:config'},
+            {sender: {url: 'https://example.com/page'}},
+        )).resolves.toEqual({success: true, value: {marker: 'value', count: 3}});
+        await expect(handler.handle(
+            {type: CONFIG_STORAGE_READ_MESSAGE, key: 'local:config'},
+            {sender: {url: 'chrome-extension://fluentread/options.html'}},
+        )).resolves.toEqual({success: true, value: record});
+    });
+
     it('content 只取得无凭据主配置，其他记录只允许扩展自身页面', async () => {
         const read = vi.fn(async key => ({
             recordKey: key,
@@ -160,6 +177,14 @@ describe('后台配置变化广播', () => {
             key: 'local:config',
         });
         expect(warn).not.toHaveBeenCalled();
+
+        // 只有计数与幂等日志变化时仍通知扩展页，但不再扇出到网页。
+        const runtimeCalls = sendRuntimeMessage.mock.calls.length;
+        harness.watchers.get('local:config')?.({on: false, count: 9, __fluentCountOperations: [{id: 'count-1'}]});
+        expect(sendRuntimeMessage).toHaveBeenCalledTimes(runtimeCalls + 1);
+        harness.watchers.get('local:config')?.(null);
+        await vi.waitFor(() => expect(queryTabs).toHaveBeenCalledTimes(2));
+        expect(queryTabs).toHaveBeenCalledTimes(2);
 
         dispose();
         expect([...harness.unsubscribers.values()].every(unsubscribe => unsubscribe.mock.calls.length === 1)).toBe(true);

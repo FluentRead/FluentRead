@@ -4,6 +4,7 @@
  * 文件职责：作为页面与后台翻译 broker 之间的客户端代理，统一管理单条、批量和视频字幕翻译的队列、取消、重试、超时、上下文与统计。
  * 主要内容：在等待前冻结调用选项和配置，先按语言证据预检，再统一排队发送单条、批量或字幕请求；按原始入场预算做有界重试（其中本地模型默认 120 秒、浏览器内置单条默认 300 秒、AI 沿用配置秒数加 1 秒收尾），退避时释放客户端并发槽；取消和超时时通知后台停止请求。
  * 模块边界：客户端不实现供应商协议、不直接读写翻译缓存，也不修改全文 DOM；单条、批量与字幕调用的信号贯穿本地排队和已启动传输，等待取消不占用活动传输租约；内部槽请求保留空响应供调用方严格解析和逐槽回退，本模块属于跨 feature 的请求编排服务；后台 runtime/broker 负责 provider 与缓存，各 feature 负责展示和会话状态。
+ * 术语表修订号：逐条请求复用模块级 memoizer，避免重复序列化与哈希。
  */
 /**
  * 翻译API代理模块
@@ -18,7 +19,7 @@ import {isTranslationServiceDisabled, TRANSLATION_SERVICE_DISABLED_MESSAGE} from
 import {isModelThinkingEnabled} from '@/src/core/config/modelThinking';
 import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
-import {buildGlossaryRevision} from '@/src/core/glossary';
+import {createGlossaryRevisionMemoizer} from '@/src/core/glossary';
 import {SUBTITLE_CONTEXT_LIMIT} from '@/src/core/translation/subtitleContext';
 import {getMissingCredentialMessage} from '@/src/core/config/validation';
 import {isTrustedCredentialStorageContext} from '@/src/platform/storage/credentialContext';
@@ -53,6 +54,9 @@ import {
     type TranslationRuntimeRequestMessage,
     type TranslationGlossaryContext,
 } from '@/src/services/translation/types';
+
+/** 字幕等逐条请求复用术语表修订号，避免每次调用都完整序列化并哈希术语库。 */
+const readGlossaryRevision = createGlossaryRevisionMemoizer();
 
 // 调试相关
 const isDev = process.env.NODE_ENV === 'development';
@@ -601,7 +605,7 @@ export interface TranslateOptions {
 /** 在任何上下文提取、队列等待和重试前固定术语版本与入口选择。 */
 function captureTranslationGlossaryOptions(options: TranslateOptions) {
   return {
-    glossaryRevision: options.glossaryRevision ?? buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled),
+    glossaryRevision: options.glossaryRevision ?? readGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled),
     glossaryIds: options.glossaryIds ? Object.freeze([...options.glossaryIds]) : options.glossaryIds,
     ...(options.glossaryContext ? {glossaryContext: options.glossaryContext} : {}),
   };

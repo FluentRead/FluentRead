@@ -3,10 +3,13 @@
  * 文件职责：在后台可信边界接收整份配置替换、字段补丁或补丁批次，规范化客户端身份与序号，并协调串行持久化和响应。
  * 主要内容：声明 persistConfig replace/patch 与 persistConfigBatch 协议及依赖，完整校验批次后逐条复用单次保存，屏蔽同客户端过期序号，共享同序号在途结果并允许失败后重试，最后返回实际提交 revision。
  * 模块边界：这里只处理跨上下文消息和保存编排，不定义 Config 字段、不直接操作 browser.storage，也不负责历史裁剪；校验、凭据拆分和存储事务由注入的配置服务承担。
+ * 容量：按客户端的序号基线只保留最近若干个，且不淘汰仍有在途保存的客户端。
  */
 import type {BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
 
 export const CONFIG_PERSIST_MESSAGE_TYPE = 'persistConfig' as const;
+/** 每次页面加载都会生成新 clientId；只保留最近的序号基线，避免长寿后台无限增长。 */
+export const CONFIG_PERSIST_CLIENT_SEQUENCE_LIMIT = 512;
 export const CONFIG_PERSIST_BATCH_MESSAGE_TYPE = 'persistConfigBatch' as const;
 export type ConfigPersistenceMode = 'replace' | 'patch';
 
@@ -231,8 +234,6 @@ function parseConfigPersistenceMessage(
 }
 
 /** 创建配置持久化 handler；队列状态封装在 handler 实例内，避免 background 暴露全局可变状态。 */
-const MAX_CLIENT_SEQUENCE_ENTRIES = 512;
-
 export function createConfigPersistenceHandler<TConfig>(
     dependencies: ConfigPersistenceDependencies<TConfig>,
 ): BackgroundMessageHandler<ConfigPersistenceContext, ConfigPersistenceMessage, ConfigPersistenceResponse> {
@@ -246,11 +247,11 @@ export function createConfigPersistenceHandler<TConfig>(
     function recordClientSequence(map: Map<string, number>, clientId: string, sequence: number): void {
         map.delete(clientId);
         map.set(clientId, sequence);
-        if (map.size <= MAX_CLIENT_SEQUENCE_ENTRIES) return;
+        if (map.size <= CONFIG_PERSIST_CLIENT_SEQUENCE_LIMIT) return;
         for (const existingClientId of map.keys()) {
             if (existingClientId === clientId || activeSequenceByClient.has(existingClientId)) continue;
             map.delete(existingClientId);
-            if (map.size <= MAX_CLIENT_SEQUENCE_ENTRIES) break;
+            if (map.size <= CONFIG_PERSIST_CLIENT_SEQUENCE_LIMIT) break;
         }
     }
 

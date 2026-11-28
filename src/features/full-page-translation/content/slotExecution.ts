@@ -18,6 +18,7 @@ import {
     type TranslationQueueSession,
 } from '@/src/services/translation/queue';
 import type {FullPageTranslationConfigSnapshot} from './translationConfigSnapshot';
+import {getPageSourceTitle} from './pageTitleSource';
 import {
     createAbortError,
     createCacheKey,
@@ -33,7 +34,7 @@ export async function translateSlotsIndividually(
     snapshot: FullPageTranslationConfigSnapshot,
     signal?: AbortSignal,
     queueSession?: TranslationQueueSession,
-    context = document.title,
+    context = getPageSourceTitle(),
     discourseContext?: string,
 ): Promise<string[]> {
     throwIfAborted(signal);
@@ -107,7 +108,7 @@ export async function translateArrayWithValidation(
     origins: readonly string[],
     snapshot: FullPageTranslationConfigSnapshot,
     options: SnapshotTranslateExecutionOptions,
-    context = document.title,
+    context = getPageSourceTitle(),
     discourseContext?: string,
 ): Promise<string[]> {
     const translations = await translateTextBatch([...origins], context,
@@ -125,7 +126,7 @@ export async function translateTextSlotsDirectly(
     queueSession?: TranslationQueueSession,
     fullPageSession?: FullPageTranslationSessionCache,
     onSlotProtocolInvalid?: () => void,
-    context = document.title,
+    context = getPageSourceTitle(),
     discourseContext?: string,
 ): Promise<string[]> {
     throwIfAborted(signal);

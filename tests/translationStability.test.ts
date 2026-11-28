@@ -317,6 +317,24 @@ describe('动态翻译稳定性判定', () => {
         expect(isTranslationArtifactCurrent(owner, marked)).toBe(true);
     });
 
+    it('句子高亮的公式标记不会让双语译文被判为宿主篡改', () => {
+        const {document} = parseHTML('<html><body><p>source</p></body></html>');
+        const owner = document.querySelector<HTMLElement>('p')!;
+        const wrapper = document.createElement('span');
+        wrapper.className = 'fluent-read-bilingual-content';
+        wrapper.setAttribute('data-fr-translation-owned', 'true');
+        wrapper.innerHTML = '译文 <span class="katex">x</span>';
+        owner.appendChild(wrapper);
+        const snapshot = state({phase: 'translated', bilingualContent: wrapper,
+            bilingualHTML: wrapper.innerHTML, bilingualOuterHTML: wrapper.outerHTML,
+            bilingualContentTemplate: wrapper.cloneNode(true) as HTMLElement});
+        const formula = wrapper.querySelector('.katex')!;
+        formula.setAttribute('data-fr-bilingual-sentence-formula', 'true');
+        expect(isTranslationArtifactCurrent(owner, snapshot)).toBe(true);
+        formula.textContent = 'y';
+        expect(isTranslationArtifactCurrent(owner, snapshot)).toBe(false);
+    });
+
     it.each([
         ['href', '/other'], ['title', 'Changed meaning'], ['role', 'button'],
         ['aria-hidden', 'true'], ['style', 'display:none'], ['class', 'hidden'],

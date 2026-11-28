@@ -11,6 +11,7 @@
  * 文件职责：编排翻译请求的配置快照、语言解析、缓存、请求去重、超时与 provider 调用，是后台翻译用例的中心服务。
  * 主要内容：createTranslationBroker 同时支持单条、批量和页面摘要，验证 provider 返回数量、类型及明显的原文回显或错语种，图片文字的内部策略接受有效原样结果并隔离缓存，空来源在本地保留；普通数组无论是否缓存都先合并完全相同的原文，再按原位置回填，AI 多段保留独立槽位与邻段语义；仅在原生批次响应结构异常时以相同取消所有权和剩余 deadline 逐段恢复，整批完成前不发布缓存；对完整多段协议逐槽修复上下文回显并拒绝空译文，以包含 Chrome auto 检测样本的完整身份构建缓存键，并按实际消费的云地域和凭据摘要、匿名额度身份、等待策略、清理代次与剩余 deadline 隔离 pending 请求；入口在等待前复制消息，ready 采用有界水合等待，之后按最终服务解析 AI 配置预算并扣除已等待时间，取消检查后沿用可信配置快照，仅未附着的公开请求复制备用配置；批次摘要与分项缓存键只构建一次并复用，重复身份只读写一次；每次公开请求累计缓存复用、上游调用次数、耗时与免费链线路尝试，结束后向注入的统计端口交付只含规模数值、服务与线路标识的事件。 可核对的公开符号包括 createTranslationBroker、聚合导出。
  * 模块边界：本文件位于翻译 application service 层，负责高层用例编排与组合路由；具体协议校验、缓存与在途存储、上游传输调度、异常恢复管线和用量统计下沉到 ./broker/* 子模块，不初始化 DOM 候选或网站规则，不挂载页面 UI，也不把供应商 HTTP 细节扩散到 feature。
+ * 术语表修订号：经 memoizer 复用，避免重复序列化与哈希。
  */
 
 import {
@@ -52,7 +53,7 @@ import {preparePrivacyRequest} from './privacyProtection';
 import {escapePageContextDelimiters} from '@/src/core/translation/prompts';
 import {SUBTITLE_CONTEXT_LIMIT} from '@/src/core/translation/subtitleContext';
 import {buildPageSummaryReference} from '@/src/core/translation/pageSummaryReference';
-import {buildGlossaryRevision, resolveGlossary} from '@/src/core/glossary';
+import {createGlossaryRevisionMemoizer, resolveGlossary} from '@/src/core/glossary';
 import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
 import {getCompositeTranslationProvider, isCompositeTranslationProviderId} from '@/src/core/config/compositeTranslation';
@@ -101,6 +102,7 @@ export {resolveTranslationRequestModel};
 
 export function createTranslationBroker(deps: TranslationBrokerDependencies): TranslationBroker {
     const now = deps.now ?? (() => Date.now());
+    const readGlossaryRevision = createGlossaryRevisionMemoizer();
     const compositeRouting = createCompositeTranslationRoutingState({now});
     const logger = deps.logger ?? console;
     const requestScheduler = deps.requestScheduler ?? createTranslationRequestScheduler(
@@ -318,7 +320,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             selectedService, getSelectedModel(current, selectedService, message.modelOverride), deps.serviceTypes,
         );
         if (supportsGlossary && message.glossaryRevision !== undefined
-            && message.glossaryRevision !== buildGlossaryRevision(current.glossaryLibraries, current.glossaryEnabled)) {
+            && message.glossaryRevision !== readGlossaryRevision(current.glossaryLibraries, current.glossaryEnabled)) {
             throw new GlossaryRevisionChangedError();
         }
         // 文档合批只接受受信入口的数组；保留同一分项译文缓存，pending 则按执行策略隔离。

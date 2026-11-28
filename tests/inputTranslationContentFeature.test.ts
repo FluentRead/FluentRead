@@ -594,6 +594,14 @@ describe('input translation content feature', () => {
         expect(records.at(-1).ui.mounted.style).toMatchObject({left: '40px', top: '152px'});
         expect(document.body.appendChild).toHaveBeenCalled();
         for (const [probe] of document.body.appendChild.mock.calls) expect(probe.remove).toHaveBeenCalledOnce();
+        // 滚动帧复用缓存的安全区内缩，不再向 body 插入探针；尺寸变化才重新测量。
+        const probes = document.body.appendChild.mock.calls.length;
+        Object.assign(document.defaultView.visualViewport, {offsetTop: 100});
+        document.defaultView.emit('scroll');
+        expect(document.body.appendChild).toHaveBeenCalledTimes(probes);
+        expect(records.at(-1).ui.mounted.style).toMatchObject({left: '40px', top: '152px'});
+        document.defaultView.visualViewport.emit('resize');
+        expect(document.body.appendChild).toHaveBeenCalledTimes(probes + 1);
         harness.controller.abort();
     });
 
@@ -711,9 +719,16 @@ describe('input translation content feature', () => {
         input.value = '继续写新草稿';
         await harness.fakeDocument.emit('input', {target: input});
         expect(success.remove).toHaveBeenCalledOnce();
+        // 用户接手编辑后不再跟踪该输入框：后续按键不应再读取整份草稿快照。
+        let draft = input.value;
+        let reads = 0;
+        Object.defineProperty(input, 'value', {configurable: true, get: () => {reads += 1; return draft;}, set: (value: string) => {draft = value;}});
+        input.value = '继续写新草稿，再多写一些';
+        await harness.fakeDocument.emit('input', {target: input});
+        expect(reads).toBe(0);
         vi.advanceTimersByTime(8000);
         expect(success.remove).toHaveBeenCalledOnce();
-        expect(input.value).toBe('继续写新草稿');
+        expect(input.value).toBe('继续写新草稿，再多写一些');
     });
 
     it('提示尚无测量宽度时仍在视口内定位，滚动后使用真实尺寸', async () => {

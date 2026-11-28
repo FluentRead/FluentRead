@@ -746,13 +746,15 @@ describe('悬浮球 content runtime', () => {
     const runtime=await import('@/src/features/floating-ball/content/runtime');
     const ctx={} as never;
     for(let i=0;i<100;i++) {mocks.config.disableFloatingBall=false;runtime.mountFloatingBall(ctx);mocks.config.disableFloatingBall=true;runtime.unmountFloatingBall();}
-    mocks.showPageNotice.mockClear();mocks.config.disableFloatingBall=false;runtime.mountFloatingBall(ctx);runtime.mountFloatingBall(ctx);
+    mocks.showPageNotice.mockClear();mocks.config.disableFloatingBall=false;const waiting=runtime.mountFloatingBall(ctx);expect(runtime.mountFloatingBall(ctx)).toBe(waiting);
     expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);
     expect(mocks.showPageNotice).toHaveBeenCalledOnce();
     expect(mocks.showPageNotice).toHaveBeenCalledWith(expect.stringContaining('刷新'), 'error', expect.objectContaining({key:'floating-ball-mount-wait'}));
     const staleFirst=ui(),staleSecond=ui(),live=ui({toggleTranslation:vi.fn()});
     first.resolve(staleFirst);await vi.waitFor(()=>expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(3));
     third.resolve(live);await vi.waitFor(()=>expect(runtime.toggleFloatingBallTranslation()).toBe(true));
+    // 被限流的调用等到重试完成才结算，registry 不会把它记为挂载失败。
+    await expect(waiting).resolves.not.toBeNull();
     expect(mocks.dismissPageNotice).toHaveBeenCalledWith('floating-ball-mount-wait');
     second.resolve(staleSecond);await vi.waitFor(()=>expect(staleSecond.remove).toHaveBeenCalledOnce());
     expect(staleFirst.remove).toHaveBeenCalledOnce();expect(live.remove).not.toHaveBeenCalled();runtime.unmountFloatingBall();
@@ -781,7 +783,8 @@ describe('悬浮球 content runtime', () => {
     mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
     const runtime=await import('@/src/features/floating-ball/content/runtime');const ctx={} as never;
     runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();
-    runtime.mountFloatingBall(ctx);mocks.config.disableFloatingBall=true;runtime.unmountFloatingBall();
+    const waiting=runtime.mountFloatingBall(ctx);mocks.config.disableFloatingBall=true;runtime.unmountFloatingBall();
+    await expect(waiting).resolves.toBeNull();
     const old=ui();first.resolve(old);await vi.waitFor(()=>expect(old.remove).toHaveBeenCalledOnce());
     expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);second.resolve(ui());await second.promise;
   });

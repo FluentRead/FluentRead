@@ -642,7 +642,8 @@ export function createConfigAuthority(dependencies: ConfigAuthorityDependencies)
                 lastPersistedSerialized = serializeConfig(nextConfig);
             }
             rememberCommittedConfig(nextConfig);
-            applyConfig(nextConfig);
+            // 后台存储会同步回放本次写入并已应用同一快照；仅在未收到回声时应用，避免订阅者重复通知。
+            if (serializeConfig(config) !== lastPersistedSerialized) applyConfig(nextConfig);
             return {count: nextConfig.count, persistedOperations};
         });
         writeQueue = operationPromise.then(() => undefined, () => undefined);

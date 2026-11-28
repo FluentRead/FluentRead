@@ -16,6 +16,7 @@ import {
     type TranslationQueueSession,
 } from '@/src/services/translation/queue';
 import type {FullPageTranslationConfigSnapshot} from './translationConfigSnapshot';
+import {getPageSourceTitle} from './pageTitleSource';
 import {
     createAbortError,
     createSnapshotTranslateOptions,
@@ -110,13 +111,13 @@ function createTranslationBatchSnapshotKey(snapshot: FullPageTranslationConfigSn
 }
 
 function createBatchScopeKey(snapshot: FullPageTranslationConfigSnapshot, session: FullPageTranslationSessionCache): string {
-    return JSON.stringify([createTranslationBatchSnapshotKey(snapshot), document.title,
+    return JSON.stringify([createTranslationBatchSnapshotKey(snapshot), getPageSourceTitle(),
         document.location?.href ?? document.URL ?? '', session.pageContextGeneration ?? 0]);
 }
 
 function createAIBatchCircuitKey(snapshot: FullPageTranslationConfigSnapshot): string {
     // 正文变动需要隔离分组和缓存，却不能让同会话、同配置重新试用已经失败的协议。
-    return JSON.stringify([createTranslationBatchSnapshotKey(snapshot), document.title,
+    return JSON.stringify([createTranslationBatchSnapshotKey(snapshot), getPageSourceTitle(),
         document.location?.href ?? document.URL ?? '']);
 }
 
@@ -318,14 +319,14 @@ export function enqueueTranslationBatchTask(
 
     // 同配置的协议已熔断时无需再凑批；逐槽请求仍使用本次快照与取消作用域。
     if (!native && queue.disabledAIKeys.has(createAIBatchCircuitKey(snapshot))) {
-        return translateSlotsIndividually(origins, snapshot, signal, queueSession, document.title, discourseContext);
+        return translateSlotsIndividually(origins, snapshot, signal, queueSession, getPageSourceTitle(), discourseContext);
     }
 
     return new Promise<string[]>((resolve, reject) => {
         const task: TranslationBatchTask = {
             batchKey: JSON.stringify([createBatchScopeKey(snapshot, session), discourseScope(discourseContext)]),
             aiCircuitKey: createAIBatchCircuitKey(snapshot),
-            context: document.title,
+            context: getPageSourceTitle(),
             discourseContext,
             owner,
             origins,

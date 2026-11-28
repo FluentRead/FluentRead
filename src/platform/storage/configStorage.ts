@@ -4,6 +4,7 @@
  * 文件职责：为共享配置 store 提供统一持久化端口，在后台连接加密 IndexedDB，在扩展页面与 content 上下文通过受控 runtime 消息代理读取和订阅。
  * 主要内容：声明配置记录键、主记录存在时的 IndexedDB 直接短路、带加密清理标记的后台旧 storage 原子迁移与验证、会话随机密钥材料与旧 Firefox 内存降级、可选原子条件写与多键提交、隔离异常的 watch 通知，以及能在并发回读中保留变更意图的非后台只读适配器。
  * 模块边界：本文件不理解 Config 字段、不决定凭据授权、不选择真实浏览器运行上下文；configStorageRuntime 负责装配 WXT legacy storage、后台 repository 或远程 runtime，userscript 构建在该边界替换为 GM storage。
+ * 旧值读取：后台端口只为凭据键在写入前读取旧值，其他键不再额外解密。
  */
 
 import type {EncryptedConfigRepository} from './configRepository';
@@ -25,6 +26,8 @@ export const CONFIG_LEGACY_CLEANUP_MARKER_KEY = 'meta:legacyStorageCleanupPendin
 
 export type ConfigIndexedDbKey = typeof CONFIG_INDEXED_DB_KEYS[number];
 type ConfigStorageListener = (nextValue: unknown, previousValue?: unknown) => void;
+/** 只有凭据键的后台订阅需要旧值比较；其他键写入前不再额外解密读取一次旧记录。 */
+const CONFIG_KEYS_WITH_PREVIOUS_VALUE: ReadonlySet<string> = new Set(['local:credentials', 'session:credentials']);
 
 interface UnverifiedLegacyCleanupMarker {
     version: 1;
@@ -203,6 +206,9 @@ export function createBackgroundConfigStorage(options: BackgroundConfigStorageOp
     const repository = options.repository;
     const listeners = new Map<string, Set<ConfigStorageListener>>();
     let migration: Promise<void> | null = null;
+    const readPrevious = async (key: string): Promise<unknown> => (
+        CONFIG_KEYS_WITH_PREVIOUS_VALUE.has(key) ? repository.get(key) : undefined
+    );
 
     const notify = (key: string, value: unknown, previousValue?: unknown) => {
         listeners.get(key)?.forEach(listener => {
@@ -369,7 +375,7 @@ export function createBackgroundConfigStorage(options: BackgroundConfigStorageOp
         },
         async setItem<T>(key: string, value: T): Promise<void> {
             await ensureMigrated();
-            const previous = await repository.get<T>(key);
+            const previous = await readPrevious(key);
             await repository.set(key, value);
             notify(key, value, previous);
         },
@@ -385,7 +391,7 @@ export function createBackgroundConfigStorage(options: BackgroundConfigStorageOp
             const removedKeys = [...new Set(removeKeys)].filter(key => !entries.has(key));
             const affectedKeys = [...entryKeys, ...removedKeys];
             const previous = new Map(await Promise.all(affectedKeys.map(async key => (
-                [key, await repository.get(key)] as const
+                [key, await readPrevious(key)] as const
             ))));
             await repository.commitChanges(entries, removedKeys);
             entries.forEach((value, key) => notify(key, value, previous.get(key)));
@@ -393,7 +399,7 @@ export function createBackgroundConfigStorage(options: BackgroundConfigStorageOp
         },
         async removeItem(key: string): Promise<void> {
             await ensureMigrated();
-            const previous = await repository.get(key);
+            const previous = await readPrevious(key);
             await repository.remove(key);
             notify(key, null, previous);
         },

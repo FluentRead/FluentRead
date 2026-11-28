@@ -4,6 +4,7 @@
  * 文件职责：把后台加密配置仓库的键级变化通知给已打开的扩展页面和网页 content，使各上下文重新向后台拉取授权后的明文快照。
  * 主要内容：监听配置、凭据、历史、备份与 OCR 元数据键，向 extension runtime 广播无值通知，通过共享网页接收者端口投递主配置与阅读模型失效事件并兼容旧适配器；凭据比较仅在后台进行，安装或解绑失败保留清理错误。
  * 模块边界：本文件不携带配置值、不判断凭据读取权限、不写 IndexedDB；读取授权由 configStorage handler 承担，运行时装配由 messageRuntime 调用。
+ * 降噪：主配置仅计数或幂等日志变化时只通知扩展页，不扇出到网页。
  */
 
 import {
@@ -31,6 +32,8 @@ export function installConfigStorageBroadcast(
     let disposed = false;
     const lifetime = new AbortController();
     const unsubscribers: Array<() => void> = [];
+    // 网页只需在用户可见配置变化时重读；翻译计数与其幂等日志的高频写入不再扇出到所有标签页。
+    let lastTabConfigFingerprint: string | undefined;
     const dispose = () => {
         disposed = true;
         lifetime.abort();
@@ -54,7 +57,13 @@ export function installConfigStorageBroadcast(
                     }
                 });
                 let tabMessage: unknown = message;
-                if (key !== 'local:config') {
+                if (key === 'local:config') {
+                    const fingerprint = JSON.stringify(value && typeof value === 'object'
+                        ? {...value, count: 0, __fluentCountOperations: undefined}
+                        : value);
+                    if (fingerprint === lastTabConfigFingerprint) return;
+                    lastTabConfigFingerprint = fingerprint;
+                } else {
                     if (key !== 'local:credentials' && key !== 'session:credentials') return;
                     // 专用凭据不会进入 content 快照。复用真实模型输入投影在后台比较，
                     // 只广播无值事件，删除或无效记录与 store 的空凭据语义一致。

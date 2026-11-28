@@ -1,7 +1,7 @@
 /**
  * @file src/shared/dom/editingTarget.ts
  * 文件职责：判断一次键盘事件是否发生在用户正在输入文字的场景，让网页快捷键在输入框、可编辑区域和无法读取的封闭组件里自动让行，同时不误拦播放器进度条、复选框或开放 ShadowRoot 自定义控件。
- * 主要内容：导出 isEditingInPage 和 deepActiveElement；识别文本输入型表单控件、contenteditable 与 ARIA 输入角色，排除滑块/勾选等非文本 input 类型，逐层穿过开放 ShadowRoot 找到真实焦点，并为具有明确非输入角色的自定义元素放行快捷键，其余封闭自定义元素继续保守保护。
+ * 主要内容：导出 isEditingInPage、isTypingKeystroke 和 deepActiveElement；识别文本输入型表单控件、contenteditable 与 ARIA 输入角色，排除滑块/勾选等非文本 input 类型，逐层穿过开放 ShadowRoot 找到真实焦点，并为具有明确非输入角色的自定义元素放行快捷键，其余封闭自定义元素继续保守保护。
  * 模块边界：本文件只读取事件路径与 document 焦点，不注册监听、不解析快捷键，也不阻止事件；是否响应按键由调用方的 feature 决定。
  */
 
@@ -68,4 +68,13 @@ export function isEditingInPage(event: KeyboardEvent, pageDocument: Document = d
     if (typeof event.composedPath === 'function' && event.composedPath().some(isTypingTarget)) return true;
     const focused = deepActiveElement(pageDocument);
     return Boolean(focused) && (isTypingTarget(focused) || isOpaqueFocusHost(focused!));
+}
+
+/**
+ * 判断按键是否是用户正在输入的字符：输入法组合期间，或在输入场景内按下不含 Control/Alt/Meta 的组合
+ * （如 Shift+1、F9、数字）。页面级快捷键遇到这类按键必须让行，不能 preventDefault 吞掉字符。
+ */
+export function isTypingKeystroke(event: KeyboardEvent, pageDocument: Document = document): boolean {
+    if (event.isComposing || event.keyCode === 229) return true;
+    return !event.ctrlKey && !event.altKey && !event.metaKey && isEditingInPage(event, pageDocument);
 }

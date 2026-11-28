@@ -4,11 +4,12 @@
  * 文件职责：封装输入框翻译封闭 Shadow Root 状态提示条的创建、视口定位、rAF 滚动追踪与淡出清理生命周期。
  * 主要内容：导出 createInputTranslationTooltipController，统一管理翻译中/成功/失败提示、撤销/重试/关闭动作按钮、只读译文预览区及退场淡出队列。
  * 模块边界：仅负责提示 UI 的渲染、定位和定时清理，不直接发起翻译请求或修改输入框文本，所有请求代次与启用校验由调用方注入。
+ * 提示定位：安全区只在创建与尺寸变化时测量，滚动帧复用缓存内缩值。
  */
 
 import type {ShadowRootContentScriptUi} from 'wxt/utils/content-script-ui/shadow-root';
 import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
-import {clampToVisualViewport, getSafeVisualViewportRect} from '@/src/platform/dom/visualViewport';
+import {clampToVisualViewport, getSafeVisualViewportRect, getVisualViewportRect} from '@/src/platform/dom/visualViewport';
 import type {InputTranslationContentDependencies} from './configKey';
 
 function getTooltipIcon(type: 'translating' | 'success' | 'error'): string {
@@ -178,10 +179,27 @@ export function createInputTranslationTooltipController(
         ui.mount();
 
         const tooltip = ui.mounted!;
+        // 安全区探针会改动 body 并强制样式计算：只在创建和尺寸变化时测量，滚动帧复用缓存的内缩值。
+        let remeasureSafeArea = true;
+        let safeInsets = {left: 0, top: 0, right: 0, bottom: 0};
+        const readViewport = (view: Window) => {
+            const raw = getVisualViewportRect(view);
+            if (remeasureSafeArea) {
+                remeasureSafeArea = false;
+                const safe = getSafeVisualViewportRect(view);
+                safeInsets = {left: safe.left - raw.left, top: safe.top - raw.top, right: raw.right - safe.right, bottom: raw.bottom - safe.bottom};
+                return safe;
+            }
+            const left = raw.left + safeInsets.left;
+            const top = raw.top + safeInsets.top;
+            const right = Math.max(left + 1, raw.right - safeInsets.right);
+            const bottom = Math.max(top + 1, raw.bottom - safeInsets.bottom);
+            return {left, top, right, bottom, width: right - left, height: bottom - top};
+        };
         const position = () => {
             const view = rootDocument.defaultView;
             const rect = element.getBoundingClientRect();
-            const viewport = view ? getSafeVisualViewportRect(view)
+            const viewport = view ? readViewport(view)
                 : {left: 0, top: 0, right: 1024, bottom: 768, width: 1024, height: 768};
             // 高度不足84时先回收留白；可用高度至少44时仍给完整44按钮留出内容空间。
             // 长状态文案与预览继续只滚动自己的提示，不推动宿主页或编辑器。
@@ -208,7 +226,8 @@ export function createInputTranslationTooltipController(
         const view = rootDocument.defaultView;
         let positionFrame: number | undefined;
         let positionActive = true;
-        const schedulePosition = () => {
+        const schedulePosition = (event?: Event) => {
+            if (event?.type === 'resize') remeasureSafeArea = true;
             if (!positionActive || positionFrame !== undefined) return;
             // 小型 DOM 适配器可不提供绘制时钟；真实页面把同帧多种视口事件合并成一次几何读取。
             if (typeof view?.requestAnimationFrame !== 'function') { position(); return; }

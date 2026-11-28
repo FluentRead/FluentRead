@@ -23,6 +23,7 @@ import {
     type TranslationQueueSession,
 } from '@/src/services/translation/queue';
 import type {FullPageTranslationConfigSnapshot, PageTranslationConfigOverrides} from './translationConfigSnapshot';
+import {getPageSourceTitle} from './pageTitleSource';
 
 const FULL_PAGE_TRANSLATION_CACHE_LIMIT = 512;
 const FULL_PAGE_TRANSLATION_REQUEST_CACHE_LIMIT = 512;
@@ -222,7 +223,7 @@ export function createRequestCacheKey(
         enableAIMultiSegment: snapshot.enableAIMultiSegment,
         aiMultiSegmentLimits: getAIMultiSegmentLimits(snapshot),
         enableNativeBatch: snapshot.enableNativeBatch !== false,
-        context: document.title,
+        context: getPageSourceTitle(),
         pageUrl: document.location?.href ?? document.URL ?? '',
         pageContextGeneration,
         aiBatchOwnerIdentity,

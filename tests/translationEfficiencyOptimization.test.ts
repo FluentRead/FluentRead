@@ -33,6 +33,9 @@ import {attachTranslationProviderConfig, createTranslationProviderConfigSnapshot
 import deepseek from '@/src/providers/translation/deepseek';
 import gemini from '@/src/providers/translation/gemini';
 import tongyi from '@/src/providers/translation/tongyi';
+import doubaoSeedTranslation from '@/src/providers/translation/doubao-seed-translation';
+import hunyuanTranslation from '@/src/providers/translation/hunyuan-translation';
+import {attachTranslationRequestScheduler} from '@/src/services/translation/requestSnapshot';
 import {setRuntimeFetch} from '@/src/platform/http/runtime';
 
 function makeConfig(overrides: Partial<Config> = {}): Config {
@@ -48,6 +51,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
             gemini: 'AIza-test',
             deepseek: 'sk-ds-test',
             tongyi: 'sk-qwen-test',
+            zhipu: 'zhipu-id.zhipu-secret',
             openai: 'sk-openai-test',
         },
         ...overrides,
@@ -366,7 +370,7 @@ describe('translation efficiency and cost optimizations', () => {
         await expect(broker.translateWithCache({origin: ['Only single miss.', 'Only single miss.']})).resolves.toEqual(['中文:Only single miss.', '中文:Only single miss.']);
     });
 
-    it.each([services.claude, services.gemini, services.deepseek, services.tongyi] as const)(
+    it.each([services.claude, services.gemini, services.deepseek, services.tongyi, services.zhipu] as const)(
         'uses compact JSON batch protocol for %s to avoid verbose slot marker tokens',
         async (service) => {
             const receivedOrigins: Array<string | string[]> = [];
@@ -616,5 +620,121 @@ describe('translation efficiency and cost optimizations', () => {
             runtimeConfig.service = previousService;
             runtimeConfig.to = previousTo;
         }
+    });
+
+    it('repairs multiple leaked/invalid slots concurrently in AI multi-segment batches and deduplicates repeated batch cache keys', async () => {
+        let activeRepairs = 0;
+        let peakRepairs = 0;
+        const releaseRepairs: Array<() => void> = [];
+        let callIndex = 0;
+        const provider = vi.fn(async (request: {origin: string | string[]}) => {
+            callIndex += 1;
+            if (callIndex === 1) {
+                // 首个完整批次：第 0、2 槽返回原文回显，第 1 槽已正确翻译。
+                return JSON.stringify([
+                    [0, 'First paragraph needs repair.'],
+                    [1, '第二段已正确翻译。'],
+                    [2, 'Third paragraph needs repair.'],
+                ]);
+            }
+            activeRepairs += 1;
+            peakRepairs = Math.max(peakRepairs, activeRepairs);
+            await new Promise<void>((resolve) => {
+                releaseRepairs.push(() => {
+                    activeRepairs -= 1;
+                    resolve();
+                });
+            });
+            return `已修复:${String(request.origin)}`;
+        });
+        const endpointSpy = vi.fn(() => ({endpoint: 'https://example.invalid/v1/chat/completions'}));
+        const cacheKeySpy = vi.fn((identity: Record<string, unknown>) => JSON.stringify(identity));
+        const currentConfig = makeConfig({service: services.openai, enableAIContext: false});
+        const broker = createTranslationBroker({
+            ready: Promise.resolve(),
+            getConfig: () => currentConfig,
+            providers: {[services.openai]: provider},
+            cache: {get: async () => null, getMany: async (keys) => keys.map(() => null), set: async () => true, setMany: async () => 1, clear: async () => undefined, cleanup: async () => undefined},
+            buildTranslationCacheKey: cacheKeySpy,
+            getTranslationLanguages: (override = {}) => ({
+                sourceLanguage: override.sourceLanguage || 'en',
+                targetLanguage: override.targetLanguage || 'zh-Hans',
+            }),
+            getMissingCredentialMessage: () => null,
+            resolveConfiguredModel,
+            serviceTypes: servicesType,
+            endpointResolver: {aiSdkTransportProfile: 'test', resolveOpenAICompatibleEndpoint: endpointSpy},
+            promptBuilder: {buildPageSummaryPrompt: (text) => text, buildPageSummarySystemPrompt: () => 'summary'},
+        });
+
+        const promise = broker.translateWithCache({
+            origin: ['First paragraph needs repair.', 'Second paragraph.', 'Third paragraph needs repair.'],
+            aiMultiSegment: true,
+            useCache: false,
+        });
+        await vi.waitFor(() => expect(releaseRepairs).toHaveLength(2));
+        expect(peakRepairs).toBe(2);
+        releaseRepairs.splice(0).forEach((release) => release());
+        await expect(promise).resolves.toEqual([
+            '已修复:First paragraph needs repair.',
+            '第二段已正确翻译。',
+            '已修复:Third paragraph needs repair.',
+        ]);
+
+        // 批量缓存键对重复文本只构建一次，且端点解析按快照复用。
+        cacheKeySpy.mockClear();
+        endpointSpy.mockClear();
+        const repeatedProvider = vi.fn(async (req: {origin: string | string[]}) =>
+            (req.origin as string[]).map((text) => `译:${text}`),
+        );
+        const batchBroker = createTranslationBroker({
+            ready: Promise.resolve(),
+            getConfig: () => makeConfig({service: services.openai}),
+            providers: {[services.openai]: repeatedProvider},
+            cache: {get: async () => null, getMany: async (keys) => keys.map(() => null), set: async () => true, setMany: async () => 1, clear: async () => undefined, cleanup: async () => undefined},
+            buildTranslationCacheKey: cacheKeySpy,
+            getTranslationLanguages: () => ({sourceLanguage: 'en', targetLanguage: 'zh-Hans'}),
+            getMissingCredentialMessage: () => null,
+            resolveConfiguredModel,
+            serviceTypes: servicesType,
+            endpointResolver: {aiSdkTransportProfile: 'test', resolveOpenAICompatibleEndpoint: endpointSpy},
+            promptBuilder: {buildPageSummaryPrompt: (text) => text, buildPageSummarySystemPrompt: () => 'summary'},
+        });
+        await batchBroker.translateWithCache({origin: ['Repeat me.', 'Repeat me.', 'Repeat me.', 'Unique one.', 'Repeat me.', 'Unique two.']});
+        // 1 次 batchKey + 3 次唯一 itemKey（而非 6 次 itemKey），端点解析与批量项数无关（只按配置快照解析）。
+        expect(cacheKeySpy).toHaveBeenCalledTimes(4);
+        expect(endpointSpy.mock.calls.length).toBeLessThanOrEqual(2);
+    });
+
+    it('reports HTTP 429 responses from Doubao Seed Translation and Hunyuan Translation to the request scheduler', async () => {
+        const observeResponse = vi.fn();
+        const scheduler = {schedule: vi.fn(), scheduleAttempt: vi.fn(), observeResponse};
+        const base = createTranslationProviderConfigSnapshot(makeConfig({
+            token: {...new Config().token, [services.doubao]: 'ark-key'},
+            model: {...new Config().model, [services.doubao]: 'doubao-seed-translation-250915'},
+            tencentSecretId: '1234567890-id',
+            tencentSecretKey: '1234567890-key',
+        }));
+
+        setRuntimeFetch(async () => new Response('rate limited', {status: 429, headers: {'retry-after': '3'}}));
+        const doubaoReq = attachTranslationRequestScheduler(
+            attachTranslationProviderConfig({
+                origin: 'Hello', serviceOverride: services.doubao, sourceLanguage: 'en', targetLanguage: 'zh-Hans',
+            }, base),
+            scheduler,
+            {service: services.doubao, quotaScope: 'doubao-scope'},
+        );
+        await expect(doubaoSeedTranslation(doubaoReq)).rejects.toMatchObject({statusCode: 429});
+        expect(observeResponse).toHaveBeenCalledTimes(1);
+
+        const hunyuanReq = attachTranslationRequestScheduler(
+            attachTranslationProviderConfig({
+                origin: 'Hello', serviceOverride: services.huanYuanTranslation, sourceLanguage: 'en', targetLanguage: 'zh-Hans',
+            }, base),
+            scheduler,
+            {service: services.huanYuanTranslation, quotaScope: 'hunyuan-scope'},
+        );
+        await expect(hunyuanTranslation(hunyuanReq)).rejects.toMatchObject({statusCode: 429});
+        expect(observeResponse).toHaveBeenCalledTimes(2);
     });
 });

@@ -248,7 +248,8 @@ export function createBrokerRecoveryPipeline(options: BrokerRecoveryPipelineOpti
             || service === services.claude
             || service === services.gemini
             || service === services.deepseek
-            || service === services.tongyi;
+            || service === services.tongyi
+            || service === services.zhipu;
         if (supportsCompactBatch
             && (!current.system_role[service] || current.system_role[service] === defaultOption.system_role)
             && (!current.user_role[service] || current.user_role[service] === defaultOption.user_role)
@@ -311,8 +312,9 @@ export function createBrokerRecoveryPipeline(options: BrokerRecoveryPipelineOpti
                 && isLikelyUntranslatedResponse(message.origin[index], result, execution.targetLanguage));
         if (parsed.every(needsRepair)) throw new AIMultiSegmentResponseError();
 
-        // 若协议完整但只有个别段落误译了页面上下文，只对这些段落做极简单段重译，
-        // 已正确的同批结果继续复用，避免整批再次消耗。
+        // 若协议完整但只有个别段落误译了页面上下文，并发重译受影响段落，
+        // 已正确的同批结果继续复用，避免整批再次消耗或逐槽串行拖长延迟。
+        const leakRepairIndexes: number[] = [];
         for (let index = 0; index < parsed.length; index += 1) {
             const origin = message.origin[index];
             const leakedPageContext = shouldRecoverPageContextLeak(
@@ -333,24 +335,37 @@ export function createBrokerRecoveryPipeline(options: BrokerRecoveryPipelineOpti
                 )) throw new AIContextRecoveryResponseError();
                 continue;
             }
-            parsed[index] = await callSingleProviderWithoutPageContext(
-                execution,
-                {...message, origin},
-                requestDeadline,
-                pageContext,
-            );
+            leakRepairIndexes.push(index);
         }
+        if (leakRepairIndexes.length > 0) {
+            await Promise.all(leakRepairIndexes.map(async (index) => {
+                parsed[index] = await callSingleProviderWithoutPageContext(
+                    execution,
+                    {...message, origin: message.origin[index]},
+                    requestDeadline,
+                    pageContext,
+                );
+            }));
+        }
+        const invalidRepairIndexes: number[] = [];
         for (let index = 0; index < parsed.length; index += 1) {
             const origin = message.origin[index];
             if (!needsRepair(parsed[index], index)
                 && !isClearlyWrongLanguageResponse(origin, parsed[index], execution.targetLanguage)) continue;
-            parsed[index] = await recoverInvalidResult(
-                execution, {...message, origin}, parsed[index], requestDeadline, '', pageContext, usedContextFreeRequest, true,
-            );
-            // 单槽恢复不能把上一次完整协议包当作译文；来源已避让本包标记，出现即表示串槽。
-            if (packet && [...packet.starts, ...packet.ends].some(marker => parsed[index].includes(marker))) {
-                throw new TranslationSlotResponseError(AI_MULTI_SEGMENT_REPAIR_FAILED);
-            }
+            invalidRepairIndexes.push(index);
+        }
+        if (invalidRepairIndexes.length > 0) {
+            await Promise.all(invalidRepairIndexes.map(async (index) => {
+                const origin = message.origin[index];
+                const repaired = await recoverInvalidResult(
+                    execution, {...message, origin}, parsed[index], requestDeadline, '', pageContext, usedContextFreeRequest, true,
+                );
+                // 单槽恢复不能把上一次完整协议包当作译文；来源已避让本包标记，出现即表示串槽。
+                if (packet && [...packet.starts, ...packet.ends].some(marker => repaired.includes(marker))) {
+                    throw new TranslationSlotResponseError(AI_MULTI_SEGMENT_REPAIR_FAILED);
+                }
+                parsed[index] = repaired;
+            }));
         }
         return parsed;
     }
@@ -446,7 +461,7 @@ export function createBrokerRecoveryPipeline(options: BrokerRecoveryPipelineOpti
             results = nativeBatch ? validateNativeBatchResults(nativeOrigins, result)
                 : requireBatchResult(result, message.origin.length);
         } catch (error) {
-            // 网络、鉴权与限流沿现有失败链路返回；只有响应结构损坏才允许拆批，避免放大上游请求。
+            // 网络、鉴权与限流沿现有失败链路返回；只有响应结构损坏才允许拆批，逐段恢复避免首槽超时或取消时放大上游请求。
             if (!nativeBatch || !isNativeBatchResponseError(error)) throw error;
             const recovered: string[] = [];
             for (const origin of nativeOrigins) {
@@ -459,6 +474,7 @@ export function createBrokerRecoveryPipeline(options: BrokerRecoveryPipelineOpti
             return recovered;
         }
         if (promptBasedAI) {
+            const leakRepairs: Array<{index: number; origin: string}> = [];
             for (let index = 0; index < results.length; index += 1) {
                 const origin = message.origin[index] ?? '';
                 const leakedPageContext = shouldRecoverPageContextLeak(
@@ -479,23 +495,25 @@ export function createBrokerRecoveryPipeline(options: BrokerRecoveryPipelineOpti
                     )) throw new AIContextRecoveryResponseError();
                     continue;
                 }
-                results[index] = await callSingleProviderWithoutPageContext(
-                    execution,
-                    {...message, origin},
-                    requestDeadline,
-                    pageContext,
-                );
+                leakRepairs.push({index, origin});
+            }
+            if (leakRepairs.length > 0) {
+                await Promise.all(leakRepairs.map(async ({index, origin}) => {
+                    results[index] = await callSingleProviderWithoutPageContext(
+                        execution,
+                        {...message, origin},
+                        requestDeadline,
+                        pageContext,
+                    );
+                }));
             }
         }
-        // 机器与 AI 数组共用逐项质量恢复；仅 AI 的无上下文重试清空提示上下文。
+        // 机器与 AI 数组共用逐项质量恢复；仅 AI 的无上下文重试清空提示上下文，多槽修复并发完成。
         const finalized = Array.from(results, value => value ?? '');
-        for (let index = 0; index < finalized.length; index += 1) {
-            finalized[index] = await recoverInvalidResult(
-                execution, {...message, origin: message.origin[index] ?? ''}, finalized[index] ?? '',
-                requestDeadline, promptBasedAI && startWithoutPageContext ? '' : context, pageContext,
-            );
-        }
-        return finalized;
+        return Promise.all(finalized.map((value, index) => recoverInvalidResult(
+            execution, {...message, origin: message.origin[index] ?? ''}, value ?? '',
+            requestDeadline, promptBasedAI && startWithoutPageContext ? '' : context, pageContext,
+        )));
     }
 
     return {

@@ -52,11 +52,17 @@ const modelMigrations: Record<string, Record<string, string>> = {
         'ERNIE-Bot 4.0': currentModelIds.yiyan,
         'ERNIE-Bot': currentModelIds.yiyan,
         'ERNIE-Speed-8K': currentModelIds.yiyanFast,
+        'ernie-speed-128k': currentModelIds.yiyanFast,
     },
     [services.minimax]: {
         chatcompletion_v2: currentModelIds.minimax,
         'MiniMax-Text-01': currentModelIds.minimax,
-        'MiniMax-M3.1': 'MiniMax-M3.1-flash',
+        'MiniMax-M3.1': defaultModelIds[services.minimax],
+        // M2.7 与 M2.5 系列已由官方停用，统一迁移到当前 M3.1 Flash。
+        'MiniMax-M2.7': defaultModelIds[services.minimax],
+        'MiniMax-M2.7-highspeed': defaultModelIds[services.minimax],
+        'MiniMax-M2.5': defaultModelIds[services.minimax],
+        'MiniMax-M2.5-highspeed': defaultModelIds[services.minimax],
     },
     [services.mimo]: {
         // 官方将在 2026-10-21 直接停用旧编号；网页、文档和模型级偏好使用同一映射。
@@ -65,6 +71,10 @@ const modelMigrations: Record<string, Record<string, string>> = {
     },
     [services.jieyue]: {
         'step-1-8k': currentModelIds.jieyue,
+        // step-2 与 step-2-mini 已由阶跃星辰官方下线，迁移到当前 Step 3.7 Flash。
+        'step-2-mini': currentModelIds.jieyue,
+        'step-2': currentModelIds.jieyue,
+        'step-3.5-flash-2603': currentModelIds.jieyue,
     },
     [services.huanYuan]: {
         // 官方已于 2026-08-31 下线预览版，迁移到正式版并复用模型级偏好迁移。

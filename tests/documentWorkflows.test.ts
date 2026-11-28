@@ -44,6 +44,28 @@ function importFixture() {
 }
 
 describe('document import workflow ownership', () => {
+    it('keeps imported HTML history separate for each source URL and for local files', async () => {
+        const f = importFixture();
+        f.ports.history = f.history;
+        const html = '<article><p>Source.</p></article>';
+        const article = new File([html], 'article.html', {type: 'text/html'});
+        const firstUrl = 'https://example.test/article';
+        const secondUrl = 'https://example.org/article';
+        await f.workflow.loadFiles([article], firstUrl);
+        await f.workflow.loadFiles([article], secondUrl);
+        await f.workflow.loadFiles([article]);
+        await f.workflow.loadFiles([article], firstUrl);
+
+        const [first, second, local, reopened] = f.tasks;
+        const localId = await documentHistoryId(new TextEncoder().encode(html));
+        expect(first.historyId).toEqual(expect.any(String));
+        expect(second.historyId).toEqual(expect.any(String));
+        expect(new Set([first.historyId, second.historyId, local.historyId]).size).toBe(3);
+        expect(local.historyId).toBe(localId);
+        expect(reopened.historyId).toBe(first.historyId);
+        expect(f.load.mock.calls).toEqual([[first.historyId], [second.historyId], [localId], [first.historyId]]);
+    });
+
     it.each(['blocked', 'timeout'] as const)('preserves existing history after a transient %s read and a later successful save', async failure => {
         const f = importFixture(), factory = new IDBFactory(), history = createDocumentHistory(factory);
         const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes);
@@ -120,6 +142,23 @@ describe('document import workflow ownership', () => {
         expect(f.ports.onOnlineError).toHaveBeenCalledWith('network failed');expect(f.tasks).toHaveLength(1);
     });
 
+    it('discards a completed online PDF download after cancellation', async () => {
+        const f = importFixture();
+        const file = new File(['PDF'], 'online.pdf');
+        const download = pending(file);
+        vi.mocked(f.ports.fetchPdf).mockReturnValueOnce(download.promise);
+        const running = f.workflow.openOnlinePdf('https://example.test/paper.pdf');
+        const {signal} = vi.mocked(f.ports.fetchPdf).mock.calls[0][1]!;
+        f.workflow.cancel();
+        download.resolve(file);
+        await running;
+
+        expect(signal?.aborted).toBe(true);
+        expect(f.ports.parseFile).not.toHaveBeenCalled();
+        expect(f.tasks).toEqual([]);
+        expect(f.ports.onOnlineError).not.toHaveBeenCalled();
+    });
+
     it.each(['cancel', 'dispose'] as const)('discards late parsing and progress after %s and releases its unowned document', async action => {
         const f = importFixture(), parsed = document(), gate = pending(parsed);
         vi.mocked(f.ports.parseFile).mockReturnValueOnce(gate.promise);
@@ -189,6 +228,32 @@ describe('document import workflow ownership', () => {
         vi.mocked(f.ports.parseFile).mockClear();await f.workflow.openHistory('history');
         expect(f.ports.parseFile).not.toHaveBeenCalled();expect(f.tasks[1]).toMatchObject({historyId: 'history', savedRevision: 0, translations: ['Kept correction']});
         f.load.mockResolvedValueOnce(null);await f.workflow.openHistory('missing');expect(f.ports.onHistoryMissing).toHaveBeenCalledOnce();
+    });
+
+    it('rebuilds Markdown tables in legacy history and retains old whole-row corrections for review', async () => {
+        const f = importFixture();
+        f.ports.history = f.history;
+        const row = '| Name | Status |';
+        const source = `Source.\n\n${row}\n| --- | --- |\n`;
+        const old: ParsedDocument = {
+            ...document('table.md'), segments: [{id: 0, source: 'Source.'}, {id: 1, source: row}],
+        };
+        delete old.markdownTables;
+        const saved = {...record(old), bytes: new TextEncoder().encode(source), total: 2, completed: 2,
+            translations: ['保留正文校订。', '| 名称 | 状态 |']};
+        f.load.mockResolvedValue(saved);
+        await f.workflow.openHistory(saved.id);
+        expect(f.ports.parseFile).toHaveBeenCalledOnce();
+        expect(f.tasks[0].document?.markdownTables).toHaveLength(1);
+        expect(f.tasks[0].document?.segments.map(item => item.source)).toEqual(['Source.', 'Name', 'Status']);
+        expect(f.tasks[0].translations).toEqual(['保留正文校订。', '', '']);
+        expect(f.tasks[0].retainedRevisions).toEqual([{source: row, translation: '| 名称 | 状态 |'}]);
+        expect(saved.translations).toEqual(['保留正文校订。', '| 名称 | 状态 |']);
+        f.load.mockResolvedValue({...saved, parsed: f.tasks[0].document!, total: 3, translations: ['保留正文校订。', '名称', '状态']});
+        vi.mocked(f.ports.parseFile).mockClear();
+        await f.workflow.openHistory(saved.id);
+        expect(f.ports.parseFile).not.toHaveBeenCalled();
+        expect(f.tasks[1].translations).toEqual(['保留正文校订。', '名称', '状态']);
     });
 
     it.each(['missing binary', 'wrong binary kind', 'missing bytes', 'untyped bytes', 'different length', 'different values', 'wrong snapshot format and missing binary'] as const)
@@ -290,6 +355,38 @@ describe('document import workflow ownership', () => {
         f.load.mockResolvedValueOnce(null);
         await f.workflow.loadFiles([new File(['New.'], 'different.txt')]);
         expect(f.tasks[3].bypassCache).toBe(false);
+    });
+
+    it('rebuilds old Word segment formatting and keeps the previous manual translation at its original position', async () => {
+        const f = importFixture();f.ports.history = f.history;
+        const parts = [{path: 'word/document.xml', source: '', paragraphSegments: [{paragraphIndex: 0, segmentIndex: 0}]}];
+        const old: ParsedDocument = {...document(), fileName: 'legacy.docx', format: 'docx',
+            binary: {kind: 'docx', bytes: new Uint8Array([1]), parts}};
+        const fresh: ParsedDocument = {...old, segments: [{id: 0, source: '<g1>Source.</g1>', docxInline: true}],
+            binary: {kind: 'docx', bytes: new Uint8Array([1]), parts, inlineFormatting: true}};
+        const saved = record(old);
+        f.load.mockResolvedValue(saved);
+        vi.mocked(f.ports.parseFile).mockResolvedValueOnce(fresh);
+        await f.workflow.openHistory(saved.id);
+        expect(f.ports.parseFile).toHaveBeenCalledOnce();
+        expect(f.tasks[0].document).toBe(fresh);
+        expect(f.tasks[0].translations).toEqual(['Kept correction']);
+        expect(f.tasks[0].retainedRevisions).toEqual([]);
+    });
+
+    it('restores the saved CSV selection with every previously translated cell when reopening or importing it again', async () => {
+        const f = importFixture();f.ports.history = f.history;
+        const raw = 'Reference,Description\nKeep this,Read this';
+        const parsed = parseDocument('table.csv', raw);
+        const saved = {...record(parsed), bytes: new TextEncoder().encode(raw), translations: ['编号', '说明', '保留', '阅读'], delimitedColumns: [1, 8]};
+        f.load.mockResolvedValue(saved);
+        await f.workflow.openHistory(saved.id);
+        await f.workflow.loadFiles([new File([raw], 'table.csv')]);
+        expect(f.tasks).toHaveLength(2);
+        for (const task of f.tasks) {
+            expect(task.delimitedColumns).toEqual([1]);
+            expect(task.translations).toEqual(saved.translations);
+        }
     });
 
     it.each(['bytes', 'history'] as const)('checks cancellation again after pending %s before advancing import', async stage => {

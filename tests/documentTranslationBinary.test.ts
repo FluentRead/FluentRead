@@ -19,7 +19,7 @@ import {
 } from '@/src/features/document-translation/services/binary';
 import {pdfPagesNeedingOcr} from '@/src/features/document-translation/services/pdfOcr';
 
-const exampleRoot = new URL('../examples/document-translation/', import.meta.url);
+const exampleRoot = new URL('./fixtures/document-translation/', import.meta.url);
 const onePixelPng = Uint8Array.from(Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlY4AAAAASUVORK5CYII=',
     'base64',
@@ -416,6 +416,99 @@ describe('binary document translation formats', () => {
         expect(linkedChapter).toContain('href="chapter-1.xhtml"');
         expect(linkedChapter.match(/<title>/gu)).toHaveLength(1);
         expect(linkedChapter).not.toContain('<title>译文：');
+        const navigation = await zip.file('OEBPS/nav.xhtml')!.async('string');
+        expect(navigation).toContain('<a href="chapter-1.xhtml">Fluent reading / 译文：Fluent reading for local books</a>');
+        expect(navigation).toContain('<a href="chapter-2.xhtml">Regression / 译文：Regression coverage</a>');
+    });
+
+    it.each([false, true])('synchronizes EPUB navigation and NCX without changing targets (nav on spine: %s)', async navOnSpine => {
+        const zip = new JSZip();
+        const navPath = 'Book/Navigation/nav.xhtml', ncxPath = 'Book/Navigation/book.ncx';
+        const chapterPath = 'Book/Text/Chapter 1.xhtml';
+        const firstLink = '../Text/Chapter%201.xhtml#start';
+        const secondLink = '../Text/Chapter%201.xhtml#%E7%AC%AC%E4%BA%8C';
+        const pageLink = '../Text/Chapter%201.xhtml';
+        const bodyLink = '../Text/Chapter%201.xhtml#p';
+        const pendingLink = '../Text/Chapter%201.xhtml#untranslated';
+        const invalidLink = '../Text/Chapter%201.xhtml#%FF';
+        const externalLink = 'https://example.invalid/Text/Chapter%201.xhtml#start';
+        const otherNavigation = `<nav ops:type="page-list"><ol><li><a href="${firstLink}">7</a></li></ol></nav>`;
+        const sourceNav = `<?xml version="1.0"?>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ops="http://www.idpf.org/2007/ops"><head><title>Contents</title></head><body>
+<nav ops:type="toc"><h1>Contents</h1><ol><li><a href="${firstLink}"><em>Chapter One</em></a>
+<ol><li><a href="${secondLink}">Details</a></li><li><a href="${pageLink}">Start</a></li><li><a href="${bodyLink}">Text</a></li>
+<li><a href="${pendingLink}">Pending</a></li><li><a href="${invalidLink}">Unknown anchor</a></li><li><a href="${externalLink}">External</a></li></ol>
+</li></ol></nav>${otherNavigation}</body></html>`;
+        const sourceNcx = `<?xml version="1.0"?>\n<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><docTitle><text>Book Name</text></docTitle><navMap>
+<navPoint id="n1" playOrder="1"><navLabel><text>Chapter One</text></navLabel><content src="${firstLink}"/>
+<navPoint id="n2" playOrder="2"><navLabel><text>Details</text></navLabel><content src="${secondLink}"/></navPoint>
+<navPoint id="n3" playOrder="3"><navLabel><text>Pending</text></navLabel><content src="${pendingLink}"/></navPoint></navPoint>
+</navMap><pageList><pageTarget id="page"><navLabel><text>7</text></navLabel><content src="${firstLink}"/></pageTarget></pageList></ncx>`;
+        zip.file('mimetype', 'application/epub+zip', {compression: 'STORE'});
+        zip.file('META-INF/container.xml', '<container><rootfiles><rootfile full-path="Book/content.opf"/></rootfiles></container>');
+        zip.file('Book/content.opf', `<package><manifest>
+<item id="c1" href="Text/Chapter%201.xhtml" media-type="application/xhtml+xml"/>
+<item id="navigation" href="Navigation/nav.xhtml" media-type="application/xhtml+xml" properties="scripted nav"/>
+<item id="ncx" href="Navigation/book.ncx" media-type="application/x-dtbncx+xml"/>
+</manifest><spine toc="ncx">${navOnSpine ? '<itemref idref="navigation"/>' : ''}<itemref idref="c1"/></spine></package>`);
+        zip.file(navPath, sourceNav);
+        zip.file(ncxPath, sourceNcx);
+        zip.file(chapterPath, `<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Book</title></head><body>
+<section id="start"><h1 id="heading">The <em>first</em> chapter</h1>
+<p id="p">Body excerpt.</p>
+<h2 id="第二">Tools &amp; terms<br/>A worked example</h2><h2 id="untranslated">Waiting</h2>
+</section></body></html>`);
+
+        const parsed = await parseBinaryDocument('navigation.epub', await zip.generateAsync({type: 'uint8array'}));
+        const selected = new Map([
+            ['The <g1>first</g1> chapter', '第<g1>一</g1>章'],
+            ['Tools & terms', '工具 & 术语'],
+            ['A worked example', '示例 <A>'],
+            ['Body excerpt.', '正文摘录。'],
+            ['Chapter One', '单独翻译的目录标签'],
+            ['Waiting', '  '],
+        ]);
+        const translations = parsed.segments.map(segment => selected.get(segment.source) ?? '');
+        for (const mode of ['bilingual', 'translated'] as const) {
+            const {data} = await createDocumentDownload(parsed, translations, mode);
+            const output = await JSZip.loadAsync(data as Uint8Array);
+            const nav = await output.file(navPath)!.async('string');
+            const ncx = await output.file(ncxPath)!.async('string');
+            for (const source of [nav, ncx]) expect(() => new SaxesParser({xmlns: true}).write(source).close()).not.toThrow();
+            const bilingual = mode === 'bilingual';
+            expect(nav).toContain(`<a href="${firstLink}">${bilingual ? '<em>Chapter One</em> / ' : ''}第一章</a>`);
+            expect(nav).toContain(`<a href="${secondLink}">${bilingual ? 'Details / ' : ''}工具 &amp; 术语 示例 &lt;A&gt;</a>`);
+            expect(nav).toContain(`<a href="${pageLink}">${bilingual ? 'Start / ' : ''}第一章</a>`);
+            expect(nav).not.toContain('单独翻译的目录标签');
+            expect(nav).toContain(otherNavigation);
+            for (const [href, label] of [[bodyLink, 'Text'], [pendingLink, 'Pending'], [invalidLink, 'Unknown anchor'], [externalLink, 'External']]) {
+                expect(nav).toContain(`<a href="${href}">${label}</a>`);
+            }
+            expect(ncx).toContain(`<text>${bilingual ? 'Chapter One / ' : ''}第一章</text></navLabel><content src="${firstLink}"/>`);
+            expect(ncx).toContain(`<text>${bilingual ? 'Details / ' : ''}工具 &amp; 术语 示例 &lt;A&gt;</text></navLabel><content src="${secondLink}"/>`);
+            expect(ncx).toContain('<text>Pending</text>');
+            expect(ncx).toContain('<docTitle><text>Book Name</text></docTitle>');
+            expect(ncx).toContain(`<pageTarget id="page"><navLabel><text>7</text></navLabel><content src="${firstLink}"/>`);
+            expect(await output.file('Book/content.opf')!.async('string')).toBe(await zip.file('Book/content.opf')!.async('string'));
+        }
+    });
+
+    it('exports EPUB 2 with an NCX translation and an XHTML 1.1-compatible marker', async () => {
+        const zip = new JSZip();
+        zip.file('mimetype', 'application/epub+zip', {compression: 'STORE'});
+        zip.file('META-INF/container.xml', '<container><rootfile full-path="book.opf"/></container>');
+        zip.file('book.opf', `<package version="2.0"><manifest>
+<item id="body" href="body.xhtml" media-type="application/xhtml+xml"/>
+<item id="ncx" href="book.ncx" media-type="application/x-dtbncx+xml"/>
+</manifest><spine toc="ncx"><itemref idref="body"/></spine></package>`);
+        zip.file('body.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Book</title></head><body><h1 id="first">Chapter One</h1></body></html>');
+        zip.file('book.ncx', '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><navMap><navPoint><navLabel><text>Chapter One</text></navLabel><content src="body.xhtml#first"/></navPoint></navMap></ncx>');
+        const book = await parseBinaryDocument('legacy.epub', await zip.generateAsync({type: 'uint8array'}));
+        const {data} = await createDocumentDownload(book, ['第一章'], 'bilingual');
+        const output = await JSZip.loadAsync(data as Uint8Array);
+        const body = await output.file('body.xhtml')!.async('string');
+        expect(body).toContain('<h1 id="first">Chapter One<br/><span class="fluentread-document-translation">第一章</span></h1>');
+        expect(body).not.toContain('data-fluent-read-document-translation');
+        expect(await output.file('book.ncx')!.async('string')).toContain('<text>Chapter One / 第一章</text>');
     });
 
     it('exports strict XHTML line breaks without rewriting namespaces, styles, resources or literal script text', async () => {
@@ -572,6 +665,47 @@ describe('binary document translation formats', () => {
         expect(documentXml).not.toContain('Again');
     });
 
+    it('round-trips DOCX hyperlink labels, styles and run order in both download modes', async () => {
+        const run = (text: string, props = '') => `<w:r>${props}<w:t xml:space="preserve">${text}</w:t></w:r>`;
+        const bold = '<w:rPr><w:b/></w:rPr>';
+        const italic = '<w:rPr><w:i/></w:rPr>';
+        const hyperlink = '<w:hyperlink r:id="rId19">';
+        const paragraph = `<w:p w:rsidR="00000001"><w:pPr><w:jc w:val="center"/></w:pPr>${run('Read the ')}` +
+            `${hyperlink}${run('setup ', italic)}${run('guide')}</w:hyperlink>${run(' and keep the ')}${run('impor', bold)}${run('tant', bold)}${run(' step.')}</w:p>`;
+        const field = `<w:p><w:fldSimple w:instr=" DATE ">${run('Today')}</w:fldSimple></w:p>`;
+        const zip = new JSZip();
+        zip.file('[Content_Types].xml', '<Types/>');
+        zip.file('word/document.xml', `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:tbl><w:tr><w:tc>${paragraph}</w:tc></w:tr></w:tbl>${field}</w:body></w:document>`, {createFolders: false});
+        const relations = '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId19" Target="https://example.com/setup" TargetMode="External" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"/></Relationships>';
+        zip.file('word/_rels/document.xml.rels', relations, {createFolders: false});
+        const parsed = await parseBinaryDocument('styled.docx', await zip.generateAsync({type: 'uint8array'}));
+        expect(parsed.segments.map(segment => segment.source)).toEqual(['Read the <g1><g2>setup </g2>guide</g1> and keep the <g3>important</g3> step.', 'Today']);
+        const corrected = ['先完成<g3>关键</g3>步骤，再读<g1><g2>安装</g2>指南</g1>。', '今天'];
+        for (const mode of ['bilingual', 'translated'] as const) {
+            const {data} = await createDocumentDownload(parsed, corrected, mode);
+            const saved = await JSZip.loadAsync(data as Uint8Array);
+            expect(Object.keys(saved.files).sort()).toEqual(Object.keys(zip.files).sort());
+            const xml = await saved.file('word/document.xml')!.async('string');
+            expect(() => new SaxesParser({xmlns: true}).write(xml).close()).not.toThrow();
+            expect(xml).toContain(run('关键', bold));
+            expect(xml).toContain(`${hyperlink}${run('安装', italic)}${run('指南')}</w:hyperlink>`);
+            expect(xml.indexOf(run('关键', bold))).toBeLessThan(xml.indexOf(`${hyperlink}${run('安装', italic)}`));
+            expect(xml.indexOf(run('指南'))).toBeLessThan(xml.indexOf('</w:tc>'));
+            expect(xml.match(/w:rsidR="00000001"/gu)).toHaveLength(1);
+            expect(xml).toContain('<w:jc w:val="center"/>');
+            expect(xml).toContain(field);
+            expect(xml).toContain('今天');
+            expect(xml.includes(paragraph)).toBe(mode === 'bilingual');
+            expect(xml).not.toMatch(/&lt;\/?g\d/u);
+            expect(await saved.file('word/_rels/document.xml.rels')!.async('string')).toBe(relations);
+        }
+        const legacy = await createDocumentDownload(parsed, ['人工校订的完整译句。', ''], 'translated');
+        const fallback = await (await JSZip.loadAsync(legacy.data as Uint8Array)).file('word/document.xml')!.async('string');
+        expect(fallback).toContain(paragraph);
+        expect(fallback).toContain('人工校订的完整译句。');
+        expect(fallback).toContain(field);
+    });
+
     it('PDF 双语导出将每张原页和保留版式的译页并排放在同一页', async () => {
         const parsed = await parseBinaryDocument('sample.pdf', loadBytes('sample.pdf'));
         const translations = parsed.segments.map((segment) => `Translated: ${segment.source}`);
@@ -597,6 +731,18 @@ describe('binary document translation formats', () => {
         });
         expect(parsed.format).toBe('epub');
         expect(parsed.segments.length).toBeGreaterThan(0);
+    });
+
+    it('保留从 UTF-8 或 UTF-16 文件导入的表格 BOM，并下载成 UTF-8 的 CSV 回读', async () => {
+        const text = '\ufeffName,Details\r\n1,"Hello, world"';
+        const utf8 = new TextEncoder().encode(text);
+        const utf16 = Uint8Array.from([...text].flatMap(character => [character.charCodeAt(0) & 255, character.charCodeAt(0) >> 8]));
+        for (const input of [utf8, utf16]) {
+            const parsed = await parseDocumentFile(new File([Uint8Array.from(input)], 'table.csv'));
+            const download = await createDocumentDownload(parsed, ['', '', '你好，世界'], 'translated');
+            expect(download.mimeType).toBe('text/csv;charset=utf-8');
+            expect(download.data).toBe('\ufeffName,Details\r\n1,"你好，世界"');
+        }
     });
 
     it('拒绝扩展名伪装或损坏的二进制文件', async () => {

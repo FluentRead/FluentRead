@@ -5,13 +5,14 @@
  * 几何与采样：小补丁保留原像素网格，大补丁等比例面积缩小，随后对称补齐模型尺寸而非分别拉伸横纵；蒙版覆盖所有参与面积采样的源字形，补齐区镜像相同蒙版；输出只从有效内容区按像素中心双线性回填，避免缩放台阶和补齐像素串入原图。
  * 渐变重建：在原始帧上完整验证每个物理清字框，只有全部边界符合双线性渐变且内部不透明时复用确定性重建；纯渐变页不等待模型队列或初始化模型，混合页仅将其余复杂区域交给 LaMa，现有透明保护路径保持。
  * 纯色文字重建：复杂分类中的物理行另须完整通过单一底色、共同墨色和字形组件检查，才按原蒙版恢复底色；整页独立预付2097152像素，注音沿用自己的字高，失败仍走原模型流程。
+ * 旋转短标签：先在原图上尝试逐列恢复。实际写入成功才告知绘制方保留这个修补结果，避免后续均匀填色覆盖书脊底纹。
  * 模块边界：不读取网页 DOM、不上传图像、不翻译文字；均匀气泡无需加载模型，最后的译文排版由 mangaRendering 处理，模型生成内容始终局限于检测文字蒙版。
  */
 import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources';
 import {mangaInferenceClient, mangaExtensionUrl, type MangaPatch} from './mangaInferenceClient';
 import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 import {protectMangaSession} from './mangaSessionFallback';
-import {configureOnnxWasmBackend} from '@/src/shared/onnx/wasmBinary';
+import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
 import {assertMangaOcrActive, loadMangaInpaintAsset, MANGA_INPAINT_ASSET, withMangaModelAdmission} from './mangaOcrAssets';
 import {mangaRegionBackground, type MangaBackground} from './mangaRendering';
 import type {MangaRegion} from './mangaRegions';
@@ -129,17 +130,27 @@ export function createMangaInpaintingRuntime(create: (signal?: AbortSignal,progr
     function queue<T>(operation:()=>Promise<T>) {const result=tail.then(operation);tail=result.then(()=>undefined,()=>undefined);return result;}
     async function release() {clearTimeout(idle);idle=undefined;const current=service;service=undefined;await current?.release();}
     return {
-        repair(pixels:Uint8ClampedArray,width:number,height:number,regions:MangaRegion[],signal?:AbortSignal,onPreparing?:(percent?:number,initializing?:boolean)=>void,onRepair?:(done:number,total:number)=>void,backgrounds?:MangaBackground[],options?:{reuseUniformPixels?:boolean;protection?:MangaAlphaProtection}) {
+        repair(pixels:Uint8ClampedArray,width:number,height:number,regions:MangaRegion[],signal?:AbortSignal,onPreparing?:(percent?:number,initializing?:boolean)=>void,onRepair?:(done:number,total:number)=>void,backgrounds?:MangaBackground[],options?:{
+            reuseUniformPixels?:boolean;protection?:MangaAlphaProtection;onRotatedLabelRestored?:(index:number)=>void;
+        }) {
             return withMangaModelAdmission(() => {
+                const flatBudget={remaining:2_097_152};
+                const rotatedRepairs=!options?.protection&&regions.some(region=>region.quarterTurn)?regions.map((region,index)=>{
+                    const sources=region.sourceBoxes??[region.bbox];
+                    if(!region.quarterTurn||sources.length!==1)return;
+                    const [mask]=maskBoxes(region,width,height);
+                    const repair=planImageFlatTextRepair(pixels,width,height,{mask,source:sources[0],fontSize:region.fontSize,rotatedLabel:true},flatBudget);
+                    if(repair)return(target:Uint8ClampedArray)=>{repair(target);options?.onRotatedLabelRestored?.(index);};
+                }):[];
                 // 不同标签页的图片任务可以并发到达这里。已确认无需模型的页面
                 // 默认复制像素；只有独占调用方显式选择时复用完整均匀页。
                 // 不访问端口、队列和空闲计时；缺失分类仍按原流程采样。
-                if (regions.every((_,index)=>backgrounds?.[index]?.uniform===true)) {
+                if (regions.every((_,index)=>backgrounds?.[index]?.uniform===true&&!rotatedRepairs[index])) {
                     return Promise.resolve().then(()=>{assertMangaOcrActive(signal);return options?.reuseUniformPixels===true ? pixels : new Uint8ClampedArray(pixels);});
                 }
                 // 先在未改变的原图上验证全部物理行框；成功后才执行，不以已修补像素证明后续区域。
-                const flatBudget={remaining:2_097_152};
                 const simpleRepairs = options?.protection ? [] : regions.map((region,index) => {
+                    if (rotatedRepairs[index]) return rotatedRepairs[index];
                     if (backgrounds?.[index]?.uniform === true) return null;
                     const sources=region.sourceBoxes??[region.bbox],sourceSize=createMangaMaskFontResolver(region);
                     const repairs = maskBoxes(region,width,height).map((box,sourceIndex) => planImageGradientRepair(pixels,width,
@@ -159,7 +170,7 @@ export function createMangaInpaintingRuntime(create: (signal?: AbortSignal,progr
                     return await (async () => {
                         const result = new Uint8ClampedArray(pixels);
                         const pending = regions.filter((region,index) => {
-                            if ((backgrounds?.[index] ?? mangaRegionBackground(pixels,width,height,region.bbox)).uniform) return false;
+                            if (!rotatedRepairs[index]&&(backgrounds?.[index] ?? mangaRegionBackground(pixels,width,height,region.bbox)).uniform) return false;
                             const repair=simpleRepairs[index];if(repair){repair(result);return false;}return true;
                         });
                         let completed = 0;
@@ -195,7 +206,7 @@ export async function createBrowserMangaInpainter(signal?:AbortSignal,progress?:
         if(percent!==lastPercent){lastPercent=percent;progress?.(percent);}
     });assertMangaOcrActive(signal);progress?.(undefined,true);
     const ort=await import('onnxruntime-web/webgpu');ort.env.wasm.numThreads=localWasmThreads();
-    configureOnnxWasmBackend(ort.env.wasm,{mjs:mangaExtensionUrl('/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'),wasm:mangaExtensionUrl('/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm')});
+    configureOnnxWasmBackend(ort.env.wasm,resolveOnnxWasmAssetPaths(mangaExtensionUrl,{leadingSlash:true}));
     const gpu=await probeWebGpu();
     let activeSignal=signal;
     let usingGpu=gpu.available;

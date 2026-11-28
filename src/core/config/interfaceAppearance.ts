@@ -27,7 +27,7 @@ export const interfaceSkinOptions = [
     kind: 'default',
     popupHeight: 'content',
     popupWidth: 320,
-    preview: {canvas: '#ffffff', backdrop: '#ffffff', surface: '#ffffff', border: '#e7e9f0', radius: 5, ink: '#172033', title: '#172033', accent: '#ef4776', action: 'linear-gradient(135deg, #f35482, #e93267)'},
+    preview: {canvas: '#ffffff', backdrop: '#ffffff', surface: '#ffffff', border: '#e7eaf1', radius: 5, ink: '#172033', title: '#172033', accent: '#ef4776', action: 'linear-gradient(135deg, #f45686, #e53268)'},
   },
   {
     value: 'minimal',
@@ -47,7 +47,7 @@ export const interfaceSkinOptions = [
     kind: 'compact',
     popupHeight: 'content',
     popupWidth: 300,
-    preview: {canvas: '#f5f6f8', backdrop: '#f5f6f8', surface: '#ffffff', border: '#e7e9f0', radius: 4, ink: '#283042', title: '#283042', accent: '#dc315f', action: 'linear-gradient(135deg, #f35482, #e93267)'},
+    preview: {canvas: '#f6f7fa', backdrop: '#f6f7fa', surface: '#ffffff', border: '#e7eaf1', radius: 4, ink: '#283042', title: '#283042', accent: '#ef4776', action: 'linear-gradient(135deg, #f45686, #e53268)'},
   },
   {
     value: 'contrast',

@@ -7,12 +7,29 @@
 日常开发、修复、PR 与普通交付只运行相关回归。全量测试和完整站点矩阵只用于用户明确要求的全量验收或正式发版；生产构建验证不等同于发版。四维 100% 覆盖率门禁及真实浏览器验收要求保持不变，专项通过须报告实际范围。
 
 ```bash
-# 先核对将执行的文件；筛选不会扩大到当前分组之外
+# 按文件或目录即时反查并运行精确受影响测试（默认 --reporter=dot，低 token 输出）
+pnpm test:for -- src/features/video-subtitle/ --dry-run
+pnpm test:for -- src/features/video-subtitle/ --coverage
+
+# 查看或执行相对 origin/main 的受影响测试与改动模块 100% 严格覆盖
+pnpm test:affected:plan
+pnpm test:affected
+
+# 一键低 token 日常开发自检（审计 + .d.mts 声明检查 + 受影响测试；完整日志落盘 coverage/dev-verify/）
+pnpm verify:dev
+pnpm verify:dev -- --compile
+
+# 诊断耦合枢纽与影响面传播路径
+pnpm test:impact --hubs
+pnpm test:impact --explain src/core/glossary/transfer.ts
+
+# 按测试分组精确筛选；先用 --dry-run 核对范围，筛选不会扩大到当前分组之外
 pnpm test:unit -- tests/harnessMemorySearch.test.ts --dry-run
 pnpm test:unit -- tests/harnessMemorySearch.test.ts
 # 单个用例或跨分组的明确文件集合
 pnpm exec vitest run tests/harnessRuntime.test.ts -t 'authorized context' --reporter=dot
 pnpm test:audit
+pnpm verify:declarations
 pnpm compile
 ```
 
@@ -25,6 +42,8 @@ pnpm compile
 浏览器使用独立临时 profile、第二屏正常尺寸可见但不抢焦点的窗口和 focus-safe helper，禁止连接日常 profile。按本次影响选 `--cases` 或 `--suite`，共享核心改动覆盖直接受影响的关键链路。检查生产产物时重跑相关专项，保留启动模式、焦点策略、诊断及截图证据。
 
 ## 专项入口
+
+专项 Vitest 配置见 [`tests/config/`](../tests/config/)。可以直接运行 `pnpm test:cloud-backup`、`pnpm test:video:learning` 和 `pnpm test:zotero`。
 
 - [范围、诊断与完整流水线](testing/contracts.md)
 - [网页翻译与站点兼容](testing/webpage.md)

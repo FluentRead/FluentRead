@@ -5,7 +5,7 @@
  模块边界：组件负责页面壳、导航状态和主题、界面皮肤根属性同步，不定义具体配置字段、不直接写 browser.storage，也不实现词汇仓库；设置表单、收藏与阅读记录业务由各 feature 组件拥有；学习栏目加载失败的重载动作在普通设置页保留栏目参数，页内设置只重载宿主文档。
 -->
 <template>
-  <div class="settings-app" :class="{'has-overlay-close': Boolean(props.onClose)}">
+  <div class="settings-app" :class="{'has-overlay-close': Boolean(props.onClose)}" @click="dismissSearchOutside">
     <aside class="sidebar">
       <a class="brand" :href="websiteUrl" target="_blank" rel="noopener noreferrer" :aria-label="t('options.aboutWebsite')" :title="t('options.aboutWebsite')">
         <img :src="iconUrl" alt="" />
@@ -15,10 +15,18 @@
         </div>
       </a>
 
-          <label class="search-box">
-            <UiIcon name="search" :size="16" />
-            <input v-model.trim="query" type="search" :placeholder="t('options.search')" :aria-label="t('options.search')" @keydown.esc="query = ''" />
-          </label>
+      <label class="search-box">
+        <UiIcon name="search" :size="16" />
+        <input
+          ref="searchInput"
+          v-model.trim="query"
+          type="search"
+          :placeholder="t('options.search')"
+          :aria-label="t('options.search')"
+          @keydown.esc="query = ''"
+          @keydown.down="focusSearchResult"
+        />
+      </label>
 
       <nav ref="navigationElement" :aria-label="t('options.navLabel')">
         <section v-for="(group, index) in localizedNavigationGroups" :key="group.label" class="nav-group">
@@ -67,9 +75,10 @@
         </button>
       </header>
 
-      <div v-if="query && filteredResults.length" class="search-results">
+      <div v-if="query && filteredResults.length" ref="searchResultsElement" class="search-results" @keydown.esc.stop.prevent="closeSearchResults">
         <button v-for="result in filteredResults" :key="result.id" type="button" @click="selectResult(result)">
-          <span><strong>{{ result.label }}</strong><small>{{ result.searchDescription }}</small></span><b>{{ t('options.open') }} →</b>
+          <span><strong>{{ result.label }}</strong><small>{{ result.searchDescription }}</small></span>
+          <UiIcon name="arrow-right" :size="14" />
         </button>
       </div>
       <div v-else-if="query" class="search-empty">{{ t('options.searchEmpty', {query}) }}</div>
@@ -239,6 +248,27 @@ const aboutLinks = [
 ]
 const {t, translateLegacy} = useUiI18n()
 const query = ref('')
+const searchInput = ref<HTMLInputElement>()
+const searchResultsElement = ref<HTMLElement>()
+
+function dismissSearchOutside(event: MouseEvent) {
+  if (query.value && event.target instanceof Element && !event.target.closest('.search-box, .search-results, .search-empty')) {
+    query.value = ''
+  }
+}
+
+function focusSearchResult(event: KeyboardEvent) {
+  const result = searchResultsElement.value?.querySelector('button')
+  if (event.isComposing || !result) return
+  event.preventDefault()
+  result.focus()
+}
+
+function closeSearchResults() {
+  query.value = ''
+  searchInput.value?.focus()
+}
+
 function sectionFromHash(hash: string): string {
   if (!props.settingsHashPrefix) return hash.replace(/^#/, '')
   const prefix = `${props.settingsHashPrefix}/`
@@ -275,7 +305,6 @@ const userscriptUnavailableSections = new Set([
   'settings-image-translation',
   'settings-area-translation',
   'settings-video',
-  'settings-writing',
   'settings-translation-stats',
   'settings-model-usage',
 ])

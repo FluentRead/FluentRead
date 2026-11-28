@@ -12,6 +12,7 @@ import {
 } from './catalog';
 import {
     getAliyunTranslationEndpoint,
+    getHuanYuanEndpoint,
     getMimoEndpoint,
     MINIMAX_ENDPOINTS,
     tongyiTokenPlanUrl,
@@ -155,6 +156,9 @@ function tokenCredentialDestination(config: Config, service: string, customEndpo
     }
     if (service === services.mimo) {
         return urlDestination(service, getMimoEndpoint(config.mimoBillingPlan, config.mimoRegion));
+    }
+    if (service === services.huanYuan) {
+        return urlDestination(service, getHuanYuanEndpoint(config.serviceRegion?.[service]));
     }
     if (service === services.tongyi) {
         return `urls:${configuredTongyiDestinations(config)}`;

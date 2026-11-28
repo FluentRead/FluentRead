@@ -8,7 +8,7 @@ overrides:
   lzo1x>lzo: '-'
 
 patchedDependencies:
-  ppu-paddle-ocr@6.6.0: patches/ppu-paddle-ocr@6.6.0.patch
+  ppu-paddle-ocr@6.6.0: scripts/patches/ppu-paddle-ocr@6.6.0.patch
 
 allowBuilds:
   esbuild: true

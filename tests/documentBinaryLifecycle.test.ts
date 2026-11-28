@@ -211,6 +211,25 @@ describe('documentbinaryAudit actual import and package boundaries', () => {
         await expect(parseDocumentFile({name: 'invalid.txt', size: NaN, text: vi.fn(), arrayBuffer: vi.fn()})).rejects.toThrow('大小无效');
     });
 
+    it.each([
+        {name: 'notes.txt', source: '星图\r\nSecond line', expected: '星图', littleEndian: true},
+        {name: 'clip.srt', source: '1\r\n00:00:01,000 --> 00:00:02,000\r\nこんにちは🌏\r\n', expected: 'こんにちは🌏', littleEndian: false},
+        {name: 'song.lrc', source: '[00:01.00]星夜\n', expected: '星夜', littleEndian: true},
+    ])('decodes BOM-marked text uploads without losing characters in $name', async ({name, source, expected, littleEndian}) => {
+        const bytes = new ArrayBuffer(2 + source.length * 2);
+        const view = new DataView(bytes);
+        view.setUint16(0, 0xfeff, littleEndian);
+        for (let index = 0; index < source.length; index += 1) view.setUint16(2 + index * 2, source.charCodeAt(index), littleEndian);
+        const result = await parseDocumentFile(new File([bytes], name));
+        expect(result.segments[0].source).toBe(expected);
+        expect((await createDocumentDownload(result, [], 'translated')).data).toBe(source);
+    });
+
+    it('reports malformed native file bytes before producing garbled translations', async () => {
+        const file = new File([Uint8Array.of(0xff, 0xfe, 0x42)], 'broken.txt');
+        await expect(parseDocumentFile(file)).rejects.toThrow('编码');
+    });
+
     it('blocks early and late canceled File reads without parsing or committing results', async () => {
         const controller = new AbortController();
         const pending = deferred<string>();

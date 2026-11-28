@@ -79,38 +79,29 @@ describe('popup feature visibility', () => {
         expect(source('src/features/settings/ui/SettingsSections.vue')).toContain('<InformationHighlightSettings');
         expect(source('src/features/settings/ui/InformationHighlightSettings.vue')).toContain('id="information-highlight-settings"');
     });
-    it('mounts smart highlighting with the continuous translation form under its own anchor', () => {
+    it('mounts smart highlighting with the continuous translation form under its reading panel', () => {
         const elements = templateElements(source('src/features/settings/ui/SettingsSections.vue'));
         const panel = (name: string) => elements.find(node => node.tag === 'SettingsPanel'
             && node.props.some(prop => prop.type === 6 && prop.name === 'name' && prop.value?.content === name))!;
-        const reading = panel('reading'), highlight = panel('information-highlight');
-        expect(reading).toBeDefined();expect(highlight).toBeDefined();
-        expect(reading.children.some(node => node.type === 1 && node.tag === 'ReadingAssistanceSettings')).toBe(true);
-        expect(reading.children.some(node => node.type === 1 && node.tag === 'InformationHighlightSettings')).toBe(false);
-        const component = highlight.children.find(node => node.type === 1 && node.tag === 'InformationHighlightSettings') as TemplateElement;
+        const reading = panel('reading');
+        expect(reading).toBeDefined();
+        expect(reading.children.some(node => node.type === 1 && node.tag === 'SentenceHighlightStyleSettings')).toBe(true);
+        const component = reading.children.find(node => node.type === 1 && node.tag === 'InformationHighlightSettings') as TemplateElement;
         expect(component).toBeDefined();
-        expect(directive(highlight, 'bind', 'active')).toBe('props.activePanel');
+        expect(directive(reading, 'bind', 'active')).toBe('props.activePanel');
         expect(directive(component, 'if')).toBe("browserCapabilities.browser !== 'userscript' && props.activeSection === 'settings-translation'");
         expect(directive(component, 'bind', 'active')).toBe("viewActive && props.activeSection === 'settings-translation'");
-        for (const name of ['reading', 'hover', 'input', 'page', 'context-menu', 'floating-ball', 'paragraph-copy', 'section-translation', 'excluded-languages']) {
+        for (const name of ['page', 'hover', 'reading', 'excluded-languages', 'excluded-tags', 'floating-ball', 'context-menu', 'input', 'writing']) {
             expect(panel(name)).toBeDefined();
             expect(directive(panel(name), 'bind', 'active')).toBe('props.activePanel');
         }
-        for (const [name, target, component] of [
-            ['context-menu', 'context-menu-settings', 'ContextMenuSettings'],
-            ['paragraph-copy', 'paragraph-copy-settings', 'ParagraphCopySettings'],
-            ['section-translation', 'section-translation-settings', 'SectionTranslationSettings'],
-            ['excluded-languages', 'excluded-language-settings', 'ExcludedLanguageSettings'],
-        ]) {
-            expect(panel(name).props.some(prop => prop.type === 6 && prop.name === 'id' && prop.value?.content === target)).toBe(true);
-            expect(panel(name).children.some(node => node.type === 1 && node.tag === component)).toBe(true);
-        }
-        const floating = elements.find(node => node.tag === 'section'
-            && node.props.some(prop => prop.type === 6 && prop.name === 'id' && prop.value?.content === 'floating-ball-settings'))!;
-        expect(floating.children).toContain(panel('floating-ball'));
+        expect(panel('context-menu').props.some(prop => prop.type === 6 && prop.name === 'id' && prop.value?.content === 'context-menu-settings')).toBe(true);
+        expect(panel('floating-ball').props.some(prop => prop.type === 6 && prop.name === 'id' && prop.value?.content === 'floating-ball-settings')).toBe(true);
+        expect(panel('excluded-languages').props.some(prop => prop.type === 6 && prop.name === 'id' && prop.value?.content === 'excluded-language-settings')).toBe(true);
+        expect(panel('excluded-tags').props.some(prop => prop.type === 6 && prop.name === 'id' && prop.value?.content === 'excluded-tag-settings')).toBe(true);
         const wrapper = templateElements(source('src/features/settings/ui/components/SettingsPanel.vue')).find(node => node.tag === 'div')!;
         const visible = directive(wrapper, 'show')!;
-        for (const name of ['reading', 'information-highlight', 'hover', 'input']) {
+        for (const name of ['page', 'hover', 'reading', 'excluded-languages']) {
             expect(runInNewContext(visible, {active: undefined, name})).toBe(true);
         }
         const navigation = templateElements(source('src/features/settings/ui/components/SettingsSectionNavigation.vue'));
@@ -141,7 +132,7 @@ describe('popup feature visibility', () => {
         const popup = source('src/app/popup/PopupApp.vue');
         const onboarding = source('src/ui/components/UiLanguageOnboarding.vue');
         const styles = source('src/app/popup/popup.css');
-        const i18n = source('src/ui/i18n.ts');
+        const i18n = source('src/ui/i18n/runtime.ts');
         const legacyDom = source('src/ui/i18n/legacyDom.ts');
 
         expect(popup).toContain('uiLanguageSetupCompleted');
@@ -166,7 +157,7 @@ describe('popup feature visibility', () => {
         expect(styles).toContain('.popup-shell.language-onboarding-shell { overflow-x: hidden; }');
         expect(styles).toContain('.popup-shell { max-height: 560px; overflow-y: auto;');
         expect(onboarding).toContain('.language-onboarding {\n  position: relative;');
-        expect(i18n).toContain("import {createUiI18nDirective, observeUiDocument} from './i18n/legacyDom';");
+        expect(i18n).toContain("import {createUiI18nDirective, observeUiDocument} from './legacyDom';");
         expect(i18n).toContain('const directive = createUiI18nDirective(context);');
         expect(i18n).toContain('observeUiDocument(uiRoot, context)');
         expect(legacyDom).toContain('function isRelevantUiMutation');
@@ -290,11 +281,10 @@ describe('popup feature visibility', () => {
 
     it('keeps full-page floating-ball and hotkey controls in the options page', () => {
         const elements = templateElements(source('src/features/settings/ui/SettingsSections.vue'));
+        const floatingBall = source('src/features/settings/ui/FloatingBallSettings.vue');
 
-        const toggles = elements.filter(node => node.tag === 'el-switch'
-            && directive(node, 'model') === 'floatingBallEnabled');
-        expect(toggles).toHaveLength(1);
-        expect(directive(toggles[0], 'bind', 'aria-label')).toBe("t('settings.general.floatingBall')");
+        expect(floatingBall).toContain('id="floating-ball-toggle"');
+        expect(floatingBall).toContain(":title=\"t('settings.general.floatingBall')\"");
         const hotkeys = elements.filter(node => node.tag === 'el-select'
             && directive(node, 'bind', 'model-value') === 'config.floatingBallHotkey');
         expect(hotkeys).toHaveLength(1);
@@ -308,7 +298,10 @@ describe('popup feature visibility', () => {
             'src/app/document-translation/DocumentApp.vue',
             'src/features/settings/model/navigation.ts',
             'src/features/settings/ui/SettingsSections.vue',
-            'src/core/config/catalog.ts',
+            'src/core/config/catalog/options.ts',
+            'src/core/config/catalog/regions.ts',
+            'src/core/config/catalog/services.ts',
+            'src/core/config/catalog/targetLanguageLabels.ts',
             'src/features/video-subtitle/content/runtime.ts',
         ].map(source);
         const localizedCatalogs = [
@@ -374,7 +367,7 @@ describe('popup feature visibility', () => {
         expect(popup).not.toContain('v-model="config.videoService"');
         expect(popup).not.toContain('v-model="config.videoLocalModel"');
         expect(popup).not.toContain('v-model="config.selectionTtsVoices"');
-        expect(settings).toContain('v-model="config.videoService"');
+        expect(source('src/core/config/featureServices.ts')).toContain('videoService');
         expect(settings).toContain('v-model="config.videoSourceLanguage"');
         expect(settings).toContain('<LocalTtsSettings :config="config"');
         // 同一个控件保留读值、更新事件、多选与在线行归属；实际写回和旧事件隔离由 localModelSettingsLifecycle 的完整 client SFC 覆盖。
@@ -425,7 +418,6 @@ describe('popup feature visibility', () => {
         expect(imageSection).toContain('selectionAreaTranslationEnabled');
         expect(areaSettings).toContain('props.config.areaTranslationService');
         expect(areaSettings).toContain('props.config.areaTranslationMode');
-        expect(areaSettings).toContain(':placeholder="t(\'area.settings.followService\')"');
         expect(areaSettings).toContain('servicesType.isUseAIContext');
         expect(areaSettings).toContain('v-if="props.showOcr !== false"');
         expect(ocrSettings).toContain('`${props.idPrefix}-ocr-pack-title`');

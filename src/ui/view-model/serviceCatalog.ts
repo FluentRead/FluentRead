@@ -54,7 +54,7 @@ const serviceWebsites = {
   mimo: 'https://platform.xiaomimimo.com/',
   jieyue: 'https://platform.stepfun.com/',
   groq: 'https://console.groq.com/',
-  huanYuan: 'https://console.cloud.tencent.com/hunyuan',
+  huanYuan: 'https://console.cloud.tencent.com/tokenhub/',
   huanYuanTranslation: 'https://console.cloud.tencent.com/hunyuan',
   doubao: 'https://console.volcengine.com/ark/',
   siliconCloud: 'https://cloud.siliconflow.cn/',

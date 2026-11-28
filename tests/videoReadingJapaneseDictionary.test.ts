@@ -18,8 +18,11 @@ describe('pinned optional Japanese dictionary', () => {
             const data = readFileSync(join(packageRoot, 'dict', file.name));
             expect(file.name).toMatch(/\.dat\.gz$/u); expect(data.byteLength).toBe(file.size);
             expect(Array.from(sha256(data), byte => byte.toString(16).padStart(2, '0')).join('')).toBe(file.sha256);
-            expect(file.urls).toEqual([
+            expect(file.urls).toHaveLength(4);
+            expect([...file.urls].sort()).toEqual([
                 `https://cdn.jsdelivr.net/npm/@faanau/kuromoji@0.2.1/dict/${file.name}`,
+                `https://cdn.jsdmirror.com/npm/@faanau/kuromoji@0.2.1/dict/${file.name}`,
+                `https://jsd.onmicrosoft.cn/npm/@faanau/kuromoji@0.2.1/dict/${file.name}`,
                 `https://unpkg.com/@faanau/kuromoji@0.2.1/dict/${file.name}`,
             ]);
         }

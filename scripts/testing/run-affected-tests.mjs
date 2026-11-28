@@ -1,27 +1,70 @@
 #!/usr/bin/env node
 
 /**
- * PR 与本地定向回归共用变更依赖图；架构门禁与受影响行为测试一次去重执行，对改动的严格覆盖模块保留四维 100%。
- * 文件清单来自现有测试矩阵，外部边界、SFC 源码读取与资源路径同样纳入依赖追踪。
- * 本入口不启动浏览器、不调用在线供应商，也不把构建或静态归属描述为行为覆盖。
+ * @file scripts/testing/run-affected-tests.mjs
+ * 文件职责：基于同源 AST 依赖图与两级架构门禁，规划并执行受本次改动影响的测试与严格覆盖率检查。
+ * 主要内容：
+ * - 复用 dependency-graph.mjs 的按符号 barrel 解析、纯类型过滤与注册表隔离能力，大幅减少无关测试误触发；
+ * - 将架构测试分为「全局仓库不变量门禁（tests/architecture/*.test.ts，始终运行）」与「领域契约测试（按依赖图精确触发）」；
+ * - 支持 --base、--files、--all-architecture、--reporter（默认 dot，降低终端与上下文 token 消耗）、--summary 与 --plan-only；
+ * - 严格覆盖率门禁失败时自动复用 istanbul 产物输出精确缺口行号。
+ * 模块边界：不启动浏览器、不调用在线供应商，也不把构建或静态归属描述为行为覆盖。
  */
 import {spawn, execFileSync} from 'node:child_process';
-import {existsSync, readFileSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
+import {appendFileSync, existsSync, readFileSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import ts from 'typescript';
+import {analyze as analyzeCoverage, formatText as formatCoverageGaps} from './coverage-gaps.mjs';
+import {
+    CODE,
+    DEPENDENCY_CONTENT,
+    analyzeDependencyGraph,
+    analyzeProjectDependencyGraph,
+    buildDependencyGraph,
+    collectAffectedClosure,
+    explainDependencies,
+} from './dependency-graph.mjs';
+
+export {CODE, DEPENDENCY_CONTENT, analyzeDependencyGraph, buildDependencyGraph, collectAffectedClosure, explainDependencies};
 
 const PROJECT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
+const COVERAGE_CONFIG = 'tests/config/vitest.coverage.config.ts';
+const LEGACY_COVERAGE_CONFIG = 'vitest.coverage.config.ts';
 const GROUPS = ['architecture', 'unit', 'functional', 'regression'];
-const CODE = /\.(?:[cm]?[jt]sx?|vue|css|html|json)$/u;
-const DEPENDENCY_CONTENT = /^(?:src|entrypoints|userscript|scripts|tests|docs\/\.vitepress)\//u;
+export const REPO_WIDE_ARCHITECTURE_GATE = /^tests\/architecture\/.*\.test\.ts$/u;
 const GLOBAL_TEST_INPUTS = new Set(['.nvmrc', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json',
     'vitest.config.ts',
     'scripts/testing/vitest-resource-lock.mjs']);
-const slash = value => value.split(path.sep).join('/');
+// 只有这些字段改变才会影响测试的解析与执行环境；scripts、version、描述性字段不影响用例集合。
+const PACKAGE_RUNTIME_FIELDS = ['type', 'imports', 'exports', 'engines', 'packageManager', 'dependencies',
+    'devDependencies', 'optionalDependencies', 'peerDependencies', 'peerDependenciesMeta', 'workspaces', 'pnpm',
+    'overrides', 'resolutions'];
+
+/** 键序稳定化：依赖字段可能被包管理器重排，键序不同不代表依赖变化。 */
+function stableStringify(value) {
+    if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+    if (value && typeof value === 'object') {
+        return `{${Object.keys(value).sort()
+            .map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+    }
+    return JSON.stringify(value) ?? 'null';
+}
+
+/** 提取 package.json 中真正影响测试行为的字段签名；无法解析时抛错，由调用方退回全量。 */
+export function packageJsonRuntimeSignature(source) {
+    const parsed = JSON.parse(source);
+    const selected = {};
+    for (const field of PACKAGE_RUNTIME_FIELDS) {
+        if (parsed[field] !== undefined) selected[field] = parsed[field];
+    }
+    return stableStringify(selected);
+}
 
 function git(root, args) {
-    return execFileSync('git', args, {cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024});
+    // stderr 一并捕获：`git show <ref>:<path>` 在路径缺席时会打印 fatal，不能污染命令输出。
+    return execFileSync('git', args, {cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe']});
 }
 
 export function changedPaths(root, base) {
@@ -35,7 +78,7 @@ export function changedPaths(root, base) {
 }
 
 export function strictCoveragePaths(source) {
-    const ast = ts.createSourceFile('vitest.coverage.config.ts', source, ts.ScriptTarget.Latest, true);
+    const ast = ts.createSourceFile(COVERAGE_CONFIG, source, ts.ScriptTarget.Latest, true);
     let include;
     const visit = node => {
         if (ts.isPropertyAssignment(node) && node.name.getText(ast) === 'coverage'
@@ -55,10 +98,17 @@ export function strictCoveragePaths(source) {
     return [...new Set(include)];
 }
 
-export function coverageRuntimeSignature(source) {
-    const ast = ts.createSourceFile('coverage.ts', source, ts.ScriptTarget.Latest, true);
+export function coverageRuntimeSignature(source, configPath = COVERAGE_CONFIG) {
+    const ast = ts.createSourceFile(configPath, source, ts.ScriptTarget.Latest, true);
+    const configDirectory = path.posix.dirname(configPath);
     const transformed = ts.transform(ast, [context => root => {
         const visit = node => {
+            // 配置移动时，相对导入按各自位置还原为仓库内的同一个路径。
+            if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text.startsWith('.')) {
+                const modulePath = path.posix.join(configDirectory, node.moduleSpecifier.text);
+                return ts.factory.updateImportDeclaration(node, node.modifiers, node.importClause,
+                    ts.factory.createStringLiteral(`./${modulePath}`), node.attributes);
+            }
             // 只登记新覆盖源码/测试不会改变执行环境；plugins、时钟、阈值或其他设置变化仍扩大行为范围。
             if (ts.isPropertyAssignment(node) && node.name.getText(ast) === 'include'
                 && ts.isObjectLiteralExpression(node.parent) && ts.isPropertyAssignment(node.parent.parent)
@@ -73,135 +123,135 @@ export function coverageRuntimeSignature(source) {
     finally {transformed.dispose();}
 }
 
-function references(source, filename) {
-    const values = new Set();
-    const templates = new Map();
-    const ast = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    const visit = node => {
-        if (ts.isStringLiteralLike(node)) values.add(node.text);
-        if (ts.isTemplateExpression(node)) {
-            // 只记录静态片段；表达式既不执行，也不把不可解析的根路径扩大成整个源码树。
-            const parts = [node.head.text, ...node.templateSpans.map(span => span.literal.text)];
-            templates.set(JSON.stringify(parts), {parts});
-        }
-        ts.forEachChild(node, visit);
-    };
-    visit(ast);
-    // Vue 模板、CSS @import 与夹具拼接的 import 源码未必是合法 TS；保留其中明确的项目文件路径。
-    for (const match of source.matchAll(/(['"`])((?:@\/|\/src\/|src\/|scripts\/|tests\/|userscript\/|assets\/|\.\.?\/)[^'"`\n]+)\1/gu)) {
-        values.add(match[2]);
-    }
-    return [...values, ...templates.values()];
-}
-
-export function buildDependencyGraph(files) {
-    const graph = new Map();
-    const known = new Set(Object.keys(files));
-    const projectPath = (owner, value) => {
-        let candidate;
-        if (value.startsWith('@/')) candidate = value.slice(2);
-        else if (value.startsWith('/src/')) candidate = value.slice(1);
-        else if (/^(?:src|scripts|tests|userscript|entrypoints|docs|public|styles|assets)\//u.test(value)) candidate = value;
-        else if (value.startsWith('.')) candidate = path.posix.normalize(path.posix.join(path.posix.dirname(owner), value));
-        else return null;
-        return candidate;
-    };
-    const resolveReference = (owner, reference) => {
-        if (typeof reference !== 'string') {
-            const [head, ...tails] = reference.parts;
-            const prefix = projectPath(owner, head);
-            if (!prefix || reference.parts.some(part => part.includes('\n'))) return [];
-            const directory = head.endsWith('/') ? prefix.replace(/\/$/u, '') : path.posix.dirname(prefix);
-            // 至少固定一个项目根内的子目录，例如 tests/fixtures 或 src/features。
-            // `src/${name}`、`./${name}`、外部 URL 与越出仓库的路径没有可靠边界，要求调用者显式登记目录。
-            if (!/^(?:src|entrypoints|userscript|scripts|tests|docs|public|styles|assets)\/[^/]+(?:\/[^/]+)*$/u.test(directory)
-                || directory.split('/').some(part => part === '..' || part === '.')) return [];
-            const parts = [prefix, ...tails];
-            const query = parts.findIndex(part => /[?#]/u.test(part));
-            if (query >= 0) {parts.splice(query + 1);parts[query] = parts[query].split(/[?#]/u)[0];}
-            const escape = value => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-            const pattern = new RegExp('^' + parts.map(escape).join('.*') + '$', 'u');
-            return [...known].filter(file => file.startsWith(directory + '/') && pattern.test(file));
-        }
-        if (reference.includes('${') || reference.includes('\n')) return [];
-        let candidate = projectPath(owner, reference);
-        if (!candidate) return [];
-        candidate = candidate.split(/[?#]/u)[0];
-        const alternatives = [candidate, ...['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.vue', '.json', '.css'].map(extension => candidate + extension),
-            ...['index.ts', 'index.tsx', 'index.mts', 'index.js', 'index.vue'].map(index => `${candidate}/${index}`)];
-        const exact = alternatives.find(item => known.has(item));
-        if (exact) return [exact];
-        // 读取整个夹具目录也应受其中任一资源的变化影响。
-        return [...known].filter(item => item.startsWith(candidate.replace(/\/$/u, '') + '/'));
-    };
-    for (const [owner, source] of Object.entries(files)) {
-        graph.set(owner, new Set(CODE.test(owner) ? references(source, owner).flatMap(value => resolveReference(owner, value)) : []));
-    }
-    return graph;
-}
-
-export function selectAffected({files, changed, matrix, coveragePaths, coverageAdded = [], coverageRuntimeChanged = false}) {
+export function selectAffected({
+    files,
+    changed,
+    matrix,
+    coveragePaths,
+    coverageAdded = [],
+    coverageRuntimeChanged = false,
+    inertGlobalInputs = [],
+    allArchitecture = false,
+    analysis = null,
+}) {
     const allTests = GROUPS.flatMap(group => matrix.groups?.[group] ?? []);
     if (new Set(allTests).size !== allTests.length) throw new Error('测试矩阵存在重复归类');
     const architecture = new Set(matrix.groups?.architecture ?? []);
-    // 现有架构组也包含真实 runtime 消费者；统一进入同一次执行才能贡献严格覆盖。
-    const architectureTests = allTests.filter(file => architecture.has(file) && Object.hasOwn(files, file));
-    const behaviorTests = allTests.filter(file => !architecture.has(file) && Object.hasOwn(files, file));
-    const nodes = {...files};
-    for (const file of changed) nodes[file] ??= ''; // 被删除源码仍保留在解析空间内。
-    const graph = buildDependencyGraph(nodes);
-    const reverse = new Map();
-    for (const [owner, dependencies] of graph) {
-        for (const dependency of dependencies) {
-            if (!reverse.has(dependency)) reverse.set(dependency, new Set());
-            reverse.get(dependency).add(owner);
-        }
+    // 只有 tests/architecture/*.test.ts 属于全仓库不变量门禁（始终运行）；
+    // 其余 architecture 契约测试（如 userscriptViteConfig、firefoxAmoLint、各后台 handler）按依赖图精确触发。
+    const alwaysRunArchitecture = allTests.filter(file => architecture.has(file)
+        && (allArchitecture || REPO_WIDE_ARCHITECTURE_GATE.test(file))
+        && Object.hasOwn(files, file));
+    const alwaysRunSet = new Set(alwaysRunArchitecture);
+    const scopedTests = allTests.filter(file => !alwaysRunSet.has(file) && Object.hasOwn(files, file));
+
+    let reverse;
+    if (analysis) {
+        reverse = analysis.reverse;
+    } else {
+        const nodes = {...files};
+        for (const file of changed) nodes[file] ??= ''; // 被删除源码仍保留在解析空间内。
+        ({reverse} = analyzeDependencyGraph(nodes));
     }
-    const affected = new Set([...changed, ...coverageAdded]);
-    const queue = [...affected];
-    for (let index = 0; index < queue.length; index++) {
-        for (const owner of reverse.get(queue[index]) ?? []) {
-            if (!affected.has(owner)) {affected.add(owner);queue.push(owner);}
-        }
-    }
-    const globalInputs = changed.filter(file => GLOBAL_TEST_INPUTS.has(file));
-    if (coverageRuntimeChanged) globalInputs.push('vitest.coverage.config.ts');
-    const affectedBehaviorTests = globalInputs.length ? behaviorTests : behaviorTests.filter(file => affected.has(file));
-    const testFiles = [...new Set([...architectureTests, ...affectedBehaviorTests])];
+    const affected = collectAffectedClosure(reverse, [...changed, ...coverageAdded]);
+
+    // inertGlobalInputs 只用于撤销「文件被改但语义未变」的扩大，例如仅新增 npm script 的 package.json。
+    const globalInputs = changed.filter(file => GLOBAL_TEST_INPUTS.has(file) && !inertGlobalInputs.includes(file));
+    if (coverageRuntimeChanged) globalInputs.push(COVERAGE_CONFIG);
+    const affectedScopedTests = globalInputs.length ? scopedTests : scopedTests.filter(file => affected.has(file));
+    const testFiles = [...new Set([...alwaysRunArchitecture, ...affectedScopedTests])].sort();
     const coverageFiles = coveragePaths.filter(file => (changed.includes(file) || coverageAdded.includes(file)) && Object.hasOwn(files, file));
     for (const file of coverageFiles) {
-        const reachable = new Set([file]), pending = [file];
-        for (let index = 0; index < pending.length; index++) {
-            for (const owner of reverse.get(pending[index]) ?? []) {
-                if (!reachable.has(owner)) {reachable.add(owner);pending.push(owner);}
-            }
-        }
+        const reachable = collectAffectedClosure(reverse, [file]);
         if (!testFiles.some(test => reachable.has(test))) throw new Error(`改动的严格覆盖模块没有可追踪行为测试：${file}`);
     }
-    return {changed: [...changed].sort(), testFiles: testFiles.sort(), coverageFiles: coverageFiles.sort(),
-        globalInputs, reason: globalInputs.length ? 'shared-test-configuration' : 'changed-dependency-graph',
+    return {
+        changed: [...changed].sort(),
+        testFiles,
+        alwaysRunArchitecture: [...alwaysRunArchitecture].sort(),
+        affectedScopedTests: [...affectedScopedTests].sort(),
+        coverageFiles: coverageFiles.sort(),
+        globalInputs,
+        reason: globalInputs.length ? 'shared-test-configuration' : 'changed-dependency-graph',
         extensionChanged: changed.some(file => /^(?:src|entrypoints|userscript|public|styles|scripts|tests|assets)\//u.test(file)
             || /^(?:\.nvmrc|package\.json|pnpm-(?:lock|workspace)\.yaml|tsconfig\.json|wxt\.config\.ts|vitest[^/]*\.ts)$/u.test(file)
-            || file === '.github/workflows/extension-quality.yml')};
+            || file === '.github/workflows/extension-quality.yml'),
+    };
 }
 
-export function createPlan(root, base) {
-    const difference = changedPaths(root, base);
-    const paths = [...new Set([...git(root, ['ls-files', '-z']).split('\0'), ...difference.paths].filter(Boolean))];
-    const files = Object.fromEntries(paths.filter(file => existsSync(path.join(root, file)))
+function listWorkspacePaths(root, extraPaths = []) {
+    return [...new Set([
+        ...git(root, ['ls-files', '-z']).split('\0'),
+        ...git(root, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0'),
+        ...extraPaths,
+    ].filter(Boolean))];
+}
+
+export function loadWorkspaceFiles(root, extraPaths = []) {
+    const paths = listWorkspacePaths(root, extraPaths);
+    return Object.fromEntries(paths.filter(file => existsSync(path.join(root, file)))
         .map(file => [file, CODE.test(file) && (DEPENDENCY_CONTENT.test(file) || !file.includes('/'))
             ? readFileSync(path.join(root, file), 'utf8') : '']));
+}
+
+export function createPlan(root, base, options = {}) {
+    const difference = options.explicitFiles
+        ? {base: git(root, ['rev-parse', 'HEAD']).trim(), paths: [...new Set(options.explicitFiles)].sort()}
+        : changedPaths(root, base);
+    const workspacePaths = listWorkspacePaths(root, difference.paths);
+    const existingOnDisk = workspacePaths.filter(file => existsSync(path.join(root, file)));
+    const existingOnDiskSet = new Set(existingOnDisk);
+    const virtualEmptyFiles = difference.paths.filter(file => !existingOnDiskSet.has(file));
+    const analysis = analyzeProjectDependencyGraph(root, {
+        filePaths: existingOnDisk,
+        virtualEmptyFiles,
+        noCache: Boolean(options.noCache),
+    });
+    const coverageConfig = analysis.existingFiles.has(COVERAGE_CONFIG)
+        ? readFileSync(path.join(root, COVERAGE_CONFIG), 'utf8')
+        : '';
+    const coveragePaths = strictCoveragePaths(coverageConfig);
     let coverageRuntimeChanged = false;
     let coverageAdded = [];
-    if (difference.paths.includes('vitest.coverage.config.ts')) {
-        const previous = git(root, ['show', `${difference.base}:vitest.coverage.config.ts`]);
-        coverageRuntimeChanged = coverageRuntimeSignature(previous) !== coverageRuntimeSignature(files['vitest.coverage.config.ts']);
+    if (!options.explicitFiles && difference.paths.includes(COVERAGE_CONFIG)) {
+        const previousPath = git(root, ['ls-tree', '--name-only', difference.base, '--', COVERAGE_CONFIG]).trim()
+            ? COVERAGE_CONFIG : LEGACY_COVERAGE_CONFIG;
+        const previous = git(root, ['show', `${difference.base}:${previousPath}`]);
+        coverageRuntimeChanged = coverageRuntimeSignature(previous, previousPath) !== coverageRuntimeSignature(coverageConfig);
         const previousPaths = new Set(strictCoveragePaths(previous));
-        coverageAdded = strictCoveragePaths(files['vitest.coverage.config.ts']).filter(file => !previousPaths.has(file));
+        coverageAdded = coveragePaths.filter(file => !previousPaths.has(file));
     }
-    return {base: difference.base, head: git(root, ['rev-parse', 'HEAD']).trim(),
-        ...selectAffected({files, changed: difference.paths, matrix: JSON.parse(files['tests/test-matrix.json']),
-            coveragePaths: strictCoveragePaths(files['vitest.coverage.config.ts']), coverageAdded, coverageRuntimeChanged})};
+    // 仅改动 scripts、version 等字段时，package.json 不应把选择范围扩大到全部行为测试。
+    let inertGlobalInputs = [];
+    const baselineManifest = !options.explicitFiles && difference.paths.includes('package.json')
+        && git(root, ['ls-tree', '--name-only', difference.base, '--', 'package.json']).trim();
+    if (baselineManifest && analysis.existingFiles.has('package.json')) {
+        try {
+            const previous = git(root, ['show', `${difference.base}:package.json`]);
+            const currentPackageJson = readFileSync(path.join(root, 'package.json'), 'utf8');
+            if (packageJsonRuntimeSignature(previous) === packageJsonRuntimeSignature(currentPackageJson)) {
+                inertGlobalInputs = ['package.json'];
+            }
+        } catch {
+            // 基线缺失或 JSON 不可解析时保持原有全量扩大，不静默缩小验证范围。
+        }
+    }
+    const files = Object.fromEntries([...analysis.existingFiles].map(file => [file, '']));
+    return {
+        base: difference.base,
+        head: git(root, ['rev-parse', 'HEAD']).trim(),
+        ...selectAffected({
+            files,
+            changed: difference.paths,
+            matrix: JSON.parse(readFileSync(path.join(root, 'tests/test-matrix.json'), 'utf8')),
+            coveragePaths,
+            coverageAdded,
+            coverageRuntimeChanged,
+            inertGlobalInputs,
+            allArchitecture: Boolean(options.allArchitecture),
+            analysis,
+        }),
+    };
 }
 
 export function scopedCoverageConfig(plan, baseConfigUrl) {
@@ -209,66 +259,114 @@ export function scopedCoverageConfig(plan, baseConfigUrl) {
     return `import base from ${JSON.stringify(baseConfigUrl)};\nexport default {...base,test:{...base.test,testTimeout:30_000,include:${JSON.stringify(plan.testFiles)},coverage:{...base.test.coverage,enabled:true,all:true,reportOnFailure:true,include:${JSON.stringify(plan.coverageFiles)},reportsDirectory:'coverage/affected',thresholds:{...base.test.coverage.thresholds,statements:100,branches:100,functions:100,lines:100,perFile:true}}}};\n`;
 }
 
-export function testInvocation(plan, configPath) {
+export function testInvocation(plan, configPath, options = {}) {
     if (!plan.testFiles.length) return null;
+    const reporter = options.reporter ?? 'dot';
+    const reporterArgs = reporter ? [`--reporter=${reporter}`] : [];
     return plan.coverageFiles.length
-        ? ['exec', 'vitest', 'run', '--config', configPath]
-        : ['exec', 'vitest', 'run', ...plan.testFiles];
+        ? ['exec', 'vitest', 'run', ...reporterArgs, '--config', configPath]
+        : ['exec', 'vitest', 'run', ...reporterArgs, ...plan.testFiles];
+}
+
+function vitestEnv(baseEnv = process.env) {
+    // 非 TTY 管道下 Vitest 5 的 dot reporter 会重复重绘进度条，产生数十 KB 无效输出；设置 CI=1 抑制重绘并保留完整失败栈。
+    if (!process.stdout.isTTY && baseEnv.CI === undefined) return {...baseEnv, CI: '1'};
+    return baseEnv;
 }
 
 function run(root, args) {
     return new Promise((resolve, reject) => {
-        const child = spawn('pnpm', args, {cwd: root, stdio: 'inherit', shell: false, env: process.env});
+        const child = spawn('pnpm', args, {cwd: root, stdio: 'inherit', shell: false, env: vitestEnv()});
         child.once('error', reject);
         child.once('exit', (code, signal) => resolve({code, signal}));
     });
 }
 
-export async function executePlan(root, plan, runner = run) {
+/**
+ * 覆盖率门禁失败时附带缺口清单：Vitest 只报告文件名和百分比，不指出具体行。
+ * 复用同一份 istanbul 产物，让 CI 日志一次给出可改代码的位置，省掉一轮重跑。
+ */
+function reportCoverageGaps(root, plan) {
+    if (!plan.coverageFiles.length) return;
+    try {
+        const report = analyzeCoverage(path.join(root, 'coverage', 'affected', 'coverage-final.json'));
+        if (!report.files.length) return;
+        console.error(`\n[affected-tests] 严格覆盖率缺口：${report.totals.failing} 个文件未达 100%\n`);
+        console.error(formatCoverageGaps(report, {max: 5}));
+        console.error('');
+    } catch {
+        // 产物缺失或格式异常不得掩盖原始失败原因。
+    }
+}
+
+export async function executePlan(root, plan, runner = run, options = {}) {
     const directory = path.join(root, 'coverage', 'affected-plan');
     mkdirSync(directory, {recursive: true});
     // 运行产物由 Vite 加载；不作为源码参与并行的 TypeScript/Vue 全工程检查。
     const configPath = path.join(directory, 'vitest.affected.config.mjs');
-    const args = testInvocation(plan, configPath);
+    const args = testInvocation(plan, configPath, options);
     if (!args) return {skipped: true, reason: 'no-affected-behavior-tests'};
     try {
-        if (plan.coverageFiles.length) writeFileSync(configPath, scopedCoverageConfig(plan, path.join(root, 'vitest.coverage.config.ts')));
+        if (plan.coverageFiles.length) writeFileSync(configPath, scopedCoverageConfig(plan, path.join(root, COVERAGE_CONFIG)));
         const result = await runner(root, args);
-        if (result.code !== 0 || result.signal) throw new Error(`受影响测试失败：退出码 ${result.code ?? 'none'}，信号 ${result.signal ?? 'none'}`);
+        if (result.code !== 0 || result.signal) {
+            reportCoverageGaps(root, plan);
+            throw new Error(`受影响测试失败：退出码 ${result.code ?? 'none'}，信号 ${result.signal ?? 'none'}`);
+        }
         return {skipped: false};
     } finally {
         rmSync(configPath, {force: true});
     }
 }
 
+/** 人读摘要：只给出规模与影响面，避免把数百个测试路径刷进终端和上下文。 */
+export function renderSummary(plan) {
+    const archCount = plan.alwaysRunArchitecture?.length ?? 0;
+    const scopedCount = plan.affectedScopedTests?.length ?? Math.max(0, plan.testFiles.length - archCount);
+    const lines = [
+        `基线 ${plan.base.slice(0, 7)} → ${plan.head.slice(0, 7)}，选择原因 ${plan.reason}`,
+        `改动 ${plan.changed.length} 个文件`,
+        `将运行 ${plan.testFiles.length} 个测试文件（全局架构门禁 ${archCount} + 受影响测试 ${scopedCount}）`,
+        `严格覆盖 ${plan.coverageFiles.length} 个源文件（statements/branches/functions/lines 各 100%）`,
+        `扩展产物受影响 ${plan.extensionChanged ? '是（含类型检查、Chrome/Firefox 与 userscript 构建）' : '否'}`,
+    ];
+    if (plan.globalInputs.length) lines.push(`共享测试输入 ${plan.globalInputs.join(', ')}（整体扩大到全部行为测试）`);
+    return lines.join('\n');
+}
+
 export async function main(argv = process.argv.slice(2), env = process.env) {
-    const allowed = new Set(['--base', '--report', '--plan-only', '--help']);
+    const allowed = new Set(['--base', '--report', '--files', '--reporter', '--plan-only', '--summary', '--all-architecture', '--no-cache', '--help']);
     const options = {};
     for (let index = 0; index < argv.length; index++) {
         const arg = argv[index];
+        if (arg === '--') continue;
         if (!allowed.has(arg)) throw new Error(`未知参数：${arg}`);
-        if (arg === '--base' || arg === '--report') {
+        if (arg === '--base' || arg === '--report' || arg === '--files' || arg === '--reporter') {
             const value = argv[++index];
             if (!value || value.startsWith('--')) throw new Error(`${arg} 缺少值`);
             options[arg] = value;
         } else options[arg] = true;
     }
     if (options['--help']) {
-        console.log('node scripts/testing/run-affected-tests.mjs --base <git-ref> [--report <json>] [--plan-only]');
+        console.log('node scripts/testing/run-affected-tests.mjs [--base <git-ref> | --files <p1,p2>] [--report <json>] [--reporter <name>] [--all-architecture] [--no-cache] [--plan-only] [--summary]');
         return;
     }
-    const plan = createPlan(PROJECT_ROOT, options['--base'] ?? env.FLUENTREAD_CI_BASE);
+    const explicitFiles = options['--files']
+        ? options['--files'].split(',').map(item => item.trim().replaceAll('\\', '/').replace(/^\.\//u, '')).filter(Boolean)
+        : null;
+    const plan = createPlan(PROJECT_ROOT, options['--base'] ?? env.FLUENTREAD_CI_BASE ?? 'origin/main', {
+        explicitFiles,
+        allArchitecture: Boolean(options['--all-architecture']),
+        noCache: Boolean(options['--no-cache']),
+    });
     if (options['--report']) {
         const report = path.resolve(PROJECT_ROOT, options['--report']);
         mkdirSync(path.dirname(report), {recursive: true});
         writeFileSync(report, JSON.stringify(plan, null, 2) + '\n');
     }
-    console.log(JSON.stringify(plan, null, 2));
-    if (env.GITHUB_OUTPUT) {
-        const {appendFileSync} = await import('node:fs');
-        appendFileSync(env.GITHUB_OUTPUT, `extension_changed=${plan.extensionChanged}\n`);
-    }
-    if (!options['--plan-only']) await executePlan(PROJECT_ROOT, plan);
+    console.log(options['--summary'] ? renderSummary(plan) : JSON.stringify(plan, null, 2));
+    if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `extension_changed=${plan.extensionChanged}\n`);
+    if (!options['--plan-only']) await executePlan(PROJECT_ROOT, plan, run, {reporter: options['--reporter'] ?? 'dot'});
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

@@ -13,6 +13,8 @@ import padPkcs7 from 'crypto-js/pad-pkcs7';
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import {detectChineseScript} from '@/src/core/language/detect';
 import {identifyTextLanguage} from '@/src/core/language/identify';
+import {segmentScriptWords} from '@/src/core/language/scripts';
+import {createLanguageDetectionCopy} from '@/src/core/language/technicalTokens';
 import {rebuildTranslationSlots} from '@/src/core/translation/slotProtocol';
 import {getTranslationGlossarySourceSlots} from '@/src/services/translation/requestSnapshot';
 import {abortErrorFromSignal, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
@@ -51,6 +53,16 @@ function classifyStatus(statusCode: number): FreeFailure {
     return 'request';
 }
 
+/** 有道与词霸网页接口仅支持中英互译；夹带假名、谚文等其他文字体系时不能退回英文方向。 */
+function hasUnsupportedAutoScript(text: string): boolean {
+    const words = segmentScriptWords(createLanguageDetectionCopy(text).text);
+    return words.some(word =>
+        word.script !== 'Latin'
+        && word.script !== 'Han'
+        && !(word.script === 'Greek' && word.letters === 1),
+    );
+}
+
 function ensureLanguage(value: string, target: boolean, text: string): string {
     const normalized = normalizeChineseLanguageCode(value);
     if (normalized === 'auto') {
@@ -59,8 +71,9 @@ function ensureLanguage(value: string, target: boolean, text: string): string {
         if (script === 'Hant') throw failure('免费网页翻译不支持繁体中文方向', 'request', 400);
         if (!target) {
             const identification = identifyTextLanguage(text);
-            if (identification.status === 'identified'
-                && identification.languages.some(language => !['en', 'zh-Hans', 'zh-Hant'].includes(language))) {
+            if ((identification.status === 'identified'
+                && identification.languages.some(language => !['en', 'zh-Hans', 'zh-Hant'].includes(language)))
+                || hasUnsupportedAutoScript(text)) {
                 throw failure('免费网页翻译不支持该语言方向', 'request', 400);
             }
         }

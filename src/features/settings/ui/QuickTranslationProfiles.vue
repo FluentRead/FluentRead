@@ -175,15 +175,15 @@
           <label class="editor-field">
             <span>{{ translateLegacy('显示方式') }}</span>
             <el-select
-              :model-value="displaySelectValue(row.profile)"
-              :disabled="!active || isGoogleProfile(row.profile)"
+              :model-value="row.profile.displayMode"
+              :disabled="!active"
               :aria-label="t('quickTranslation.displayModeAria', {hotkey: hotkeyLabel(row.profile.hotkey)})"
               :data-testid="`quick-profile-display-${row.profile.id}`"
               :onUpdate:modelValue="row.display"
             >
               <el-option :label="t('quickTranslation.followDefault', {value: defaultDisplayModeLabel})" value="inherit" />
               <el-option :label="translateLegacy('双语对照')" value="bilingual" />
-              <el-option :label="translateLegacy('仅译文')" value="translation-only" :disabled="!active || isGoogleProfile(row.profile)" />
+              <el-option :label="translateLegacy('仅译文')" value="translation-only" />
             </el-select>
           </label>
 
@@ -237,7 +237,6 @@ import {
   models,
   options,
   resolveConfiguredModel,
-  services,
   servicesType,
 } from '@/src/core/config/catalog'
 import {
@@ -252,6 +251,7 @@ import {useSettingsActionContext} from '../model/useSettingsActionContext'
 import {useQuickProfileDraft} from '../model/useQuickProfileDraft'
 import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation'
 import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation'
+import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut'
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection'
 import {
   createQuickTranslationProfile,
@@ -259,7 +259,6 @@ import {
   type QuickTranslationAction,
   inputBoxTranslationTriggerHotkey,
   MAX_QUICK_TRANSLATION_PROFILES,
-  type QuickTranslationDisplayMode,
   type QuickTranslationProfile,
 } from '@/src/core/config/quickTranslation'
 import {canonicalizeHotkey, parseHotkey, resolveConfiguredHotkey, validateHotkeyConflicts} from '@/src/core/hotkey'
@@ -414,7 +413,8 @@ function legacyHotkeyEntries(): Array<{hotkey: string; label: string}> {
   if (props.config.selectionAreaEnabled) entries.push({hotkey: resolveAreaTranslationHotkey(props.config.selectionAreaHotkey, props.config.customSelectionAreaHotkey), label: translateLegacy('圈选翻译')})
   if (props.config.paragraphCopyEnabled) entries.push({hotkey: resolveParagraphCopyHotkey(props.config.paragraphCopyHotkey, props.config.customParagraphCopyHotkey), label: t('paragraphCopy.settings.title')})
   if (props.config.sectionTranslationHotkeyEnabled) entries.push({hotkey: resolveSectionTranslationHotkey(props.config.sectionTranslationHotkey, props.config.customSectionTranslationHotkey), label: t('sectionTranslation.settings.title')})
-  const input = inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger)
+  if (props.config.videoSubtitleModeHotkeyEnabled) entries.push({hotkey: resolveVideoSubtitleModeHotkey(props.config.videoSubtitleModeHotkey, props.config.customVideoSubtitleModeHotkey), label: t('video.modeShortcut.title')})
+  const input = inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger, props.config.customInputBoxTranslationHotkey)
   if (input) entries.push({hotkey: input, label: translateLegacy('输入框翻译')})
   return entries.filter(entry => Boolean(canonicalizeHotkey(entry.hotkey)))
 }
@@ -460,7 +460,6 @@ function setEnabled(profile: QuickTranslationProfile, value: unknown): void {
 function setService(profile: QuickTranslationProfile, value: unknown): void {
   if (typeof value !== 'string' || (value && !serviceOptions.value.some(option => option.value === value && !option.disabled)) || profile.service === value) return
   updateProfile(profile, {service: value, model: ''})
-  if ((value || props.config.service) === services.google && profile.displayMode !== 'bilingual') ElMessage.info(t('quickTranslation.googleNotice'))
 }
 function setModel(profile: QuickTranslationProfile, value: unknown): void {
   if (typeof value !== 'string' || !usesModel(profile) || !isProfileAvailable(profile) || (value && !modelOptions(profile).includes(value)) || value === profile.model) return
@@ -478,7 +477,7 @@ function setGlossary(profile: QuickTranslationProfile, value: unknown): void {
   updateProfile(profile, {glossaryIds: normalized})
 }
 function setDisplayMode(profile: QuickTranslationProfile, value: unknown): void {
-  if (isGoogleProfile(profile) || (value !== 'inherit' && value !== 'bilingual' && value !== 'translation-only') || value === profile.displayMode) return
+  if ((value !== 'inherit' && value !== 'bilingual' && value !== 'translation-only') || value === profile.displayMode) return
   updateProfile(profile, {displayMode: value})
 }
 function setFullPageMode(profile: QuickTranslationProfile, value: unknown): void {
@@ -488,10 +487,6 @@ function setFullPageMode(profile: QuickTranslationProfile, value: unknown): void
 
 function effectiveService(profile: QuickTranslationProfile): string {
   return profile.service || props.config.service
-}
-
-function isGoogleProfile(profile: QuickTranslationProfile): boolean {
-  return effectiveService(profile) === services.google
 }
 
 function isProfileAvailable(profile: QuickTranslationProfile): boolean {
@@ -566,14 +561,9 @@ function targetLanguageLabel(profile: QuickTranslationProfile): string {
 }
 
 function displayModeLabel(profile: QuickTranslationProfile): string {
-  if (isGoogleProfile(profile)) return `${translateLegacy('双语对照')} · ${t('quickTranslation.serviceRestriction')}`
   if (profile.displayMode === 'bilingual') return translateLegacy('双语对照')
   if (profile.displayMode === 'translation-only') return translateLegacy('仅译文')
   return defaultDisplayModeLabel.value
-}
-
-function displaySelectValue(profile: QuickTranslationProfile): QuickTranslationDisplayMode {
-  return isGoogleProfile(profile) ? 'bilingual' : profile.displayMode
 }
 
 function fullPageModeLabel(profile: QuickTranslationProfile): string {

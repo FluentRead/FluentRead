@@ -12,8 +12,7 @@
 - 仅无语言前缀的首页根据 `navigator.languages` 按顺序匹配中文或英文；其他语言回退英文。
 - 语言菜单的主动选择优先，保存在 `fluentread-site-language`。明确的 `/en/` 与文档深链接尊重原 URL。
 - 页面加载前执行选择，避免先绘制中文再跳转。存储被禁用时仍可访问。
-- 宣传素材在仓库根部 `marketing/`，不复制到站点。
 
-图片采集、压缩、商店规格与验证命令见 `marketing/README.md`。
+商店文案、宣传图、采集与验证命令见[宣传与商店素材](./marketing/README.md)。
 
 [Google Drive 同步开发教程](./google-drive-sync-guide.md) 说明默认普通设置与持续敏感信息选择、v1/v2 兼容、本机加密风险、Google Cloud 申请步骤、Chrome 客户端配置、同步确认与验证边界。

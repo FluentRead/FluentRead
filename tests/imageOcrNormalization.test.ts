@@ -11,7 +11,7 @@ import {
     restoreOcrLineCoordinates,
     selectChangedTranslations,
 } from '@/src/features/image-translation/core';
-import {getMangaOcrEngine, getRequiredImageOcrLanguages} from '@/src/features/image-translation/ocrLanguages';
+import {getMangaOcrEngine, getRequiredImageOcrLanguages, IMAGE_OCR_LANGUAGE_PACKS, IMAGE_OCR_SOURCE_LANGUAGES, normalizeImageOcrLanguageCodes} from '@/src/features/image-translation/ocrLanguages';
 import {inpaintTextRegions} from '@/src/features/image-translation/services/inpainting';
 import {groupMangaOcrLines} from '@/src/features/image-translation/services/mangaRegions';
 
@@ -44,6 +44,59 @@ it('Tesseract竖排合段保留各列清字范围，缩放后不擦除列间图�
         expect(restoreOcrLineCoordinates(bad,200,200,200,200)).toEqual([]);
         expect(groupMangaOcrLines(bad,'ja',200,200)).toEqual([]);
     }
+});
+
+describe('OCR 横排右到左词序',()=>{
+    const box=(x0:number,x1:number)=>({x0,y0:20,x1,y1:44});
+    const word=(text:string,x0:number,x1:number)=>({text,bbox:box(x0,x1),confidence:92});
+    const views=(text:string,words:ReturnType<typeof word>[])=>normalizeOcrLineViews([{
+        paragraphs:[{lines:[{text,bbox:box(10,340),words}]}],
+    }]);
+
+    it.each([
+        ['اتجه نحو اليمين', ['اتجه','نحو','اليمين']],
+        ['פנה ימינה עכשיו', ['פנה','ימינה','עכשיו']],
+    ] as const)('保留识别器给出的 %s 词序与原框', (text,words)=>{
+        const input=words.map((value,index)=>word(value,190-index*60,230-index*60));
+        const snapshot=structuredClone(input);
+        const {ordinary,manga}=views(text,input);
+        expect(ordinary).toEqual([{text,bbox:box(70,230)}]);
+        expect(manga).toHaveLength(1);
+        expect(manga[0]).toMatchObject(ordinary[0]);
+        expect(input).toEqual(snapshot);
+    });
+
+    it('混合英文数字按原顺序保留，跨大片空白的区域仍独立',()=>{
+        const {ordinary}=views('باب A 12 פנה ימינה',[
+            word('باب',300,340),word('A',242,258),word('12',266,282),
+            word('פנה',66,98),word('ימינה',10,57),
+        ]);
+        expect(ordinary).toEqual([
+            {text:'باب A 12',bbox:box(242,340)},
+            {text:'פנה ימינה',bbox:box(10,98)},
+        ]);
+    });
+
+    it.each([
+        ['A12 לכיוון צפון', ['A12', 'לכיוון', 'צפון']],
+        ['A12 إلى اليمين', ['A12', 'إلى', 'اليمين']],
+    ] as const)('包含拉丁编号开头的横排行按识别器核对后的词序恢复 %s', (text, input) => {
+        const words = input.map((value,index)=>word(value,234-index*62,280-index*62));
+        const {ordinary,manga} = views(text, words);
+        expect(ordinary).toEqual([{text, bbox:box(110,280)}]);
+        expect(manga).toHaveLength(1);
+        expect(manga[0]).toMatchObject(ordinary[0]);
+    });
+
+    it('只含拉丁文字的行依照物理顺序，即使识别器词数组顺序相反', () => {
+        const {ordinary} = views('Gate A12', [word('Gate', 178, 224), word('A12', 121, 160)]);
+        expect(ordinary).toEqual([{text:'A12 Gate', bbox:box(121,224)}]);
+    });
+
+    it('识别词组无法与整行核对时继续按位置恢复已有分组',()=>{
+        const {ordinary}=views('باب صحيح', [word('باب',140,180),word('فرعي',75,125)]);
+        expect(ordinary).toEqual([{text:'فرعي باب',bbox:box(75,180)}]);
+    });
 });
 
 describe('普通图片按完整段落翻译', () => {
@@ -540,6 +593,19 @@ describe('图片 OCR 有界尺寸和可信文本', () => {
             expect(getRequiredImageOcrLanguages(source)).toEqual(['kor', 'eng']);
         }
         for (const source of ['auto', '', 'en', 'ja', 'zh-Hans', 'es', 'fr', 'uk', 'russian', 'korean']) expect(getMangaOcrEngine(source)).toBe('paddle');
+    });
+    it.each([
+        ['ar', 'ara', 'العربية', ['ar', ' ar_SA ']],
+        ['he', 'heb', 'עברית', ['he', 'HE-IL', ' iw_IL ']],
+    ] as const)('在源语言列表中提供 %s，并只在明确选择后要求该语言包', (language, pack, label, aliases) => {
+        expect(IMAGE_OCR_SOURCE_LANGUAGES).toContainEqual({value: language, label});
+        expect(IMAGE_OCR_LANGUAGE_PACKS).toContainEqual(expect.objectContaining({code: pack, label, recommended: false}));
+        expect(normalizeImageOcrLanguageCodes([pack, 'eng', pack])).toEqual([pack, 'eng']);
+        expect(getRequiredImageOcrLanguages('auto')).not.toContain(pack);
+        for (const source of aliases) {
+            expect(getRequiredImageOcrLanguages(source)).toEqual([pack, 'eng']);
+            expect(getMangaOcrEngine(source)).toBe('tesseract');
+        }
     });
     it('普通图片保留原始尺寸，大图同时受像素总数和最长边约束', () => {
         expect(getOcrImageSize(320, 180)).toEqual({width: 320, height: 180});

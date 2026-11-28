@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/displayMode.ts
  * 文件职责：复用已提交的原译文槽即时切换网页双语、仅译文及上下顺序，保留宿主原文身份与恢复能力。
- * 主要内容：复验来源及现有工件后，仅替换扩展自己的双语容器或闭合 Shadow 文本槽；普通网页优先应用网站仅译文偏好，沿用冻结的语言、样式和服务限制，明确同步当前译文位置，单语顺序变化仅更新重放偏好，同值回声不遍历页面；模式切换跳过显式快捷方案，校订更新可原位重绘当前模式。
+ * 主要内容：复验来源及现有工件后，仅替换扩展自己的双语容器或闭合 Shadow 文本槽；普通网页优先应用网站仅译文偏好，沿用冻结的语言与样式，明确同步当前译文位置，单语顺序变化仅更新重放偏好，同值回声不遍历页面；模式切换跳过显式快捷方案，校订更新可原位重绘当前模式。
  * 模块边界：不请求 provider、不修改会话配置、不创建消息或订阅；content 现有配置订阅与 runtime 提交入口调用本模块。
  */
 import {applyTranslationsToSnapshot, collectLiveTranslationTextSlots, createTranslationSourceSnapshot,
@@ -17,14 +17,13 @@ import {getTranslationStateProtectionBoundary, getTranslationTextProtectionOptio
     isTranslationArtifactCurrent, statefulSourceAndTextSlotsAreCurrent} from './translationStability';
 import {withFullPageViewportAnchor} from './viewportStability';
 
-/** 请求与显示解耦：显式模式覆盖与 Google 的双语限制始终沿用本次请求。 */
+/** 请求与显示解耦：显式模式覆盖始终沿用本次请求。 */
 export function syncTranslationDisplayMode(node: HTMLElement, state: TranslationState, display: number, refresh = false,
     translationBeforeOriginal?: boolean): boolean {
     const replay = state.bilingualReplay;
     const requestedMode = display === 0 ? 'single' : 'bilingual';
-    // 服务或快捷方案只约束显示模式；全局上下顺序仍应能应用于其现有双语结果。
-    const mode = !refresh && (replay?.displayModeOverridden || requestedMode === 'single' && replay?.service === 'google')
-        ? state.mode : requestedMode;
+    // 显式快捷方案只约束显示模式；全局上下顺序仍应能应用于其现有双语结果。
+    const mode = !refresh && replay?.displayModeOverridden ? state.mode : requestedMode;
     const orderChanged = translationBeforeOriginal !== undefined && Boolean(replay?.translationBeforeOriginal) !== translationBeforeOriginal;
     if (!node.isConnected || state.kind !== 'content' || state.phase !== 'translated' || !replay ||
         (!refresh && state.mode === mode && !orderChanged)) return false;

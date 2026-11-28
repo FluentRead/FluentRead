@@ -348,8 +348,8 @@ describe('已提交网页译文显示切换', () => {
         expect(corrections.lookup).not.toHaveBeenCalled();
     });
 
-    it.each(['single', 'bilingual'] as const)('当前%s重绘沿用显式模式覆盖；保护Google与原文节点', mode => {
-        const {owner, state, nodes} = committed(mode, {displayModeOverridden: true, ...(mode === 'bilingual' ? {service: 'google'} : {})});
+    it.each(['single', 'bilingual'] as const)('当前%s重绘沿用显式模式覆盖并保护原文节点', mode => {
+        const {owner, state, nodes} = committed(mode, {displayModeOverridden: true, service: 'google'});
         state.bilingualReplay!.translations = ['新译文。', '更新。'];
         expect(refreshTranslationPresentation(owner, state)).toBe(true);
         expect(state.mode).toBe(mode); expect(state.bilingualReplay!.displayModeOverridden).toBe(true);
@@ -396,13 +396,23 @@ describe('已提交网页译文显示切换', () => {
         expect(owner.firstChild).toBe(state.bilingualContent);
         expect(nodes.every(node => owner.contains(node))).toBe(true);
     });
-    it.each(['google', 'explicit'] as const)('%s限制保留显示模式，同时允许上下顺序即时生效', restriction => {
-        const {owner, state, nodes} = committed('bilingual', {translationBeforeOriginal: false,
-            ...(restriction === 'google' ? {service: 'google'} : {displayModeOverridden: true})});
+    it('显式模式限制保留显示模式，同时允许上下顺序即时生效', () => {
+        const {owner, state, nodes} = committed('bilingual', {translationBeforeOriginal: false, displayModeOverridden: true});
         expect(syncTranslationDisplayMode(owner, state, 0, false, true)).toBe(true);
         expect(state.mode).toBe('bilingual'); expect(owner.firstChild).toBe(state.bilingualContent);
         expect(nodes.every(node => owner.contains(node))).toBe(true);
         expect(syncTranslationDisplayMode(owner, state, 0, false, true)).toBe(false);
+    });
+    it('谷歌翻译已提交译文可在双语与仅译文间即时切换并保留原文节点', () => {
+        const {owner, state, nodes, sourceHTML} = committed('bilingual', {service: 'google', translationBeforeOriginal: false});
+        expect(syncTranslationDisplayMode(owner, state, 0)).toBe(true);
+        expect(state.mode).toBe('single');
+        expect(nodes.every(node => owner.contains(node))).toBe(true);
+        expect(syncTranslationDisplayMode(owner, state, 1, false, true)).toBe(true);
+        expect(state.mode).toBe('bilingual');
+        expect(owner.firstChild).toBe(state.bilingualContent);
+        expect(restoreTranslation(owner)).toBe(true);
+        expect(owner.innerHTML).toBe(sourceHTML);
     });
     it('原文或翻译工件失效时不因顺序变化重放陈旧译文', () => {
         const {owner, state} = committed('bilingual', {translationBeforeOriginal: false});
@@ -503,7 +513,7 @@ describe('已提交网页译文显示切换', () => {
         expect(failed.state.mode).toBe('bilingual');
     });
 
-    it.each(['detached', 'control', 'loading', 'missing-replay', 'explicit', 'google', 'same-mode', 'source-edited',
+    it.each(['detached', 'control', 'loading', 'missing-replay', 'explicit', 'same-mode', 'source-edited',
         'artifact-removed', 'source-count', 'translation-count', 'source-mismatch'] as const)('拒绝%s时保留当前工件，不写入过期译文', reason => {
         const {owner, state} = committed();
         let display = 0;
@@ -513,7 +523,6 @@ describe('已提交网页译文显示切换', () => {
             case 'loading': state.phase = 'loading'; break;
             case 'missing-replay': state.bilingualReplay = undefined; break;
             case 'explicit': state.bilingualReplay!.displayModeOverridden = true; break;
-            case 'google': state.bilingualReplay!.service = 'google'; break;
             case 'same-mode': display = 1; break;
             case 'source-edited': state.sourceTextNodes![0]!.data = 'Host changed source.'; break;
             case 'artifact-removed': state.bilingualContent!.remove(); break;

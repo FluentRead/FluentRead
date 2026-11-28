@@ -789,7 +789,7 @@ async function main() {
   const builtinGlossary = parseBuiltinGlossaryArg(process.argv.slice(2));
   const translationResumes = parseTranslationResumesArg(process.argv.slice(2));
   const repository = path.resolve(__dirname, '../..'), requireRepo = createRequire(path.join(repository, 'package.json'));
-  const examples = path.resolve(arg('example-dir', path.join(repository, 'examples/document-translation')));
+  const examples = path.resolve(arg('example-dir', path.join(repository, 'tests/fixtures/document-translation')));
   const defaults = [path.resolve(repository, '../BabelDOC-APP/docs/1706.03762v7.pdf'),
     ...['pdf', 'docx', 'html', 'epub', 'md', 'txt', 'srt', 'json'].map(extension => path.join(examples, `sample.${extension}`)),
     path.join(repository, 'docs/en/guide/document-translation.md')];

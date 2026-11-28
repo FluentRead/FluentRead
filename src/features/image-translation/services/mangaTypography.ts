@@ -8,7 +8,7 @@
  */
 import type {ImageTranslationTextLayout,ImageTextLayoutConstraints} from './textLayoutTypes';
 
-export const MANGA_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", "Noto Sans CJK KR", sans-serif';
+export {IMAGE_TEXT_FONT as MANGA_TEXT_FONT} from './imageTextFont';
 const OPEN = /^[（【「『《〈“‘(\[]+$/u;
 const CLOSE = /^[，。！？、；：）】」』》〉”’….,!?;:)\]]+$/u;
 const OPEN_ANY = /[（【「『《〈“‘(\[]/u;

@@ -8,7 +8,7 @@
   <SettingsGroup :class="{'area-settings-compact': props.compact}" :title="props.compact ? undefined : t('area.settings.title')" :description="props.compact ? undefined : t('area.settings.intro')">
     <p v-if="!browserCapabilities.areaTranslation" class="area-settings-note" role="status">{{ t('area.settings.unavailable') }}</p>
     <FeatureEnableCard :model-value="props.enabled" :title="t(props.compact ? 'area.settings.title' : 'area.settings.enabled')" :description="t('area.settings.shortcut', {shortcut: hotkeyDisplayName})" :disabled="!browserCapabilities.areaTranslation" @update:model-value="emit('update:enabled', $event)" />
-    <div class="area-translation-details">
+    <div v-if="props.enabled" class="area-translation-details">
     <SettingsItem :label="t('area.settings.hotkey')" :description="t('area.settings.hotkeyDescription')" :disabled="!browserCapabilities.areaTranslation">
       <div class="hotkey-config">
         <el-select :model-value="props.config.selectionAreaHotkey" :aria-label="t('area.settings.hotkey')" :disabled="!browserCapabilities.areaTranslation" @change="handleHotkeyChange">
@@ -23,13 +23,6 @@
           </el-button>
         </div>
       </div>
-    </SettingsItem>
-    <SettingsItem :label="t('area.settings.service')" :description="serviceDescription">
-      <el-select v-model="props.config.areaTranslationService" :aria-label="t('area.settings.service')" :placeholder="t('area.settings.followService')">
-        <el-option :value="''" :label="t('area.settings.followService')" />
-        <el-option v-if="savedServiceUnavailable" :value="props.config.areaTranslationService" :label="props.config.areaTranslationService" disabled />
-        <el-option v-for="item in props.serviceOptions" :key="item.value" :value="item.value" :label="item.label" :disabled="item.disabled" />
-      </el-select>
     </SettingsItem>
     <p v-if="unavailableMessage" class="area-settings-note area-settings-warning" role="status">{{ unavailableMessage }}</p>
     <SettingsItem :label="t('area.settings.recognitionMode')" :description="t(prefersVision ? capabilityMessageKey : 'area.settings.recognitionModeDescription')" :help="t(prefersVision ? 'area.settings.visionPrivacy' : 'area.settings.privacy')">
@@ -93,6 +86,7 @@ import {canonicalizeHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
 import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation';
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
 import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy';
+import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
 import {
     findEnabledQuickTranslationHotkeyConflict,
     quickTranslationActionKey,
@@ -152,7 +146,13 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
                 : '',
             feature: t('paragraphCopy.settings.title'),
         },
-        {hotkey: inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger), feature: translateLegacy('输入框翻译')},
+        {
+            hotkey: props.config.videoSubtitleModeHotkeyEnabled
+                ? resolveVideoSubtitleModeHotkey(props.config.videoSubtitleModeHotkey, props.config.customVideoSubtitleModeHotkey)
+                : '',
+            feature: t('video.modeShortcut.title'),
+        },
+        {hotkey: inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger, props.config.customInputBoxTranslationHotkey), feature: translateLegacy('输入框翻译')},
     ];
 }
 
@@ -192,9 +192,6 @@ function handleCustomHotkeyCancel(): void {
 }
 const service = computed(() => props.config.areaTranslationService || props.config.service);
 const model = computed(() => resolveConfiguredModel(props.config.model[service.value], props.config.customModel[service.value]));
-const serviceDescription = computed(() => model.value
-  ? `${props.serviceOptions.find(item => item.value === service.value)?.label || service.value} · ${model.value}`
-  : t('area.settings.serviceDescription'));
 const {result: visionStatus} = useVisionProbeStatus(() => props.config, () => service.value,
     () => model.value, () => hotkeyEditorActive.value);
 const capability = computed(() => visionStatus.value.capability);
@@ -224,8 +221,6 @@ const supportsAI = computed(() => servicesType.isUseAIContext(
 ));
 const unavailableMessage = computed(() => props.config.disabledTranslationServices.includes(service.value)
   ? t('settings.services.library.serviceDisabledMessage') : getTranslationServiceUnavailableMessage(service.value));
-const savedServiceUnavailable = computed(() => props.config.areaTranslationService
-  && !props.serviceOptions.some(item => item.value === props.config.areaTranslationService));
 
 </script>
 

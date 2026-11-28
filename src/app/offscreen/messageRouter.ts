@@ -44,7 +44,8 @@ export interface OffscreenMessageDependencies {
     /** 生产组合根注入自身扩展 ID，TTS 播放控制仅接受同扩展且无 tab 的发送方。 */
     readonly runtimeId?: string;
     readonly translate: (data: unknown, signal: AbortSignal) => Promise<string>;
-    readonly ttsPlayer: Pick<SelectionTtsPlayer, 'play' | 'stop' | 'seek'>;
+    readonly ttsPlayer: Pick<SelectionTtsPlayer, 'play' | 'stop' | 'seek'>
+        & Partial<Pick<SelectionTtsPlayer, 'pause' | 'resume' | 'setRate'>>;
     readonly fetchImage: (url: string, signal: AbortSignal) => Promise<unknown>;
     readonly translateImage: (
         image: string,
@@ -411,7 +412,11 @@ export function createOffscreenMessageListener(dependencies: OffscreenMessageDep
             return true;
         }
         if (dependencies.runtimeId !== undefined
-            && ['READ_SELECTION_TTS_REVISION', 'RESERVE_SELECTION_TTS', 'PLAY_SELECTION_TTS', 'STOP_SELECTION_TTS', 'SEEK_SELECTION_TTS'].includes(message.type)
+            && [
+                'READ_SELECTION_TTS_REVISION', 'RESERVE_SELECTION_TTS', 'PLAY_SELECTION_TTS',
+                'STOP_SELECTION_TTS', 'SEEK_SELECTION_TTS',
+                'PAUSE_SELECTION_TTS', 'RESUME_SELECTION_TTS', 'SET_RATE_SELECTION_TTS',
+            ].includes(message.type)
             && (!isRecord(sender) || sender.id !== dependencies.runtimeId || sender.tab !== undefined)) {
             sendResponse({success: false, error: 'TTS 播放控制发送方无效'});
             return true;
@@ -447,6 +452,15 @@ export function createOffscreenMessageListener(dependencies: OffscreenMessageDep
                 return true;
             case 'SEEK_SELECTION_TTS':
                 respondWith(async () => dependencies.ttsPlayer.seek(message), sendResponse, (seeked) => ({success: true, seeked}));
+                return true;
+            case 'PAUSE_SELECTION_TTS':
+                respondWith(async () => Boolean(dependencies.ttsPlayer.pause?.(message)), sendResponse, (paused) => ({success: true, paused}));
+                return true;
+            case 'RESUME_SELECTION_TTS':
+                respondWith(async () => Boolean(await dependencies.ttsPlayer.resume?.(message)), sendResponse, (resumed) => ({success: true, resumed}));
+                return true;
+            case 'SET_RATE_SELECTION_TTS':
+                respondWith(async () => Boolean(dependencies.ttsPlayer.setRate?.(message)), sendResponse, (updated) => ({success: true, updated}));
                 return true;
             case 'VIDEO_AI_TRANSCRIBE':
                 if (!dependencies.videoAi) { sendResponse({success: false, error: '视频 AI 未启用'}); return true; }

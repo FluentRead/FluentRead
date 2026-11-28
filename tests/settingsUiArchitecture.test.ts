@@ -90,14 +90,14 @@ function minimalPopupSpacing(viewportWidth: number, skin: string, dark: boolean,
 }
 
 describe('options UI composition architecture', () => {
-  it('keeps persistent all-node recognition in advanced settings using the shared config and localized switch', () => {
+  it('keeps persistent all-node recognition in webpage translation strategy using the shared config and localized switch', () => {
     const sections = source('src/features/settings/ui/SettingsSections.vue')
-    const advanced = activeSectionSource(sections, 'settings-advanced')
-    expect(advanced).toContain('<SettingsGroup :title="t(\'settings.pageRecognition.title\')">')
-    expect(advanced).toContain(':label="t(\'settings.pageRecognition.allNodes\')"')
-    expect(advanced).toContain(':description="t(\'settings.pageRecognition.description\')"')
-    expect(advanced).toContain('v-model="config.translationScope" active-value="all" inactive-value="content"')
-    expect(advanced).toContain(':aria-label="t(\'settings.pageRecognition.allNodes\')"')
+    const translation = activeSectionSource(sections, 'settings-translation')
+    expect(translation).toContain('id="page-recognition-settings"')
+    expect(translation).toContain(':label="t(\'settings.pageRecognition.allNodes\')"')
+    expect(translation).toContain(':description="t(\'settings.pageRecognition.description\')"')
+    expect(translation).toContain('v-model="config.translationScope" active-value="all" inactive-value="content"')
+    expect(translation).toContain(':aria-label="t(\'settings.pageRecognition.allNodes\')"')
     expect(sections.match(/v-model="config\.translationScope"/gu)).toHaveLength(1)
     expect(source('src/app/popup/PopupApp.vue')).not.toContain('translationScope')
   })
@@ -562,8 +562,8 @@ describe('options UI composition architecture', () => {
     expect(settingsSections).not.toContain("'Shift+Z'")
     expect(settingsSections).toMatch(/useTranslationShortcutSettings\(config,\s*kind => viewActive\.value && props\.activeSection/u)
     expect(settingsSections).toMatch(/\(\) => configEditor\.applying\);/u)
-    expect(translationShortcutSettings).toContain('inputBoxTranslationTriggerHotkey(value)')
-    expect(quickTranslationProfiles).toContain('inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger)')
+    expect(translationShortcutSettings).toContain('inputBoxTranslationTriggerHotkey(value, config.value.customInputBoxTranslationHotkey)')
+    expect(quickTranslationProfiles).toContain('inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger, props.config.customInputBoxTranslationHotkey)')
     expect(translationShortcutSettings).toContain('previousFullPageHotkey')
     expect(translationShortcutSettings).toContain('previousSelectionTrigger')
     expect(configManagement).toContain('<LocalDataManagement :config="config" :active="props.active && (!props.activePanel || props.activePanel === \'backup\')" />')
@@ -643,7 +643,7 @@ describe('options UI composition architecture', () => {
     expect(drawerSections).toBeDefined()
     expect(Object.fromEntries([...drawerSections!.matchAll(/(\w+):\s*'([^']+)'/gu)]
       .map(([, drawer, section]) => [drawer, section]))).toEqual({
-      services: 'settings-services', aiContext: 'settings-general', hover: 'settings-translation',
+      services: 'settings-services', aiContext: 'settings-translation', hover: 'settings-translation',
       selection: 'settings-selection', appearance: 'settings-interface', image: 'settings-image-translation',
     })
     const popupTemplate = popup.match(/^<template>([\s\S]*?)^<\/template>/mu)?.[1]
@@ -660,9 +660,9 @@ describe('options UI composition architecture', () => {
     expect(playerMenu).toContain('button.disabled = !state.available || state.checking || downloading')
     expect(playerMenu).toContain("!state.available ? 'video.aiUnavailable'")
     const navigation = source('src/features/settings/model/navigation.ts')
-    expect(navigation).toContain("description: 'YouTube/X 边看边译'")
+    expect(navigation).toContain("description: 'YouTube/X 边看边译与外观'")
     expect(navigation).toContain('视频与网页会议的双语字幕')
-    expect(navigation).toContain('YouTube、X、Twitter、视频字幕、本地 AI、Whisper')
+    expect(navigation).toContain('YouTube、X、Twitter、Bilibili、Udemy、edX、视频字幕')
     expect(videoModelSettings).toMatch(/\.capability-warning\s*\{[^}]*color:\s*var\(--el-color-danger\)/u)
     expect(settingsSections).toContain('VIDEO_SOURCE_LANGUAGE_OPTIONS')
     // Resource guidance is localized; assert the live key and its Chinese catalog entry.
@@ -679,7 +679,7 @@ describe('options UI composition architecture', () => {
     expect(videoAppearanceSettings).toContain('data-video-subtitle-preview')
     expect(videoAppearanceSettings).toContain('subtitle-appearance-advanced')
     expect(videoAppearanceSettings).toContain('恢复默认')
-    expect(settingsSections).toContain('<SettingsGroup title="X 本地 AI 字幕"')
+    expect(settingsSections).toContain(":title=\"t('settings.video.localAiSummary')\"")
     expect(settingsSections).toContain('<VideoSubtitleAppearanceSettings :config="config" />')
     expect(settingsSections).toContain('config.videoSourceLanguage')
     expect(videoAppearanceSettings).toContain('config.videoSubtitleAppearance.fontScale')
@@ -1081,18 +1081,15 @@ describe('options UI composition architecture', () => {
     expect(promptEditor).toContain('@mousedown.prevent')
   })
 
-  it('prioritizes basic configuration before webpage assistance and basic preferences in General', () => {
+  it('prioritizes basic configuration before basic preferences and feature services in General', () => {
     const settings = source('src/features/settings/ui/SettingsSections.vue')
     const general = activeSectionSource(settings, 'settings-general')
     const services = activeSectionSource(settings, 'settings-services')
     const styles = sourceBody('src/features/settings/ui/settings-sections.css')
 
-    expect(settingsGroupTitles(general)).toEqual(['基础配置', "t('settings.general.assistance')", "t('settings.general.preferences')"])
+    expect(settingsGroupTitles(general)).toEqual(['基础配置', "t('settings.general.preferences')"])
     expect(general).not.toContain('class="settings-subgroup-heading"')
     expect(general).not.toContain('id="translated-display-heading"')
-    expect(general).toContain('data-testid="open-translation-settings"')
-    expect(general).toContain('data-testid="open-floating-ball-settings"')
-    expect(general).toContain("openSettingsSection('settings-translation', 'floating-ball-settings')")
     expect(general).toContain('data-testid="default-translation-service-card"')
     expect(general).toContain(':data-default-service="config.service"')
     expect(general).toContain('data-testid="translation-language-setting"')
@@ -1106,19 +1103,10 @@ describe('options UI composition architecture', () => {
     expect(general).toContain('<template #prefix><ServiceIcon :service="config.service" :label="defaultTextServiceLabel" size="small"')
     expect(general).toContain('aria-label="默认网页翻译服务"')
     expect(general).toContain('defaultTextServiceLabel')
-    expect(general).toContain(":aria-label=\"t('popup.aiContext.settingsTitle')\"")
-    const aiContextSwitch = general.match(/<el-switch\b[^>]*v-model="config.enableAIContext"[^>]*\/>/u)?.[0]
-    expect(aiContextSwitch).toBeDefined()
-    expect(aiContextSwitch).not.toContain(':disabled')
     expect(general).toContain('label="翻译模式"')
-    // 译文样式、逐句高亮和预览已迁到界面风格页第一组，通用设置只保留跳转入口。
     expect(general).not.toContain('aria-label="译文样式"')
     expect(general).not.toContain('v-model="config.bilingualSentenceHighlightEnabled"')
     expect(general).not.toContain('data-testid="bilingual-highlight-preview"')
-    expect(general).toContain('data-testid="open-translation-style-settings"')
-    expect(general).toContain("openSettingsSection('settings-interface')")
-    expect(general).toContain("t('settings.translationStyle.title')")
-    expect(general).toContain('settings-heading-link')
     expect(settings).not.toContain('highlightPreviewSentence')
     expect(settings).not.toContain('styleGroups')
     expect(styles).not.toContain('.style-preview-text')
@@ -1221,29 +1209,29 @@ describe('options UI composition architecture', () => {
     expect(item).toContain('<ServiceIcon')
   })
 
-  it('keeps translation interactions together in the requested order', () => {
+  it('keeps webpage translation and interactions organized in clear layers', () => {
     const settings = source('src/features/settings/ui/SettingsSections.vue')
     const translation = activeSectionSource(settings, 'settings-translation')
+    const interactions = activeSectionSource(settings, 'settings-interactions')
+    const writing = activeSectionSource(settings, 'settings-writing')
     const inputTranslation = source('src/features/settings/ui/InputTranslationSettings.vue')
     const paragraphCopySettings = source('src/features/settings/ui/ParagraphCopySettings.vue')
     const aiMultiSegmentSettings = source('src/features/settings/ui/AiMultiSegmentSettings.vue')
 
     expect(settingsGroupTitles(translation)).toEqual([
-      '鼠标悬浮翻译',
       '全文翻译',
-      "t('contextMenuSettings.title')",
+      '鼠标悬浮翻译',
     ])
-    expect(translation).toContain("v-if=\"browserCapabilities.browser === 'userscript'\"")
-    expect(translation).toContain('data-userscript-unavailable="context-menu"')
+    expect(interactions).toContain("v-if=\"browserCapabilities.browser === 'userscript'\"")
+    expect(interactions).toContain('data-userscript-unavailable="context-menu"')
+    expect(interactions).toContain('<FloatingBallSettings :config="config"')
+    expect(interactions).toContain('id="floating-ball-settings"')
     expect(translation).toContain('aria-label="鼠标悬浮快捷键"')
     expect(translation).not.toContain("openSettingsSection('settings-selection')")
     expect(activeSectionSource(settings, 'settings-selection')).toContain('label="划词显示内容"')
-    expect(translation).toContain('<InputTranslationSettings')
+    expect(writing).toContain('<InputTranslationSettings')
     expect(inputTranslation.indexOf('data-testid="input-translation-trigger"')).toBeLessThan(inputTranslation.indexOf('data-testid="input-translation-target"'))
-    expect(inputTranslation.indexOf('data-testid="input-translation-target"')).toBeLessThan(inputTranslation.indexOf('data-testid="input-translation-service"'))
     expect(inputTranslation).not.toContain('<el-dialog')
-    expect(inputTranslation).toContain('class="input-translation-service-control"')
-    expect(inputTranslation).toContain('<ServiceIcon')
     expect(translation).toContain('label="全文翻译范围"')
     expect(translation).toContain('<AiMultiSegmentSettings :config="config"')
     expect(aiMultiSegmentSettings).toContain(":aria-label=\"t('settings.fullPage.multiSegmentTitle')\"")
@@ -1255,35 +1243,19 @@ describe('options UI composition architecture', () => {
     expect(translation.match(/:profiles="config\.quickTranslationProfiles"/gu)).toHaveLength(2)
     expect(translation.match(/@update:profiles="config\.quickTranslationProfiles = \$event"/gu)).toHaveLength(2)
 
-    // 悬浮球详细设置属于全文翻译入口，段落复制紧随其后，形成翻译设置的末尾操作区。
-    expect(translation).toContain("<ParagraphCopySettings :config=\"config\" :active=\"viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'paragraph-copy')\" />")
-    expect(translation).toContain('<FloatingBallSettings :config="config" />')
-    expect(translation).toContain('id="floating-ball-settings"')
+    expect(translation).toContain("<ParagraphCopySettings :config=\"config\" :active=\"viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'reading')\" />")
     expect(settingsGroupTitles(paragraphCopySettings)).toEqual(["t('paragraphCopy.settings.title')"])
     expect(paragraphCopySettings).toContain('data-testid="paragraph-copy-hotkey"')
     expect(paragraphCopySettings).toContain('data-testid="paragraph-copy-content"')
-    expect(translation.indexOf('<FloatingBallSettings'))
-      .toBeGreaterThan(translation.indexOf('title="全文翻译"'))
-    expect(translation.indexOf('<ParagraphCopySettings'))
-      .toBeGreaterThan(translation.indexOf('<FloatingBallSettings'))
-    // 局部翻译紧跟段落复制：两者都是“对网页某一块内容”的操作，快捷键冲突提示也相互覆盖。
     const sectionTranslationSettings = source('src/features/settings/ui/SectionTranslationSettings.vue')
-    expect(translation.indexOf('<SectionTranslationSettings :config="config" :active="viewActive && props.activeSection === \'settings-translation\' && (!props.activePanel || props.activePanel === \'section-translation\')" />'))
-      .toBeGreaterThan(translation.indexOf('<ParagraphCopySettings'))
+    expect(translation).toContain("<SectionTranslationSettings :config=\"config\" :active=\"viewActive && props.activeSection === 'settings-translation' && (!props.activePanel || props.activePanel === 'hover')\" />")
     expect(settingsGroupTitles(sectionTranslationSettings)).toEqual(["t('sectionTranslation.settings.title')"])
     expect(sectionTranslationSettings).toContain('data-testid="section-translation-hotkey"')
     expect(sectionTranslationSettings).toContain('v-model="props.config.sectionTranslationHotkeyEnabled"')
     expect(paragraphCopySettings).toContain("feature: t('sectionTranslation.settings.title')")
 
-    const hoverProfiles = translation.indexOf('action="hover"')
-    const fullPageProfiles = translation.indexOf('action="full-page"')
-    const inputTranslationSection = translation.indexOf('<InputTranslationSettings')
-    expect(hoverProfiles).toBeGreaterThan(translation.indexOf('aria-label="悬浮翻译延迟"'))
-    expect(hoverProfiles).toBeLessThan(inputTranslationSection)
-    expect(inputTranslationSection).toBeGreaterThan(hoverProfiles)
-    expect(inputTranslationSection).toBeLessThan(translation.indexOf('title="全文翻译"'))
-    expect(fullPageProfiles).toBeGreaterThan(translation.indexOf('label="全文翻译范围"'))
-    expect(fullPageProfiles).toBeGreaterThan(translation.indexOf('aria-label="右键全文翻译"'))
+    expect(translation.indexOf('action="hover"')).toBeGreaterThan(translation.indexOf('aria-label="悬浮翻译延迟"'))
+    expect(translation.indexOf('action="full-page"')).toBeGreaterThan(translation.indexOf('label="全文翻译范围"'))
   })
 
   it('loads shared tokens before the unchanged settings page rules', () => {
@@ -1329,7 +1301,7 @@ describe('options UI composition architecture', () => {
     expect(item).toContain('<FieldHelp v-if="help" :content="help" />')
     expect(item).toContain('<slot name="description"><small v-if="description">{{ description }}</small></slot>')
     expect(settings).toContain(`label="划词触发方式" :help="t('selectionTrigger.modeDescription')">`)
-    expect(settings).toContain(`<SettingsItem id="floating-ball-toggle" :label="t('settings.general.floatingBall')">`)
+    expect(source('src/features/settings/ui/FloatingBallSettings.vue')).toContain('id="floating-ball-toggle"')
     expect(source('src/features/settings/ui/AiMultiSegmentSettings.vue')).toContain(`:description="t('settings.fullPage.multiSegmentDescription')" :help="t('settings.fullPage.multiSegmentHelp')"`)
   })
 
@@ -1404,8 +1376,7 @@ describe('options UI composition architecture', () => {
     expect(source('src/features/writing-assistant/markdown.ts')).toContain("@/src/features/reading-assistant/answer/public")
     expect(sourceBody('src/features/reading-assistant/ui/answer/public.ts').trim()).toBe("export {default as ReadingAnswer} from '../ReadingAnswer.vue';")
     expect(sourceBody('src/features/reading-assistant/ui/panel/public.ts').trim()).toBe("export {default as ReadingPanel} from '../ReadingPanel.vue';")
-    for (const file of ['src/features/settings/ui/HarnessSettings.vue', 'src/features/settings/ui/SelectionSettings.vue',
-      'src/features/vocabulary/ui/VocabularyBook.vue', 'src/features/vocabulary/ui/ReencounterPanel.vue',
+    for (const file of ['src/features/vocabulary/ui/VocabularyBook.vue', 'src/features/vocabulary/ui/ReencounterPanel.vue',
       'src/features/vocabulary/ui/VocabularyStudy.vue', 'src/features/writing-assistant/ui/WritingPanel.vue']) {
       expect(source(file), file).toContain("@/src/features/reading-assistant/ui/answer/public")
     }
@@ -1419,11 +1390,10 @@ describe('options UI composition architecture', () => {
     const speech = source('src/features/settings/ui/LocalTtsSettings.vue')
     const floatingBall = source('src/features/settings/ui/FloatingBallSettings.vue')
 
-    expect(manga).toContain(`<SettingsGroup class="manga-translation-options" :title="t('image.settings.languageServiceTitle')"`)
     expect(manga).not.toContain('class="manga-setting-fields"')
     expect(writing).not.toContain('class="writing-service-grid"')
-    expect(writing).toContain('<SettingsItem label="AI 服务">')
+    expect(writing).toContain('<SettingsItem label="输出语言">')
     expect(speech).not.toContain(' stacked')
-    expect(floatingBall).toContain('.floating-ball-settings :deep(.site-rules-editor)')
+    expect(floatingBall).toContain('class="floating-ball-advanced"')
   })
 })

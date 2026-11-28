@@ -9,15 +9,15 @@ import type {OcrLine} from '@/src/shared/image/types';
 import {endsEastAsianText, startsEastAsianText} from '../textBoundary';
 import type {NumericEvidenceOcrLine} from '../core';
 import {numericInformation} from './mangaNumeric';
-import type {ImageParagraphContinuations} from '../paragraphs';
+import type {ImageParagraphContinuations,ImageTextRegion} from '../paragraphs';
 import {attachImageRuby} from '../ruby';
 
-export interface MangaOcrItem {
+export interface MangaOcrItem extends Pick<ImageTextRegion,'quarterTurn'|'preserveSource'> {
     text: string;
     confidence: number;
     box: {x: number; y: number; width: number; height: number};
 }
-export interface MangaRegion extends OcrLine {fontSize: number; sourceBoxes?: OcrLine['bbox'][]; numericUncertain?: true; guardOnly?: true}
+export interface MangaRegion extends ImageTextRegion {fontSize: number}
 
 function union(left: OcrLine['bbox'], right: OcrLine['bbox']): OcrLine['bbox'] {
     return {x0: Math.min(left.x0, right.x0), y0: Math.min(left.y0, right.y0),
@@ -25,7 +25,7 @@ function union(left: OcrLine['bbox'], right: OcrLine['bbox']): OcrLine['bbox'] {
 }
 
 function adjacent(left: MangaRegion, right: MangaRegion, lineGap: number, columnGap: number): boolean {
-    if (left.vertical !== right.vertical) return false;
+    if (left.vertical !== right.vertical || left.quarterTurn || right.quarterTurn || left.preserveSource || right.preserveSource) return false;
     const a = left.bbox, b = right.bbox;
     const [start, end, crossStart, crossEnd] = left.vertical
         ? ['x0', 'x1', 'y0', 'y1'] as const : ['y0', 'y1', 'x0', 'x1'] as const;
@@ -73,17 +73,19 @@ export function groupMangaText(items: MangaOcrItem[], sourceLanguage: string, wi
         if (numericSyntax && !numeric) return [];
         if ((!numeric && (!/\p{L}/u.test(text)
             || (english && (!/[a-z]/iu.test(text) || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(text)))
-            || (japanese && !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u3040-\u30ff\u3400-\u9fff]/u.test(text) && text.replace(/[^a-z]/giu,'').length < 4)))
+            || (japanese && !item.quarterTurn && !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u3040-\u30ff\u3400-\u9fff]/u.test(text) && text.replace(/[^a-z]/giu,'').length < 4)))
             || ![box.x, box.y, box.width, box.height].every(Number.isFinite) || box.width <= 0 || box.height <= 0) return [];
         const bbox = {x0: Math.max(0, box.x), y0: Math.max(0, box.y),
             x1: Math.min(width, box.x + box.width), y1: Math.min(height, box.y + box.height)};
         if (bbox.x1 <= bbox.x0 || bbox.y1 <= bbox.y0) return [];
-        const vertical = !english && box.height > box.width * 1.8;
-        const fontSize = vertical ? box.width : box.height;
+        const vertical = !item.quarterTurn && !english && box.height > box.width * 1.8;
+        const fontSize = vertical || item.quarterTurn ? box.width : box.height;
         // 巨大拟声字和纹理中的孤字不作为对白；保留 I/A 等合法英语短句。
         if (!numeric && Array.from(text.replace(/[^\p{L}\p{N}]/gu, '')).length < 2
             && (english ? !/^[IA][.!?]?$/u.test(text) : item.confidence < 0.9 || (context !== 'bubble' && Math.max(box.width, box.height) > width * 0.12))) return [];
-        return [{text, bbox, fontSize, ...(vertical ? {vertical: true as const} : {})}];
+        return [{text, bbox, fontSize, ...(vertical ? {vertical: true as const} : {}),
+            ...(item.quarterTurn ? {quarterTurn:item.quarterTurn,textAlign:'center' as const} : {}),
+            ...(item.preserveSource ? {preserveSource:true as const} : {})}];
     });
     // 只有已有明确归属的独立气泡才允许较宽横排行距；整页竖列最多放宽至1.8倍字宽，
     // 避免把邻近旁白或不同说话者误并成一句。
@@ -144,6 +146,8 @@ function mergeMangaLines(lines: MangaRegion[], lineGap = 0.8, columnGap = 0.8): 
         groups.push(members);
     }
     return groups.map(members => {
+        const first=members[0];
+        if(first.quarterTurn||first.preserveSource)return {...first,sourceBoxes:[first.bbox]};
         members.sort((a, b) => {
             const near = Math.min(a.fontSize, b.fontSize) * 0.45;
             return a.vertical

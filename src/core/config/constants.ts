@@ -3,7 +3,7 @@
  * 本地端点：Rapid-MLX 使用完整的 /v1/chat/completions 地址，避免调用方重复拼接版本路径。
  *
  * 文件职责：集中声明配置领域中跨模块复用的端点、请求方式、样式名和连接测试消息等稳定常量。
- * 主要内容：包含 MiniMax/MiMo 地域端点映射、云服务厂商与本地 Ollama 端点、服务 URL、POST/GET 常量以及 getMimoEndpoint 的回退解析，避免调用方各自复制协议字面量。 可核对的公开符号包括 MINIMAX_ENDPOINTS、MIMO_ENDPOINTS、getMimoEndpoint、DEFAULT_OLLAMA_ENDPOINT、AZURE_TRANSLATOR_ENDPOINT、VOLC_TRANSLATION_ENDPOINT、getAliyunTranslationEndpoint、urls、method、CONNECTION_TEST_MESSAGE、tongyiTokenPlanUrl、constants。
+ * 主要内容：包含 MiniMax/MiMo 地域端点映射、云服务厂商与腾讯混元 TokenHub 地域端点、本地 Ollama 端点、服务 URL、POST/GET 常量以及 getMimoEndpoint 的回退解析，避免调用方各自复制协议字面量。 可核对的公开符号包括 MINIMAX_ENDPOINTS、MIMO_ENDPOINTS、getMimoEndpoint、DEFAULT_OLLAMA_ENDPOINT、AZURE_TRANSLATOR_ENDPOINT、VOLC_TRANSLATION_ENDPOINT、getAliyunTranslationEndpoint、getHuanYuanEndpoint、urls、method、CONNECTION_TEST_MESSAGE、tongyiTokenPlanUrl、constants。
  * 模块边界：本文件属于 core 领域层，只定义规则、类型与纯转换；不直接读写浏览器存储、不发起网络请求、不挂载 Vue/WXT 入口，持久化、协议调用和界面编排分别由 services、providers 与 features 承担。
  */
 
@@ -61,6 +61,14 @@ export function getAliyunTranslationEndpoint(region?: string): string {
     return `https://mt.${resolved}.aliyuncs.com/`;
 }
 
+/** 腾讯混元（TokenHub）按服务地域分域名部署，未知地域回落到默认地域。 */
+export function getHuanYuanEndpoint(region?: string): string {
+    const resolved = resolveCloudRegion(services.huanYuan, region);
+    return resolved === 'ap-guangzhou'
+        ? 'https://tokenhub.tencentmaas.com/v1/chat/completions'
+        : 'https://tokenhub-intl.tencentmaas.com/v1/chat/completions';
+}
+
 export const urls: any = {
     [services.myMemory]: "https://api.mymemory.translated.net/get",
     [services.deepL]: "https://api-free.deepl.com/v2/translate",
@@ -84,7 +92,7 @@ export const urls: any = {
     [services.jieyue]: "https://api.stepfun.com/v1/chat/completions",
     [services.yiyan]: "https://qianfan.bj.baidubce.com/v2/chat/completions",
     [services.groq]: "https://api.groq.com/openai/v1/chat/completions",
-    [services.huanYuan]: "https://api.hunyuan.cloud.tencent.com/v1/chat/completions",
+    [services.huanYuan]: getHuanYuanEndpoint(),
     [services.huanYuanTranslation]: "https://hunyuan.tencentcloudapi.com/",
     [services.doubao]: "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
     [services.siliconCloud]: "https://api.siliconflow.cn/v1/chat/completions",

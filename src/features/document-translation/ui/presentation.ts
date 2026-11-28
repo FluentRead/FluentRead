@@ -6,6 +6,7 @@
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {renderDocument, resolveDocumentTranslation, type DocumentFormat, type DocumentRenderMode, type ParsedDocument} from '@/src/features/document-translation/core/document';
+import {stripDocumentInlineMarkers} from '@/src/core/translation/documentInlineMarkers';
 
 /** 小型本地范例只走正常导入流程，不预填译文或自动发起翻译。 */
 export const DOCUMENT_QUICK_SAMPLES = [
@@ -23,9 +24,10 @@ export function isDocumentExportExcerpt(document: ParsedDocument): boolean {
 export function getDocumentExportPreview(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode): string {
     const text = isDocumentExportExcerpt(document)
         ? document.segments.slice(0, 3).map(segment => {
-            const translation = resolveDocumentTranslation(segment.source, translations[segment.id]).slice(0, 1601);
+            const clean = segment.docxInline ? stripDocumentInlineMarkers : (value: string) => value;
+            const translation = clean(resolveDocumentTranslation(segment.source, translations[segment.id])).slice(0, 1601);
             return mode === 'bilingual' && hasDistinctTranslation(segment.source, translations[segment.id])
-                ? `${segment.source.slice(0, 1601)}\n${translation}` : translation;
+                ? `${clean(segment.source).slice(0, 1601)}\n${translation}` : translation;
         }).join('\n\n')
         : renderDocument(document, translations, mode, 1601);
     return text.length > 1600 ? `${text.slice(0, 1600)}\n…` : text;
@@ -99,7 +101,8 @@ export function hasDocumentPlaceholder(value: string | undefined): boolean {
     return Boolean(value) && /<\/?g\d+\/?>/u.test(value!);
 }
 
-export function formatDocumentReaderText(format: DocumentFormat | undefined, value: string): string {
+export function formatDocumentReaderText(format: DocumentFormat | undefined, value: string, docxInline?: true): string {
+    if (docxInline) return stripDocumentInlineMarkers(value).trim();
     if (format === 'html' || format === 'epub') return value.replace(/<[^>]+>/gu, '').trim();
     if (format === 'markdown') {
         return value

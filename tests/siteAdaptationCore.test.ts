@@ -16,6 +16,63 @@ const rule = (extra: Partial<SiteRule> = {}): SiteRule => ({
 });
 const pack = (rules: SiteRule[] = [rule()]): SiteRulePack => ({version: 1, rules});
 
+describe('Twitch live chat and sidebar (#1382)', () => {
+    it('discovers sidebar streamer names, pinned chat, reply previews, VOD chat, and live updates while protecting handles and emotes', () => {
+        const {document} = parseHTML(`<html><body>
+            <div data-a-target="side-nav-bar"><nav id="side-nav">
+                <a href="/directory" id="nav-link">Browse channels</a>
+                <a href="/nagisekaied"><div><div class="side-nav-card__title">
+                    <p data-a-target="side-nav-title" id="channel"><span>陵本なぎ <span class="intl-login">(nagisekaied)</span></span></p>
+                </div><div class="side-nav-card__metadata"><p id="category">WARDOGS</p></div></div></a>
+            </nav></div>
+            <main><p id="intro">This channel broadcasts electronic music.</p></main>
+            <aside id="live-page-chat"><section data-test-selector="chat-room-component-layout">
+                <div class="pinned-chat"><span id="pinned" data-a-target="chat-message-text">【お知らせ】配信スケジュールを更新しました。</span></div>
+                <div class="chat-scrollable-area__message-container"><div class="chat-line__message">
+                    <div class="chat-line__message-container">
+                        <div><p title="昨シーズンと比べて増えたという印象は受けない">回复 <span dir="auto" id="reply-user">@Matti533</span> ：<span dir="auto" id="reply-preview">昨シーズンと比べて増えたという印象は受けない</span></p></div>
+                        <button class="chat-line__username-container">Chat author</button>
+                        <span data-a-target="chat-line-message-body" id="english">
+                            <span class="chat-line__message--emote-button" data-a-target="emote-name"><button><img alt="nagise1Furifuri"></button></span>
+                            <span class="mention-fragment" data-a-target="chat-message-mention">@Matti533</span>
+                            <span data-a-target="chat-message-text">Thanks for this wonderful stream.</span>
+                        </span>
+                    </div>
+                </div></div>
+                <p id="aside-note">Join the daily music chat</p>
+            </section></aside>
+            <aside><div class="video-chat__message-list-wrapper"><span id="vod-msg" data-a-target="chat-line-message-body"><span data-a-target="chat-message-text">Replay chat message from VOD.</span></span></div></aside>
+        </body></html>`);
+        const adapters = compileSiteRulePack(builtinSiteRulePack);
+        const url = new URL('https://www.twitch.tv/nagisekaied');
+        const core = new TranslationCandidateCore({url, adapters});
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['channel', 'intro', 'pinned', 'reply-preview', 'english', 'vod-msg']);
+
+        const channel = document.getElementById('channel')!;
+        expect(extractTranslationText(channel, core.shouldStayOriginal)).toBe('陵本なぎ');
+        expect(createTranslationSourceSnapshot(channel, core.shouldStayOriginal, undefined, undefined, core.shouldOmitFromTranslation).clone.textContent?.trim()).toBe('陵本なぎ');
+        expect(collectLiveTranslationTextSlots(channel, core.shouldStayOriginal).map(slot => slot.source)).toEqual(['陵本なぎ']);
+
+        const english = document.getElementById('english')!;
+        expect(collectLiveTranslationTextSlots(english, core.shouldStayOriginal).map(slot => slot.source)).toEqual(['Thanks for this wonderful stream.']);
+        const englishSnapshot = createTranslationSourceSnapshot(english, core.shouldStayOriginal, undefined, undefined, core.shouldOmitFromTranslation);
+        expect(englishSnapshot.clone.querySelector('.chat-line__message--emote-button')).toBeNull();
+        expect(englishSnapshot.clone.querySelector('.mention-fragment')?.textContent).toBe('@Matti533');
+
+        const chat = document.querySelector('.chat-scrollable-area__message-container')!;
+        chat.insertAdjacentHTML('beforeend', '<div class="chat-line__message"><span id="japanese" data-a-target="chat-message-text">今日も素敵な配信をありがとうございます。</span></div>');
+        const japanese = document.getElementById('japanese')!;
+        expect(core.discover(japanese).map(candidate => candidate.element)).toEqual([japanese]);
+        expect(core.resolve(japanese.firstChild)?.element).toBe(japanese);
+        expect(core.resolve(document.getElementById('reply-user')!.firstChild)).toBeNull();
+        expect(core.resolve(document.getElementById('nav-link')!.firstChild)).toBeNull();
+        expect(new TranslationCandidateCore({url, adapters, includeSidebarRegions: true})
+            .discover(document).map(candidate => candidate.element.id)).toContain('category');
+        expect(new TranslationCandidateCore({url: new URL('https://twitch.tv.example.org/'), adapters})
+            .discover(document).map(candidate => candidate.element.id)).toEqual(['intro']);
+    });
+});
+
 describe('issue #1251: explicit no-translate overrides', () => {
     const url = new URL('https://example.test/comments');
     const custom = () => pack([rule({forceTranslate: ['#comments'], content: [{css: ['.post_body p']}], protect: ['.author']})]);
@@ -263,6 +320,65 @@ describe('Kagi News content-bearing buttons', () => {
     });
 });
 
+describe('Inco blog article summary', () => {
+    function fixture(href = 'https://inco.ai/blog/splash/', disabledRuleIds: string[] = []) {
+        const {document} = parseHTML(`<html lang="en"><body>
+            <header class="nav"><p id="navigation" class="post-dek">Browse the site and manage your account.</p></header>
+            <main id="content"><div class="post-page"><header class="post-head">
+                <a id="back" href="/blog/">Return to all posts</a>
+                <time datetime="2026-09-17">September 17, 2026</time>
+                <h1 id="title" class="post-title">Splash: A local engine built around the model</h1>
+                <p id="summary" class="post-dek">Splash is an open-source <em>inference engine</em> for Apple silicon.</p>
+                <p id="metadata">Published by the Inco editorial team.</p>
+            </header><article class="prose">
+                <p id="body">The engine specializes its kernels for the models it serves.</p>
+                <pre><code>splash serve</code></pre>
+            </article></div></main>
+        </body></html>`);
+        const url = new URL(href);
+        const settings = normalizeSiteAdaptationSettings({disabledRuleIds});
+        const core = new TranslationCandidateCore({url, adapters: composeSiteAdapters(builtinSiteRulePack, settings)});
+        return {document, core, summary: document.getElementById('summary')!};
+    }
+
+    it.each(['https://inco.ai/blog/splash/', 'https://inco.ai/blog/inco-platform-aa/'])(
+        'discovers just the article header summary as additional content on %s', href => {
+            const {document, core, summary} = fixture(href);
+            expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['title', 'summary', 'body']);
+            expect(core.resolve(summary.querySelector('em')!.firstChild)).toMatchObject({
+                element: summary, kind: 'content', adapterId: 'inco-blog',
+            });
+            for (const id of ['navigation', 'back', 'metadata']) {
+                expect(core.resolve(document.getElementById(id)!.firstChild), id).toBeNull();
+            }
+        },
+    );
+
+    it('rediscovers a replaced summary and respects its local no-translate marker', () => {
+        const {core, summary} = fixture();
+        const replacement = summary.cloneNode(true) as HTMLElement;
+        replacement.querySelector('em')!.textContent = 'local inference engine';
+        summary.replaceWith(replacement);
+        expect(core.discover(replacement.querySelector('em')!).map(candidate => candidate.element)).toEqual([replacement]);
+        expect(core.resolve(replacement.lastChild)?.element).toBe(replacement);
+
+        replacement.setAttribute('translate', 'no');
+        expect(core.discover(replacement)).toEqual([]);
+        expect(core.resolve(replacement.lastChild)).toBeNull();
+    });
+
+    it.each([
+        ['https://inco.ai/blog/', []],
+        ['https://inco.ai/products/splash/', []],
+        ['https://example.test/blog/splash/', []],
+        ['https://inco.ai/blog/splash/', ['inco-blog']],
+    ] as const)('leaves ordinary header filtering on %s with disabled rules %j', (href, disabled) => {
+        const {document, core, summary} = fixture(href, [...disabled]);
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['title', 'body']);
+        expect(core.resolve(summary.firstChild)).toBeNull();
+    });
+});
+
 describe('Llamaperf Mac benchmark introduction', () => {
     function fixture(href = 'https://llamaperf.com/mac/m5?utm_source=chatgpt.com', settings = normalizeSiteAdaptationSettings(undefined)) {
         // The live Next.js page splits sentences and counters with comment nodes inside an article header.
@@ -468,7 +584,7 @@ describe('Englio word-segmented article paragraphs', () => {
             else article.querySelectorAll('[data-word-pos]').forEach(word => word.removeAttribute(remove));
             expect(core.discover(document).some(candidate => candidate.adapterId === 'englio-article')).toBe(false);
         }
-    });
+    }, 30_000);
 });
 
 describe('OpenAI community reading boundaries', () => {

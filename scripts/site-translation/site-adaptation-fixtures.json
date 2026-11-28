@@ -643,17 +643,48 @@
   {
     "id": "google-search",
     "url": "https://www.google.com/search?q=example",
-    "html": "<nav id=\"navigation\"><a href=\"/settings\">Navigation remains unchanged</a></nav><div id=\"search\"><h3 id=\"body1\">This readable paragraph describes the behavior and provides enough context for translation. <code id=\"protected\">KEEP_ORIGINAL_TOKEN</code></h3><div class=\"VwiC3b\" id=\"body2\">A second independent paragraph explains the example and should remain stable during repeated translation.</div><cite id=\"source-url\">https://example.test/path</cite></div><p id=\"unrelated\">Search tools and navigation remain original.</p>",
+    "html": "<nav id=\"navigation\"><a href=\"/settings\">Navigation remains unchanged</a></nav><div id=\"m-x-content\"><div data-container-id=\"main-col\"><div class=\"overview-section\"><div class=\"overview-paragraph\" id=\"overview-div\"><span>A generated overview explains the answer using nested div prose blocks.</span><span class=\"inline-citation\"><button id=\"citation-button\" aria-label=\"View related links\">1</button></span></div></div><div role=\"heading\" aria-level=\"3\" id=\"overview-heading\">Key points in the summary</div><p id=\"overview\">A generated overview explains the answer using ordinary prose.</p><ul><li id=\"overview-item\">An additional detail provides context for the answer.</li></ul><button id=\"show-more\">Show more of this summary</button><div role=\"button\" id=\"show-more-aria\">Show more details</div></div><div data-container-id=\"rhs-col\"><div id=\"rhs-source\">Right rail citation cards should remain original.</div></div><aside><p id=\"overview-source\">Source card metadata should remain original.</p></aside></div><div data-subtree=\"aimc\"><div data-mcpr=\"true\"><div id=\"aimc-paragraph\">Another AI Overview subtree renders readable paragraphs inside div containers.</div></div><div data-attrid=\"VisualDigestWebResult\"><div id=\"visual-digest-source\">Cited web card metadata should remain original.</div></div></div><div data-attrid=\"VisualDigestGeneratedDescription\"><p id=\"generated-answer\">Another layout includes a generated description in featured results.</p></div><div id=\"search\"><h3 id=\"body1\">This readable paragraph describes the behavior and provides enough context for translation. <code id=\"protected\">KEEP_ORIGINAL_TOKEN</code></h3><div class=\"VwiC3b\" id=\"body2\">A second independent paragraph explains the example and should remain stable during repeated translation.</div><cite id=\"source-url\">https://example.test/path</cite></div><p id=\"unrelated\">Search tools and navigation remain original.</p>",
     "required": [
       "#body1",
-      "#body2"
+      "#body2",
+      "#overview-div",
+      "#overview-heading",
+      "#overview",
+      "#overview-item",
+      "#aimc-paragraph",
+      "#generated-answer"
     ],
     "forbidden": [
       "#navigation",
       "#protected",
       "#source-url",
+      "#citation-button",
+      "#show-more",
+      "#show-more-aria",
+      "#rhs-source",
+      "#overview-source",
+      "#visual-digest-source",
       "#unrelated"
-    ]
+    ],
+    "restoreSelectors": ["#m-x-content", "#search"],
+    "dynamic": {
+      "appendHtml": [
+        {
+          "selector": "#m-x-content",
+          "click": "#show-more",
+          "html": "<div class=\"overview-section\"><div id=\"expanded-overview\">More generated overview prose becomes readable after expanding the summary.</div></div>",
+          "required": ["#expanded-overview"],
+          "sourceIncludes": ["More generated overview prose becomes readable"]
+        },
+        {
+          "selector": "#m-x-content",
+          "route": "/search?q=next-example",
+          "html": "<p id=\"new-overview\">A second search route brings a new paragraph into the generated overview.</p>",
+          "required": ["#new-overview"],
+          "sourceIncludes": ["A second search route brings a new paragraph"]
+        }
+      ]
+    }
   },
   {
     "id": "google-scholar",

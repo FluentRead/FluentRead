@@ -7,8 +7,8 @@ Write your message in a chat, email or other webpage, then translate it into the
 ## Set up the feature
 
 1. Open **Settings → Translation → Input translation** and enable it.
-2. Choose the target language, trigger and output mode. The provider follows page translation unless you choose a separate one.
-3. Write in the input field, then press your chosen **Space, equals or hyphen key three times**. Wait for the translation to appear. Existing **Ctrl+Enter** preferences also work.
+2. Choose the target language, trigger and output mode. Triggers support pressing **Space, equals or hyphen three times** or a **Custom shortcut** (a modifier combination or function key F1–F12). The provider follows page translation unless you choose a separate one.
+3. Write in the input field, then press your chosen triple-key trigger or custom shortcut. Wait for the translation to appear. Existing **Ctrl+Enter** preferences also work.
 
 Settings save automatically. Changing a language or provider does not enable the feature. Password fields and code editors are excluded.
 

@@ -160,7 +160,11 @@ When a batch falls back to individual requests, each passage appears as soon as 
 
 Once enabled, **Batch limits** default to at most **8 text fragments and 2,000 source characters**, adjustable to **2–32** and **500–12,000** respectively. A batch splits when either limit is reached; a single long paragraph stays intact without truncation. A rich-text paragraph can contain several fragments, so fragments do not equal webpage paragraphs. The collection window is fixed at **32 ms**: later fragments do not extend it, and batches are not guaranteed to fill.
 
-Turning the option off preserves the limits; **Reset** restores only those two values. Larger batches are not always faster and depend more on the model returning every translation. Missing or duplicate markers and incomplete results make the entire batch fall back to individual requests; later passages with the same request settings also use individual requests for the current page session.
+Turning the option off preserves the limits. **Reset** restores the two default values. OpenAI-compatible chat services with default prompts and request bodies use compact JSON for batching and validate the translation order by index. A malformed response temporarily switches that route back to paragraph markers. Custom prompts and advanced request bodies use paragraph markers.
+
+Larger batches depend more on the model returning every translation. If the batch structure is intact, empty, echoed, or clearly wrong-language passages are translated again individually. If a repair fails, the original remains available with a retry action. Batches that fail validation or echo all source text fall back to individual requests for the current page session. Only complete, validated batches enter the cache.
+
+AI services with shared backoff honor the wait indicated by the service. When the service gives no wait time and continues to rate-limit requests, FluentRead increases the delay. One request checks recovery before other requests sharing that quota resume.
 
 Restore the original page and restart full-page translation after changes. Use a [glossary](/en/guide/glossary) for required terms.
 
@@ -208,7 +212,7 @@ Placeholders use the current model and saved key. A URL containing `{key}` recei
 
 ### Tencent Hunyuan connection failures
 
-**Tencent Hunyuan** uses a Hunyuan console API key. **Hunyuan Translation** instead needs SecretId and SecretKey. A custom gateway needs its matching full endpoint and credentials; see the [official integration guide](https://cloud.tencent.com/document/product/1729/116755).
+**Tencent Hunyuan** now uses the Tencent Cloud [TokenHub console](https://console.cloud.tencent.com/tokenhub/) and requires a TokenHub API key matching the selected service region (Singapore / Global `tokenhub-intl.tencentmaas.com` or South China / Guangzhou `tokenhub.tencentmaas.com`; keys are not shared across regions). **Hunyuan Translation** instead needs SecretId and SecretKey. A custom gateway needs its matching full endpoint and credentials; see the [official integration guide](https://cloud.tencent.com/document/product/1823/132252).
 
 ### Local ACP agent bridge
 

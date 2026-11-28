@@ -94,6 +94,53 @@
     ]
   },
   {
+    "id": "twitch-live-chat",
+    "name": "Twitch 直播聊天与侧边栏",
+    "match": {"hosts": ["twitch.tv", "www.twitch.tv"]},
+    "mode": "augment",
+    "content": [
+      {
+        "css": [
+          ".chat-scrollable-area__message-container [data-a-target=\"chat-line-message-body\"]",
+          ".chat-scrollable-area__message-container .chat-line__message span[data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)",
+          "[data-test-selector=\"chat-room-component-layout\"] [data-a-target=\"chat-line-message-body\"]",
+          "[data-test-selector=\"chat-room-component-layout\"] span[data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)",
+          ".stream-chat [data-a-target=\"chat-line-message-body\"]",
+          ".stream-chat span[data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)",
+          ".video-chat__message-list-wrapper [data-a-target=\"chat-line-message-body\"]",
+          ".video-chat__message-list-wrapper [data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)"
+        ],
+        "resolve": "closest",
+        "key": "twitch-live-chat:message"
+      },
+      {
+        "css": [
+          ".chat-line__message-container p[title] > span[dir=\"auto\"]:not(:first-of-type)"
+        ],
+        "resolve": "closest",
+        "key": "twitch-live-chat:reply-preview"
+      },
+      {
+        "css": [
+          ".side-nav-card__title [data-a-target=\"side-nav-title\"]",
+          "[data-a-target=\"side-nav-bar\"] [data-a-target=\"side-nav-title\"]"
+        ],
+        "resolve": "closest",
+        "key": "twitch-live-chat:sidebar-channel-name"
+      }
+    ],
+    "protect": [
+      ".chat-line__message .mention-fragment",
+      ".chat-line__message [data-a-target=\"chat-message-mention\"]"
+    ],
+    "omit": [
+      "[data-a-target=\"side-nav-title\"] .intl-login",
+      ".side-nav-card__title .intl-login",
+      ".chat-line__message--emote-button",
+      "[data-a-target=\"emote-name\"]"
+    ]
+  },
+  {
     "id": "bilibili",
     "name": "哔哩哔哩",
     "match": {
@@ -374,6 +421,25 @@
     ],
     "watchIgnore": [
       "main article span:has(+ span > a.x-link[href^=\"/\"]:not([href^=\"//\"]) > span.text-secondary.line-clamp-1) > a.x-link[href^=\"/\"]:not([href^=\"//\"]) > div.text-body.font-bold.line-clamp-1:not([dir=\"auto\"] *)"
+    ]
+  },
+  {
+    "id": "x-post-expand-control",
+    "name": "X 帖子展开控件",
+    "allScopes": true,
+    "match": {
+      "hosts": [
+        "*.x.com",
+        "*.twitter.com"
+      ]
+    },
+    "priority": 410,
+    "mode": "augment",
+    "omit": [
+      "article [data-testid=\"tweet-text-show-more-link\"]",
+      "article div[dir=\"auto\"] button",
+      "article div[dir=\"auto\"] [role=\"button\"]",
+      "article div[dir=\"auto\"] + button.text-brand"
     ]
   },
   {

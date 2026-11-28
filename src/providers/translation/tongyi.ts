@@ -15,11 +15,12 @@ import {createHttpStatusError, createImageInputHttpError, readJsonResponse} from
 import {abortErrorFromSignal, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
 import {
     requireTranslationProviderConfig,
+    observeTranslationHttpResponse,
     reportTranslationModelUsage,
     reportTranslationModelUsageFailure,
     getTranslationImageInput,
 } from '@/src/services/translation/requestSnapshot';
-import type {TranslationProviderRequest} from '@/src/services/translation/types';
+import {TRANSLATION_COMPACT_BATCH, type TranslationProviderRequest} from '@/src/services/translation/types';
 import {normalizeOpenAICompatibleUsage} from './usage';
 
 // 文档：https://help.aliyun.com/zh/dashscope/developer-reference/tongyi-thousand-questions-metering-and-billing
@@ -63,6 +64,7 @@ async function tongyi(message: TranslationProviderRequest<string>) {
             body,
             signal: message.abortSignal,
         });
+        observeTranslationHttpResponse(message, resp);
         if (!resp.ok) {
             reportTranslationModelUsageFailure(message, undefined, startedAt, configuredModel, resp.status);
             attemptReported = true;
@@ -75,7 +77,22 @@ async function tongyi(message: TranslationProviderRequest<string>) {
         const actualModel = typeof result?.model === 'string' && result.model.trim()
             ? result.model
             : configuredModel;
-        const translatedText = result?.choices?.[0]?.message?.content;
+        const choice = result?.choices?.[0];
+        if (current[TRANSLATION_COMPACT_BATCH] === true && choice?.finish_reason === 'length') {
+            const error = Object.assign(new Error('批量翻译返回格式异常'), {
+                kind: 'response', retryable: false, code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID', statusCode: resp.status,
+            });
+            attemptReported = true;
+            reportTranslationModelUsage(message, {
+                ...normalizeOpenAICompatibleUsage(result?.usage, actualModel),
+                startedAt,
+                durationMs: Math.max(0, Date.now() - startedAt),
+                outcome: 'error',
+                statusCode: resp.status,
+            });
+            throw error;
+        }
+        const translatedText = choice?.message?.content;
         if (typeof translatedText !== 'string' || !translatedText.trim()) {
             throw new Error('通义千问返回数据格式异常：缺少文本内容');
         }

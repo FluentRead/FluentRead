@@ -6,27 +6,32 @@
  -->
 <template>
   <SettingsGroup :title="t('sectionTranslation.settings.title')" :description="t('sectionTranslation.settings.description')">
-    <SettingsItem :label="t('sectionTranslation.settings.hotkeyEnabled')" :description="t('sectionTranslation.settings.hotkeyEnabledDescription', {shortcut: hotkeyDisplayName})" :help="t('sectionTranslation.settings.usage')">
-      <el-switch v-model="props.config.sectionTranslationHotkeyEnabled" class="settings-toggle" :aria-label="t('sectionTranslation.settings.hotkeyEnabled')" @change="handleEnabledChange" />
-    </SettingsItem>
-    <SettingsItem :label="t('sectionTranslation.settings.hotkey')" :description="t('sectionTranslation.settings.hotkeyDescription')" :disabled="!props.config.sectionTranslationHotkeyEnabled">
-      <div class="hotkey-config">
-        <el-select :model-value="props.config.sectionTranslationHotkey" data-testid="section-translation-hotkey" :aria-label="t('sectionTranslation.settings.hotkey')" :disabled="!props.config.sectionTranslationHotkeyEnabled" @change="handleHotkeyChange">
-          <el-option v-for="item in SECTION_TRANSLATION_HOTKEY_OPTIONS" :key="item.value" :value="item.value" :label="item.label" data-i18n-ignore />
-          <el-option value="custom" :label="t('sectionTranslation.settings.hotkeyCustom')" />
-        </el-select>
-        <div v-if="props.config.sectionTranslationHotkey === 'custom'" class="section-translation-hotkey-custom">
-          <span v-if="props.config.customSectionTranslationHotkey" class="section-translation-hotkey-text" data-i18n-ignore>{{ hotkeyDisplayName }}</span>
-          <span v-else class="section-translation-hotkey-text section-translation-hotkey-placeholder">{{ t('sectionTranslation.settings.hotkeyCustomEmpty') }}</span>
-          <el-button size="small" text :disabled="!props.config.sectionTranslationHotkeyEnabled" :aria-label="t('sectionTranslation.settings.hotkeyEdit')" :title="t('sectionTranslation.settings.hotkeyEdit')" @click="openCustomHotkeyDialog">
-            <el-icon><Edit /></el-icon>
-          </el-button>
-        </div>
+    <template #heading-extra>
+      <div class="section-translation-heading-actions">
+        <FieldHelp :content="t('sectionTranslation.settings.usage')" :label="t('sectionTranslation.settings.title')" />
+        <el-switch v-model="props.config.sectionTranslationHotkeyEnabled" class="settings-toggle" :aria-label="t('sectionTranslation.settings.hotkeyEnabled')" @change="handleEnabledChange" />
       </div>
-    </SettingsItem>
-    <SectionTranslationRules :config="props.config" :active="props.active" />
-    <QuickTranslationProfiles :active="props.active" :config="props.config" action="section" :profiles="props.config.quickTranslationProfiles"
-      @update:profiles="props.config.quickTranslationProfiles = $event" />
+    </template>
+    <template v-if="props.config.sectionTranslationHotkeyEnabled">
+      <SettingsItem :label="t('sectionTranslation.settings.hotkey')" :description="t('sectionTranslation.settings.hotkeyDescription')">
+        <div class="hotkey-config">
+          <el-select :model-value="props.config.sectionTranslationHotkey" data-testid="section-translation-hotkey" :aria-label="t('sectionTranslation.settings.hotkey')" @change="handleHotkeyChange">
+            <el-option v-for="item in SECTION_TRANSLATION_HOTKEY_OPTIONS" :key="item.value" :value="item.value" :label="item.label" data-i18n-ignore />
+            <el-option value="custom" :label="t('sectionTranslation.settings.hotkeyCustom')" />
+          </el-select>
+          <div v-if="props.config.sectionTranslationHotkey === 'custom'" class="section-translation-hotkey-custom">
+            <span v-if="props.config.customSectionTranslationHotkey" class="section-translation-hotkey-text" data-i18n-ignore>{{ hotkeyDisplayName }}</span>
+            <span v-else class="section-translation-hotkey-text section-translation-hotkey-placeholder">{{ t('sectionTranslation.settings.hotkeyCustomEmpty') }}</span>
+            <el-button size="small" text :aria-label="t('sectionTranslation.settings.hotkeyEdit')" :title="t('sectionTranslation.settings.hotkeyEdit')" @click="openCustomHotkeyDialog">
+              <el-icon><Edit /></el-icon>
+            </el-button>
+          </div>
+        </div>
+      </SettingsItem>
+      <SectionTranslationRules :config="props.config" :active="props.active" />
+      <QuickTranslationProfiles :active="props.active" :config="props.config" action="section" :profiles="props.config.quickTranslationProfiles"
+        @update:profiles="props.config.quickTranslationProfiles = $event" />
+    </template>
   </SettingsGroup>
   <CustomHotkeyInput
     v-model="showCustomHotkeyDialog"
@@ -51,6 +56,7 @@ import {
 import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation';
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
 import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy';
+import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
 import {canonicalizeHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
 import {
     findEnabledQuickTranslationHotkeyConflict,
@@ -61,6 +67,7 @@ import {useUiI18n} from '@/src/ui/i18n';
 import {useHotkeyDraft} from './useHotkeyDraft';
 import SettingsGroup from './components/SettingsGroup.vue';
 import SettingsItem from './components/SettingsItem.vue';
+import FieldHelp from './components/FieldHelp.vue';
 
 const SectionTranslationRules = defineAsyncComponent(() => import('./SectionTranslationRules.vue'));
 const QuickTranslationProfiles = defineAsyncComponent(() => import('./QuickTranslationProfiles.vue'));
@@ -101,7 +108,13 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
                 : '',
             feature: t('paragraphCopy.settings.title'),
         },
-        {hotkey: inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger), feature: translateLegacy('输入框翻译')},
+        {
+            hotkey: props.config.videoSubtitleModeHotkeyEnabled
+                ? resolveVideoSubtitleModeHotkey(props.config.videoSubtitleModeHotkey, props.config.customVideoSubtitleModeHotkey)
+                : '',
+            feature: t('video.modeShortcut.title'),
+        },
+        {hotkey: inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger, props.config.customInputBoxTranslationHotkey), feature: translateLegacy('输入框翻译')},
     ];
 }
 
@@ -154,6 +167,7 @@ function handleCustomHotkeyCancel(): void {
 </script>
 
 <style scoped>
+.section-translation-heading-actions { display: inline-flex; align-items: center; gap: 8px; flex: none; margin-left: auto; }
 .hotkey-config { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .section-translation-hotkey-custom { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border: 1px dashed var(--line, #e7e9f0); border-radius: 8px; }
 .section-translation-hotkey-text { font-size: 12px; color: var(--ink, #172033); }

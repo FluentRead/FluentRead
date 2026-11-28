@@ -1,6 +1,6 @@
 # Video & meeting translation
 
-Read original captions and translations in YouTube, X, Udemy, Disney+, and Google Meet, Teams, or Zoom web meetings. Most platforms need readable captions; X also offers local AI transcription.
+Read original captions and translations in YouTube, X, Bilibili, Udemy, edX, Disney+, and Google Meet, Teams, or Zoom web meetings. Bilibili and X also offer local AI transcription.
 
 <GuideVisual kind="video" en />
 
@@ -10,7 +10,9 @@ Read original captions and translations in YouTube, X, Udemy, Disney+, and Googl
 2. In YouTube or X, click the FluentRead icon near the fullscreen button.
 3. Choose **Bilingual / Translated / Original**. Other supported platforms provide display controls near their captions.
 
-The service follows webpage translation by default; choose a separate one in **Video translation settings**. Selecting **Off** in the player disables video translation and removes its button. Re-enable it from the extension menu or settings.
+The service follows webpage translation by default; choose a separate one in **Video translation settings**. Selecting **Off** in the player hides FluentRead subtitles while keeping its icon so you can re-enable them later.
+
+To switch subtitle modes from the keyboard without clicking the player icon, enable **Subtitle mode shortcut** under **Video translation settings → General** (default `Alt+M` / `Option+M`, with presets and custom shortcut recording) and choose **Bilingual ↔ Original**, **Cycle (Bilingual → Translated → Original)**, or **Cycle all (including Off)**. The shortcut automatically yields while typing in input fields.
 
 Translation depends on the selected service's response. Opening a video or seeking to an untranslated section can cause a delay. Retry a failed translation without repeating transcription: recognized source captions and their timeline remain available.
 
@@ -97,7 +99,9 @@ Enable **Word-by-word highlight** in video appearance settings (off by default) 
 
 ## Sentence learning
 
-Choose **Start sentence learning** in a YouTube/X subtitle menu to read the source sentence, context, and whole-sentence translation. It needs a readable timeline; X AI subtitles must finish first. Long or unpunctuated captions may be labelled as fragments, rather than complete sentences.
+Choose **Start sentence learning** in the subtitle menu on YouTube, X, Bilibili, Udemy, or edX. The browser extension can replay and save sentences once a complete subtitle track is available. Its downloads menu exports original, translated, or bilingual **SRT, WebVTT, and Markdown**. It asks before translating any missing captions. Long or unpunctuated captions may appear as fragments.
+
+On Coursera lecture pages that expose a readable WebVTT track, enable **Bilingual** or **Original only** in the FluentRead player menu. The complete track is then available for replay, saving and download. Coursera manages access to the lecture.
 
 The learning panel splits existing captions into sentences using local rules. Each sentence keeps its source text and original caption timing. Sentences from the same caption can share a playback range, so moving between them keeps your current position.
 

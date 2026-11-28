@@ -5,65 +5,68 @@
  * 模块边界：服务候选与就绪提示遵循共享平台可用性；继承项及内置名称显式本地化，选择框与传送到页面的选项保护用户服务名和模型值；ChatGPT 套餐选择器保留已保存的全局与写作实际模型 slug，不发起账户模型发现；只编辑设置中心持久化的同一份写作配置并恢复被禁用的网站；选项通过写作 UI 公开入口复用，不加载网页卡片，不请求模型也不生成真实正文。
  -->
 <template>
-  <div class="writing-settings">
+  <div id="writing-assistant-settings" class="writing-settings">
     <div ref="modelOptionsHost" data-i18n-ignore />
-    <FeatureEnableCard v-model="config.writing.enabled" title="启用写作助手" :description="t('writing.experience.enableDescription')" />
-    <p v-if="!config.writing.enabled" class="writing-description" role="status">{{ t('writing.experience.disabled') }}</p>
-    <p v-else-if="!config.on" class="writing-description" role="status">{{ t('writing.experience.paused') }}</p>
-    <SettingsGroup v-if="config.writing.disabledDomains.length" :title="t('writing.entry.disabledSites')">
-      <p class="writing-site-help">{{ t('writing.entry.siteHelp') }}</p>
-      <div v-for="domain in config.writing.disabledDomains" :key="domain" class="writing-disabled-site" :data-writing-disabled-site="domain"><span>{{ domain }}</span><button type="button" :aria-label="t('writing.entry.restoreSite', {domain})" @click="config.writing.disabledDomains = config.writing.disabledDomains.filter(item => item !== domain)">{{ t('writing.entry.restore') }}</button></div>
+    <SettingsGroup>
+      <FeatureEnableCard v-model="config.writing.enabled" title="启用写作助手" :description="t('writing.experience.enableDescription')" />
+      <template v-if="config.writing.enabled">
+        <p v-if="!config.on" class="writing-description" role="status">{{ t('writing.experience.paused') }}</p>
+        <p v-if="readiness.issue === 'service'" class="writing-setup-banner" role="status">{{ t('featureServices.needsAi') }} · {{ t('settings.serviceManagedInGeneral') }}</p>
+        <p v-else-if="readiness.issue && readiness.issue !== 'model'" class="writing-setup-banner" role="status">{{ readiness.message }}</p>
+        <SettingsItem label="输出语言">
+          <el-select v-model="config.writing.language" class="writing-default-language" data-i18n-ignore :aria-label="translateLegacy('输出语言')" :wrap-label="false" filterable>
+            <el-option v-for="item in WRITING_LANGUAGES" :key="item.value" data-i18n-ignore :value="item.value" :label="item.value === 'target' ? t('writing.experience.inheritTargetLanguage', {language: targetLanguageLabel}) : getMultilingualTargetLanguageLabel(item.value, item.label, uiLanguage)" />
+          </el-select>
+        </SettingsItem>
+        <SettingsItem :label="t('writing.referenceLanguage')">
+          <el-select v-model="config.writing.referenceLanguage" class="writing-default-language" data-i18n-ignore :aria-label="t('writing.referenceLanguage')" :wrap-label="false" filterable>
+            <el-option value="ui" data-i18n-ignore :label="t('writing.interfaceLanguage')" />
+            <el-option value="off" data-i18n-ignore :label="t('writing.referenceDisabled')" />
+            <el-option v-for="item in WRITING_LANGUAGES.filter(item => item.value !== 'target')" :key="item.value" data-i18n-ignore :value="item.value" :label="getMultilingualTargetLanguageLabel(item.value, item.label, uiLanguage)" />
+          </el-select>
+        </SettingsItem>
+        <details class="writing-advanced" data-testid="writing-model-advanced">
+          <summary>
+            <span>{{ t('settings.writing.advancedTitle') }}</span>
+            <small>{{ config.writing.model || resolvedModel || effectiveServiceLabel }}</small>
+          </summary>
+          <SettingsItem label="模型" :description="`${effectiveServiceLabel} · ${t('settings.serviceManagedInGeneral')}`">
+            <template v-if="readiness.issue === 'model'" #description>
+              <small class="writing-setup-message" role="status">{{ readiness.message }}</small>
+            </template>
+            <el-select v-model="config.writing.model" data-i18n-ignore :append-to="modelOptionsHost" :empty-values="[null, undefined]" filterable allow-create default-first-option :aria-label="translateLegacy('写作模型')" :placeholder="translateLegacy('选择或输入模型')" :disabled="!supported">
+              <el-option value="" data-i18n-ignore :label="resolvedModel ? t('writing.experience.inheritModel', {model: resolvedModel}) : t('writing.experience.inheritModelEmpty')" />
+              <el-option v-for="item in modelOptions" :key="item" data-i18n-ignore :label="item" :value="item" />
+            </el-select>
+          </SettingsItem>
+        </details>
+      </template>
     </SettingsGroup>
-    <SettingsGroup title="写作服务" data-settings-anchor="service" data-settings-anchor-label="写作服务">
-      <SettingsItem label="AI 服务">
-        <template v-if="readiness.issue && readiness.issue !== 'model'" #description><small class="writing-setup-message" role="status">{{ readiness.message }}</small></template>
-        <el-select v-model="config.writing.service" data-i18n-ignore :empty-values="[null, undefined]" :aria-label="translateLegacy('写作服务')" :placeholder="translateLegacy('选择 AI 服务')" @change="config.writing.model = ''" filterable>
-          <el-option value="" data-i18n-ignore :label="t('writing.experience.inheritService', {service: defaultServiceLabel})" />
-          <el-option v-for="item in serviceOptions" :key="item.value" data-i18n-ignore :label="item.label" :value="item.value" :disabled="item.disabled" />
-        </el-select>
-      </SettingsItem>
-      <SettingsItem label="模型">
-        <template v-if="supported || readiness.issue === 'model'" #description>
-          <small v-if="readiness.issue === 'model'" class="writing-setup-message" role="status">{{ readiness.message }}</small>
-          <small v-if="supported" class="writing-model-label"><button type="button" @click="emit('configure-service')">配置服务连接 →</button></small>
-        </template>
-        <el-select v-model="config.writing.model" data-i18n-ignore :append-to="modelOptionsHost" :empty-values="[null, undefined]" filterable allow-create default-first-option :aria-label="translateLegacy('写作模型')" :placeholder="translateLegacy('选择或输入模型')" :disabled="!supported">
-          <el-option value="" data-i18n-ignore :label="resolvedModel ? t('writing.experience.inheritModel', {model: resolvedModel}) : t('writing.experience.inheritModelEmpty')" />
-          <el-option v-for="item in modelOptions" :key="item" data-i18n-ignore :label="item" :value="item" />
-        </el-select>
-      </SettingsItem>
-      <SettingsItem label="输出语言">
-        <el-select v-model="config.writing.language" class="writing-default-language" data-i18n-ignore :aria-label="translateLegacy('输出语言')" :wrap-label="false" filterable>
-          <el-option v-for="item in WRITING_LANGUAGES" :key="item.value" data-i18n-ignore :value="item.value" :label="item.value === 'target' ? t('writing.experience.inheritTargetLanguage', {language: targetLanguageLabel}) : getMultilingualTargetLanguageLabel(item.value, item.label, uiLanguage)" />
-        </el-select>
-      </SettingsItem>
-      <SettingsItem :label="t('writing.referenceLanguage')">
-        <el-select v-model="config.writing.referenceLanguage" class="writing-default-language" data-i18n-ignore :aria-label="t('writing.referenceLanguage')" :wrap-label="false" filterable>
-          <el-option value="ui" data-i18n-ignore :label="t('writing.interfaceLanguage')" />
-          <el-option value="off" data-i18n-ignore :label="t('writing.referenceDisabled')" />
-          <el-option v-for="item in WRITING_LANGUAGES.filter(item => item.value !== 'target')" :key="item.value" data-i18n-ignore :value="item.value" :label="getMultilingualTargetLanguageLabel(item.value, item.label, uiLanguage)" />
-        </el-select>
-      </SettingsItem>
-    </SettingsGroup>
-    <SettingsGroup title="回答风格" data-settings-anchor="style" data-settings-anchor-label="回答风格">
-      <div class="writing-default-style">
-        <WritingStylePreview
-          :length="config.writing.length" :style="config.writing.style"
-          :tone="toneChoice === 'custom' ? customTone || 'custom' : config.writing.tone" :role="roleChoice === 'custom' ? customRole || 'custom' : config.writing.role"
-          :reference-label="referencePreviewLabel" :animated="config.animations"
-        />
-        <div class="writing-style-controls">
-        <section><h3>长度</h3><WritingChoices v-model="config.writing.length" :options="WRITING_LENGTHS" label="长度" /></section>
-        <section><h3>风格</h3><WritingChoices v-model="config.writing.style" :options="WRITING_STYLES" label="风格" /></section>
-        <section><h3>语气</h3><WritingChoices v-model="toneChoice" :options="toneOptions" label="语气" />
-          <div v-if="toneChoice === 'custom'" class="writing-custom-preference"><el-input :model-value="customTone" :maxlength="WRITING_TONE_MAX_LENGTH" aria-label="自定义语气" placeholder="例如：耐心、鼓励，避免夸张" @update:model-value="updateCustomTone" /><small>留空时使用自然语气</small></div>
-        </section>
-        <section><h3 :title="t('writing.experience.roleHelp')">您的角色</h3><WritingChoices v-model="roleChoice" :options="roleOptions" label="您的角色" />
-          <div v-if="roleChoice === 'custom'" class="writing-custom-preference"><el-input :model-value="customRole" :maxlength="WRITING_ROLE_MAX_LENGTH" aria-label="自定义角色" placeholder="例如：正在排查问题的项目维护者" @update:model-value="updateCustomRole" /><small>留空时不指定回复身份</small></div>
-        </section>
+    <template v-if="config.writing.enabled">
+      <SettingsGroup v-if="config.writing.disabledDomains.length" :title="t('writing.entry.disabledSites')">
+        <p class="writing-site-help">{{ t('writing.entry.siteHelp') }}</p>
+        <div v-for="domain in config.writing.disabledDomains" :key="domain" class="writing-disabled-site" :data-writing-disabled-site="domain"><span>{{ domain }}</span><button type="button" :aria-label="t('writing.entry.restoreSite', {domain})" @click="config.writing.disabledDomains = config.writing.disabledDomains.filter(item => item !== domain)">{{ t('writing.entry.restore') }}</button></div>
+      </SettingsGroup>
+      <SettingsGroup title="回答风格" data-settings-anchor="style" data-settings-anchor-label="回答风格">
+        <div class="writing-default-style">
+          <WritingStylePreview
+            :length="config.writing.length" :style="config.writing.style"
+            :tone="toneChoice === 'custom' ? customTone || 'custom' : config.writing.tone" :role="roleChoice === 'custom' ? customRole || 'custom' : config.writing.role"
+            :reference-label="referencePreviewLabel" :animated="config.animations"
+          />
+          <div class="writing-style-controls">
+          <section><h3>长度</h3><WritingChoices v-model="config.writing.length" :options="WRITING_LENGTHS" label="长度" /></section>
+          <section><h3>风格</h3><WritingChoices v-model="config.writing.style" :options="WRITING_STYLES" label="风格" /></section>
+          <section><h3>语气</h3><WritingChoices v-model="toneChoice" :options="toneOptions" label="语气" />
+            <div v-if="toneChoice === 'custom'" class="writing-custom-preference"><el-input :model-value="customTone" :maxlength="WRITING_TONE_MAX_LENGTH" aria-label="自定义语气" placeholder="例如：耐心、鼓励，避免夸张" @update:model-value="updateCustomTone" /><small>留空时使用自然语气</small></div>
+          </section>
+          <section><h3 :title="t('writing.experience.roleHelp')">您的角色</h3><WritingChoices v-model="roleChoice" :options="roleOptions" label="您的角色" />
+            <div v-if="roleChoice === 'custom'" class="writing-custom-preference"><el-input :model-value="customRole" :maxlength="WRITING_ROLE_MAX_LENGTH" aria-label="自定义角色" placeholder="例如：正在排查问题的项目维护者" @update:model-value="updateCustomRole" /><small>留空时不指定回复身份</small></div>
+          </section>
+          </div>
         </div>
-      </div>
-    </SettingsGroup>
+      </SettingsGroup>
+    </template>
   </div>
 </template>
 <script setup lang="ts">
@@ -86,7 +89,6 @@ const {t, translateLegacy, language: uiLanguage} = useUiI18n();
 // allow-create 的候选由控件内部生成；专属容器保护整个传送菜单中的模型原值。
 const modelOptionsHost = ref<HTMLElement>();
 const props = defineProps<{config: Config}>(); const config = toRef(props, 'config');
-const emit = defineEmits<{'configure-service': []}>();
 const targetLanguageLabel = computed(() => {const item = WRITING_LANGUAGES.find(item => item.value === resolveWritingLanguage('target', config.value.to))!; return getMultilingualTargetLanguageLabel(item.value, item.label, uiLanguage.value);});
 const toneOptions = [...WRITING_TONES, {value: 'custom', label: '自定义'}];
 const roleOptions = [...WRITING_ROLES, {value: 'custom', label: '自定义'}];
@@ -119,7 +121,7 @@ const serviceUnavailableMessage = computed(() => config.value.disabledTranslatio
   ? t('settings.services.library.serviceDisabledMessage') : getTranslationServiceUnavailableMessage(service.value));
 const readiness = computed(() => resolveWritingReadiness(config.value, true, serviceUnavailableMessage.value));
 const supported = computed(() => readiness.value.supported);
-const defaultServiceLabel = computed(() => {const builtin = options.services.find(item => item.value === config.value.service); return builtin ? translateLegacy(builtin.label) : serviceOptions.value.find(item => item.value === config.value.service)?.label || config.value.service;});
+const effectiveServiceLabel = computed(() => {const builtin = options.services.find(item => item.value === service.value); return builtin ? translateLegacy(builtin.label) : serviceOptions.value.find(item => item.value === service.value)?.label || service.value;});
 const resolvedModel = computed(() => resolveConfiguredModel(config.value.model[service.value], config.value.customModel[service.value]));
 const modelOptions = computed(() => service.value === services.chatgptPlan
   ? [...new Set([resolvedModel.value, config.value.writing.model].filter(Boolean))]
@@ -134,7 +136,12 @@ const referencePreviewLabel = computed(() => {
 <style scoped>
 .writing-settings{max-width:1080px;margin:0 auto}
 .writing-settings>.feature-enable-card{margin:0 0 24px}
-.writing-description{margin:-12px 0 24px;color:var(--muted);font-size:12px;line-height:1.7}
+.writing-description{margin:0;padding:12px 20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.6}
+.writing-setup-banner{margin:0;padding:10px 20px;border-top:1px solid var(--line);color:var(--fr-warning);font-size:12px;line-height:1.55}
+.writing-advanced{border-top:1px solid var(--line)}
+.writing-advanced>summary{display:flex;align-items:center;justify-content:flex-start;gap:8px;padding:var(--fr-settings-row-padding-block,14px) var(--fr-card-padding-inline,20px)!important;border:0!important;border-radius:0!important;font-size:13px;font-weight:550}
+.writing-advanced>summary small{margin-left:auto;color:var(--muted);font-size:12px;font-weight:450}
+.writing-advanced[open]>summary{margin-bottom:0!important;border-bottom:1px solid var(--line)!important}
 .writing-site-help{margin:0;padding:12px 18px 0;color:var(--muted);font-size:12px}.writing-disabled-site{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;font-size:13px}.writing-disabled-site button{border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--brand);padding:6px 10px;font:inherit;cursor:pointer}.writing-disabled-site button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .writing-settings small.writing-setup-message{color:var(--fr-warning)}
 .writing-model-label button{border:0;padding:0;background:none;color:var(--brand-strong);font:inherit;font-weight:600;cursor:pointer}

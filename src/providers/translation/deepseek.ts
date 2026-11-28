@@ -19,12 +19,12 @@ import {createHttpStatusError, createImageInputHttpError, readJsonResponse} from
 import {abortErrorFromSignal, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
 import {
     requireTranslationProviderConfig,
+    observeTranslationHttpResponse,
     getTranslationImageInput,
     reportTranslationModelUsage,
     reportTranslationModelUsageFailure,
 } from '@/src/services/translation/requestSnapshot';
-import type {TranslationProviderRequest} from '@/src/services/translation/types';
-import type {TranslationProviderConfigSnapshot} from '@/src/services/translation/types';
+import {TRANSLATION_COMPACT_BATCH, type TranslationProviderRequest, type TranslationProviderConfigSnapshot} from '@/src/services/translation/types';
 import {normalizeDeepSeekResponsesUsage, normalizeOpenAICompatibleUsage} from './usage';
 import {buildOpenAIApiEndpoint, readResponsesApiText} from './responses-api';
 
@@ -84,6 +84,7 @@ async function deepseek(message: TranslationProviderRequest<string>) {
             body,
             signal: message.abortSignal,
         });
+        observeTranslationHttpResponse(message, resp);
         if (!resp.ok) {
             reportTranslationModelUsageFailure(message, undefined, startedAt, configuredModel, resp.status);
             attemptReported = true;
@@ -125,9 +126,24 @@ async function deepseek(message: TranslationProviderRequest<string>) {
             throw error;
         }
 
+        const compactBatch = current[TRANSLATION_COMPACT_BATCH] === true;
+        if (!isResponses && compactBatch && result?.choices?.[0]?.finish_reason === 'length') {
+            const error = Object.assign(new Error('批量翻译返回格式异常'), {
+                kind: 'response', retryable: false, code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID', statusCode: resp.status,
+            });
+            attemptReported = true;
+            reportTranslationModelUsage(message, {
+                ...normalizeOpenAICompatibleUsage(result?.usage, actualModel),
+                startedAt,
+                durationMs: Math.max(0, Date.now() - startedAt),
+                outcome: 'error',
+                statusCode: resp.status,
+            });
+            throw error;
+        }
         const translatedText = isResponses
-            ? extractResponsesContent(result)
-            : extractChatContent(result);
+            ? extractResponsesContent(result, compactBatch)
+            : extractChatContent(result, compactBatch);
         reportTranslationModelUsage(message, {
             ...(isResponses
                 ? normalizeDeepSeekResponsesUsage(result?.usage, actualModel)
@@ -147,13 +163,14 @@ async function deepseek(message: TranslationProviderRequest<string>) {
     }
 }
 
-function extractChatContent(result: any): string {
+function extractChatContent(result: any, compactBatch = false): string {
     const content = result?.choices?.[0]?.message?.content;
 
     if (typeof content !== 'string') {
         throw new Error('DeepSeek 返回数据格式异常：缺少 choices[0].message.content');
     }
 
+    if (compactBatch) return content;
     // 页面只渲染最终的 message.content；reasoning_content 等 DeepSeek 思考字段会被
     // 主动忽略，绝不能进入页面。
     const text = contentPostHandler(content);
@@ -161,8 +178,9 @@ function extractChatContent(result: any): string {
     return text;
 }
 
-function extractResponsesContent(result: any): string {
+function extractResponsesContent(result: any, compactBatch = false): string {
     const text = readResponsesApiText(result);
+    if (compactBatch) return text;
 
     const translated = contentPostHandler(text);
     if (!translated) {

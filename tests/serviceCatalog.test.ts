@@ -51,6 +51,9 @@ describe('service catalog helpers', () => {
       expect(url.protocol).toBe('https:')
       expect(`${url.username}${url.password}${url.search}${url.hash}`).toBe('')
     }
+    expect(getServiceWebsite(services.huanYuan)).toEqual({
+      url: 'https://console.cloud.tencent.com/tokenhub/', kind: 'website',
+    })
     expect(getServiceWebsite(services.huanYuanTranslation)).toEqual({
       url: 'https://console.cloud.tencent.com/hunyuan', kind: 'website',
     })

@@ -16,7 +16,7 @@ for (let i=0;i<args.length;i++) {
 }
 if(!options.background)throw Error('Use --background for an isolated visible secondary-display browser');
 const sites=(options.sites||'').split(',');
-if(!sites.length||sites.some(site=>!['bilibili','udemy','edx'].includes(site)))throw Error('Specify --sites bilibili,udemy,edx or a non-empty subset');
+if(!sites.length||sites.some(site=>!['bilibili','udemy','edx','coursera'].includes(site)))throw Error('Specify --sites bilibili,udemy,edx,coursera or a non-empty subset');
 const root=path.resolve(__dirname,'../..');
 const extension=path.resolve(options['extension-dir']||path.join(root,'.output/chrome-mv3'));
 const artifacts=path.resolve(options['artifacts-dir']||path.join(os.tmpdir(),'fluentread-course-layout-results'));
@@ -24,9 +24,9 @@ const {chromium}=require(path.join(options['playwright-root']||process.env.PLAYW
 const skill=path.join(os.homedir(),'.codex/skills/fluentread-browser-translation-test/scripts');
 const helper=require(path.join(skill,'focus-safe-browser.cjs'));
 const {createRuntimeDiagnostics}=require(path.join(skill,'runtime-diagnostics.cjs'));
-const urls={bilibili:'https://www.bilibili.com/video/BV1xx411c7mD/',udemy:'https://www.udemy.com/course/python/learn/lecture/123/',edx:'https://courses.edx.org/courseware/layout-test'};
-const captionSelectors={bilibili:'.bpx-player-ctrl-subtitle-result',udemy:'[data-purpose="captions-dropdown-button"] svg',edx:'.toggle-captions svg'};
-const report={kind:'local-native-layout-reproduction',sites,mocked:{page:true,subtitles:true,translation:true},results:[],limitations:['Bilibili dimensions were measured on the live site on 2026-11-14; Udemy and edX are representative layouts, not live-course acceptance.']};
+const urls={bilibili:'https://www.bilibili.com/video/BV1xx411c7mD/',udemy:'https://www.udemy.com/course/python/learn/lecture/123/',edx:'https://courses.edx.org/courseware/layout-test',coursera:'https://www.coursera.org/learn/python/lecture/Ab12/classes'};
+const captionSelectors={bilibili:'.bpx-player-ctrl-subtitle-result',udemy:'[data-purpose="captions-dropdown-button"] svg',edx:'.toggle-captions svg',coursera:'.vjs-subs-caps-button svg'};
+const report={kind:'local-native-layout-reproduction',sites,mocked:{page:true,subtitles:true,translation:true},results:[],limitations:['Bilibili dimensions were measured on the live site on 2026-11-14. Udemy, edX and Coursera use representative layouts; live-course acceptance is separate.']};
 const diagnostics=createRuntimeDiagnostics();
 let session,profile,page;
 
@@ -52,20 +52,23 @@ async function main(){
         await control.goto(`chrome-extension://${extensionId}/options.html`,{waitUntil:'domcontentloaded'});
         const result=await control.evaluate(async()=>{
             const stored=await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'});const config=typeof stored.value==='string'?JSON.parse(stored.value):stored.value;
-            return chrome.runtime.sendMessage({type:'persistConfig',clientId:'course-layout-test',sequence:1,baseRevision:config.__fluentConfigRevision,config:{...config,on:true,uiLanguageSetupCompleted:true,uiLanguage:'zh-CN',from:'en',to:'zh-Hans',service:'microsoft',videoService:'microsoft',videoTranslationEnabled:true,videoSubtitleVisible:true,videoSubtitleDisplayMode:'original-only',videoCourseAutoStart:{bilibili:true,udemy:true,edx:true}}});
+            return chrome.runtime.sendMessage({type:'persistConfig',clientId:'course-layout-test',sequence:1,baseRevision:config.__fluentConfigRevision,config:{...config,on:true,uiLanguageSetupCompleted:true,uiLanguage:'zh-CN',from:'en',to:'zh-Hans',service:'microsoft',videoService:'microsoft',videoTranslationEnabled:true,videoSubtitleVisible:true,videoSubtitleDisplayMode:'original-only',videoCourseAutoStart:{bilibili:true,udemy:true,edx:true},vocabularyBookEnabled:true}});
         });assert.equal(result.success,true,JSON.stringify(result));
         let platform;
         await context.route('**/*',async route=>{
             const req=route.request(),url=new URL(req.url());
             if(url.protocol==='chrome-extension:')return route.continue();
             const headers={'access-control-allow-origin':req.headers().origin||'*','access-control-allow-credentials':'true'};
+            if(url.hostname==='course-frame.example.test'&&req.isNavigationRequest()){
+                return route.fulfill({contentType:'text/html; charset=utf-8',body:`<iframe title="edX course" src="${urls.edx}" width="1190" height="860"></iframe>`});
+            }
             if(req.isNavigationRequest())return route.fulfill({contentType:'text/html; charset=utf-8',body:coursePlayerFixture(platform,mediaUrl)});
             let body;
-            if(url.hostname==='api.bilibili.com')body={data:{cid:456,subtitle:{subtitles:[{lan:'en',subtitle_url:'https://aisubtitle.hdslb.com/layout.json'}]}}};
+            if(url.hostname==='api.bilibili.com')body={code:0,data:{cid:456,subtitle:{subtitles:[{lan:'en',subtitle_url:'https://aisubtitle.hdslb.com/layout.json'}]}}};
             else if(url.hostname==='aisubtitle.hdslb.com')body={body:[{from:0,to:20,content:source}]};
             else if(url.pathname.startsWith('/api-2.0/courses/'))body={id:77,locale:{locale:'en_US'}};
             else if(url.pathname.startsWith('/api-2.0/users/'))body={asset:{captions:[{locale_id:'en_US',source:'manual',status:1,url:'https://captions.udemycdn.com/layout.vtt'}]}};
-            else if(url.hostname==='captions.udemycdn.com')return route.fulfill({contentType:'text/vtt',headers,body:`WEBVTT\n\n00:00.000 --> 00:20.000\n${source}\n`});
+            else if(url.hostname==='captions.udemycdn.com'||(url.hostname==='www.coursera.org'&&url.pathname==='/subtitles/layout.vtt'))return route.fulfill({contentType:'text/vtt',headers,body:`WEBVTT\n\n00:00.000 --> 00:20.000\n${source}\n`});
             else if(url.pathname.startsWith('/transcript/'))body={start:[0],end:[20000],text:[source]};
             else return route.fulfill({status:204,headers});
             return route.fulfill({contentType:'application/json',headers,body:JSON.stringify(body)});
@@ -104,6 +107,36 @@ async function main(){
             report.results.push({platform,state,centerDeltaCssPx:delta,icon:a,nativeButton:b,menu:bounds,viewport,fullscreen:await page.evaluate(()=>!!document.fullscreenElement),passed:true});
             console.log(`${platform} ${state}: aligned (${delta.toFixed(2)}px), menu fits`);
         };
+        const checkCourseActions = async () => {
+            diagnostics.setPhase(platform + '-study-export');
+            await button().click();
+            const downloadToggle = menu().locator('[data-action="toggle-subtitle-downloads"]');
+            await downloadToggle.click();
+            await menu().locator('[data-subtitle-format]').selectOption('vtt');
+            await menu().locator('[data-action="download-bilingual-subtitles"]').click();
+            const exportChoice = menu().locator('[data-export-choice="complete"]');
+            await exportChoice.waitFor({state:'visible'});
+            const [download] = await Promise.all([page.waitForEvent('download'), exportChoice.click()]);
+            const file = path.join(artifacts, platform + '-bilingual.vtt');
+            await download.saveAs(file);
+            const text = fs.readFileSync(file, 'utf8');
+            assert.ok(text.startsWith('WEBVTT') && text.includes(source) && text.includes('类是创建对象的蓝图。'));
+            assert.ok(text.includes('00:00:00.000 --> 00:00:20.000'));
+
+            await menu().locator('[data-action="open-sentence-learning"]').click();
+            const panel = page.locator('#fluent-read-video-learning-panel .fr-video-learning');
+            await panel.waitFor({state:'visible'});
+            assert.equal((await panel.locator('[data-learning-original]').textContent()).trim(), source);
+            await panel.locator('[data-learning-action="play"]').click();
+            await page.waitForFunction(() => !document.querySelector('.player video').paused);
+            await page.locator('.player video').evaluate(video => {video.pause();});
+            await panel.locator('[data-learning-action="save"]').click();
+            await panel.locator('[data-learning-action="save"][data-learning-saved="true"]').waitFor();
+            await page.screenshot({path:path.join(artifacts, platform + '-course-learning.png')});
+            await panel.locator('[data-learning-action="close"]').click();
+            await panel.waitFor({state:'detached'});
+            report.results.push({platform,state:'sentence-study-and-bilingual-vtt',passed:true});
+        };
         for(platform of sites){
             diagnostics.setPhase(platform+'-navigation');await page.goto(urls[platform],{waitUntil:'domcontentloaded'});await helper.activateExtensionTabWithoutForeground(context,page);
             await host().waitFor({state:'visible'});await page.locator('video').waitFor({state:'visible'});
@@ -112,6 +145,28 @@ async function main(){
             await page.locator('[data-fixture-web]').click();await page.locator('[data-fixture-full]').click();await page.waitForFunction(()=>!!document.fullscreenElement);await check('native-fullscreen');
             await page.evaluate(()=>document.exitFullscreen());await page.waitForFunction(()=>!document.fullscreenElement);await check('restored');
             await page.setViewportSize({width:390,height:844});await check('narrow');await page.setViewportSize({width:1280,height:900});
+            await checkCourseActions();
+        }
+        if(sites.includes('edx')){
+            platform='edx';
+            diagnostics.setPhase('edx-embedded-learning-styles');
+            await page.goto('https://course-frame.example.test/edx', {waitUntil:'domcontentloaded'});
+            const frame=page.frameLocator('iframe[title="edX course"]');
+            const frameHost=frame.locator('#fluent-read-course-controls');
+            await frameHost.locator('button[aria-haspopup]').click();
+            await frameHost.locator('[data-action="open-sentence-learning"]').click();
+            const panel=frame.locator('#fluent-read-video-learning-panel .fr-video-learning');
+            await panel.waitFor({state:'visible'});
+            assert.equal((await panel.locator('[data-learning-original]').textContent()).trim(),source);
+            const sheet=frame.locator('link[rel="stylesheet"][href$="/content-scripts/supportedFrame.css"]');
+            await sheet.waitFor({state:'attached'});
+            await sheet.evaluate(link=>link.sheet?true:new Promise((resolve,reject)=>{
+                link.addEventListener('load',()=>resolve(true),{once:true});
+                link.addEventListener('error',()=>reject(new Error('edX learning stylesheet failed to load')),{once:true});
+                setTimeout(()=>reject(new Error('edX learning stylesheet did not load')),5000);
+            }));
+            await page.locator('iframe[title="edX course"]').screenshot({path:path.join(artifacts,'edx-embedded-learning.png')});
+            report.results.push({platform,state:'embedded-reading-stylesheet',passed:true});
         }
         diagnostics.setPhase('teardown');await page.goto('about:blank');await control.reload();await diagnostics.flush();diagnostics.assertClean();report.passed=true;
     }catch(error){report.passed=false;report.failure=error.stack;if(page&&!page.isClosed())await page.screenshot({path:path.join(artifacts,'failure.png')});throw error;}

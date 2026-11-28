@@ -142,7 +142,7 @@ function createScopeSnapshot(plan, cwd, artifactsDir) {
     };
     if (!plan.steps.some((step) => step.id === 'strict-coverage')) return snapshot;
     snapshot.status = 'complete';
-    const configPath = path.join(cwd, 'vitest.coverage.config.ts');
+    const configPath = path.join(cwd, 'tests/config/vitest.coverage.config.ts');
     const matrixPath = path.join(cwd, 'tests', 'test-matrix.json');
     try {
         snapshot.expectedCoverageFiles = expectedCoverageFiles(cwd, configPath);
@@ -371,7 +371,7 @@ function validateMetric(metric) {
 
 function collectCoverage(data, file, cwd, expectedFiles, issues) {
     const result = {
-        status: 'complete', path: file, scopePath: path.join(cwd, 'vitest.coverage.config.ts'),
+        status: 'complete', path: file, scopePath: path.join(cwd, 'tests/config/vitest.coverage.config.ts'),
         expectedFiles: [], reportedFiles: [], missingFiles: [], unexpectedFiles: [], metrics: {}, failures: [],
     };
     if (expectedFiles?.length) result.expectedFiles = [...expectedFiles];

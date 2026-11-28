@@ -103,7 +103,7 @@ describe('Obsidian Markdown document flow', () => {
     });
 
     it('extracts text from a real two-page PDF without changing the fixture', async () => {
-        const bytes = readFileSync(new URL('../examples/document-translation/sample.pdf', import.meta.url));
+        const bytes = readFileSync(new URL('./fixtures/document-translation/sample.pdf', import.meta.url));
         const before = Buffer.from(bytes);
         const buffer = new ArrayBuffer(bytes.byteLength);
         new Uint8Array(buffer).set(bytes);

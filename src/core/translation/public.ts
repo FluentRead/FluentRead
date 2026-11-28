@@ -69,11 +69,13 @@ export {
     getCurrentTranslationCore,
     createCurrentTranslationResolverBatch,
     setCurrentTranslationAdapters,
+    setCurrentTranslationExcludedSelectors,
     setCurrentTranslationSidebarRegions,
     resolveTranslationCandidateAtPoint,
 } from './current';
 export type * from './types';
 export {findDocumentLiteralTerms} from './documentLiterals';
 export {protectDocumentMathText} from './documentMathProtection';
+export {normalizeParagraphTranslationSource, unwrapSoftLineBreaks, unwrapWrappedParagraphs} from './wrappedParagraphs';
 export {DocumentInlineMarkerError, DocumentInlineTextError, documentInlineMarkerRanges, normalizeDocumentInlineMarkers, validateDocumentInlineMarkers} from './documentInlineMarkers';
 export type {DocumentInlineValidationContext} from './documentInlineMarkers';

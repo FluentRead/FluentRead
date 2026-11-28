@@ -23,6 +23,7 @@ export function userscriptMessages<T extends Record<string, string>>(messages: T
         && !key.startsWith('contextMenu.notice.') && !key.startsWith('video.learning.') && !key.startsWith('video.learningAppearance.')
         && !key.startsWith('video.readingAnnotation.')
         && !key.startsWith('video.appearance.') && !key.startsWith('video.export') && !key.startsWith('video.ai') && !key.startsWith('video.model')
+        && (!key.startsWith('video.modeShortcut.') || key === 'video.modeShortcut.title')
         && key !== 'video.nativeFullscreenHint'
         && !key.startsWith('diagnostics.')
         && !['waitingTranslation', 'crossPageContext', 'fullPassage', 'closePassage'].some(name => key === `document.pdfReading.${name}`)
@@ -42,7 +43,26 @@ export const zhCNMessages = userscriptMessages(extensionChinese);
 
 const materialSources = new Set(Object.keys(learningMaterialLegacyText['en-US']));
 const materialPatternSources = new Set(learningMaterialPatterns.map(({pattern}) => pattern));
-const nativeOnlyLegacySources = new Set(['移动端 / X 自动贴底', '未绘制译文', '查看全文', '复制全文']);
+const nativeOnlyLegacySources = new Set([
+    '移动端 / X 自动贴底', '未绘制译文', '查看全文', '复制全文',
+    // 图片语言包与漫画首次下载提示由扩展提供。
+    '识别阿拉伯语图片文字', '识别希伯来语图片文字',
+    '需要准备阿拉伯语和英语识别资源，约 4.6 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+    '需要准备希伯来语和英语识别资源，约 3.5 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+    // 独立文档工作台专用的旧文案。共享的翻译、校订和下载操作仍由脚本词典提供。
+    '文档换一种语言，阅读依然流畅',
+    '论文、电子书、工作资料与字幕，从打开文件到双语阅读。',
+    '文件在本地解析，待译文字会发送给你选择的翻译服务。扫描版 PDF 暂不支持文字识别。',
+    '设置已更改。现有译文仍保留，按新设置翻译会从头开始。',
+    '文件在本地解析，文字发送至所选服务。',
+    '按页面连续阅读，可切换原文与译文',
+    'PDF 译页以图像呈现，适合保留版面阅读，暂不支持复制译文。',
+    '已完成的片段可在「校订译文」中查看，可随时暂停。',
+    '已完成的译文已保留，继续时只翻译剩余内容。',
+    '译文仅保留在本页，请下载后再离开。',
+    '当前翻译和校订结果只保留在本页，离开后无法恢复。建议先下载需要的结果。',
+    '重新翻译会替换现有译文和人工校订。你也可以返回并先下载当前结果。',
+]);
 
 // Userscript does not mount settings-video or its native ASR runtime. Keep config-diff
 // field names AND provider values; only unreachable video UI/transport feedback is omitted.
@@ -50,6 +70,7 @@ const extensionOnlyNativeAsrText = new Set([
     "识别方式",
     "本机服务地址",
     "固定模型：Qwen/Qwen3-ASR-1.7B。使用标准 vLLM 音频转写接口，仅允许 127.0.0.1 或 [::1]，服务需由你事先启动。",
+    "使用本机已启动的 vLLM 接口（仅限 127.0.0.1 / [::1]，模型固定为 Qwen/Qwen3-ASR-1.7B）；开始识别时才发送音频，不自动回退 Whisper。",
     "保存设置不会探测端口、启动服务或下载权重。开始 AI 字幕后才发送音频到所填本机地址；失败会报错，不自动切回 Whisper。",
     "该接口返回文本，字幕时间按音频窗口估计，并非字级对齐；此处不代表模型已经加载或已使用 GPU。",
     "请在设置中切换识别方式",

@@ -60,6 +60,13 @@
   },
   "rules": [
     {
+      "id": "inco-blog",
+      "category": "ai",
+      "verification": "site-fixture",
+      "fixture": "tests/siteAdaptationCore.test.ts",
+      "liveVerification": "tests/browser-translation-cases.json#inco-blog-splash"
+    },
+    {
       "id": "llamaperf-mac",
       "category": "community",
       "verification": "site-fixture",
@@ -1363,6 +1370,13 @@
       ],
       "notes": "公开 posts 原生作者组件与 dialog label 的独立夹具；标准浏览器契约保留完整帖文/已加载评论和元数据边界，未执行的契约不代表实站通过。登录信息流、移动版及无限新增回复待验证。",
       "liveVerification": "pending-native-public-post-contract"
+    },
+    {
+      "id": "paulgraham-essays",
+      "category": "community",
+      "verification": "site-fixture",
+      "fixture": "tests/siteAdaptationCatalog.test.ts",
+      "liveVerification": "not-performed"
     }
   ],
   "remainingCapabilities": [

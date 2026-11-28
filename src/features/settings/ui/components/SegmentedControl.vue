@@ -105,37 +105,39 @@ function handleKeydown(event: KeyboardEvent, currentIndex: number) {
   width: 100%;
   padding: 3px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--fr-radius-md, 10px);
   background: var(--surface-soft);
 }
 
 .segmented-control button {
   min-width: 0;
-  min-height: 36px;
-  padding: 7px 10px;
+  min-height: 34px;
+  padding: 6px 10px;
   overflow: visible;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--fr-radius-xs, 6px);
   color: var(--muted);
   background: transparent;
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--fr-text-sm, 12px);
+  font-weight: 500;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
   line-height: 1.4;
-  transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  transition: color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), box-shadow var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease);
 }
 
-.segmented-control.compact { padding: 3px; border-radius: 10px; }
-.segmented-control.compact button { min-height: 30px; padding: 4px 12px; border-radius: 7px; font-size: 12px; font-weight: 600; }
+.segmented-control.compact { padding: 3px; border-radius: var(--fr-control-radius, 8px); }
+.segmented-control.compact button { min-height: 30px; padding: 4px 12px; border-radius: var(--fr-radius-xs, 6px); font-size: var(--fr-text-sm, 12px); font-weight: 500; }
 
 .segmented-control button:hover:not(:disabled) { color: var(--ink); }
 .segmented-control button.active {
   color: var(--brand-strong);
   background: var(--surface);
-  box-shadow: 0 2px 7px rgba(31, 40, 61, .09);
+  font-weight: 600;
+  box-shadow: var(--fr-shadow-xs, 0 1px 2px rgba(22, 27, 38, .06));
 }
 .segmented-control button:disabled { cursor: not-allowed; opacity: .55; }
-.segmented-control button:focus-visible { outline: 2px solid rgba(239, 71, 118, .28); outline-offset: 1px; }
+.segmented-control button:focus-visible { outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand-strong)); outline-offset: 1px; }
 </style>

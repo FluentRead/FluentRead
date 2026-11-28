@@ -2,7 +2,7 @@
  * @file src/features/image-translation/background/offscreenAdapter.ts
  * 通过既有消息透传本地后端偏好和不含原文的会话诊断，不建立额外通信通道。
  * 文件职责：把跨域图片读取、图片识别、整图翻译和 OCR 语言包下载请求适配为平台 Offscreen 消息，并校验隔离文档返回的结构后交还后台 handlers。
- * 主要内容：回查原页面当前图片任务的短期授权；透传单图本地识别方式，校验模型状态并兼容旧响应中缺省的可选文字分割状态；包含 OffscreenResponse 解析、data:image 与 lines 数组验证、译图 image/lines 和普通图片保留原图状态（含合法空识别）及仅属于未绘制译文的私有缺资源重试标记结果收窄，以及 createImageTranslationOffscreenAdapter 和默认 extensionDomClient 实例。
+ * 主要内容：回查原页面当前图片任务的短期授权；透传单图本地识别方式，校验模型状态并兼容旧响应中缺省的可选文字分割状态；校验 OffscreenResponse、译图、阅读译文、原图保留状态和可选分割就绪后的重试标记，并提供 createImageTranslationOffscreenAdapter 和默认 extensionDomClient 实例。
  * 模块边界：可选漫画可见范围原样透传，不在中间层授予额外绘制范围；适配器不创建 Offscreen document、不执行 OCR/绘制，也不读取配置；文档生命周期属于 platform/offscreen，实际运算在 services/offscreenRuntime 与 ocrRuntime 中完成。
  */
 import {createImageTranslationFailure} from '../failure';
@@ -21,6 +21,7 @@ import {
 } from '@/src/platform/offscreen/client';
 
 import {parseMangaPatchPacket} from '../mangaPatchResult';
+import {canRetryImageAfterSegmentationImport} from '../resultReadiness';
 
 interface OffscreenResponse {
     readonly mangaPatches?: unknown;
@@ -65,8 +66,7 @@ function parseTranslationResult(
     manga = false,
 ): OffscreenImageTranslationResult {
     const unchanged = response?.imageUnchanged === true && !manga && response.image === '' && response.mangaPatches === undefined;
-    const retry = response?.retryWhenSegmentationReady === true && unchanged && Array.isArray(response.lines)
-        && response.lines.some(line => line && typeof line === 'object' && line.renderSkipped === true);
+    const retry = canRetryImageAfterSegmentationImport(response, unchanged, manga);
     if (!response?.success || (response.imageUnchanged !== undefined && !unchanged)
         || (response.retryWhenSegmentationReady !== undefined && !retry)
         || (typeof response.image !== 'string' && response.mangaPatches === undefined) || !Array.isArray(response.lines)

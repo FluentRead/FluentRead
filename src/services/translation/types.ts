@@ -17,6 +17,9 @@ import type {TranslationRequestScheduler, TranslationRequestIdentity, Translatio
 /** 内部 symbol 无法由 content runtime 消息伪造，也不会进入网络 JSON。 */
 export const TRANSLATION_PROVIDER_CONFIG = Symbol('fluentread.translation-provider-config');
 
+/** 仅在后台完成逐项保护后，为本次 provider 请求选择默认 JSON 模板。 */
+export const TRANSLATION_COMPACT_BATCH = Symbol('fluentread.translation-compact-batch');
+
 export const TRANSLATION_REMAINING_BUDGET = Symbol('fluentread.translation-remaining-budget');
 
 export const TRANSLATION_REQUEST_STARTED_AT = Symbol('fluentread.translation-request-started-at');
@@ -78,6 +81,7 @@ export type TranslationProviderRequestContext = {
     readonly [TRANSLATION_REQUEST_SCHEDULER]?: {
         readonly scheduler: TranslationRequestScheduler;
         readonly identity?: TranslationRequestIdentity;
+        readonly deadlineAt?: number;
         /** provider 在真正启动 transport 时登记结算，取消包装不能提前归还外层并发槽。 */
         readonly lease?: TranslationRequestLease;
     };
@@ -209,7 +213,9 @@ export interface TranslationLanguages {
 
 export interface TranslationCachePort {
     get: (key: string) => Promise<string | null>;
+    getMany?: (keys: readonly string[]) => Promise<Array<string | null>>;
     set: (key: string, value: string) => Promise<boolean>;
+    setMany?: (entries: readonly {key: string; value: string}[]) => Promise<number>;
     clear: () => Promise<void>;
     cleanup: () => Promise<void>;
 }
@@ -317,7 +323,9 @@ export interface TranslationProviderConfigFields {
 }
 
 /** 一次 provider 调用使用的完整、不可变配置视图。 */
-export type TranslationProviderConfigSnapshot = Readonly<TranslationConfigSnapshot & TranslationProviderConfigFields>;
+export type TranslationProviderConfigSnapshot = Readonly<TranslationConfigSnapshot & TranslationProviderConfigFields & {
+    [TRANSLATION_COMPACT_BATCH]?: true;
+}>;
 
 /** 测试或迁移期配置源可以省略凭据字段，snapshot factory 会补安全默认值。 */
 export type TranslationConfigSource = TranslationConfigSnapshot & Partial<TranslationProviderConfigFields>;

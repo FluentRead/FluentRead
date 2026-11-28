@@ -15,6 +15,7 @@ export interface MangaGlyphRasterPlan {
 export interface MangaGlyphRasterStyles {
     fillStyle:CanvasRenderingContext2D['fillStyle'];
     strokeStyle:CanvasRenderingContext2D['strokeStyle'];
+    language?:string;
 }
 export interface MangaGlyphRasterLedger {
     canvasPixels:number;
@@ -133,6 +134,8 @@ export function rasterizeMangaGlyphs(plan:MangaGlyphRasterPlan,box:MangaGlyphRas
     let result:MangaGlyphRasterResult;
     try {
         glyph=createLayer(width,height,ledger);verify=createLayer(width,height,ledger);
+        // 实际栅格化与主画布的试排使用同一语言，避免设备回退到不同字形。
+        if(styles.language)glyph.canvas.lang=styles.language;
         const context=glyph.context;
         context.translate(-x,-y);context.font=plan.font;context.lineWidth=plan.lineWidth;
         context.textAlign='left';context.textBaseline='alphabetic';context.lineJoin='round';

@@ -1,8 +1,8 @@
 /**
  * @file src/core/translation/engine.ts
  *
- * 文件职责：实现 DOM 节点到 TranslationCandidate 的核心解析引擎，协调安全守卫、站点适配器、布局边界和文本有效性；为显式非原子行内容器保留直属正文与独立子段落的一致发现和悬浮边界。
- * 主要内容：按正文/全部节点范围协调候选，统一发现、悬浮与请求取词的精确禁译覆盖；定义 TranslationCandidateCore、候选优选与键值函数，记录发现步骤和原因，按站点规则把显式换行拆为两种入口一致的内联候选，处理编辑器坐标命中屏障、hover 屏障、适配优先级、快照省略、缓存及坐标命中；局部脏内联子树仅在完整保护检查通过后回到最近显式非原子祖先重扫，不把每个正文子节点重定向成重复整段请求；发现强制目标时仅在当前 enter 的同步检查中复用既有决策和祖先选择器 miss，不跨生成器让出缓存；同步只读批量解析复用全部范围及无站点适配/应用外壳例外的普通正文祖先守卫和文本保护，涉及显式外壳权限或站点重定向目标时独立解析；无元素子节点的非文档表面不重复探测不可能成立的内联分段，仍由完整候选分类复验文本和保护；悬浮命中独立后代的包裹层时禁止回退吞并整个容器，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
+ * 文件职责：实现 DOM 节点到 TranslationCandidate 的核心解析引擎，协调安全守卫、站点适配器、布局边界和文本有效性；为显式非原子行内容器保留直属正文与独立子段落的一致发现和悬浮边界，并支持内联容器显式换行拆分与通用层旧式双 br 多段正文拆分。
+ * 主要内容：按正文/全部节点范围协调候选，统一发现、悬浮与请求取词的精确禁译覆盖；定义 TranslationCandidateCore、候选优选与键值函数，提供同步只读祖先 miss 缓存作用域（退出或显式失效后立即释放），记录发现步骤和原因，按站点规则把显式换行（含内联正文容器如 font）拆为两种入口一致的内联候选，并在通用层对含至少三段连续双 br 的块级或透明内联包装容器（font/span）自动拆分分段，处理编辑器坐标命中屏障、hover 屏障、适配优先级、快照省略、缓存及坐标命中；局部脏内联子树仅在完整保护检查通过后回到最近显式非原子祖先重扫，不把每个正文子节点重定向成重复整段请求；发现强制目标时仅在当前 enter 的同步检查中复用既有决策和祖先选择器 miss，不跨生成器让出缓存；同步只读批量解析复用全部范围及无站点适配/应用外壳例外的普通正文祖先守卫和文本保护，涉及显式外壳权限或站点重定向目标时独立解析；无元素子节点的非文档表面不重复探测不可能成立的内联分段，仍由完整候选分类复验文本和保护；悬浮命中独立后代的包裹层时禁止回退吞并整个容器，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
  * 模块边界：本文件属于可独立测试的 core 候选领域；内置站点提供的应用外壳正文入口仍须经过显式目标、局部保护与去重检查，不改变通用发现守卫；可以读取传入 DOM 以计算结果，坐标命中栈与祖先守卫只在单次同步解析中复用，不跨手势缓存；不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
@@ -25,6 +25,7 @@ import type {HardGuardResult} from './dom';
 import type {TranslationTextProtectionOptions} from './dom';
 import {
     classifyGenericCandidate,
+    collectDoubleBrParagraphBarriers,
     findTranslationControlOwner,
     getDirectInlineRuns,
     getAllScopeCandidateKind,
@@ -55,6 +56,34 @@ import {
     inheritCachedFlag,
 } from './internal';
 import {resolveVisualTranslationRange} from './visual';
+import {normalizeExcludedTags} from '@/src/core/config/pageTranslation';
+
+const combinedExcludedSelectorsByDocument = new WeakMap<Document, Map<string, string | null>>();
+
+function getCombinedExcludedSelector(element: Element, selectors: readonly string[]): string | null {
+    const document = element.ownerDocument;
+    if (!document) return null;
+    const cacheKey = selectors.join('\u0000');
+    let documentCache = combinedExcludedSelectorsByDocument.get(document);
+    if (!documentCache) {
+        documentCache = new Map();
+        combinedExcludedSelectorsByDocument.set(document, documentCache);
+    }
+    if (documentCache.has(cacheKey)) return documentCache.get(cacheKey) ?? null;
+
+    const probe = document.createElement('div');
+    const valid = selectors.filter((selector) => {
+        try {
+            probe.matches(selector);
+            return true;
+        } catch {
+            return false;
+        }
+    });
+    const combined = valid.length > 0 ? valid.join(',') : null;
+    documentCache.set(cacheKey, combined);
+    return combined;
+}
 
 const maxHoverBarrierDiscoverySteps = 256;
 /**
@@ -178,20 +207,30 @@ export function selectPreferredTranslationCandidate(
     return existing;
 }
 
+/** 仅在无 DOM 写入的同步只读批次中复用的祖先守卫、文本保护与声明式 miss 缓存。 */
+interface SynchronousReadOnlyEpoch {
+    adapterContext: AdapterContext;
+    defaultInspectionContext: ResolutionEvaluationContext;
+}
+
 /** 候选发现门面；翻译调度与渲染仍留在 runtime 端口。 */
 export class TranslationCandidateCore {
     readonly url: URL;
     readonly scope: TranslationScope;
     /** 正文范围下是否把侧边栏与导航当作可翻译内容。 */
     readonly includeSidebarRegions: boolean;
+    /** 用户显式跳过翻译的 HTML 标签或 CSS 选择器列表。 */
+    readonly excludedSelectors: readonly string[];
     readonly adapters: readonly TranslationSiteAdapter[];
     private readonly context: AdapterContext;
+    private readOnlyEpoch: SynchronousReadOnlyEpoch | null = null;
     private readonly discoveredCandidateChildBarriers = new WeakMap<Element, ReadonlySet<Element>>();
 
     constructor(options: TranslationCoreOptions = {}) {
         this.url = options.url ?? currentURL();
         this.scope = options.scope ?? 'content';
         this.includeSidebarRegions = options.includeSidebarRegions === true;
+        this.excludedSelectors = normalizeExcludedTags(options.excludedSelectors);
         // 全部节点默认绕过站点正文边界，仅保留显式适用于全部范围的规则（如模型名称）。
         // 脚本、表单输入、代码、隐藏区域等保护仍由统一 DOM 硬守卫负责。
         this.adapters = (options.adapters ?? [])
@@ -210,15 +249,26 @@ export class TranslationCandidateCore {
         this.context = {url: this.url};
     }
 
-    /** 候选发现、请求取词及状态复验使用同一份精确禁译覆盖；无规则时保持原参数。 */
+    /** 候选发现、请求取词及状态复验使用同一份禁译覆盖与排除标签；无规则时保持原参数。 */
     textOptions(options?: TranslationTextProtectionOptions): TranslationTextProtectionOptions | undefined {
-        return this.adapters.some(adapter => adapter.forceTranslate?.length)
-            ? {...options, allowNoTranslate: this.allowNoTranslate}
-            : options;
+        const hasForceTranslate = this.adapters.some(adapter => adapter.forceTranslate?.length);
+        const hasExcludedSelectors = this.excludedSelectors.length > 0;
+        if (!hasForceTranslate && !hasExcludedSelectors) return options;
+        return {
+            ...options,
+            ...(hasForceTranslate ? {allowNoTranslate: this.allowNoTranslate} : {}),
+            ...(hasExcludedSelectors ? {isExcludedElement: this.matchesExcludedSelector} : {}),
+        };
     }
 
     private allowNoTranslate = (element: Element): boolean => this.adapters.some(adapter =>
         adapter.forceTranslate?.some(selector => safeMatches(element, selector)) === true);
+
+    private matchesExcludedSelector = (element: Element): boolean => {
+        if (this.excludedSelectors.length === 0 || isDocumentSurface(element)) return false;
+        const combined = getCombinedExcludedSelector(element, this.excludedSelectors);
+        return combined ? safeMatches(element, combined) : false;
+    };
 
     private newContext(options?: TranslationTextProtectionOptions): ResolutionEvaluationContext {
         return createResolutionEvaluationContext(this.textOptions(options));
@@ -281,13 +331,41 @@ export class TranslationCandidateCore {
         return !this.adapters.some((adapter) => adapter.genericCandidatePolicy === 'targets-only');
     }
 
-    private adapterContextForResolution(evaluationContext?: ResolutionEvaluationContext): AdapterContext {
-        return evaluationContext?.adapterContext ?? this.context;
+    /** 仅在无 DOM 写入的同步只读阶段复用祖先守卫、文本保护与声明式 miss；写入前须调用 invalidate，退出作用域自动释放。 */
+    withSynchronousReadCache<T>(callback: (invalidate: () => void) => T): T {
+        const inherited = this.readOnlyEpoch !== null;
+        const previous = this.readOnlyEpoch;
+        const reset = () => {
+            const adapterContext: AdapterContext = {url: this.url, closestSelectorMisses: new WeakMap()};
+            const defaultInspectionContext = this.newContext();
+            defaultInspectionContext.adapterContext = adapterContext;
+            this.readOnlyEpoch = {adapterContext, defaultInspectionContext};
+        };
+        if (!inherited) reset();
+        try {
+            return callback(reset);
+        } finally {
+            if (!inherited) this.readOnlyEpoch = previous;
+        }
     }
 
-    shouldStayOriginal = (element: Element): boolean => this.shouldStayOriginalWithContext(element, this.context);
+    /** 仅在活动同步只读批次内返回默认保护参数的共享文本保护缓存。 */
+    getSynchronousTextProtectionCache(): TranslationTextProtectionCache | undefined {
+        return this.readOnlyEpoch?.defaultInspectionContext.textProtectionCache;
+    }
+
+    private currentAdapterContext(): AdapterContext {
+        return this.readOnlyEpoch?.adapterContext ?? this.context;
+    }
+
+    private adapterContextForResolution(evaluationContext?: ResolutionEvaluationContext): AdapterContext {
+        return evaluationContext?.adapterContext ?? this.currentAdapterContext();
+    }
+
+    shouldStayOriginal = (element: Element): boolean => this.shouldStayOriginalWithContext(element, this.currentAdapterContext());
 
     private shouldStayOriginalWithContext(element: Element, context: AdapterContext): boolean {
+        if (this.matchesExcludedSelector(element)) return true;
         return this.adapters.some((adapter) => {
             try {
                 return adapter.shouldStayOriginal?.(element, context) === true;
@@ -300,7 +378,7 @@ export class TranslationCandidateCore {
     /** 双语快照省略宿主元数据；原文保护仍由 shouldStayOriginal 独立负责。 */
     shouldOmitFromTranslation = (element: Element): boolean => this.adapters.some((adapter) => {
         try {
-            return adapter.shouldOmitFromTranslation?.(element, this.context) === true;
+            return adapter.shouldOmitFromTranslation?.(element, this.currentAdapterContext()) === true;
         } catch {
             return false;
         }
@@ -308,7 +386,7 @@ export class TranslationCandidateCore {
 
     shouldIgnoreMutation = (element: Element): boolean => this.adapters.some((adapter) => {
         try {
-            return adapter.shouldIgnoreMutation?.(element, this.context) === true;
+            return adapter.shouldIgnoreMutation?.(element, this.currentAdapterContext()) === true;
         } catch {
             return false;
         }
@@ -449,9 +527,17 @@ export class TranslationCandidateCore {
     }
 
     inspect(element: Element, textProtectionOptions?: TranslationTextProtectionOptions): TranslationCoreInspection {
+        const epoch = this.readOnlyEpoch;
+        if (!textProtectionOptions && epoch) {
+            return this.inspectWithTextProtectionCache(
+                element,
+                epoch.defaultInspectionContext.textProtectionCache,
+                epoch.defaultInspectionContext,
+            );
+        }
         const evaluationContext = this.newContext(textProtectionOptions);
-        // 只在此同步只读 inspect 生效；resolve/discover 与不同 owner 不共享。
-        evaluationContext.adapterContext = {...this.context, closestSelectorMisses: new WeakMap()};
+        // 只在此同步只读 inspect 或外层同步只读批次生效；不同步跨让出或 DOM 写入复用。
+        evaluationContext.adapterContext = epoch?.adapterContext ?? {...this.context, closestSelectorMisses: new WeakMap()};
         return this.inspectWithTextProtectionCache(
             element,
             evaluationContext.textProtectionCache,
@@ -544,13 +630,29 @@ export class TranslationCandidateCore {
         // 未出现显式换行时仍使用完整段落；超宽节点由下层预算拒绝物化。
         if (candidate.element.childNodes.length <= 2048 &&
             !Array.from(candidate.element.children).some((child) => child.localName === 'br')) return [candidate];
+        // 老式站点可能把按 <br> 分段的正文直接放在 inline <font>/<span> 内；
+        // force-target 已通过硬守卫与站点规则核准，允许该容器按直接子级 br 拆分。
         const runs = getDirectInlineRuns(
             candidate.element, this.shouldStayOriginal, true,
             (child) => child.localName === 'br' || isTranslationControlElement(child),
             textProtectionCache, evaluationContext?.textProtectionOptions ?? this.textOptions(), this.scope,
-            false, this.structuralRegionOptions(),
+            true, this.structuralRegionOptions(),
         );
         return runs.map((nodes) => ({...candidate, nodes, sourceLine: true}));
+    }
+
+    private genericDoubleBrBarriers(
+        element: Element,
+        textProtectionCache: TranslationTextProtectionCache,
+        evaluationContext?: ResolutionEvaluationContext,
+    ): ReadonlySet<Element> | null {
+        if (!this.allowsGenericCandidates()) return null;
+        return collectDoubleBrParagraphBarriers(
+            element,
+            this.shouldStayOriginal,
+            textProtectionCache,
+            evaluationContext?.textProtectionOptions ?? this.textOptions(),
+        );
     }
 
     private inlineRunCandidates(
@@ -560,6 +662,7 @@ export class TranslationCandidateCore {
         explicitContainer: boolean,
         candidateChildBarriers?: ReadonlySet<Element>,
         evaluationContext?: ResolutionEvaluationContext,
+        doubleBrBarriers?: ReadonlySet<Element> | null,
     ): TranslationCandidate[] {
         if (!this.allowsGenericCandidates() && !explicitContainer) return [];
         const candidates: TranslationCandidate[] = [];
@@ -575,6 +678,7 @@ export class TranslationCandidateCore {
             return result;
         };
         const isDirectRunBarrier = (candidate: Element): boolean =>
+            doubleBrBarriers?.has(candidate) === true ||
             candidateChildBarriers?.has(candidate) === true ||
             isAtomicAdapterTarget(candidate) || isTranslationControlElement(candidate) ||
             (this.scope === 'all' && isTranslationTextElementProtected(
@@ -590,14 +694,17 @@ export class TranslationCandidateCore {
             textProtectionCache,
             protectionOptions,
             this.scope,
-            explicitContainer,
+            explicitContainer || Boolean(doubleBrBarriers),
             this.structuralRegionOptions(),
         )) {
             candidates.push({
                 element: element as HTMLElement,
                 nodes,
-                kind: this.scope === 'all' ? getAllScopeCandidateKind(element)
-                    : findTranslationControlOwner(element) ? 'control' : 'content',
+                ...(doubleBrBarriers ? {sourceLine: true} : {}),
+                kind: doubleBrBarriers
+                    ? (this.scope === 'all' && (isStructuralContainer(element) || hasStructuralAncestor(element)) ? 'control' : 'content')
+                    : this.scope === 'all' ? getAllScopeCandidateKind(element)
+                        : findTranslationControlOwner(element) ? 'control' : 'content',
                 reason: 'generic-inline-run',
                 ...this.candidateResolutionMetadata(evaluationContext),
             });
@@ -644,9 +751,13 @@ export class TranslationCandidateCore {
             (decision.target ?? element) === element;
         if (this.scope === 'content' && (isDocumentSurface(element) || (!explicitContainer && (
             this.isStructuralContainerForResolution(element, evaluationContext) ||
-            this.hasStructuralAncestorForResolution(element, evaluationContext) ||
-            !isBlockBoundary(element))) ||
-            element.children.length === 0)) {
+            this.hasStructuralAncestorForResolution(element, evaluationContext))))) {
+            return null;
+        }
+        const doubleBrBarriers = explicitContainer
+            ? null
+            : this.genericDoubleBrBarriers(element, evaluationContext.textProtectionCache, evaluationContext);
+        if (this.scope === 'content' && !explicitContainer && !doubleBrBarriers && !isBlockBoundary(element)) {
             return null;
         }
         // 优先探测全文后序发现记录的所有权屏障，再在统一严格预算内复核每个内联子节点；
@@ -658,11 +769,12 @@ export class TranslationCandidateCore {
                 this.discoveredCandidateChildBarriers.get(element),
                 explicitContainer,
             );
+            const candidates = this.inlineRunCandidates(
+                element, true, evaluationContext.textProtectionCache, explicitContainer, childBarriers, evaluationContext, doubleBrBarriers,
+            );
             summary = {
-                candidates: this.inlineRunCandidates(
-                    element, true, evaluationContext.textProtectionCache, explicitContainer, childBarriers, evaluationContext,
-                ),
-                blocksWholeCandidate: childBarriers.size > 0,
+                candidates,
+                blocksWholeCandidate: childBarriers.size > 0 || (Boolean(doubleBrBarriers) && candidates.length > 0),
             };
             evaluationContext.inlineRuns.set(element, summary);
         }
@@ -795,7 +907,7 @@ export class TranslationCandidateCore {
             // 继承硬守卫适用于每个可能的祖先候选；遇到极深树时立即停止，避免反复上溯。
             const guard = this.hardGuard(current, evaluationContext);
             const guardReason = guard.reason;
-            if (guardReason === 'ancestor-depth-limit' || guardReason === 'foreign-translation') return null;
+            if (guardReason === 'ancestor-depth-limit' || guardReason === 'foreign-translation' || guardReason === 'excluded-tag') return null;
             // 外壳本身不是显式目标；避免在缺少更细粒度块边界的 SPA 中把整个应用根
             // 当作候选，同时允许继续向其上方寻找正常的页面结构。
             if (isTopLevelApplicationShell(current) &&
@@ -988,8 +1100,10 @@ export class TranslationCandidateCore {
                     if (ownAdapter.decision.kind === 'force-target' && !hardGuard.prune) {
                         // 本段检查在 enter 的 yield 之前完成；不把缓存放入 frame，
                         // 后续节点仍读取让出后可能变化的宿主属性和站点决策。
-                        const forceContext = this.newContext();
-                        forceContext.adapterContext = {...this.context, closestSelectorMisses: new WeakMap()};
+                        const forceContext = this.readOnlyEpoch?.defaultInspectionContext ?? this.newContext();
+                        if (!this.readOnlyEpoch) {
+                            forceContext.adapterContext = {...this.context, closestSelectorMisses: new WeakMap()};
+                        }
                         forceContext.adapterDecisions.set(frame.element, ownAdapter);
                         frame.forcedCandidate = this.inspectWithTextProtectionCache(
                             frame.element,
@@ -1078,18 +1192,35 @@ export class TranslationCandidateCore {
                                 textProtectionCache,
                                 explicitContainer,
                                 frame.candidateChildBarriers,
+                                undefined,
+                                this.genericDoubleBrBarriers(frame.element, textProtectionCache),
                             );
                     } else {
-                        const candidate = this.genericCandidateForDiscovery(
-                            frame.element,
-                            frame.insideStructural,
-                            textProtectionCache,
-                        );
-                        frame.exitCandidates = candidate ? [candidate] : this.scope === 'all'
-                            ? this.inlineRunCandidates(
-                                frame.element, true, textProtectionCache, explicitContainer, frame.candidateChildBarriers,
-                            )
-                            : [];
+                        const doubleBrBarriers = frame.insideStructural
+                            ? null
+                            : this.genericDoubleBrBarriers(frame.element, textProtectionCache);
+                        if (doubleBrBarriers) {
+                            frame.exitCandidates = this.inlineRunCandidates(
+                                frame.element,
+                                true,
+                                textProtectionCache,
+                                explicitContainer,
+                                frame.candidateChildBarriers,
+                                undefined,
+                                doubleBrBarriers,
+                            );
+                        } else {
+                            const candidate = this.genericCandidateForDiscovery(
+                                frame.element,
+                                frame.insideStructural,
+                                textProtectionCache,
+                            );
+                            frame.exitCandidates = candidate ? [candidate] : this.scope === 'all'
+                                ? this.inlineRunCandidates(
+                                    frame.element, true, textProtectionCache, explicitContainer, frame.candidateChildBarriers,
+                                )
+                                : [];
+                        }
                     }
                     this.discoveredCandidateChildBarriers.set(
                         frame.element,
@@ -1121,17 +1252,20 @@ export class TranslationCandidateCore {
     }
 
     discover(root: Node): TranslationCandidate[] {
-        const unique = new Map<Node, TranslationCandidate>();
-        for (const {candidate} of this.discoverSteps(root)) {
-            if (!candidate) continue;
-            const key = getTranslationCandidateKey(candidate);
-            const existing = unique.get(key);
-            unique.set(key, selectPreferredTranslationCandidate(existing, candidate));
-        }
-        return [...unique.values()];
+        return this.withSynchronousReadCache(() => {
+            const unique = new Map<Node, TranslationCandidate>();
+            for (const {candidate} of this.discoverSteps(root)) {
+                if (!candidate) continue;
+                const key = getTranslationCandidateKey(candidate);
+                const existing = unique.get(key);
+                unique.set(key, selectPreferredTranslationCandidate(existing, candidate));
+            }
+            return [...unique.values()];
+        });
     }
 
     resolveAtPoint(root: Document | ShadowRoot, x: number, y: number): TranslationCandidate | null {
+        return this.withSynchronousReadCache(() => {
         // 一次坐标解析是同步只读阶段：每个 root 的原生命中栈只读取一次，
         // 普通正文的祖先守卫也可复用；下一次手势重新读取，避免缓存动态页面。
         const hitStacks = new Map<Document | ShadowRoot, Element[]>();
@@ -1154,6 +1288,7 @@ export class TranslationCandidateCore {
             if (!hit) break;
             const guard = evaluateHardGuard(hit, this.textOptions());
             if (guard.reason === 'contenteditable' ||
+                guard.reason === 'excluded-tag' ||
                 guard.reason === 'protected-tag:textarea' ||
                 guard.reason === 'protected-tag:select' ||
                 guard.reason === 'protected-tag:option' ||
@@ -1185,6 +1320,7 @@ export class TranslationCandidateCore {
         };
 
         return resolveInRoot(root, 0);
+        });
     }
 
     private refineHoverCandidate(

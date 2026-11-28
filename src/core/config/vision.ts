@@ -55,12 +55,14 @@ export function normalizeAreaVisionPrompt(value: unknown): string {
 // https://www.together.ai/models/qwen3-8-27b
 // https://deepinfra.com/blog/qwen3-8-27b
 // https://openrouter.ai/qwen/qwen3.8-flash
+// https://cloud.tencent.com/document/product/1823/132252
 const VERIFIED_VISION_MODELS: Readonly<Record<string, ReadonlySet<string>>> = {
   openai: new Set(['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano']),
   claude: new Set(['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5']),
   gemini: new Set(['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro']),
   deepseek: new Set(['deepseek-flash', 'deepseek-v4-flash', 'deepseek-v4-flash-vision-exp']),
   tongyi: new Set(['qwen3.8-flash', 'qwen3.8-max', 'qwen3.8-27b']),
+  huanYuan: new Set(['hy4', 'hy4-flash']),
   doubao: new Set(['doubao-seed-2-1-lite-260915', 'doubao-seed-2-1-pro-260915', 'doubao-seed-2-1-turbo-260628', 'doubao-seed-evolving']),
   jieyue: new Set(['step-3.7-flash', 'step-5-preview']),
   siliconCloud: new Set(['Qwen/Qwen3.8-27B']),

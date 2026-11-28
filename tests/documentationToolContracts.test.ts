@@ -71,14 +71,14 @@ function brandFixture(bilingual = false) {
     write(root, 'src/core/i18n/messages/brand-taglines.json', JSON.stringify(taglines));
     write(root, 'src/core/i18n/messages/product-descriptions.json', JSON.stringify(descriptions));
     write(root, 'package.json', JSON.stringify({description: descriptions['en-US']}));
-    write(root, 'marketing/brand.md', Object.values(taglines).join('\n'));
+    write(root, 'docs/maintainers/marketing/brand.md', Object.values(taglines).join('\n'));
     for (const language of Object.keys(taglines)) write(root, `src/core/i18n/messages/${language}.ts`, `"brand.tagline": brandTaglines['${language}']`);
     for (const [locale, language] of [['en', 'en-US'], ['zh-CN', 'zh-CN']]) {
-        const folder = `marketing/chrome-web-store/${locale}`;
+        const folder = `docs/maintainers/marketing/chrome-web-store/${locale}`;
         write(root, `${folder}/short-description.txt`, descriptions[language] + '\n');
         write(root, `${folder}/listing.json`, JSON.stringify({shortDescription: descriptions[language]}));
         write(root, `${folder}/description.txt`, `${taglines[language]}\n\nFixture`);
-        write(root, `marketing/copy/${locale}.md`, taglines[language]);
+        write(root, `docs/maintainers/marketing/copy/${locale}.md`, taglines[language]);
     }
     write(root, 'README.md', `<div>${bilingual ? combined : taglines['en-US']}\n[简体中文](./misc/README_ZH.md)</div>`);
     write(root, 'misc/README_ZH.md', `<div>${bilingual ? combined : taglines['zh-CN']}\n[English](../README.md)</div>`);
@@ -152,7 +152,7 @@ const fsPort = {...fs,
  readFileSync(file, encoding) {if(String(file).endsWith('manifest.json')) return JSON.stringify({version:'fixture'}); return encoding ? 'fixture-source' : Buffer.from('fixture-source');},
  mkdtempSync() {state.calls.push('profile.create'); fail('profile'); state.profile = fs.mkdtempSync(path.join(input.fixture,'owned-profile-')); return state.profile;},
  mkdirSync() {},
- writeFileSync(file, data) {state.writes.push(String(file)); if(String(file).endsWith('/marketing/site-ui-manifest.json')||String(file).endsWith('/report.json')||String(file).endsWith('/capture-manifest.json')) {state.calls.push('report.write'); state.attemptedReport=JSON.parse(data); fail('report');} virtual.set(String(file),data); fail('write');},
+ writeFileSync(file, data) {state.writes.push(String(file)); if(String(file).endsWith('/docs/maintainers/marketing/site-ui-manifest.json')||String(file).endsWith('/report.json')||String(file).endsWith('/capture-manifest.json')) {state.calls.push('report.write'); state.attemptedReport=JSON.parse(data); fail('report');} virtual.set(String(file),data); fail('write');},
  statSync() {return {size:bytes.length};},
  rmSync(file, options) {state.calls.push('profile.remove'); state.removed.push(String(file)); if(file!==state.profile) throw Error('unowned-remove'); fs.rmSync(file,options); fail('remove');}
 };
@@ -325,13 +325,13 @@ describe('documentation delivery CLI contracts', () => {
     });
     it.each([
         ['package.json', JSON.stringify({description: combined}), 'Package product description'],
-        ['marketing/chrome-web-store/en/short-description.txt', combined, 'en: localized product short description'],
-        ['marketing/chrome-web-store/zh-CN/short-description.txt', combined, 'zh-CN: localized product short description'],
-        ['marketing/chrome-web-store/en/listing.json', JSON.stringify({shortDescription: combined}), 'en: listing'],
-        ['marketing/chrome-web-store/zh-CN/listing.json', JSON.stringify({shortDescription: combined}), 'zh-CN: listing'],
-        ['marketing/chrome-web-store/en/description.txt', 'bad', 'en: full description'],
-        ['marketing/copy/zh-CN.md', 'bad', 'zh-CN: community copy'],
-        ['marketing/brand.md', 'bad', 'copyable brand guide'],
+        ['docs/maintainers/marketing/chrome-web-store/en/short-description.txt', combined, 'en: localized product short description'],
+        ['docs/maintainers/marketing/chrome-web-store/zh-CN/short-description.txt', combined, 'zh-CN: localized product short description'],
+        ['docs/maintainers/marketing/chrome-web-store/en/listing.json', JSON.stringify({shortDescription: combined}), 'en: listing'],
+        ['docs/maintainers/marketing/chrome-web-store/zh-CN/listing.json', JSON.stringify({shortDescription: combined}), 'zh-CN: listing'],
+        ['docs/maintainers/marketing/chrome-web-store/en/description.txt', 'bad', 'en: full description'],
+        ['docs/maintainers/marketing/copy/zh-CN.md', 'bad', 'zh-CN: community copy'],
+        ['docs/maintainers/marketing/brand.md', 'bad', 'copyable brand guide'],
     ])('rejects broken functional description/store/community contract at %s', async (file, invalid, diagnostic) => {
         const root = brandFixture(true);
         write(root, file, invalid);

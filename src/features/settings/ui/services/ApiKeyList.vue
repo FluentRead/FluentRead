@@ -171,7 +171,7 @@ async function addKey(): Promise<void> {
 .api-key-state.is-success { color: var(--key-success); }
 .api-key-state.is-error, .api-key-state.is-duplicate { color: var(--key-error); }
 .api-key-state.is-checking { color: var(--brand-strong, #bd3159); }
-.api-key-duration { margin-left: 1px; color: var(--muted, #737d90); font-size: 10px; font-variant-numeric: tabular-nums; }
+.api-key-duration { margin-left: 1px; color: var(--muted, #5b6476); font-size: var(--fr-text-xs, 11px); font-variant-numeric: tabular-nums; }
 .api-key-idle-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .5; }
 .api-key-error-toggle { border: 0; padding: 3px 0; background: transparent; text-align: left; cursor: pointer; }
 .api-key-error-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }

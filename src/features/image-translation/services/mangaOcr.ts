@@ -6,18 +6,19 @@
  * 识别颜色：仅装饰原生识别缩放副本的一次既有读回，在完整不透明端点边缘和原页像素预算内补足红通道缺失对比；复用原会话，不改裁切、原图或检测输入，推理收尾恢复上下文，页级 finally 清理取消信号。
  * 模型形状：资源层仅在原文件完整校验与入库后生成固定识别图的内存副本，CPU 重载同样处理；本入口固定识别高度48，并在每次原生调用前核对正 batch、三通道和至少八像素宽度，不把未证明输入交给优化图。
  * 视图词界：所有局部框映回后，仅对同字符且空格边界不同的重叠拉丁行生成有界原像素证明；索引、比较和尝试均有限，保持最终页面与气泡对象引用，原文字、数字证据与几何不改；原图回读与已有方向和斜行预处理共用两百万像素余额，独立于既有识别颜色读回适配。
- * 普通图片旁证：复用既有透明度扫描，仅透明图片按需捕获同次检测原概率的有界位图；依锁定SDK及实际检测配置核对原比例帧和填充张量，不借放大气泡概率；自有位图只在Worker私有响应传输，按结果数组、原图和尺寸绑定后供修补查询，不进入文字、阅读或缓存。
+ * 普通图片旁证：复用既有透明度扫描和原 RGBA。透明图按需捕获同次检测的有界位图，不透明图只保存疑似裁切的纯色横行周边；核对原比例帧和填充张量，不借放大气泡概率。自有位图只走 Worker 私有响应，按结果数组、原图和尺寸绑定供修补查询。
  * 段落间距：普通图片与漫画均在全部物理框映回后借用仍存活的既有识别像素，生成有界局部静区关系；不新增画布读回、整图副本或推理。漫画只请求轻量段落侧车，不开启普通图片检测帧；关系随同一结果对象图传输，漫画收集器只采用仍为单原框的整页物理行，不授予擦除权限。
  * 气泡补绘：仅漫画结果将收集阶段记录的局部气泡提示绑定到当前原图与尺寸，不向公开行属性附加坐标，也不增加 Worker 消息或模型调用；提示只供后续纯白空处复核。
  * 检测核心：借用同次原概率与未加留白组件，将完全没有0.3响应的候选绑定到原SDK Box；保留原检测和识别批次，原数字证据先进入保护，再在识别重试结束后排除弱结果。反向重检的新候选仍按其自身检测旁证核对，不改弱边缘修补侧车；页内有界观察，取消和失败清除引用。
  * 弱连接复核：仅原像素视图记录大框内的完整紧凑核心，原整页、瓦片、气泡及既有重试全部结束后，独立复核有限双裁图；两次高置信文字一致且实际墨迹完整才替换低置信父框或补充漏行。复用原会话和原像素，不重跑检测、不改变原批次或复识别预算，其他原文和数值始终作为障碍。
+ * 旋转标签：同一原像素检测框提供深色窄带候选；逐页最多复核两个紧凑亮字区域，双向识别共用预处理像素预算，原图方向与字框同时通过才替换粗框。
  * 模块边界：不访问宿主 DOM、不翻译文本、不处理译图；仅漫画及显式选择 PaddleOCR 的单张图片使用本模型；通用识别与圈选继续由 Tesseract 负责。
  */
 import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources';
 import {mangaInferenceClient, mangaExtensionUrl, type MangaInferenceProgress} from './mangaInferenceClient';
 import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 import {protectMangaSession} from './mangaSessionFallback';
-import {configureOnnxWasmBackend} from '@/src/shared/onnx/wasmBinary';
+import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
 import {assertMangaOcrActive, loadMangaOcrAssets, removeMangaOcrAssets, withMangaModelAdmission, withMangaModelRemoval} from './mangaOcrAssets';
 import type {MangaOcrItem,MangaRegion} from './mangaRegions';
 import {findMangaBubbleLayout,assignMangaLayoutBubbles,collectMangaRegions,type MangaOcrPage} from './mangaBubbles';
@@ -37,6 +38,7 @@ import {bindImageParagraphGapEvidence,produceImageParagraphGapProofs} from './im
 import {bindMangaBubblePlacements} from './mangaBubblePlacement';
 import {createMangaDetectionCore} from './mangaDetectionCore';
 import {planMangaDetectionRecovery,recoverMangaDetectionRegions} from './mangaDetectionRecovery';
+import {isMangaRotatedLabelParent,recoverMangaRotatedLabels,rotatedLabelPadding,type MangaLabelTurn} from './mangaRotatedLabel';
 
 interface MangaOcrPort {
     recognize(image: string, options: {flatten: true; noCache: true; strategy: 'per-box';signal?:AbortSignal; decodedImage?: HTMLImageElement; progress?: MangaInferenceProgress;imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true}): Promise<MangaOcrPage>;
@@ -209,10 +211,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
     // 两个包共享同一 ONNX 实例；在导入 SDK 前覆盖其 CDN 默认路径，符合扩展 CSP。
     const ort = await import('onnxruntime-web/webgpu');
     ort.env.wasm.numThreads = localWasmThreads();
-    configureOnnxWasmBackend(ort.env.wasm, {
-        mjs: mangaExtensionUrl('/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'),
-        wasm: mangaExtensionUrl('/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'),
-    });
+    configureOnnxWasmBackend(ort.env.wasm, resolveOnnxWasmAssetPaths(mangaExtensionUrl, {leadingSlash: true}));
     const {PaddleOcrService,DetectionService,RecognitionService} = await import('ppu-paddle-ocr/web');
     const gpu=await probeWebGpu();
     let activeSignal=signal;
@@ -283,11 +282,18 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
         }
     }
     let detectionBudget:ReturnType<typeof createImageDetectionEvidenceBudget>|undefined;
+    let opaqueDetectionPixels:Uint8ClampedArray|undefined;
     let detectionObservation:{canvas:HTMLCanvasElement|OffscreenCanvas;frame:Omit<ImageDetectionFrameSource,'resizeRatio'>}|undefined;
     let activeDetectionFrame:(ImageDetectionFrameSource&{canvas:HTMLCanvasElement|OffscreenCanvas})|undefined;
+    const rotatedLabelParents:MangaOcrItem['box'][]=[];
     class MangaDetection extends DetectionService {
         private readonly evidenceSideLimit:number|undefined;
-        readonly detectionCore=createMangaDetectionCore();
+        readonly detectionCore=createMangaDetectionCore((data,width,height,box)=>{
+            const frame=activeDetectionFrame;
+            if(frame?.resizeRatio!==1||!opaqueDetectionPixels
+                ||frame.canvas.width!==frame.width||frame.canvas.height!==frame.height)return;
+            detectionBudget?.capture(data,width,height,frame,{box,pixels:opaqueDetectionPixels});
+        });
         constructor(session:ConstructorParameters<typeof DetectionService>[0],options:ConstructorParameters<typeof DetectionService>[1]){
             super(session,options);
             this.evidenceSideLimit=typeof options?.maxSideLength==='number'?options.maxSideLength:undefined;
@@ -314,7 +320,19 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                 const frame=observation.frame;
                 activeDetectionFrame={...frame,canvas:observation.canvas,resizeRatio:Math.min(1,limit/Math.max(frame.width,frame.height))};
             }
-            try{const boxes=await super.run(image);this.detectionCore.bindBoxes(ticket,boxes);return boxes;}
+            try{
+                const boxes=await super.run(image);
+                this.detectionCore.bindBoxes(ticket,boxes);
+                if(observation?.canvas===image){
+                    const {frame}=observation;
+                    for(const box of boxes){
+                        if(rotatedLabelParents.length>=16)break;
+                        if(isMangaRotatedLabelParent(box,frame.width,frame.height))
+                            rotatedLabelParents.push({...box,x:box.x+frame.x,y:box.y+frame.y});
+                    }
+                }
+                return boxes;
+            }
             finally{this.detectionCore.endFrame(ticket);activeDetectionFrame=undefined;}
         }
     }
@@ -349,6 +367,35 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
             }
             page.results=recovered.results;
         }
+        async recoverRotatedLabels(canvas:HTMLCanvasElement|OffscreenCanvas,pixels:Uint8ClampedArray,page:MangaOcrPage,bubbles:NonNullable<MangaOcrPage['bubbles']>):Promise<void>{
+            if(!rotatedLabelParents.length)return;
+            const detector=this.detector as MangaDetection;
+            const checkActive=()=>assertMangaOcrActive(activeSignal);
+            const protectedItems=[...(page.numericEvidence??[]),...bubbles.flatMap(bubble=>[...bubble.results,...(bubble.numericEvidence??[])])];
+            page.results=await recoverMangaRotatedLabels(pixels,canvas.width,canvas.height,rotatedLabelParents,page.results,protectedItems,async parent=>{
+                const {x,y}=rotatedLabelPadding,width=parent.height+2*x,height=parent.width+2*y;
+                const cost=2*width*height;
+                if(cost>this.remainingPreprocessingPixels)return [[],[]];
+                this.remainingPreprocessingPixels-=cost;
+                const recognize=async(turn:MangaLabelTurn)=>{
+                    checkActive();
+                    const crop=createOcrCanvas();
+                    try{
+                        crop.width=width;crop.height=height;
+                        const context=crop.getContext('2d',{willReadFrequently:true});
+                        if(!context)throw new Error('浏览器不支持图片处理');
+                        context.fillStyle='#d2d2d2';context.fillRect(0,0,width,height);
+                        context.translate(turn===1?x+parent.height:x,turn===1?y:y+parent.width);
+                        context.rotate(turn*Math.PI/2);
+                        context.drawImage(canvas,parent.x,parent.y,parent.width,parent.height,0,0,parent.width,parent.height);
+                        const result=await this.recognize(crop,{flatten:true,noCache:true,strategy:'per-box'});
+                        checkActive();this.checkInferenceFailure();
+                        return result.results.filter(item=>!detector.detectionCore.rejects(item.box));
+                    }finally{crop.width=0;crop.height=0;}
+                };
+                return [await recognize(1),await recognize(-1)];
+            },checkActive);
+        }
         beginMangaPage(): void {this.remainingRetries=4;this.remainingRubyRescues=2;this.remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;this.originalSource=undefined;colorAdapter.beginPage(activeSignal);whitespace.beginPage(activeSignal);if(this.detector instanceof MangaDetection)this.detector.detectionCore.beginPage(activeSignal);}
         tryReserveMangaRubyRescue(sourcePixels:number):boolean {
             if(this.remainingRubyRescues<=0||!Number.isSafeInteger(sourcePixels)||sourcePixels<=0||sourcePixels>this.remainingPreprocessingPixels)return false;
@@ -357,7 +404,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
         bindMangaSource(image:ImageBitmap|HTMLImageElement,width:number,height:number):void {
             this.originalSource={image,width,height,...('naturalWidth' in image?{identity:{src:image.src,currentSrc:image.currentSrc}}:{})};
         }
-        clearMangaSource():void {this.originalSource=undefined;if(this.detector instanceof MangaDetection)this.detector.detectionCore.endPage();}
+        clearMangaSource():void {this.originalSource=undefined;rotatedLabelParents.length=0;if(this.detector instanceof MangaDetection)this.detector.detectionCore.endPage();}
         /** 供本页私有质量规划共用原图/预算；不保留整页alpha副本，失败尝试也不返还已扣读回成本。 */
         readMangaSourceRegion(region:{left:number;top:number;width:number;height:number},maxPixels=131072):Uint8ClampedArray|undefined {
             const source=this.originalSource;if(!source)return;
@@ -591,7 +638,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                                 }
                                 return output;
                             });
-                            if(key==='detection'&&detectionBudget&&activeDetectionFrame){
+                            if(key==='detection'&&detectionBudget&&activeDetectionFrame&&!opaqueDetectionPixels){
                                 const frame=activeDetectionFrame,input=args[0]?.x,output=result[session.outputNames[0]||'sigmoid_0.tmp_0'];
                                 if(frame.canvas.width===frame.width&&frame.canvas.height===frame.height&&input?.dims.length===4
                                     &&input.dims[0]===1&&input.dims[1]===3&&output?.dims.length===4&&output.dims[0]===1&&output.dims[1]===1
@@ -618,7 +665,6 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                 assertMangaOcrActive(options.signal);
                 service.beginMangaPage();
                 let remainingRubyRescues=2;
-                detectionBudget=undefined;
                 const recognizeFrame=async(canvas:HTMLCanvasElement|OffscreenCanvas,frame:Omit<ImageDetectionFrameSource,'resizeRatio'>)=>{
                     detectionObservation={canvas,frame};
                     try{return await service.recognizeManga(canvas,{flatten:true,noCache:true,strategy:'per-box'});}
@@ -646,8 +692,10 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                             context.fillStyle=alphaBackground===0?'#000':'#fff';
                             context.fillRect(0,0,canvas.width,canvas.height);
                         }finally{context.globalCompositeOperation=previousComposite;}
-                        // 复用原有alpha扫描结果；整张不透明图片不捕获或复制任何新检测侧车。
-                        if(options.imageDetectionEvidence===true)detectionBudget=createImageDetectionEvidenceBudget();
+                    }
+                    if(options.imageDetectionEvidence===true){
+                        detectionBudget=createImageDetectionEvidenceBudget();
+                        if(alphaBackground===undefined)opaqueDetectionPixels=pixels.data;
                     }
                     const {recognition:boxes,ownership}=findMangaBubbleLayout(pixels.data,canvas.width,canvas.height);
                     const sdkOptions={flatten:true as const,noCache:true as const,strategy:'per-box' as const};
@@ -730,6 +778,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                     }
                     assertMangaOcrActive(options.signal);
                     await service.recoverDetectionFrames(canvas,pixels.data,page,bubbles);
+                    await service.recoverRotatedLabels(canvas,pixels.data,page,bubbles);
                     assertMangaOcrActive(options.signal);
                     const layoutBubbles=assignMangaLayoutBubbles(pixels.data,canvas.width,canvas.height,ownership,page.results);
                     const hasLargeAlphaHoles=alphaProfile.totalPixels>0&&alphaProfile.transparentPixels/alphaProfile.totalPixels>=.2;
@@ -745,7 +794,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                     return finalPage;
                 }finally{canvas.width=0;canvas.height=0;}
                 }finally{if ('close' in bitmap)bitmap.close();}
-                }finally{try{service.clearMangaSource();}finally{try{colorAdapter.endPage();}finally{try{whitespace.endPage();}finally{activeSignal=undefined;detectionBudget=undefined;detectionObservation=undefined;activeDetectionFrame=undefined;}}}}
+                }finally{try{service.clearMangaSource();}finally{try{colorAdapter.endPage();}finally{try{whitespace.endPage();}finally{activeSignal=undefined;detectionBudget=undefined;opaqueDetectionPixels=undefined;detectionObservation=undefined;activeDetectionFrame=undefined;}}}}
             },
             destroy: () => service.destroy(),
         };

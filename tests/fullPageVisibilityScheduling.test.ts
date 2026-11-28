@@ -53,6 +53,7 @@ const runtime = vi.hoisted(() => ({
     nativeBatchEnabled: false,
     cancelQueue: vi.fn(),
     retryCallbacks: [] as Array<() => void>,
+    showTranslationRetryWait: vi.fn(),
     config: {
         on: true,
         personalCorrectionsEnabled: false,
@@ -155,6 +156,7 @@ vi.mock('@/src/features/full-page-translation/ui/translationIndicators', () => (
         runtime.retryCallbacks.push(onRetry);
         return node.ownerDocument.createElement("span");
     },
+    showTranslationRetryWait: runtime.showTranslationRetryWait,
 }));
 // 标题走 <head> 的独立通路，与正文候选调度无关；本文件按请求顺序核对正文译文，
 // 放行标题翻译会多出一次 translateText 调用并打乱这里的请求计账。
@@ -257,6 +259,7 @@ vi.mock("@/src/core/translation/public", async (importOriginal) => {
     return {
         // 属性型按钮标签的安全边界由 core 唯一定义，测试替身不复制其判定规则。
         getTranslatableControlValueAttribute: actual.getTranslatableControlValueAttribute,
+        normalizeParagraphTranslationSource: actual.normalizeParagraphTranslationSource,
         normalizeTranslationText: actual.normalizeTranslationText,
         createCurrentTranslationResolverBatch: () => (start: Node, scope = 'content') => runtime.realCore
             ? runtime.realCore.resolve(start) : resolveCandidate(scope)(start),
@@ -566,6 +569,7 @@ describe("全文翻译可见性锚点", () => {
         runtime.nativeBatchEnabled = false;
         runtime.cancelQueue.mockReset();
         runtime.retryCallbacks = [];
+        runtime.showTranslationRetryWait.mockClear();
         runtime.config.on = true;
         runtime.config.personalCorrectionsEnabled = false;
         runtime.config.service = "microsoft";
@@ -923,14 +927,25 @@ describe("全文翻译可见性锚点", () => {
             expect(owner.textContent).toBe('First public paragraph to translate.');
             expect(document.querySelector('[data-fr-translation-owned]')).toBeNull();
         });
-        it.each(['google', 'explicit'])('%s keeps the frozen bilingual request when global mode changes', async kind => {
+        it('explicit bilingual override keeps the frozen bilingual request when global mode changes', async () => {
             const {owner} = displayFixture();
-            if (kind === 'google') runtime.config.service = 'google';
-            autoTranslateEnglishPage(kind === 'explicit' ? {displayMode: 'bilingual'} : {});
+            autoTranslateEnglishPage({displayMode: 'bilingual'});
             await finishScheduledWork();
             runtime.config.display = 0; syncPageTranslationDisplayMode(0); await finishScheduledWork();
             expect(getTranslationState(owner)?.mode).toBe('bilingual');
             expect(owner.querySelector('.fluent-read-bilingual-content')).not.toBeNull();
+            expect(runtime.requests).toHaveBeenCalledTimes(1);
+        });
+        it('Google Translate switches between bilingual and translation-only when global mode changes without re-requesting', async () => {
+            const {owner} = displayFixture();
+            runtime.config.service = 'google';
+            autoTranslateEnglishPage({});
+            await finishScheduledWork();
+            expect(getTranslationState(owner)?.mode).toBe('bilingual');
+            runtime.config.display = 0; syncPageTranslationDisplayMode(0); await finishScheduledWork();
+            expect(getTranslationState(owner)?.mode).toBe('single');
+            expect(owner.querySelector('.fluent-read-single-slot')).not.toBeNull();
+            expect(owner.querySelector('.fluent-read-bilingual-content')).toBeNull();
             expect(runtime.requests).toHaveBeenCalledTimes(1);
         });
     });
@@ -10430,7 +10445,18 @@ describe("全文翻译可见性锚点", () => {
         expect(getFullPageTranslationDiagnostic()?.code).toBe(kind);
         expect(JSON.stringify(getFullPageTranslationDiagnostic())).not.toContain('private');
         runtime.requests.mockImplementation(async origins => origins.map(origin => `译:${origin}`));
-        expect(runtime.retryCallbacks).toHaveLength(1); runtime.retryCallbacks[0]!(); await finishScheduledWork();
+        expect(runtime.retryCallbacks).toHaveLength(1);
+        if (kind === 'rate-limit') {
+            const requestCount = runtime.requests.mock.calls.length;
+            expect(runFullPageFailureAction(getFullPageTranslationProgress().sessionId, 'retry')).toBe(0);
+            expect(runtime.showTranslationRetryWait).toHaveBeenCalledWith(expect.objectContaining({
+                code: 'rate-limit', retryAfterMs: expect.any(Number),
+            }));
+            runtime.retryCallbacks[0]!();
+            expect(runtime.requests).toHaveBeenCalledTimes(requestCount);
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        runtime.retryCallbacks[0]!(); await finishScheduledWork();
         expect(getFullPageTranslationDiagnostic()).toBeUndefined();
         expect(getTranslationToolbarStatus()).toBe('translated');
     });

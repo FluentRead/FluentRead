@@ -37,7 +37,7 @@ pnpm install --frozen-lockfile
 pnpm storybook
 ```
 
-Open the address shown in the terminal, usually `http://127.0.0.1:6006`. Examples live in `storybook/`, and configuration in `.storybook/`. Reuse components from `src/ui/components/` and styles from `src/ui/styles/`.
+Open the address shown in the terminal, usually `http://127.0.0.1:6006`. The stories and their configuration live in `docs/development/storybook/`. Reuse components from `src/ui/components/` and styles from `src/ui/styles/`.
 
 ### Cards and information order
 

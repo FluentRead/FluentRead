@@ -13,6 +13,7 @@ const icons: Record<string, string> = {
   'settings-interface': 'layout',
   'settings-services': 'plug',
   'settings-translation': 'translate',
+  'settings-interactions': 'keyboard',
   'settings-selection': 'card',
   'settings-image-translation': 'image',
   'settings-area-translation': 'scan',

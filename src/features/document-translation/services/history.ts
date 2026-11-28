@@ -8,6 +8,7 @@
  */
 import {documentSourceLocators, matchDocumentSourceLocators} from '../core/materialLocator';
 import {normalizePdfAnnotations, type PdfAnnotation} from '../core/pdfAnnotations';
+import {normalizeWebArticleProgress} from '../core/webArticle';
 import type {DocumentSegment, ParsedDocument, PdfDocumentBlock, PdfDocumentLine, PdfDocumentPage, PdfDocumentRun} from '../core/document';
 
 export const DOCUMENT_HISTORY_MAX_ENTRIES = 20;
@@ -17,6 +18,7 @@ const STORE = 'documents';
 const META = 'metadata';
 const GENERATION = 'generation';
 const SEQUENCE = 'sequence';
+const ARTICLE_PROGRESS_PREFIX = 'article-position:';
 
 export interface DocumentHistorySummary {
     id: string;
@@ -36,6 +38,8 @@ export interface DocumentHistorySummary {
 export interface DocumentHistoryRecord extends DocumentHistorySummary {
     /** 批注与原始文件同生命周期、同一事务保存；删除历史时一起清除。 */
     pdfAnnotations?: PdfAnnotation[];
+    /** CSV/TSV 文件最后选择的源列号；缺省表示全部可译列。 */
+    delimitedColumns?: readonly number[];
     bytes: Uint8Array;
     mimeType: string;
     translations: string[];
@@ -68,6 +72,8 @@ export interface DocumentHistory {
     saveChecked(record: DocumentHistoryRecord, expected: DocumentHistoryVersion): Promise<{status: 'saved'; version: string} | {status: 'conflict' | 'unavailable'}>;
     remove(id: string): Promise<boolean>;
     removeChecked(id: string, expected: string): Promise<{status: 'removed' | 'conflict' | 'unavailable'}>;
+    loadArticleProgress(id: string): Promise<number | undefined>;
+    saveArticleProgress(id: string, position: number): Promise<boolean>;
     clear(): Promise<boolean>;
 }
 
@@ -417,6 +423,10 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
         });
     };
     // 保存、限额计算、淘汰及删除世代推进必须在同一事务完成。
+    const deleteEntry = (target: IDBObjectStore, meta: IDBObjectStore, id: string) => {
+        target.delete(id);
+        meta.delete(ARTICLE_PROGRESS_PREFIX + id);
+    };
     const enforceLimit = (target: IDBObjectStore, meta: IDBObjectStore, protectedId: string, signal: AbortSignal) => {
         const entries: Array<{id: string; updatedAt: number; order: number; bytes: number}> = [];
         const cursor = target.openCursor();
@@ -433,7 +443,7 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
                 let bytes = 0, removed = false;
                 for (const [index, entry] of entries.entries()) {
                     bytes += entry.bytes;
-                    if (index >= DOCUMENT_HISTORY_MAX_ENTRIES || bytes > DOCUMENT_HISTORY_MAX_BYTES) {target.delete(entry.id);removed = true;}
+                    if (index >= DOCUMENT_HISTORY_MAX_ENTRIES || bytes > DOCUMENT_HISTORY_MAX_BYTES) {deleteEntry(target, meta, entry.id);removed = true;}
                 }
                 if (removed) meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});
             } catch {target.transaction.abort();}
@@ -517,7 +527,7 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
                         if (typeof value !== 'string' || !value.startsWith('g:')) throw new Error('Invalid history generation');
                         const record = (read.result as DocumentHistoryRecord | undefined) ?? null;
                         if (!record || documentHistoryVersion(record) !== expected) {conflict = true;return;}
-                        target.delete(id);
+                        deleteEntry(target, meta, id);
                         meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});
                     } catch {target.transaction.abort();}
                 };
@@ -525,7 +535,42 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
             });
             return {status: conflict ? 'conflict' : 'removed'};
         }),
-        remove: id => guarded(false, async signal => {await write(signal, (target, meta) => {target.delete(id);meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});});return true;}),
-        clear: () => guarded(false, async signal => {await write(signal, (target, meta) => {target.clear();meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});});return true;}),
+        remove: id => guarded(false, async signal => {await write(signal, (target, meta) => {deleteEntry(target, meta, id);meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});});return true;}),
+        // 位置与文档属于同一历史生命周期，单独写入以避免滚动引发译文校订的跨标签冲突。
+        loadArticleProgress: id => guarded<number | undefined>(undefined, async signal => {
+            let position: number | undefined;
+            await write(signal, (_target, meta) => {
+                const read = meta.get(ARTICLE_PROGRESS_PREFIX + id);
+                read.onsuccess = () => {position = normalizeWebArticleProgress(read.result?.value);};
+            });
+            return position;
+        }),
+        saveArticleProgress: (id, position) => guarded(false, async signal => {
+            if (normalizeWebArticleProgress(position) === undefined) return false;
+            let saved = false;
+            await write(signal, (target, meta) => {
+                const read = target.getKey(id);
+                read.onsuccess = () => {
+                    if (read.result === undefined) return;
+                    meta.put({key: ARTICLE_PROGRESS_PREFIX + id, value: position});
+                    saved = true;
+                };
+            });
+            return saved;
+        }),
+        clear: () => guarded(false, async signal => {
+            await write(signal, (target, meta) => {
+                target.clear();
+                meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});
+                const entries = meta.openKeyCursor();
+                entries.onsuccess = () => {
+                    const entry = entries.result;
+                    if (!entry) return;
+                    if (typeof entry.key === 'string' && entry.key.startsWith(ARTICLE_PROGRESS_PREFIX)) meta.delete(entry.key);
+                    entry.continue();
+                };
+            });
+            return true;
+        }),
     };
 }

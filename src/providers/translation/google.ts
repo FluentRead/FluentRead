@@ -7,7 +7,7 @@
  */
 
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
-import {getTranslationProviderLanguages, isImageTextBatch} from '@/src/services/translation/requestSnapshot';
+import {getImageLabelSlots, getTranslationProviderLanguages, isImageTextBatch} from '@/src/services/translation/requestSnapshot';
 import {createHttpStatusError} from '@/src/platform/http/errors';
 import {
     getDynamicFreeProviderWeight,
@@ -339,11 +339,15 @@ async function translateGoogleBatch(
     }
 }
 
+type ImageContextInput = boolean | readonly number[];
+
 async function translateGoogleHtml(
-    texts: readonly string[], fromLang: string, toLang: string, deadlineAt: number, signal: AbortSignal, imageContext: boolean,
+    texts: readonly string[], fromLang: string, toLang: string, deadlineAt: number, signal: AbortSignal, imageContext: ImageContextInput,
 ): Promise<string[]> {
-    const documents = import.meta.env.BROWSER !== 'userscript' && imageContext ? createGoogleImageContext(texts, escapeGoogleText)
-        : texts.map(text => `<pre>${escapeGoogleText(text)}</pre>`);
+    const imagePlan = import.meta.env.BROWSER !== 'userscript' && imageContext
+        ? createGoogleImageContext(texts, escapeGoogleText, imageContext === true ? undefined : imageContext)
+        : undefined;
+    const documents = imagePlan?.documents ?? texts.map(text => `<pre>${escapeGoogleText(text)}</pre>`);
     // 在 try 外选择解析器，避免异常保护的保守打包分析为 userscript 保留不可达的图片协议。
     const parseImageResponse = import.meta.env.BROWSER !== 'userscript' && imageContext ? parseGoogleImageContext : undefined;
     const {responseBody} = await fetchGoogleResponse(GOOGLE_TRANSLATE_HTML_URL, {
@@ -354,7 +358,7 @@ async function translateGoogleHtml(
     }, deadlineAt, signal, import.meta.env.BROWSER !== 'userscript' && imageContext ? 4_000 : GOOGLE_TRANSLATE_ATTEMPT_TIMEOUT_MS);
     try {
         const translations = requireGoogleTexts(getArrayItem(JSON.parse(responseBody), 0), documents.length);
-        if (parseImageResponse) return parseImageResponse(translations, texts, decodeGoogleText);
+        if (parseImageResponse) return parseImageResponse(translations, texts, decodeGoogleText, imagePlan?.labelSlots);
         return requireGoogleTexts(translations.map(text => decodeGoogleText(text.replace(/^<pre(?:\s[^>]*)?>([\s\S]*)<\/pre>$/i, '$1'))), texts.length);
     } catch (error) {
         const failure = createGoogleParseError(new Error('返回格式或译文数量异常'), responseBody);
@@ -388,7 +392,7 @@ async function translateGoogleList(
 }
 
 async function executeGoogleTexts(texts: readonly string[], fromLang: string, toLang: string, signal: AbortSignal,
-    deadline = Date.now() + GOOGLE_TRANSLATE_TOTAL_TIMEOUT_MS, imageContext = false): Promise<string[]> {
+    deadline = Date.now() + GOOGLE_TRANSLATE_TOTAL_TIMEOUT_MS, imageContext: ImageContextInput = false): Promise<string[]> {
     const providers: GoogleProvider[] = [
         {name: '浏览器批量接口', endpoint: GOOGLE_TRANSLATE_HTML_URL, baseWeight: 1.2,
             translate: timeout => translateGoogleHtml(texts, fromLang, toLang, timeout, signal, imageContext)},
@@ -578,7 +582,7 @@ export function translateGoogleOwnerTexts(
 }
 
 export async function translateGoogleTexts(texts: readonly string[], fromLang: string, toLang: string, signal?: AbortSignal,
-    requestTimeoutMs?: number, enableNativeBatch = true, lease?: TranslationRequestLease, imageContext = false): Promise<string[]> {
+    requestTimeoutMs?: number, enableNativeBatch = true, lease?: TranslationRequestLease, imageContext: ImageContextInput = false): Promise<string[]> {
     texts = [...texts];
     const controller = new AbortController();
     const abortCallbacks = new Set<VoidFunction>();
@@ -609,8 +613,12 @@ export async function translateGoogleTexts(texts: readonly string[], fromLang: s
                 group.push(text); characters += size;
             }
             if (group.length) groups.push(group);
+            const labelSlots = imageContext === true ? undefined : new Set(imageContext);
+            let offset = 0;
             return (await Promise.all(groups.map(items => {
-                const transport = executeGoogleTexts(items, googleLanguage(fromLang), googleLanguage(toLang), controller.signal, deadlineAt, true);
+                const groupContext = labelSlots ? items.flatMap((_, index) => labelSlots.has(offset + index) ? [index] : []) : true;
+                offset += items.length;
+                const transport = executeGoogleTexts(items, googleLanguage(fromLang), googleLanguage(toLang), controller.signal, deadlineAt, groupContext);
                 lease?.holdUntil(transport);
                 return new Promise<string[]>((resolve, reject) => {
                     const remove = subscribeAbort(() => reject(abortErrorFromSignal(controller.signal)));
@@ -658,8 +666,10 @@ async function google(message: TranslationProviderRequest) {
     const enableNativeBatch = message.enableNativeBatch
         ?? isNativeTranslationBatchEnabled('google', current.nativeBatchTranslationEnabled);
     const texts = typeof message.origin === 'string' ? [message.origin] : message.origin;
+    const imageContext = import.meta.env.BROWSER !== 'userscript' && isImageTextBatch(message)
+        && (getImageLabelSlots(message) ?? true);
     const results = await translateGoogleTexts(texts, sourceLanguage, targetLanguage, message.abortSignal, message.requestTimeoutMs,
-        enableNativeBatch, getTranslationRequestScheduler(message)?.lease, isImageTextBatch(message));
+        enableNativeBatch, getTranslationRequestScheduler(message)?.lease, imageContext);
     return typeof message.origin === 'string' ? results[0]! : results;
 }
 

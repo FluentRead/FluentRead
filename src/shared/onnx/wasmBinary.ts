@@ -5,6 +5,29 @@
  * 模块边界：只处理 ONNX WASM 资源，不决定模型、设备、缓存或 Worker 生命周期。
  */
 
+declare const __FLUENTREAD_ONNX_WASM_VARIANT__: 'jspi' | 'asyncify' | undefined;
+
+export type OnnxWasmVariant = 'jspi' | 'asyncify';
+
+/** 按构建目标返回打包的 ONNX WASM 变体：Chrome/Edge/Firefox 使用体积更小且无栈改写开销的 JSPI，Safari 保留 Asyncify。 */
+export function resolveOnnxWasmVariant(): OnnxWasmVariant {
+    return typeof __FLUENTREAD_ONNX_WASM_VARIANT__ === 'string' && __FLUENTREAD_ONNX_WASM_VARIANT__ === 'asyncify'
+        ? 'asyncify'
+        : 'jspi';
+}
+
+export function resolveOnnxWasmAssetPaths(
+    resolveUrl: (path: string) => string,
+    options: {leadingSlash?: boolean; variant?: OnnxWasmVariant} = {},
+): {mjs: string; wasm: string} {
+    const variant = options.variant ?? resolveOnnxWasmVariant();
+    const prefix = options.leadingSlash ? '/fluent-read-ai' : 'fluent-read-ai';
+    return {
+        mjs: resolveUrl(`${prefix}/ort-wasm-simd-threaded.${variant}.mjs`),
+        wasm: resolveUrl(`${prefix}/ort-wasm-simd-threaded.${variant}.wasm`),
+    };
+}
+
 export interface OnnxWasmBackend {
     numThreads?: number;
     proxy?: boolean;

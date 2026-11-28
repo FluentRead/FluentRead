@@ -7,7 +7,7 @@
 import {config} from '@/src/services/config/store';
 import {matchesClickSelectionShortcut} from '@/src/core/config/clickSelection';
 import {shouldSkipChineseSelection, shouldSkipTranslationForTarget} from '@/src/core/language/detect';
-import {readSelectionText, selectionReverseTarget, shouldIgnoreSelection} from '@/src/features/selection-translation/core';
+import {readSelectionText, resolveActiveSelection, selectionReverseTarget, shouldIgnoreSelection} from '@/src/features/selection-translation/core';
 import {
     addPressedHotkeyEventKey,
     canonicalizeHotkey,
@@ -48,13 +48,14 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
 
     const hasActiveSelectionTranslationCandidate = (): boolean => {
         if (!isSelectionTranslatorEnabled()) return false;
-        const selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return false;
         const selectionHost = document.getElementById('fluent-read-selection-translator-container');
-        if (selectionHost && selection.containsNode(selectionHost, true)) return false;
+        const resolved = resolveActiveSelection(window, document, {
+            isIgnoredSelection: (selection) => Boolean(selectionHost && selection.containsNode?.(selectionHost, true)),
+        });
+        if (!resolved) return false;
 
-        const range = selection.getRangeAt(0);
-        const text = readSelectionText(range, selection.toString());
+        const {range, nativeText} = resolved;
+        const text = readSelectionText(range, nativeText);
         const canReverse = config.selectionTranslatorBidirectional
             && Boolean(selectionReverseTarget(text, config.to, config.from));
         if (!text || text.length > 4096 || (shouldSkipChineseSelection(text, config.to) && !canReverse)

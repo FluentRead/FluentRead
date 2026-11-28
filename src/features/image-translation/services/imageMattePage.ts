@@ -1,12 +1,17 @@
 /**
  * @file src/features/image-translation/services/imageMattePage.ts
  * 文件职责：在普通图片的严格透明准入失败后，原子规划同一原始帧的完整 RGBA 墨迹修补。
- * 主要内容：共享整页观察、绘字扫描、候选和碰撞预算，逐物理源框验证局部背景；无权限提案只公开完整译文字形预检与模型投影需要的冻结几何，真实同帧支持逐点授权后才登记一次性写入计划。保留原文与相邻行的原像素必须避开实际新墨迹支持；绘字框内未归属源墨且不同于观测背景的像素只作图案保护；全页填充与图案冲突即撤回，精确墨迹行段合并为有界脏矩形，仅上传确实改变的字形像素，不回写整页图案。
+ * 主要内容：共享整页观察、绘字扫描、候选和碰撞预算，逐物理源框验证局部背景；无权限提案只公开完整译文字形预检与模型投影需要的冻结几何，真实同帧支持逐点授权后才登记一次性写入计划。显式传入 OCR 原文时，允许纯色标签逐字形复核一致的裁切。分割资源缺失时，可在已有清字几何内使用确认的纯色底，精确更新交集墨迹。保留原文与相邻行的原像素必须避开实际新墨迹支持；绘字框内未归属源墨且不同于观测背景的像素只作图案保护；全页填充与图案冲突即撤回，精确墨迹行段合并为有界脏矩形，仅上传确实改变的字形像素，不回写整页图案。
  * 模块边界：纯数据规划和独占像素写入，不创建 Canvas、不运行模型、不修改 OCR；仅消费同帧局部 RGBA 证明，不能证明相连同色装饰的语义。调用方必须在可选模型准备前完成所有完整译文字形预检，并保持原像素独占和同帧身份；失败授权不改候选或像素，取消时丢弃提案，授权成功后只能向原像素应用一次。
+ * 图案保留：限单行，完整验证同底色字形与独立边饰。原框外至多三行，仅将同帧分割支持且与已确认正文相连的像素计入写入。
+ * 细衬线：较淡笔画提案必须通过原文逐字核对和同帧模型授权，不参与缺模型时的旧框内补底。
  */
 import type {ImageTextRegion} from '../paragraphs';
+import {coversClippedImageGlyphs} from './imageClippedGlyphs';
+import {keepImageMatteDecoration,type ImageMatteDecoration} from './imageMatteDecoration';
 import {imageMatteObservationBox,planImageMatteCandidate,planImageMatteRepair,type ImageMatteRepair} from './imageMatteRepair';
 import type {ImageDetectionSupport} from './imageDetectionEvidence';
+import {imageMaskBoxes} from './inpainting';
 
 type Box=ImageTextRegion['bbox'];
 type Rgba=readonly [number,number,number,number];
@@ -15,7 +20,7 @@ export interface ImageMattePageDrawing {readonly line:ImageTextRegion;readonly b
 export interface ImageMattePagePlan {
     readonly drawings:readonly ImageMattePageDrawing[];
     readonly rectangles:readonly Readonly<Box>[];
-    /** 半开原图坐标，仅覆盖已经确认的墨迹，不能以包络代替这些上传授权。 */
+    /** 半开原图坐标。完整修补只上传墨迹行段，范围内补底按已有的清字矩形上传。 */
     readonly uploads:readonly Readonly<Box>[];
 }
 declare const proposalIdentity:unique symbol;
@@ -25,8 +30,10 @@ export interface ImageMatteProposalView {
     readonly drawings:readonly ImageMattePageDrawing[];
     readonly rectangles:readonly Readonly<Box>[];
     readonly observations:readonly Readonly<{sourceBox:Readonly<Box>;left:number;top:number;width:number;height:number}>[];
+    readonly requiresGlyphProof?:true;
+    readonly hasDecorationFringe?:true;
 }
-interface Authority {pixels:Uint8ClampedArray;width:number;height:number;repairs:ImageMatteRepair[];applied:boolean}
+interface Authority {pixels:Uint8ClampedArray;width:number;height:number;repairs:ImageMatteRepair[];repairLines:Array<ImageTextRegion|undefined>;applied:boolean}
 interface PageCandidate {plan:ImageMattePagePlan;authority:Authority}
 interface ProposalCandidate extends PageCandidate {view:ImageMatteProposalView}
 const authorities=new WeakMap<ImageMattePagePlan,Authority>();
@@ -78,15 +85,18 @@ function rectangles(rows:Run[]):Readonly<Box>[]|undefined {
 /** 原框不变；两种入口共享所有预算、局部证明和全页碰撞，始终借读尚未回写的同一原始像素。 */
 function buildPageCandidate(
     pixels:Uint8ClampedArray,width:number,height:number,lines:ImageTextRegion[],retained:ImageTextRegion[],
-    drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,support?:ImageDetectionSupport,
+    drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,support?:ImageDetectionSupport,decoration?:ImageMatteDecoration,
+    allowFringe=false,
 ):PageCandidate|undefined {
     if(!(pixels instanceof Uint8ClampedArray)||![width,height].every(v=>Number.isSafeInteger(v)&&v>0&&v<=8192)
         ||width*height>16_777_216||pixels.length<width*height*4||lines.length===0||lines.length>MAX_ATTEMPTS)return;
     let remainingPixels=MAX_PIXELS,checks=MAX_CHECKS,attempts=0,retainedBoxes=0;
     const reserve=(amount:number)=>Number.isSafeInteger(amount)&&amount>0&&(remainingPixels-=amount)>=0;
     const repairs:ImageMatteRepair[]=[],drawings:ImageMattePageDrawing[]=[],artRows:Run[]=[],inkRows:Run[]=[];
+    const repairLines:Array<ImageTextRegion|undefined>=[];
     const protectedBoxes:Box[]=[];
     const fitBudget={remaining:4_194_304};
+    if(decoration&&lines.length!==1)return;
     for(const line of retained){
         const sources=line.sourceBoxes;
         for(let index=-1;index<(sources?.length??0);index++){
@@ -98,8 +108,19 @@ function buildPageCandidate(
     }
     for(const line of lines){
         const sources=line.sourceBoxes??[line.bbox];if(!sources.length||sources.length>MAX_ATTEMPTS-attempts)return;
-        const bounds=drawBounds(line,width,height),draw=integerBox(bounds,width,height);
-        if(!draw||bounds.x0<0||bounds.y0<0||bounds.x1>width||bounds.y1>height)return;
+        const singleHorizontal=sources.length===1&&!line.vertical&&!line.quarterTurn&&!line.ruby?.length;
+        if(decoration&&!singleHorizontal)return;
+        const legacy=decoration?imageMaskBoxes(line,width,height)[0]:undefined;
+        if(decoration&&!legacy)return;
+        const requested=drawBounds(line,width,height);
+        if(!valid(requested)||requested.x0<0||requested.y0<0||requested.x1>width||requested.y1>height)return;
+        // 空心边饰只处理旧擦除范围；原绘字余量可能正压在框外保留的笔画上。
+        const bounds=decoration?.enclosed?{
+            x0:Math.max(requested.x0,legacy!.x0),y0:Math.max(requested.y0,legacy!.y0),
+            x1:Math.min(requested.x1,legacy!.x1),y1:Math.min(requested.y1,legacy!.y1),
+        }:requested;
+        const draw=integerBox(bounds,width,height);
+        if(!draw)return;
         if(!reserve((draw.x1-draw.x0)*(draw.y1-draw.y0)))return;
         for(const old of drawings){if(--checks<0||overlap(draw,old.bounds))return;}
         for(const box of protectedBoxes){if(--checks<0||overlap(draw,box))return;}
@@ -109,8 +130,11 @@ function buildPageCandidate(
             const observation=imageMatteObservationBox(width,height,source);
             if(!observation||!reserve(observation.width*observation.height))return;
             const supportAt=support?.forBox(source,observation);if(support&&!supportAt)return;
+            const purpose=decoration&&!decoration.enclosed?'decoration'
+                :decoration?.enclosed||allowFringe&&singleHorizontal?'recognition':undefined;
             const plan=support?planImageMatteRepair(pixels,width,height,source,supportAt!,fitBudget)
-                :planImageMatteCandidate(pixels,width,height,source,fitBudget);if(!plan)return;
+                :planImageMatteCandidate(pixels,width,height,source,fitBudget,purpose);if(!plan)return;
+            if(decoration&&!keepImageMatteDecoration(plan,decoration,legacy!))return;
             if(group.length&&!equal(group[0].background,plan.background))return;
             // 支持可超出原排版框；不同背景不能按应用顺序争用同一个原墨迹像素。
             for(const old of repairs){
@@ -133,7 +157,7 @@ function buildPageCandidate(
                     if(plan.mask[y*plan.width+x]&&plan.left+x>=box.x0&&plan.left+x<box.x1&&plan.top+y>=box.y0&&plan.top+y<box.y1)return;
                 }
             }
-            group.push(plan);repairs.push(plan);
+            group.push(plan);repairs.push(plan);repairLines.push(singleHorizontal?line:undefined);
         }
         const background=group[0].background;
         for(let y=draw.y0;y<draw.y1;y++){
@@ -164,7 +188,7 @@ function buildPageCandidate(
     }
     const uploads=rectangles(ink),holes=rectangles(art);if(!uploads||!holes)return;
     const result:ImageMattePagePlan={drawings:Object.freeze(drawings),rectangles:Object.freeze(holes),uploads:Object.freeze(uploads)};
-    return {plan:Object.freeze(result),authority:{pixels,width,height,repairs,applied:false}};
+    return {plan:Object.freeze(result),authority:{pixels,width,height,repairs,repairLines,applied:false}};
 }
 
 /** 旧入口仍要求真实支持；缺失时不运行候选，也不发布任何写入权限。 */
@@ -181,13 +205,14 @@ export function planImageMattePage(
 /** 无模型支持的整页预提案；完整冲突检查完成后才公开布局几何，提案本身永远不可apply。 */
 export function proposeImageMattePage(
     pixels:Uint8ClampedArray,width:number,height:number,lines:ImageTextRegion[],retained:ImageTextRegion[],
-    drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,
+    drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,decoration?:ImageMatteDecoration,allowFringe=false,
 ):ImageMatteProposal|undefined {
-    const candidate=buildPageCandidate(pixels,width,height,lines,retained,drawBounds);if(!candidate)return;
+    const candidate=buildPageCandidate(pixels,width,height,lines,retained,drawBounds,undefined,decoration,allowFringe);if(!candidate)return;
     const view:ImageMatteProposalView=Object.freeze({drawings:candidate.plan.drawings,rectangles:candidate.plan.rectangles,
         observations:Object.freeze(candidate.authority.repairs.map(repair=>Object.freeze({
             sourceBox:Object.freeze({...repair.sourceBox}),left:repair.left,top:repair.top,width:repair.width,height:repair.height,
-        })))});
+        }))),...(candidate.authority.repairs.some(repair=>repair.fringeCore)?{requiresGlyphProof:true as const}:{}),
+        ...(candidate.authority.repairs.some(repair=>repair.decorationFringe)?{hasDecorationFringe:true as const}:{})});
     const proposal=Object.freeze({}) as ImageMatteProposal;
     proposals.set(proposal,{...candidate,view});return proposal;
 }
@@ -197,19 +222,97 @@ export function getImageMatteProposalDrawings(proposal:ImageMatteProposal):Image
     return proposals.get(proposal)?.view;
 }
 
-/** 每个候选墨迹点必须被真实支持接受；失败保持提案，可继续尝试另一同帧模型，不重扫原图。 */
-export function authorizeImageMatteProposal(proposal:ImageMatteProposal,support:ImageDetectionSupport):ImageMattePagePlan|undefined {
+function everyInkPixelSupported(repair:ImageMatteRepair,supportAt:(x:number,y:number)=>boolean):boolean {
+    for(let y=0;y<repair.height;y++)for(let x=0;x<repair.width;x++){
+        if(repair.mask[y*repair.width+x]&&supportAt(repair.left+x,repair.top+y)!==true)return false;
+    }
+    return true;
+}
+
+/** 逐点核验同帧支持。单行标签可用原文和同帧支持复核统一裁切，失败时仍可尝试另一模型。 */
+export function authorizeImageMatteProposal(proposal:ImageMatteProposal,support:ImageDetectionSupport,
+    sourceLabels?:ReadonlyMap<ImageTextRegion,string>):ImageMattePagePlan|undefined {
     const candidate=proposals.get(proposal);if(!candidate||!support)return;
+    const clippedBudget={remaining:262_144};
     for(let i=0;i<candidate.authority.repairs.length;i++){
         const repair=candidate.authority.repairs[i],observation=candidate.view.observations[i];
         const supportAt=support.forBox(observation.sourceBox,observation);if(!supportAt)return;
-        for(let y=0;y<repair.height;y++)for(let x=0;x<repair.width;x++){
-            if(repair.mask[y*repair.width+x]&&supportAt(repair.left+x,repair.top+y)!==true)return;
-        }
+        if(!repair.fringeCore&&everyInkPixelSupported(repair,supportAt))continue;
+        const line=candidate.authority.repairLines[i];
+        const label=line&&sourceLabels?.get(line);
+        if(label===undefined||!coversClippedImageGlyphs(repair,label,supportAt,clippedBudget))return;
     }
     // 同步支持回调也可能撤销或重入；失去提案所有权后不能重新发布旧授权。
     if(proposals.get(proposal)!==candidate)return;
     proposals.delete(proposal);authorities.set(candidate.plan,candidate.authority);return candidate.plan;
+}
+
+/** 边饰已从蒙版删除。由旧框内有分割支持的墨迹起步，逐行只纳入相连且受支持的原墨。 */
+export function authorizeImageMatteDecorationFringe(proposal:ImageMatteProposal,support:ImageDetectionSupport):ImageMattePagePlan|undefined {
+    const candidate=proposals.get(proposal);
+    if(!candidate)return;
+    const [repair]=candidate.authority.repairs;
+    const fringe=repair.decorationFringe;
+    if(!fringe)return;
+    const [observation]=candidate.view.observations;
+    const supportAt=support.forBox(observation.sourceBox,observation);
+    if(!supportAt)return;
+
+    const {left,top,width}=repair;
+    const mask=repair.mask.slice();
+    const anchorRow=fringe.firstRow-fringe.step;
+    let anchored=mask.slice(anchorRow*width,(anchorRow+1)*width);
+    for(let x=1;x<width-1;x++){
+        if(anchored[x]&&supportAt(left+x,top+anchorRow)!==true)anchored[x]=0;
+    }
+    let changed=false;
+    for(let offset=0;offset<fringe.mask.length;offset+=width){
+        const y=fringe.firstRow+fringe.step*offset/width;
+        const row=mask.subarray(y*width,(y+1)*width);
+        // 闭环墨迹不会接触观察框边，连接只可来自上一行的三个相邻位置。
+        for(let x=1;x<width-1;x++){
+            if(fringe.mask[offset+x]&&(anchored[x-1]||anchored[x]||anchored[x+1])&&supportAt(left+x,top+y)===true){
+                row[x]=1;
+                changed=true;
+            }
+        }
+        anchored=row;
+    }
+    if(!changed)return;
+    const runs:Run[]=[];
+    // 单一观察框至多有 MAX_RUNS 个像素，逐行合并后不会超过行段预算。
+    appendMaskRuns(repair,mask,runs,MAX_RUNS);
+    const uploads=rectangles(runs);
+    if(!uploads||proposals.get(proposal)!==candidate)return;
+    const plan=Object.freeze({...candidate.plan,uploads:Object.freeze(uploads)});
+    proposals.delete(proposal);
+    authorities.set(plan,{...candidate.authority,repairs:[{...repair,mask}]});
+    return plan;
+}
+
+/** 缺分割时仅使用原有清字范围，避免把框外原字的颜色当成底色扩散进去。 */
+export function authorizeImageMatteWithinExistingMasks(proposal:ImageMatteProposal):ImageMattePagePlan|undefined {
+    const candidate=proposals.get(proposal);
+    if(!candidate||candidate.view.requiresGlyphProof)return;
+    const {width,height}=candidate.authority;
+    const repairs:ImageMatteRepair[]=[],uploads:Readonly<Box>[]=[];
+    for(const repair of candidate.authority.repairs){
+        if(repair.background[3]!==255)return;
+        const [bounds]=imageMaskBoxes({bbox:repair.sourceBox,text:''},width,height);
+        const x0=Math.max(0,bounds.x0-repair.left),x1=Math.min(repair.width,bounds.x1-repair.left);
+        const y0=Math.max(0,bounds.y0-repair.top),y1=Math.min(repair.height,bounds.y1-repair.top);
+        const mask=new Uint8Array(repair.mask.length);
+        for(let y=y0;y<y1;y++){
+            const row=y*repair.width;
+            mask.set(repair.mask.subarray(row+x0,row+x1),row+x0);
+        }
+        repairs.push({...repair,mask});
+        uploads.push(Object.freeze(bounds));
+    }
+    const plan=Object.freeze({...candidate.plan,uploads:Object.freeze(uploads)});
+    proposals.delete(proposal);
+    authorities.set(plan,{...candidate.authority,repairs});
+    return plan;
 }
 
 /** 页面、原帧或布局失效时撤销提案；不能撤回已经登记的计划，也不改变任何像素。 */

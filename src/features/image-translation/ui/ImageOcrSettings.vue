@@ -14,7 +14,7 @@
       <MangaModelSettings v-if="props.showManga" />
       <component :is="props.embedded ? 'details' : 'div'" class="image-ocr-engine-details" :open="props.embedded ? engineExpanded : undefined" @toggle="engineExpanded = ($event.target as HTMLDetailsElement).open">
         <summary v-if="props.embedded" class="image-ocr-engine-summary">
-          <div><strong :id="`${props.idPrefix}-ocr-pack-title`">{{ translateLegacy('轻量识别') }}</strong><small>Tesseract · {{ translateLegacy(props.active ? '当前使用' : '备用识别') }}</small></div>
+          <div><strong :id="`${props.idPrefix}-ocr-pack-title`">{{ translateLegacy('轻量识别') }}</strong><small>Tesseract · {{ translateLegacy(activeEngine ? '当前使用' : '备用识别') }}</small></div>
           <span v-if="initialized" class="image-ocr-count">{{ t('ocr.packs.count', {count: downloadedCodes.length, total: languagePacks.length}) }}</span>
         </summary>
         <header v-else class="image-ocr-heading settings-card-heading">
@@ -88,7 +88,7 @@ import DownloadProgress from '@/src/ui/components/DownloadProgress.vue';
 import {ocrLanguageDownloadId, type DownloadProgress as DownloadProgressValue} from '@/src/core/download/progress';
 import {watchDownloadProgress} from '@/src/platform/storage/downloadProgress';
 import {
-  IMAGE_OCR_LANGUAGE_PACKS, IMAGE_OCR_SOURCE_LANGUAGES, IMAGE_OCR_LANGUAGE_STATE_KEY, getRequiredImageOcrLanguages,
+  IMAGE_OCR_LANGUAGE_PACKS, IMAGE_OCR_SOURCE_LANGUAGES, IMAGE_OCR_LANGUAGE_STATE_KEY, getImageOcrEngine, getRequiredImageOcrLanguages,
   normalizeImageOcrLanguageCodes, type ImageOcrLanguageCode, type ImageOcrDownloadState, type ImageOcrStatusResponse,
 } from '../ocrLanguages';
 
@@ -114,9 +114,10 @@ const requiredReady = computed(() => initialized.value && requiredCodes.value.ev
 const requiredBusy = computed(() => requiredCodes.value.some(isBusy));
 const hasActiveTasks = computed(() => IMAGE_OCR_LANGUAGE_PACKS.some(pack => isBusy(pack.code)));
 const hasPackErrors = computed(() => Object.values(states.value).some(state => state?.phase === 'error') || Object.values(actionErrors.value).some(Boolean));
-const engineExpanded = ref(props.active);
+const activeEngine = computed(() => getImageOcrEngine(props.sourceLanguage, props.active ? 'tesseract' : 'paddle') === 'tesseract');
+const engineExpanded = ref(activeEngine.value);
 const languagesExpanded = ref(false);
-watch(() => props.active, active => {engineExpanded.value = active || hasActiveTasks.value || statusError.value || hasPackErrors.value;});
+watch(activeEngine, active => {engineExpanded.value = active || hasActiveTasks.value || statusError.value || hasPackErrors.value;});
 // 开始任务或失败时展开；完成后保留展开状态，便于查看结果并继续管理。
 watch([hasActiveTasks, hasPackErrors, statusError], feedback => {
   if (feedback.some(Boolean)) {engineExpanded.value = true; languagesExpanded.value = true;}

@@ -14,6 +14,8 @@ If the store is unavailable, follow [offline installation](/en/guide/offline-ins
 
 In Chrome, click the puzzle-shaped **Extensions** button beside the address bar. Find **FluentRead** and click its pin icon. Use the toolbar icon to open FluentRead’s menu.
 
+Hover over the icon to see a short description of page and selection translation in your browser’s language.
+
 <details class="guide-details">
 <summary>See where to pin the icon</summary>
 

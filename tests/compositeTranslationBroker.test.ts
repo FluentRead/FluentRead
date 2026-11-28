@@ -529,13 +529,16 @@ describe('组合翻译真实 broker 接入', () => {
         for (const key of itemKeys) h.cacheStore.set(key, '旧译文 <webpage_context>泄漏的私有参考</webpage_context>');
         const owner = new AbortController();
         const snapshots: unknown[] = [];
+        const quotaScopes: string[] = [];
         h.recordRequest.mockClear();
         h.providers.claude = vi.fn(async message => {
             expect(message.summaryPrompt).toBeUndefined();
             expect(message.context).toBe('');
             expect(message.pageContext).toBe('');
             expect(message.abortSignal?.aborted).toBe(false);
-            expect(getTranslationRequestScheduler(message)?.identity).toEqual({service: 'claude', model: 'claude-sonnet-4-5'});
+            const identity = getTranslationRequestScheduler(message)?.identity;
+            expect(identity).toEqual({service: 'claude', model: 'claude-sonnet-4-5', quotaScope: expect.stringMatching(/^[0-9a-f]{64}$/)});
+            quotaScopes.push(identity!.quotaScope!);
             const snapshot = getTranslationProviderConfig(message, h.config);
             snapshots.push(snapshot);
             expect(snapshot.token.claude).toBe('fixture-claude-before');
@@ -547,6 +550,7 @@ describe('组合翻译真实 broker 接入', () => {
         await expect(h.broker.translateWithCache(attachTranslationRequestControl({origin: origins, context, pageContext,
             modelOverride: 'group-model'}, {signal: owner.signal, ownershipKey: 'recover-cached-array'}))).resolves.toEqual(translations);
         expect(h.providers.claude).toHaveBeenCalledTimes(2);
+        expect(new Set(quotaScopes).size).toBe(1);
         expect(snapshots[0]).toStrictEqual(snapshots[1]);
         expect(snapshots.every(snapshot => Object.isFrozen(snapshot))).toBe(true);
         expect(owner.signal.aborted).toBe(false);

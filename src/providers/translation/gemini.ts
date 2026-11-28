@@ -16,11 +16,12 @@ import {abortErrorFromSignal, cancelUnreadResponseBody, createRuntimeAbortContex
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
 import {
     requireTranslationProviderConfig,
+    observeTranslationHttpResponse,
     reportTranslationModelUsage,
     reportTranslationModelUsageFailure,
     getTranslationImageInput,
 } from '@/src/services/translation/requestSnapshot';
-import type {TranslationProviderRequest} from '@/src/services/translation/types';
+import {TRANSLATION_COMPACT_BATCH, type TranslationProviderRequest} from '@/src/services/translation/types';
 import {normalizeGeminiUsage} from './usage';
 
 
@@ -73,6 +74,7 @@ async function gemini(message: TranslationProviderRequest<string>) {
             body,
             signal: abortContext.signal,
         });
+        observeTranslationHttpResponse(message, resp);
         if (!resp.ok) {
             reportTranslationModelUsageFailure(message, undefined, startedAt, model, resp.status);
             attemptReported = true;
@@ -85,7 +87,22 @@ async function gemini(message: TranslationProviderRequest<string>) {
         const actualModel = typeof result?.modelVersion === 'string' && result.modelVersion.trim()
             ? result.modelVersion
             : model;
-        const parts = result?.candidates?.[0]?.content?.parts;
+        const candidate = result?.candidates?.[0];
+        if (current[TRANSLATION_COMPACT_BATCH] === true && candidate?.finishReason === 'MAX_TOKENS') {
+            const error = Object.assign(new Error('批量翻译返回格式异常'), {
+                kind: 'response', retryable: false, code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID', statusCode: resp.status,
+            });
+            attemptReported = true;
+            reportTranslationModelUsage(message, {
+                ...normalizeGeminiUsage(result?.usageMetadata, actualModel),
+                startedAt,
+                durationMs: Math.max(0, Date.now() - startedAt),
+                outcome: 'error',
+                statusCode: resp.status,
+            });
+            throw error;
+        }
+        const parts = candidate?.content?.parts;
         const translatedText = Array.isArray(parts)
             ? parts.filter((part: unknown): part is {text: string} => Boolean(
                 part && typeof part === 'object' && typeof (part as {text?: unknown}).text === 'string'

@@ -21,7 +21,7 @@ import {INFORMATION_HIGHLIGHT_COLORS, INFORMATION_HIGHLIGHT_PALETTES, informatio
 const runtime = createRequire(import.meta.url)('vue') as typeof import('vue')
 const key = '__fluentReadInformationHighlightSettingsLifecycle'
 const folder = 'src/features/settings/ui/'
-const realComponents = ['InformationHighlightSettings', 'InformationHighlightPreferences', 'InformationHighlightModelCard', 'InformationHighlightPreview', 'SettingsGroup']
+const realComponents = ['InformationHighlightSettings', 'InformationHighlightPreferences', 'InformationHighlightModelCard', 'InformationHighlightPreview', 'SettingsGroup', 'SettingsDisclosure']
 let server: ViteDevServer | undefined, app: import('vue').App | undefined
 let document: Document, props: {config: Config; active?: boolean}
 let shown: import('vue').Ref<boolean>, events: Map<Element, Record<string, any>>
@@ -110,7 +110,7 @@ async function compile(relative: string) {
 async function mount(mode: 'keywords' | 'surprisal-local' = 'surprisal-local', active: boolean | undefined = true) {
   await server!.ssrLoadModule('/src/ui/components/CustomHotkeyInput.vue')
   for (const name of realComponents.filter(name => name !== 'InformationHighlightSettings')) {
-    await compile(`${folder}${name === 'SettingsGroup' ? 'components/' : ''}${name}.vue`)
+    await compile(`${folder}${name === 'SettingsGroup' || name === 'SettingsDisclosure' ? 'components/' : ''}${name}.vue`)
   }
   const component = await compile(`${folder}InformationHighlightSettings.vue`)
   props = runtime.reactive({config: new Config(), active}); props.config.on = false
@@ -265,7 +265,13 @@ describe('信息高亮设置真实父子模板与生命周期', () => {
     expect(control.getAttribute('aria-label')).toBe('informationHighlight.enabled')
     const toggle = event('[data-information-highlight-enabled]', 'onUpdate:modelValue')
     toggle(true); await settle(); expect(props.config.informationHighlight).toEqual({enabled: true, hotkey: 'Alt+H', hotkeyEnabled: true, model: 'qwen2.5-0.5b', mode: 'keywords', density: 'high', color: 'blue', style: 'underline', intensity: 'standard'})
-    props.active = false; await settle(); toggle(false); expect(props.config.informationHighlight.enabled).toBe(true)
+    const clickControl = element('[data-information-highlight-click-to-translate]')
+    expect(clickControl.getAttribute('aria-label')).toBe('informationHighlight.clickToTranslate')
+    event('[data-information-highlight-click-to-translate]', 'onUpdate:modelValue')(true); await settle(); expect(props.config.informationHighlight.clickToTranslate).toBe(true)
+    const toggleClick = event('[data-information-highlight-click-to-translate]', 'onUpdate:modelValue')
+    toggleClick(false); await settle(); expect(props.config.informationHighlight).not.toHaveProperty('clickToTranslate')
+    const latestToggleClick = event('[data-information-highlight-click-to-translate]', 'onUpdate:modelValue')
+    props.active = false; await settle(); toggle(false); latestToggleClick(true); expect(props.config.informationHighlight.enabled).toBe(true); expect(props.config.informationHighlight).not.toHaveProperty('clickToTranslate')
     expect(send).not.toHaveBeenCalled()
   })
   it('颜色浓度三档即时改变预览、色阶卡与样例的透明度，只保存 intensity', async () => {
@@ -323,51 +329,17 @@ describe('信息高亮设置真实父子模板与生命周期', () => {
     expect(element('[data-testid="information-highlight-preview"] figcaption').textContent).toBe('informationHighlight.preview.caption')
     expect(send).not.toHaveBeenCalled(); expect(props.config.on).toBe(false)
   })
-  it('标题辅助插槽保留原始标题，三个标签是原生按钮并声明悬停、聚焦和点击提示', async () => {
+  it('折叠卡片保留标题、说明与动态状态摘要，不触发模型读取', async () => {
     await mount('keywords')
-    const heading = element('#information-highlight-settings .settings-group-heading'), title = element('#information-highlight-settings h2')
-    expect(title.textContent).toBe('informationHighlight.title'); expect(heading.querySelectorAll('h2')).toHaveLength(1)
-    const copy = element('#information-highlight-settings .settings-card-heading-copy'), tags = element('.information-highlight-tags')
-    expect(title.parentElement).toBe(copy); expect(title.nextElementSibling?.textContent).toBe('informationHighlight.description')
-    expect(copy.parentElement).toBe(heading); expect(tags.parentElement).toBe(heading); expect(tags.previousElementSibling).toBe(copy)
-    expect(tooltips).toHaveLength(3)
-    for (const [index, tag] of ['keywords', 'surprisal', 'reading'].entries()) {
-      const button = element(`[data-information-highlight-tag="${tag}"]`)
-      expect(button.tagName).toBe('BUTTON'); expect(button.getAttribute('type')).toBe('button'); expect(button.getAttribute('tabindex')).not.toBe('-1')
-      expect(button.getAttribute('aria-label')).toBe(`informationHighlight.tags.${tag}`); expect(button.textContent).toBe(`informationHighlight.tags.${tag}`)
-      expect(button.hasAttribute('disabled')).toBe(false)
-      expect(tooltips[index].props).toMatchObject({content: `informationHighlight.tags.${tag}.help`, trigger: ['hover', 'focus', 'click'],
-        disabled: false, persistent: false, teleported: false, placement: 'bottom', showAfter: 150, hideAfter: 100, popperClass: 'fluentread-information-highlight-tag-popper'})
-    }
+    const summary = element('#information-highlight-settings .settings-disclosure-summary')
+    expect(summary.querySelector('strong')?.textContent).toBe('informationHighlight.title')
+    expect(summary.querySelector('small')?.textContent).toBe('informationHighlight.description')
+    expect(summary.querySelector('.settings-disclosure-status')?.textContent?.trim()).toBe('Alt+H')
+    props.config.informationHighlight = {...props.config.informationHighlight, enabled: true}; await settle()
+    expect(summary.querySelector('.settings-disclosure-status')?.textContent?.trim()).toBe('informationHighlight.mode.keywords')
+    props.config.informationHighlight = {...props.config.informationHighlight, enabled: false, hotkeyEnabled: false}; await settle()
+    expect(summary.querySelector('.settings-disclosure-status')?.textContent?.trim()).toBe('common.none')
     expect(send).not.toHaveBeenCalled(); expect(props.config.on).toBe(false)
-  })
-  it('Escape 调用现有提示延迟关闭和立即隐藏端口，不移动焦点或改偏好；其他键不关闭', async () => {
-    await mount('keywords'); const before = {...props.config.informationHighlight}, stopPropagation = vi.fn()
-    event('[data-information-highlight-tag="surprisal"]', 'onKeydown')({key: 'Enter', stopPropagation})
-    expect(stopPropagation).not.toHaveBeenCalled(); expect(tooltips.every(tooltip => tooltip.hide.mock.calls.length === 0)).toBe(true)
-    event('[data-information-highlight-tag="surprisal"]', 'onKeydown')({key: 'Escape', stopPropagation})
-    expect(stopPropagation).toHaveBeenCalledOnce()
-    for (const tooltip of tooltips) {expect(tooltip.onClose).toHaveBeenCalledOnce(); expect(tooltip.hide).toHaveBeenCalledOnce()}
-    expect(props.config.informationHighlight).toEqual(before); expect(send).not.toHaveBeenCalled(); expect(props.config.on).toBe(false)
-  })
-  it.each(['hidden', 'cached', 'unmounted'] as const)('%s 撤销提示触发所有权；卸载后的旧 Escape 不触碰已移除的提示', async reason => {
-    await mount('keywords'); const button = element('[data-information-highlight-tag="keywords"]'), escape = event('[data-information-highlight-tag="keywords"]', 'onKeydown')
-    if (reason === 'hidden') props.active = false
-    else if (reason === 'cached') shown.value = false
-    else {app!.unmount(); app = undefined}
-    await settle()
-    for (const tooltip of tooltips) {expect(tooltip.onClose).toHaveBeenCalledOnce(); expect(tooltip.hide).toHaveBeenCalledOnce()}
-    if (reason === 'unmounted') {
-      escape({key: 'Escape', stopPropagation: vi.fn()})
-      for (const tooltip of tooltips) {expect(tooltip.onClose).toHaveBeenCalledOnce(); expect(tooltip.hide).toHaveBeenCalledOnce()}
-      expect(document.querySelector('[data-tooltip-content-port]')).toBeNull()
-    } else {
-      expect(button.hasAttribute('disabled')).toBe(true); expect(tooltips.every(tooltip => tooltip.props.disabled === true)).toBe(true)
-      if (reason === 'hidden') props.active = true; else shown.value = true
-      await settle(); expect(button.hasAttribute('disabled')).toBe(false); expect(tooltips.every(tooltip => tooltip.props.disabled === false)).toBe(true)
-      for (const tooltip of tooltips) {expect(tooltip.onClose).toHaveBeenCalledOnce(); expect(tooltip.hide).toHaveBeenCalledOnce()}
-    }
-    expect(send).not.toHaveBeenCalled(); expect(props.config.informationHighlight.mode).toBe('keywords')
   })
   it('关键词模式不挂载模型卡；改成本地模式后只读取状态，模型卡在模式与密度之间', async () => {
     await mount('keywords'); expect(document.querySelector('[data-testid="information-highlight-model-card"]')).toBeNull(); expect(send).not.toHaveBeenCalled()

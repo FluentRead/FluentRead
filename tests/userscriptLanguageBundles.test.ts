@@ -214,15 +214,36 @@ describe('standalone default message provider', () => {
 });
 
 describe('userscript remote UI language data', () => {
-    it('keeps native manga filter labels in extension locales without adding them to userscript bundles', () => {
-        const nativeLabels=['未绘制译文','查看全文','复制全文'];
-        for(const language of Object.keys(extensionBundles) as (keyof typeof extensionBundles)[]){
-            const original=extensionBundles[language],projected=currentUserscriptLanguageBundle(language);
-            for(const source of nativeLabels){expect(original.legacyText[source]).toBeTruthy();expect(projected.legacyText).not.toHaveProperty(source);}
-            for(const source of ['复制全部','原文对照','漫画文字'])expect(projected.legacyText[source]).toBe(original.legacyText[source]);
-            for(const source of nativeLabels)expect(original.legacyText[source]).toBeTruthy();
+    it('keeps document workbench copy in the extension and shared editing copy in the userscript', () => {
+        const documentCopy = [
+            '文档换一种语言，阅读依然流畅',
+            '文件在本地解析，文字发送至所选服务。',
+            '重新翻译会替换现有译文和人工校订。你也可以返回并先下载当前结果。',
+        ];
+        for (const source of documentCopy) {
+            expect(extensionBundles['en-US'].legacyText[source]).toBeTruthy();
+            expect(UI_LANGUAGE_BUNDLES['en-US'].legacyText).not.toHaveProperty(source);
         }
-        for(const source of nativeLabels)expect(UI_LANGUAGE_BUNDLES['en-US'].legacyText).not.toHaveProperty(source);
+        expect(UI_LANGUAGE_BUNDLES['en-US'].legacyText['校订译文']).toBe(extensionBundles['en-US'].legacyText['校订译文']);
+    });
+    it('keeps native manga filters and model preparation in extension locales', () => {
+        const nativeLabels = [
+            '未绘制译文', '查看全文', '复制全文', '识别阿拉伯语图片文字', '识别希伯来语图片文字',
+            '需要准备阿拉伯语和英语识别资源，约 4.6 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+            '需要准备希伯来语和英语识别资源，约 3.5 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+        ];
+        for (const language of Object.keys(extensionBundles) as (keyof typeof extensionBundles)[]) {
+            const original = extensionBundles[language];
+            const projected = currentUserscriptLanguageBundle(language);
+            for (const source of nativeLabels) {
+                expect(original.legacyText[source]).toBeTruthy();
+                expect(Object.hasOwn(projected.legacyText, source)).toBe(false);
+            }
+            for (const source of ['复制全部', '原文对照', '漫画文字']) {
+                expect(projected.legacyText[source]).toBe(original.legacyText[source]);
+            }
+        }
+        for (const source of nativeLabels) expect(Object.hasOwn(UI_LANGUAGE_BUNDLES['en-US'].legacyText, source)).toBe(false);
     });
     it('keeps native sidebar messages in extension locales and omits them from every userscript locale', () => {
         expect(extensionChinese['sidepanel.title']).toBeTruthy();
@@ -751,9 +772,7 @@ describe('userscript excludes unreachable native ASR translations', () => {
         const excluded = [
         "识别方式",
         "本机服务地址",
-        "固定模型：Qwen/Qwen3-ASR-1.7B。使用标准 vLLM 音频转写接口，仅允许 127.0.0.1 或 [::1]，服务需由你事先启动。",
-        "保存设置不会探测端口、启动服务或下载权重。开始 AI 字幕后才发送音频到所填本机地址；失败会报错，不自动切回 Whisper。",
-        "该接口返回文本，字幕时间按音频窗口估计，并非字级对齐；此处不代表模型已经加载或已使用 GPU。",
+        "使用本机已启动的 vLLM 接口（仅限 127.0.0.1 / [::1]，模型固定为 Qwen/Qwen3-ASR-1.7B）；开始识别时才发送音频，不自动回退 Whisper。",
         "请在设置中切换识别方式",
         "字幕配置尚未安全加载，请稍后重试",
         "原生转写模型与请求不一致",

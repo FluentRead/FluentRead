@@ -1,15 +1,17 @@
 /**
  * @file src/features/video-subtitle/content/courseCaptionData.ts
- * 文件职责：解析课程视频身份、原文字幕轨道及 B 站和 edX 的完整字幕时间轴。
+ * 文件职责：解析课程视频身份和原文字幕轨道，以及 B 站和 edX 的完整字幕时间轴。
  * 主要内容：分 P、课程小节和语言偏好进入身份；识别 B 站标题中的自带字幕标记，先匹配原语言或选择非目标语言候选，再优先人工轨，限定字幕资源主机并校验时间轴边界。
  * 模块边界：只读取传入的地址、视频节点和数据，不调用网络、页面全局、翻译或持久化。
  */
 import type {VideoCoursePlatform} from '@/src/core/config/videoCourse';
 import {finalizeVideoSubtitleCues, type VideoSubtitleCue} from './youtubeSubtitleData';
-import {captionLanguageMatch} from './platforms';
+import {captionLanguageMatch, getCourseraLectureId} from './platforms';
+
+export type CourseCaptionPlatform = VideoCoursePlatform | 'coursera';
 
 export interface CourseCaptionRequest {
-    platform: VideoCoursePlatform;
+    platform: CourseCaptionPlatform;
     key: string;
     id: string;
     language: string;
@@ -36,7 +38,7 @@ export function getBilibiliPart(url: URL): string {
 }
 
 /** 字幕地址来自宿主元数据，仍按站点限制；跨站资源不携带账号凭据。 */
-export function resolveCourseCaptionUrl(value: unknown, base: URL, platform: VideoCoursePlatform): string {
+export function resolveCourseCaptionUrl(value: unknown, base: URL, platform: CourseCaptionPlatform): string {
     if (typeof value !== 'string' || !value || value.length > 8192) return '';
     try {
         const url = new URL(value, base);
@@ -44,11 +46,13 @@ export function resolveCourseCaptionUrl(value: unknown, base: URL, platform: Vid
         const allowed = platform === 'bilibili' ? /(^|\.)(?:hdslb|bilibili|biliapi)\.com$/.test(url.hostname)
             : platform === 'udemy' ? /(^|\.)(?:udemy|udemycdn)\.com$/.test(url.hostname)
             : url.origin === base.origin;
-        return allowed ? url.href : '';
+        const courseraCdn = import.meta.env.BROWSER !== 'userscript' && platform === 'coursera'
+            && (url.hostname.endsWith('.coursera.org') || url.hostname === 'd3c33hcgiwev3.cloudfront.net');
+        return allowed || courseraCdn ? url.href : '';
     } catch { return ''; }
 }
 
-export function getCourseCaptionRequest(platform: VideoCoursePlatform, url: URL, video: HTMLVideoElement, sourceLanguage = '', targetLanguage = ''): CourseCaptionRequest | null {
+export function getCourseCaptionRequest(platform: CourseCaptionPlatform, url: URL, video: HTMLVideoElement, sourceLanguage = '', targetLanguage = ''): CourseCaptionRequest | null {
     if (platform === 'bilibili') {
         const id = getBilibiliPart(url);
         return id ? {platform, key: `${id}:${sourceLanguage}:${targetLanguage}`, id, language: sourceLanguage, target: targetLanguage, url: ''} : null;
@@ -56,6 +60,21 @@ export function getCourseCaptionRequest(platform: VideoCoursePlatform, url: URL,
     if (platform === 'udemy') {
         const match = url.pathname.match(/^\/course\/([^/]+)\/learn\/lecture\/(\d+)\/?$/);
         return match ? {platform, key: `${match[1]}/${match[2]}`, id: `${match[1]}/${match[2]}`, language: '', url: ''} : null;
+    }
+    if (import.meta.env.BROWSER !== 'userscript' && platform === 'coursera') {
+        const id = getCourseraLectureId(url.pathname);
+        if (!id) return null;
+        const tracks = Array.from(video.querySelectorAll('track[src]')).flatMap(track => {
+            if (!['subtitles', 'captions'].includes(track.getAttribute('kind') || 'subtitles')) return [];
+            const language = track.getAttribute('srclang') || '';
+            const source = resolveCourseCaptionUrl(track.getAttribute('src'), url, platform);
+            if (!source || !/^[\w-]{1,35}$/u.test(language)) return [];
+            const rank = captionLanguageMatch(language, sourceLanguage) * 4 +
+                (captionLanguageMatch(language, targetLanguage) ? 0 : 2) + Number(track.hasAttribute('default'));
+            return [{source, language, rank}];
+        });
+        const track = tracks.sort((left, right) => right.rank - left.rank)[0];
+        return track ? {platform, id, key: `${id}:${track.language}:${track.source}`, language: track.language, url: track.source} : null;
     }
     const block = video.closest<HTMLElement>('.video[data-metadata]');
     if (!block) return null;

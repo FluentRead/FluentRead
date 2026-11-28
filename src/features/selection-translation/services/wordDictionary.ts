@@ -47,6 +47,7 @@ export interface WordCardData {
     phonetics: WordPronunciation[];
     meanings: WordMeaning[];
     origin?: string;
+    inflections?: string;
     sources: WordDictionarySource[];
 }
 
@@ -63,6 +64,9 @@ interface WiktApiEntry {
     word?: unknown;
     lang_code?: unknown;
     pos?: unknown;
+    etymology_text?: unknown;
+    etymology?: unknown;
+    forms?: unknown;
     senses?: unknown;
     sounds?: unknown;
 }
@@ -125,6 +129,14 @@ const CHINA_PROVIDER_TIMEOUT_MS = 1_800;
 const WIKTAPI_TIMEOUT_MS = 1_200;
 const MAX_DEFINITIONS_PER_MEANING = 6;
 const MAX_MEANINGS = 6;
+const MAX_INFLECTIONS = 8;
+const IGNORED_WIKTAPI_FORM_TAGS = new Set([
+    'table-tags',
+    'inflection-template',
+    'class',
+    'canonical',
+    'romanization',
+]);
 
 const SOURCE_INFO: Record<WordDictionaryProviderId, WordDictionarySource> = {
     'ecdict-local': {
@@ -349,11 +361,51 @@ function hasEnglishDefinition(definition: WordDefinition): boolean {
     return /[A-Za-z]/u.test(definition.definition);
 }
 
+function mergeInflections(current: string | undefined, addition: string): string {
+    const merged: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of current ? [current, addition] : [addition]) {
+        for (const part of raw.split(';')) {
+            const value = part.trim();
+            const key = value.toLocaleLowerCase();
+            if (value && !seen.has(key)) {
+                seen.add(key);
+                merged.push(value);
+                if (merged.length >= MAX_INFLECTIONS) return merged.join('; ');
+            }
+        }
+    }
+    return merged.join('; ');
+}
+
+function formatWiktApiInflections(forms: unknown, normalizedWord: string): string {
+    if (!Array.isArray(forms)) return '';
+    const items: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of forms) {
+        if (!raw || typeof raw !== 'object') continue;
+        const value = raw as Record<string, unknown>;
+        const form = textValue(value.form);
+        if (!form || form === '-') continue;
+        const tags = Array.isArray(value.tags) ? value.tags.map(textValue).filter(Boolean) : [];
+        if (tags.some(tag => IGNORED_WIKTAPI_FORM_TAGS.has(tag.toLowerCase()))) continue;
+        if (tags.length === 0 && form.toLowerCase() === normalizedWord) continue;
+        const formatted = tags.length > 0 ? `${form} (${tags.slice(0, 3).join(', ')})` : form;
+        const key = formatted.toLocaleLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        items.push(formatted);
+        if (items.length >= MAX_INFLECTIONS) break;
+    }
+    return items.join('; ');
+}
+
 export function mergeWordCardData(base: WordCardData | null, addition: WordCardData): WordCardData {
     const card = base || createPartialCard(addition.normalizedWord, addition.sources[0] || SOURCE_INFO['free-dictionary']);
     card.word = card.word || addition.word;
     card.normalizedWord = addition.normalizedWord || card.normalizedWord;
     if (!card.origin && addition.origin) card.origin = addition.origin;
+    if (addition.inflections) card.inflections = mergeInflections(card.inflections, addition.inflections);
     addPronunciations(card, addition.phonetics);
     for (const meaning of addition.meanings) addMeaning(card, meaning.partOfSpeech, meaning.definitions);
     for (const source of addition.sources) addSource(card, source);
@@ -396,16 +448,16 @@ function chooseYoudaoVariant(value: unknown): { text: string; audio?: string } |
     };
 }
 
-function localDictionaryUrl(): string | null {
+function hasExtensionRuntime(): boolean {
     try {
         const extensionGlobal = globalThis as typeof globalThis & {
             browser?: { runtime?: { getURL?: (path: string) => string } };
             chrome?: { runtime?: { getURL?: (path: string) => string } };
         };
         const runtime = extensionGlobal.browser?.runtime || extensionGlobal.chrome?.runtime;
-        return typeof runtime?.getURL === 'function' ? runtime.getURL('ecdict-core.json') : null;
+        return typeof runtime?.getURL === 'function';
     } catch {
-        return null;
+        return false;
     }
 }
 
@@ -578,6 +630,10 @@ export function parseWiktApiEntry(entry: WiktApiEntry, normalizedWord: string): 
         const label = /received-pronunciation|british|uk/i.test(tags) ? '英式' : /general-american|american|us/i.test(tags) ? '美式' : undefined;
         return [{ text, audio, label }];
     }));
+    const origin = stripHtml(entry.etymology_text) || stripHtml(entry.etymology);
+    if (origin) card.origin = origin;
+    const inflections = formatWiktApiInflections(entry.forms, normalizedWord);
+    if (inflections) card.inflections = inflections;
     return card;
 }
 
@@ -648,50 +704,23 @@ export interface WordDictionaryProvider {
 }
 
 function createEcdictProvider(): WordDictionaryProvider {
-    type EcdictIndex = Map<string, EcdictEntry | EcdictCompactRow>;
-    let indexPromise: Promise<EcdictIndex> | null = null;
+    type EcdictIndex = Map<string, EcdictCompactRow>;
     let optionalIndexPromise: Promise<EcdictIndex | null> | null = null;
     let optionalDownload: Promise<void> | null = null;
     let nextDownloadAt = 0;
 
-    const indexRows = (entries: unknown[]): EcdictIndex => {
+    const indexRows = (entries: readonly EcdictCompactRow[]): EcdictIndex => {
         const index: EcdictIndex = new Map();
         for (const entry of entries) {
-            if (Array.isArray(entry)) {
-                if (entry.length !== 4 || entry.some(value => typeof value !== 'string')) continue;
-                const word = entry[0].toLowerCase();
-                if (word) index.set(word, entry as unknown as EcdictCompactRow);
-            } else if (entry && typeof entry === 'object') {
-                const word = textValue((entry as EcdictEntry).w).toLowerCase();
-                if (word) index.set(word, entry as EcdictEntry);
-            }
+            index.set(entry[0].toLowerCase(), entry);
         }
         return index;
     };
 
-    const loadIndex = async (url: string): Promise<EcdictIndex> => {
-        if (indexPromise) return indexPromise;
-
-        // 步骤 1：同一后台生命周期只解析一次本地词库；若读取失败则清掉失败 Promise，
-        // 让浏览器资源短暂不可用后的下一次查询能够自动恢复。
-        indexPromise = (async () => {
-            const response = await runtimeFetch(url, {credentials: 'omit'});
-            if (!response.ok) {cancelUnreadResponseBody(response); throw new Error(`local dictionary request failed: ${response.status}`);}
-            const payload = await readJsonResponse(response, 'local dictionary response is not valid JSON');
-            const entries = Array.isArray(payload) ? payload : [];
-            return indexRows(entries);
-        })();
-        try {
-            return await indexPromise;
-        } catch (error) {
-            indexPromise = null;
-            throw error;
-        }
-    };
-
     const loadOptionalIndex = (): Promise<EcdictIndex | null> => {
         if (!optionalIndexPromise) {
-            optionalIndexPromise = readCachedFullEcdict().then(rows => rows ? indexRows(rows) : null);
+            optionalIndexPromise = readCachedFullEcdict()
+                .then(rows => (rows ? indexRows(rows) : null));
         }
         return optionalIndexPromise;
     };
@@ -699,7 +728,7 @@ function createEcdictProvider(): WordDictionaryProvider {
     const startOptionalDownload = (): void => {
         if (optionalDownload || Date.now() < nextDownloadAt
             || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
-        // 当前词立即交给线上 provider；完整词库在后台准备好，后续查询从本地命中。
+        // 当前词立即交给线上 provider；完整 20,000 词离线词库在后台经国内外多镜像校验缓存，后续查询本地命中。
         optionalDownload = downloadFullEcdict()
             .then(rows => { optionalIndexPromise = Promise.resolve(indexRows(rows)); })
             .catch(() => { nextDownloadAt = Date.now() + 30 * 60_000; })
@@ -709,21 +738,16 @@ function createEcdictProvider(): WordDictionaryProvider {
     return {
         id: 'ecdict-local',
         async lookup(normalizedWord) {
-            // Userscript 没有打包扩展词库；不能在宿主页面上下文中下载可选资源。
-            const url = localDictionaryUrl();
-            if (!url) return null;
-            const coreIndex = await loadIndex(url);
-            let entry = coreIndex.get(normalizedWord);
-            if (!entry && canCacheOptionalEcdict()) {
-                const optionalIndex = await loadOptionalIndex();
-                entry = optionalIndex?.get(normalizedWord);
-                if (!optionalIndex) startOptionalDownload();
+            // Userscript 没有扩展运行时上下文；不能在宿主页面上下文中下载或缓存可选词库资产。
+            if (!hasExtensionRuntime() || !canCacheOptionalEcdict()) return null;
+            const optionalIndex = await loadOptionalIndex();
+            if (!optionalIndex) {
+                startOptionalDownload();
+                return null;
             }
+            const entry = optionalIndex.get(normalizedWord);
             if (!entry) return null;
-            const parsed: EcdictEntry = Array.isArray(entry)
-                ? {w: entry[0], p: entry[1], d: entry[2], t: entry[3]}
-                : entry as EcdictEntry;
-            return parseEcdictEntry(parsed, normalizedWord);
+            return parseEcdictEntry({w: entry[0], p: entry[1], d: entry[2], t: entry[3]}, normalizedWord);
         },
     };
 }
@@ -745,7 +769,7 @@ async function lookupYoudao(normalizedWord: string, signal?: AbortSignal): Promi
 }
 
 async function lookupWiktApi(normalizedWord: string, signal?: AbortSignal): Promise<WordCardData | null> {
-    const payload = await fetchJson(`https://api.wiktapi.dev/v1/en/word/${encodeURIComponent(normalizedWord)}`, WIKTAPI_TIMEOUT_MS, signal);
+    const payload = await fetchJson(`https://api.wiktapi.dev/v1/en/word/${encodeURIComponent(normalizedWord)}?lang=en`, WIKTAPI_TIMEOUT_MS, signal);
     if (!payload || typeof payload !== 'object') return null;
     const rawEntries = (payload as WiktApiResponse).entries;
     const entries: unknown[] = Array.isArray(rawEntries) ? rawEntries : [];

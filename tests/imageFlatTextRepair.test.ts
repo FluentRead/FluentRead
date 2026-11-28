@@ -1,5 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {planImageFlatTextRepair} from '@/src/features/image-translation/services/flatTextRepair';
+import {rotatedSpineFixture} from './helpers/rotatedSpineFixture';
 
 const box=(x0:number,y0:number,x1:number,y1:number)=>({x0,y0,x1,y1});
 function fixture(background=[238,234,213],foreground=[18,25,29]){
@@ -15,6 +16,32 @@ function fixture(background=[238,234,213],foreground=[18,25,29]){
 const plan=(f=fixture(),budget={remaining:2_097_152})=>planImageFlatTextRepair(f.pixels,f.width,f.height,f.request,budget);
 
 describe('原蒙版内的纯色文字独立修补证据',()=>{
+    it('逐列恢复弯曲书脊的色阶与贴边抗锯齿，只写已证实的墨迹',()=>{
+        const f=rotatedSpineFixture(),mask=box(29,14,56,69),budget={remaining:10000};
+        const request={mask,source:f.region.bbox,fontSize:19,rotatedLabel:true},before=f.pixels.slice();
+        const repair=planImageFlatTextRepair(f.pixels,f.width,f.height,request,budget)!;
+        expect(repair).toBeTypeOf('function');
+        expect(budget.remaining).toBe(10000-29*59);
+        const cleaned=before.slice();repair(cleaned);
+        expect(cleaned).toEqual(f.background);
+        const quiet=f.offset(42,42);
+        cleaned[quiet]=207;repair(cleaned);
+        expect(cleaned[quiet]).toBe(207);
+        expect(f.pixels).toEqual(before);
+        expect(planImageFlatTextRepair(f.pixels,f.width,f.height,{...request,rotatedLabel:false},{remaining:10000})).toBeUndefined();
+    });
+    it.each(['second-top','second-bottom','alpha','side','art','edge'] as const)('逐列方案撤回不能完整核对的 %s 场景',kind=>{
+        const f=rotatedSpineFixture(),mask=box(29,14,56,69);
+        if(kind==='second-top')f.pixels[f.offset(43,12)]++;
+        if(kind==='second-bottom')f.pixels[f.offset(43,70)]++;
+        if(kind==='alpha')f.pixels[f.offset(43,28)+3]=254;
+        if(kind==='side')f.pixels[f.offset(28,38)]++;
+        if(kind==='art')f.pixels.set(f.foreground,f.offset(30,40));
+        if(kind==='edge')mask.y1=f.height-1;
+        const before=f.pixels.slice();
+        const result=planImageFlatTextRepair(f.pixels,f.width,f.height,{mask,source:f.region.bbox,fontSize:19,rotatedLabel:true},{remaining:10000});
+        expect(result).toBeUndefined();expect(f.pixels).toEqual(before);
+    });
     it.each([
         [[238,234,213],[18,25,29]],[[10,20,30],[240,245,250]],
         [[200,255,200],[10,0,10]],[[200,200,255],[10,10,0]],

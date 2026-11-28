@@ -257,7 +257,8 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
             .flatMap(item => {
                 const physical=groupMangaText([item],language,width,height,context(item))
                 // 数字不能随普通正文合段，否则将来无法单独阻止翻译和保护原图。
-                    .map(({sourceBoxes: _boxes, ...line}) => numericInformation(line.text) ? {...line,sourceBoxes:[line.bbox]} : line);
+                    .map(({sourceBoxes: _boxes, ...line}) => numericInformation(line.text) || line.quarterTurn || line.preserveSource
+                        ? {...line,sourceBoxes:[line.bbox]} : line);
                 wordBoundaries.record(physical,[item]);
                 physical.forEach(line=>paragraphGaps.record(item,line));
                 return physical;
@@ -286,7 +287,7 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     const physicalRegions=new Map<MangaRegion,Box>();
     if(page.imageParagraphGapProofs?.length){
         const byBox=new Map<string,MangaRegion[]>();
-        for(const region of result)if(region.sourceBoxes?.length===1&&sameBox(region.sourceBoxes[0],region.bbox)){
+        for(const region of result)if(!region.quarterTurn&&!region.preserveSource&&region.sourceBoxes?.length===1&&sameBox(region.sourceBoxes[0],region.bbox)){
             const box=region.bbox,key=[box.x0,box.y0,box.x1,box.y1].join(',');
             const matches=byBox.get(key);if(matches)matches.push(region);else byBox.set(key,[region]);
         }

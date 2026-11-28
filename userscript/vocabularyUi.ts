@@ -16,3 +16,5 @@ export const MaterialWorkspace = {
         return () => h('p', {role: 'status'}, t('options.userscriptUnavailableDescription'));
     },
 };
+
+export const loadMaterialWorkspace = () => Promise.resolve(MaterialWorkspace);

@@ -1,4 +1,5 @@
 import {siteRuleTextRows} from '@/src/core/i18n/messages/siteRules';
+import {createUiLanguageBundleFiles} from '@/src/core/i18n/bundles';
 import {translateSharedVideoModelText} from '@/src/features/settings/model/sharedVideoModelText';
 import {readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
@@ -11,6 +12,7 @@ import * as onboardingMessages from '@/src/core/i18n/messages/onboarding';
 
 import {
   DEFAULT_UI_LANGUAGE,
+  getUiLanguageBundlePath,
   getUiLanguageDisplayLabel,
   UI_LANGUAGE_OPTIONS,
   normalizeUiLanguage,
@@ -18,6 +20,7 @@ import {
   translate,
   translateLegacyText,
   registerUiLanguageBundle,
+  type UiLanguageBundle,
 } from '@/src/core/i18n';
 import {enUSLegacyText, enUSMessages} from '@/src/core/i18n/messages/en-US';
 import {esESLegacyText, esESMessages} from '@/src/core/i18n/messages/es-ES';
@@ -331,7 +334,7 @@ describe('界面 i18n 契约', () => {
   });
 
   it.each(['en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES'] as const)('图片翻译的准备与各阶段说明在 %s 中完整本地化', language => {
-    for (const source of ["首次使用需准备识别语言包，下载后自动继续", "正在准备识别语言包…", "正在读取图片…", "正在识别图片文字…", "正在翻译文字…", "正在生成译图…", "已翻译 · 点击恢复原图", "查看译图", "翻译设置已更改，请重试", "译图加载超时", "图片读取超时", "图片加载超时"]) {
+    for (const source of ["首次使用需准备识别语言包，下载后自动继续", "翻译中…", "首次准备中…", "排队中…", "识别内容仅供参考，请核对数字与专名", "正在准备识别语言包…", "正在读取图片…", "正在识别图片文字…", "正在翻译文字…", "正在生成译图…", "已翻译 · 点击恢复原图", "查看译图", "翻译设置已更改，请重试", "译图加载超时", "图片读取超时", "图片加载超时"]) {
       const translated = translateLegacyText(source, language);
       expect(translated).not.toBe(source);
       if (language !== 'ja-JP') expect(translated).not.toMatch(/[\u3400-\u9fff]/u);
@@ -525,7 +528,6 @@ describe('界面 i18n 契约', () => {
       {key: 'quickTranslation.defaultModel'},
       {key: 'quickTranslation.followServiceDefault'},
       {key: 'quickTranslation.followServiceDefaultModel', params: {model: 'Model'}},
-      {key: 'quickTranslation.serviceRestriction'},
       {key: 'quickTranslation.useDefaults'},
       {key: 'quickTranslation.profileUnavailable', params: {detail: 'English · Bilingual'}},
       {key: 'quickTranslation.profilePaused', params: {detail: 'English · Bilingual'}},
@@ -545,8 +547,6 @@ describe('界面 i18n 契约', () => {
       {key: 'quickTranslation.recordFirst'},
       {key: 'quickTranslation.setFirst'},
       {key: 'quickTranslation.selectionPrecedence'},
-      {key: 'quickTranslation.googleNotice'},
-      {key: 'quickTranslation.googleOnly'},
       {key: 'quickTranslation.conflictProfile', params: {group: 'Extra hover shortcuts'}},
       {key: 'quickTranslation.conflictProfilePopup', params: {group: 'Extra hover shortcuts'}},
       {key: 'quickTranslation.shortcutDisabled'},
@@ -584,9 +584,6 @@ describe('界面 i18n 契约', () => {
     expect(translate('quickTranslation.heading.hover', 'en-US')).toBe('More hover shortcuts');
     expect(translate('popup.quickTranslation.profileCount', 'ja-JP', {count: 3})).toContain('3');
 
-    for (const language of languages) {
-      expect(translate('quickTranslation.serviceRestriction', language)).not.toContain(' · ');
-    }
     const chineseProfileName = translate('quickTranslation.profileName', 'zh-CN', {
       action: translate('quickTranslation.action.hover', 'zh-CN'), index: 1, hotkey: 'Ctrl+T',
     });
@@ -1026,6 +1023,12 @@ describe('i18n 全量界面扫描', () => {
   it('Vue 文案和展示注册表在非中文界面有本地化结果', async () => {
     const {collectUiSourceCopy} = await import('../scripts/testing/i18n-source-audit.mjs');
     const audit = collectUiSourceCopy(process.cwd());
+    const extensionCopyOwners = new Set([
+      'src/app/document-translation/DocumentApp.vue',
+      'src/features/settings/ui/SiteAdaptationSettings.vue',
+    ]);
+    const extensionLegacyText = new Map(createUiLanguageBundleFiles().map(({relativeDest, contents}) =>
+      [relativeDest, (JSON.parse(contents) as UiLanguageBundle).legacyText]));
     // 固定的中英术语演示、语言自身名称和装饰图标不属于界面译文。
     const examples = new Set(['中文', 'A中', '語言', '言語', 'large language model → 大语言模型', 'source,target,tgt_lng large language model,大语言模型,zh-Hans']);
     const readingPreviewFile = 'src/features/settings/ui/VideoSubtitleAppearanceSettings.vue';
@@ -1041,7 +1044,8 @@ describe('i18n 全量界面扫描', () => {
           // 共享目录文案只由扩展设置加载，按该组件实际使用的本地词典与公共回退共同验收。
           const local = file === 'src/features/settings/ui/VideoLocalModelSettings.vue'
             ? translateSharedVideoModelText(source, locale) : undefined;
-          const result = local ?? translateLegacyText(source, locale);
+          const extension = extensionCopyOwners.has(file) ? extensionLegacyText.get(getUiLanguageBundlePath(locale))?.[source] : undefined;
+          const result = local ?? extension ?? translateLegacyText(source, locale);
           if (/[\u3400-\u9fff]/u.test(result)) missing.push(`${locale} ${file}: ${source}`);
         }
       }

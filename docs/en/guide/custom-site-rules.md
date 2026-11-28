@@ -29,6 +29,10 @@ Enter a complete HTTP(S) URL in Effective preview to see site preferences, match
 
 With all-node recognition, only rules that declare support for that scope apply. The advanced field is `allScopes`.
 
+## Official rule updates
+
+Builds that support signed updates periodically check for official rules. Open **Site rules → Content rules** to see the release number or select **Check for rule updates**. Reopen a webpage to use the latest verified release. Custom rules and disabled entries still apply. Offline, the extension uses the last verified release or the rules bundled with a fresh installation.
+
 ## Import and backup
 
 Expand **JSON & backup** to import, export, or open the advanced JSON editor. Edits remain a draft until **Save and apply** succeeds.

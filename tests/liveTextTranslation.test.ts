@@ -20,6 +20,7 @@ vi.mock('@/src/core/translation/public', async (importOriginal) => {
         createTranslationSourceSnapshot: actual.createTranslationSourceSnapshot,
         buildWholeBlockTranslationSource: actual.buildWholeBlockTranslationSource,
         createInlineCodePacket: actual.createInlineCodePacket,
+        normalizeParagraphTranslationSource: actual.normalizeParagraphTranslationSource,
     };
 });
 
@@ -392,6 +393,31 @@ describe('双语正文整块翻译', () => {
         expect(await request(() => {
             throw new Error('detached');
         })).toEqual(['one two']);
+    });
+
+    it('单槽普通段落展开源码软换行，预格式折行段落自动合并并保留原始 DOM 槽来源', async () => {
+        const wrapped = [
+            'The opaque rect that we report to the compositor is derived from the',
+            'opaque rectangle of the render node, shrunk to whole surface pixels.',
+        ].join('\n');
+        const unwrapped = 'The opaque rect that we report to the compositor is derived from the opaque rectangle of the render node, shrunk to whole surface pixels.';
+
+        const normalParagraph = owner(`<p>${wrapped}</p>`);
+        runtime.translations = ['译文'];
+        const normalResult = await createTranslationRequest(normalParagraph, 'content', 'bilingual', bilingual);
+        expect(runtime.translateTextSlots).toHaveBeenLastCalledWith(
+            [unwrapped], bilingualRequestSnapshot, undefined, undefined, undefined, false);
+        expect(normalResult).toEqual({kind: 'snapshot', sources: [wrapped], translations: ['译文']});
+
+        const preParagraph = owner(`<div style="white-space: pre-wrap">${wrapped}\n\nKeep the edges that cannot be proven opaque out of the region in\n\`gdk_surface_set_opaque_rect()\`, using the exact buffer ratio.</div>`);
+        Object.defineProperty(preParagraph.ownerDocument, 'defaultView', {configurable: true,
+            value: {getComputedStyle: () => ({whiteSpace: 'pre-wrap'})}});
+        runtime.translateTextSlots.mockClear();
+        const preResult = await createTranslationRequest(preParagraph, 'content', 'single', snapshot);
+        expect(runtime.translateTextSlots).toHaveBeenLastCalledWith(
+            [`${unwrapped}\n\nKeep the edges that cannot be proven opaque out of the region in \`gdk_surface_set_opaque_rect()\`, using the exact buffer ratio.`],
+            requestSnapshot, undefined, undefined, undefined, false);
+        expect(preResult.sources).toEqual([preParagraph.textContent!]);
     });
 });
 

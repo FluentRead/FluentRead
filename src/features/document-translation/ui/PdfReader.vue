@@ -1,6 +1,6 @@
 <!--
  @file src/features/document-translation/ui/PdfReader.vue
- 协作批注：显式开启官方 Hypothesis 侧栏，复用 PDF 租约与虚拟页定位；重排按实际文字隔离指纹，翻译中暂停，可主动关闭，切换文件撤销；不读取账号或上传文件。
+ 协作批注：批注面板提供官方 Hypothesis 侧栏开关与连接状态，复用 PDF 租约与虚拟页定位；重排按实际文字隔离指纹，翻译中暂停，可主动关闭，切换文件撤销；不读取账号或上传文件。
  智能配色：固定版式使用 sRGB SVG 滤镜更换纸张与文字颜色，并合回识别到的原图像素，按解析器确认的图形区域保护原色；遮罩不接管鼠标、选区或页资源，切换主题复用原始画布。
  阅读外观：原文、双语与译文均可单栏重排，字体、字号、行距、段距及六种配色按本机偏好显示；阅读外观变化复用页面资源，并在 DOM 更新前保留段落锚点。
  扫描核对：原页按 OCR 返回的有效页面坐标显示待核对内容的虚线框；识别行叠加透明原文选择层，沿用划词、复制和页内定位，缩放或其他页更新时保留节点；原图与画布不因补入文字层而重建。
@@ -36,7 +36,7 @@
         <div class="pdf-presentation-control pdf-menu" :class="{open: openMenu === 'presentation'}">
           <button type="button" class="pdf-menu-button" aria-haspopup="listbox" :aria-expanded="openMenu === 'presentation'" :aria-label="t('document.pdfReading.presentationLabel')" @click="openMenu = openMenu === 'presentation' ? null : 'presentation'">{{ t(presentation === 'layout' ? 'document.pdfReading.layoutPresentation' : 'document.pdfReading.readablePresentation') }}<i aria-hidden="true" /></button>
           <ul v-if="openMenu === 'presentation'" class="pdf-menu-list" role="listbox" :aria-label="t('document.pdfReading.presentationLabel')">
-            <li v-for="value in PRESENTATIONS" :key="value" role="presentation" :class="{selected: presentation === value}"><button type="button" role="option" :aria-selected="presentation === value" :class="{selected: presentation === value}" :data-value="value" @click="choosePresentation(value)">{{ t(value === 'layout' ? 'document.pdfReading.layoutPresentation' : 'document.pdfReading.readablePresentation') }}</button></li>
+            <li v-for="value in PRESENTATIONS" :key="value" role="presentation" :class="{selected: presentation === value}"><button type="button" role="option" :aria-selected="presentation === value" :class="{selected: presentation === value}" :data-value="value" @click="closeMenu(true); choosePresentation(value)">{{ t(value === 'layout' ? 'document.pdfReading.layoutPresentation' : 'document.pdfReading.readablePresentation') }}</button></li>
           </ul>
         </div>
         <div class="pdf-menu pdf-search" :class="{open: openMenu === 'search'}">
@@ -63,9 +63,28 @@
             <p v-if="!readable" class="pdf-style-hint">{{ t('document.pdfReading.reflowStyleHint') }}</p>
           </div>
         </div>
-        <PdfAnnotations ref="annotationControls" :document="document" :root="viewport" :annotations="annotations" :translations="translations" :source-url="sourceUrl" :saved="annotationsSaved" :open="openMenu === 'annotations'" @toggle="openMenu = openMenu === 'annotations' ? null : 'annotations'" @update:annotations="emit('update:annotations', $event)" @jump="jumpTo" />
-        <button class="pdf-tool-button" type="button" data-testid="pdf-hypothesis-toggle" :aria-label="t('document.pdfReading.hypothesisToggle')" :aria-pressed="hypothesisActive" :aria-busy="hypothesisBusy" :title="t('document.pdfReading.hypothesisEmbeddedNotice')" :disabled="hypothesisBusy || translating && !hypothesisRequested" @click="toggleHypothesis">H</button>
-        <span v-if="hypothesisMessage" class="pdf-information-status" role="status">{{ t(hypothesisMessage) }}</span>
+        <PdfAnnotations ref="annotationControls" :document="document" :root="viewport" :annotations="annotations" :translations="translations"
+          :storage-unavailable="annotationStorageUnavailable" :open="openMenu === 'annotations'" @toggle="openMenu = openMenu === 'annotations' ? null : 'annotations'"
+          @update:annotations="emit('update:annotations', $event)" @jump="jumpToAnnotation">
+          <template #collaboration>
+            <button class="pdf-hypothesis-toggle" type="button" data-testid="pdf-hypothesis-toggle" :aria-pressed="hypothesisCanCancel ? undefined : hypothesisRequested"
+              :aria-busy="hypothesisBusy && !hypothesisRequested" :aria-disabled="translating && !hypothesisRequested || undefined" :disabled="hypothesisBusy && !hypothesisRequested"
+              :title="t(hypothesisCanCancel ? 'document.pdfReading.hypothesisCancelConnection' : translating && !hypothesisRequested ? 'document.pdfReading.hypothesisWaiting' : 'document.pdfReading.hypothesisEmbeddedNotice')" @click="toggleHypothesis">
+              {{ t(hypothesisCanCancel ? 'document.pdfReading.hypothesisCancelConnection' : 'document.pdfReading.hypothesisToggle') }}
+            </button>
+          </template>
+          <template #collaboration-feedback>
+            <div v-if="hypothesisStatus" class="pdf-hypothesis-feedback">
+              <p role="status">{{ t(hypothesisStatus) }}</p>
+              <details v-if="hypothesisMessage === 'document.pdfReading.hypothesisFailed'">
+                <summary>{{ t('document.pdfReading.hypothesisFallback') }}</summary>
+                <p>{{ t(hypothesisUrl ? 'document.pdfReading.hypothesisNotice' : 'document.pdfReading.hypothesisLocal') }}</p>
+                <a v-if="hypothesisUrl" :href="hypothesisUrl" target="_blank" rel="noopener noreferrer">{{ t('document.pdfReading.hypothesisOpen') }}</a>
+                <a v-else href="https://web.hypothes.is/help/annotating-locally-saved-pdfs/" target="_blank" rel="noopener noreferrer">{{ t('document.pdfReading.hypothesisHelp') }}</a>
+              </details>
+            </div>
+          </template>
+        </PdfAnnotations>
         <button v-if="informationHighlight" class="pdf-information-highlight" type="button" :aria-pressed="informationState.enabled" :disabled="!informationHighlight.available" :title="informationState.enabled ? `${t(`informationHighlight.phase.${informationState.phase}`)} · ${t('informationHighlight.progress', {paragraphs: informationState.processedParagraphs, spans: informationState.highlightedSpans})}` : t('informationHighlight.title')" @click="informationController?.setEnabled(!informationState.enabled)">{{ t('informationHighlight.title') }}</button>
         <span v-if="informationState.enabled && informationState.phase === 'error'" class="pdf-information-status" role="status">{{ t('informationHighlight.phase.error') }} <button type="button" @click="informationController?.retry()">{{ t('informationHighlight.retry') }}</button></span>
       </div>
@@ -158,7 +177,7 @@
 import {computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type ComponentPublicInstance} from 'vue';
 import {useUiI18n} from '@/src/ui/i18n';
 import PdfAnnotations from './PdfAnnotations.vue';
-import {PDF_ANNOTATION_COLORS, type PdfAnnotation} from '../core/pdfAnnotations';
+import {pdfHypothesisUrl, PDF_ANNOTATION_COLORS, type PdfAnnotation} from '../core/pdfAnnotations';
 import {PDF_READING_THEMES as THEME_CHOICES, pdfReadingThemeColors, pdfReadingThemeTransfer, pdfReadingThemeRegions} from '../core/pdfReadingTheme';
 import TranslationLoadingPreview from '@/src/ui/components/TranslationLoadingPreview.vue';
 import {DEFAULT_TRANSLATION_LOADING_STYLE, type TranslationLoadingStyle} from '@/src/core/config/translationLoadingStyle';
@@ -181,7 +200,7 @@ import {installDocumentZoomGestures, type DocumentZoomPoint} from './documentZoo
 import {captureVisiblePdfMaterialLocation, createPdfMaterialNavigation, resolvePdfMaterialSelection, waitPdfMaterialFrame, type PdfMaterialLocation} from './pdfMaterialNavigation';
 
 const annotationControls = ref<{markSelection(range: Range, kind: 'highlight' | 'underline'): boolean}>();
-const props = withDefaults(defineProps<{document: ParsedDocument; translations?: readonly string[]; annotations?: readonly PdfAnnotation[]; annotationsSaved?: boolean; mode: PdfReaderMode; sourceUrl?: string; presentation?: PdfReadingPresentation; translating?: boolean; controlsTarget?: HTMLElement | null; outlineTarget?: HTMLElement | null; loadingStyle?: TranslationLoadingStyle; animated?: boolean; informationHighlight?: {preferences: InformationHighlightPreferences; scoreLocal(text: string, signal: AbortSignal, modelId?: InformationHighlightModelId): Promise<InformationHighlightResult>; available: boolean}}>(), {translations: () => [], annotations: () => [], annotationsSaved: false, sourceUrl: '', presentation: 'layout', translating: false, controlsTarget: null, outlineTarget: null, loadingStyle: DEFAULT_TRANSLATION_LOADING_STYLE, animated: true});
+const props = withDefaults(defineProps<{document: ParsedDocument; translations?: readonly string[]; annotations?: readonly PdfAnnotation[]; annotationStorageUnavailable?: boolean; mode: PdfReaderMode; sourceUrl?: string; presentation?: PdfReadingPresentation; translating?: boolean; controlsTarget?: HTMLElement | null; outlineTarget?: HTMLElement | null; loadingStyle?: TranslationLoadingStyle; animated?: boolean; informationHighlight?: {preferences: InformationHighlightPreferences; scoreLocal(text: string, signal: AbortSignal, modelId?: InformationHighlightModelId): Promise<InformationHighlightResult>; available: boolean}}>(), {translations: () => [], annotations: () => [], annotationStorageUnavailable: false, sourceUrl: '', presentation: 'layout', translating: false, controlsTarget: null, outlineTarget: null, loadingStyle: DEFAULT_TRANSLATION_LOADING_STYLE, animated: true});
 const emit = defineEmits<{ 'update:presentation': [value: PdfReadingPresentation]; 'update:annotations': [value: PdfAnnotation[]]; 'page-change': [page: number]; 'material-position-change': [] }>();
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 const PRESENTATIONS: PdfReadingPresentation[] = ['layout', 'readable'];
@@ -377,7 +396,7 @@ function closeMenu(restoreFocus = false): void {
   if (restoreFocus) toolbar.value?.querySelector<HTMLButtonElement>('.pdf-menu.open > .pdf-menu-button')?.focus();
   openMenu.value = null;
 }
-function choosePresentation(value: PdfReadingPresentation): void {closeMenu(true); if (presentation.value === value) return; presentation.value = value; emit('update:presentation', value);}
+function choosePresentation(value: PdfReadingPresentation): void {if (presentation.value === value) return; presentation.value = value; emit('update:presentation', value);}
 function closeMenus(event: Event): void {
   if (!openMenu.value) return;
   if (event.type === 'keydown') {if ((event as KeyboardEvent).key === 'Escape') closeMenu(true);}
@@ -970,8 +989,15 @@ function captureMaterialLocation(): number | undefined {
     readyPages: new Set(residentLayouts.value.filter(layout => states.value.get(layout.page.pageNumber)?.status === 'ready').map(layout => layout.page.pageNumber))});
 }
 function markSelection(range: Range, kind: 'highlight' | 'underline'): boolean {return annotationControls.value?.markSelection(range, kind) ?? false;}
-const hypothesisActive = ref(false), hypothesisBusy = ref(false), hypothesisMessage = ref('');
-let hypothesisRequested = false, hypothesisRevision = 0;
+const hypothesisRequested = ref(false), hypothesisBusy = ref(false), hypothesisMessage = ref('');
+const hypothesisCanCancel = computed(() => hypothesisBusy.value && hypothesisRequested.value);
+const hypothesisUrl = computed(() => pdfHypothesisUrl(props.sourceUrl));
+const hypothesisStatus = computed(() => {
+  if (hypothesisMessage.value) return hypothesisMessage.value;
+  if (props.translating && hypothesisRequested.value) return 'document.pdfReading.hypothesisWaiting';
+  return hypothesisBusy.value && hypothesisRequested.value ? 'document.pdfReading.hypothesisConnecting' : '';
+});
+let hypothesisRevision = 0;
 let hypothesisClient: ReturnType<typeof createHypothesisClient> | undefined;
 function documentHypothesisClient() {
   return hypothesisClient ??= createHypothesisClient({document: globalThis.document, window,
@@ -995,35 +1021,62 @@ function documentHypothesisClient() {
     },
   });
 }
-async function syncHypothesis(): Promise<void> {
+async function syncHypothesis(): Promise<boolean> {
   const revision = ++hypothesisRevision;
   hypothesisBusy.value = true; hypothesisMessage.value = '';
   const client = documentHypothesisClient();
   await client.setEnabled(false);
-  if (closed || revision !== hypothesisRevision) return;
+  if (closed || revision !== hypothesisRevision) return false;
   let result = {status: 'success', active: false};
-  if (hypothesisRequested && !props.translating) {
+  if (hypothesisRequested.value && !props.translating) {
     await nextTick();
-    if (closed || revision !== hypothesisRevision) return;
+    if (closed || revision !== hypothesisRevision) return false;
     result = await client.setEnabled(true);
   }
-  if (closed || revision !== hypothesisRevision) return;
-  hypothesisActive.value = result.active; hypothesisBusy.value = false;
-  if (result.status !== 'success') {hypothesisRequested = false; hypothesisMessage.value = result.status === 'external' ? 'document.pdfReading.hypothesisExternal' : 'document.pdfReading.hypothesisFailed';}
+  if (closed || revision !== hypothesisRevision) return false;
+  hypothesisBusy.value = false;
+  if (result.status !== 'success') {
+    hypothesisRequested.value = false;
+    hypothesisMessage.value = result.status === 'external' ? 'document.pdfReading.hypothesisExternal' : 'document.pdfReading.hypothesisFailed';
+  }
+  return result.active;
 }
-async function toggleHypothesis(): Promise<void> {
-  if (hypothesisBusy.value || props.translating && !hypothesisRequested) return;
-  if (!hypothesisRequested && (props.mode === 'translated' || pages.value.some(page => page.ocrRecognized)) && !readable.value) {choosePresentation('readable'); await nextTick();}
-  hypothesisRequested = !hypothesisRequested;
-  await syncHypothesis();
+async function toggleHypothesis(event: MouseEvent): Promise<void> {
+  if (hypothesisBusy.value && !hypothesisRequested.value) return;
+  const button = event.currentTarget as HTMLButtonElement | null;
+  if (props.translating && !hypothesisRequested.value) {
+    hypothesisMessage.value = 'document.pdfReading.hypothesisWaiting';
+    return;
+  }
+  if (!hypothesisRequested.value && (props.mode === 'translated' || pages.value.some(page => page.ocrRecognized)) && !readable.value) {
+    choosePresentation('readable');
+    await nextTick();
+  }
+  hypothesisRequested.value = !hypothesisRequested.value;
+  // 等待期间可能已打开备注编辑器，或收起后重新打开了面板。
+  if (await syncHypothesis() && button?.isConnected && openMenu.value === 'annotations') closeMenu(true);
 }
 watch([presentation, () => props.mode, () => props.translating, () => props.translations, () => props.document], () => {
-  if (!hypothesisRequested) return;
-  if ((props.mode === 'translated' || pages.value.some(page => page.ocrRecognized)) && !readable.value) {hypothesisRequested = false;}
+  if (!props.translating && hypothesisMessage.value === 'document.pdfReading.hypothesisWaiting') hypothesisMessage.value = '';
+  if (!hypothesisRequested.value) return;
+  if ((props.mode === 'translated' || pages.value.some(page => page.ocrRecognized)) && !readable.value) {hypothesisRequested.value = false;}
   void syncHypothesis();
 }, {flush: 'post'});
-watch(() => props.document.binary?.bytes, () => {if (hypothesisClient) {hypothesisRequested = false; void syncHypothesis();}}, {flush: 'sync'});
+watch(() => props.document.binary?.bytes, () => {
+  hypothesisMessage.value = '';
+  if (hypothesisClient) {hypothesisRequested.value = false; void syncHypothesis();}
+}, {flush: 'sync'});
 defineExpose({resumePage, resumeLocation, cancelMaterialResume, resolveMaterialSelection, captureMaterialLocation, markSelection});
+function jumpToAnnotation(annotation: PdfAnnotation): void {
+  closeMenu(true);
+  const index = annotation.page - 1;
+  const page = pages.value[index];
+  if (readable.value || !page || !annotation.rects.length) {
+    jumpTo(annotation.page);
+    return;
+  }
+  jumpToPosition(index, Math.min(...annotation.rects.map(rect => rect.y)) * page.height);
+}
 function jumpToPosition(pageIndex: number, y: number): void {
   materialNavigation.cancel();
   const layout = layouts.value[pageIndex];
@@ -1135,11 +1188,6 @@ onMounted(() => {
   viewportWidth.value = viewport.value?.clientWidth || 920;
   viewportHeight.value = viewport.value?.clientHeight || 720;
   createScheduler();
-  const fragment = new URLSearchParams(window.location.hash.slice(1));
-  if (fragment.get('hypothesis') === '1') {
-    fragment.delete('hypothesis'); window.history.replaceState(window.history.state, '', `#${fragment}`);
-    void toggleHypothesis();
-  }
   window.addEventListener('resize', fitToolbarMenus);
   globalThis.document.addEventListener('selectionchange', handleSelectionChange);
   globalThis.document.addEventListener('keydown', handleInformationHotkey, true);
@@ -1167,7 +1215,7 @@ onMounted(() => {
   }
 });
 onBeforeUnmount(() => {
-  hypothesisRequested = false; hypothesisRevision += 1; void hypothesisClient?.dispose();
+  hypothesisRequested.value = false; hypothesisRevision += 1; void hypothesisClient?.dispose();
   materialNavigation.dispose();
   closed = true;
   fullPassageDialog.value?.close();
@@ -1214,7 +1262,7 @@ onBeforeUnmount(() => {
 .pdf-full-passage-dialog button:focus-visible, .pdf-cross-page-context:focus-visible, .pdf-full-passage-button:focus-visible {outline: 2px solid var(--brand); outline-offset: 2px;}
 @media (max-width: 600px) {.pdf-full-passage-content {padding: 16px;} .pdf-full-passage-pair {grid-template-columns: 1fr; gap: 20px;} .pdf-full-passage-source {position: static; max-height: none; overflow: visible;} .pdf-full-passage-dialog header {padding: 12px 16px;}}
 .pdf-layout-viewer {width: 100%; height: 100%; min-height: 0; flex: 1; min-width: 0; display: flex; flex-direction: column; color: var(--ink);}
-.pdf-viewer-toolbar {display: flex; align-items: center; gap: 14px; min-width: 0; font-size: 12px; color: var(--ink);}
+.pdf-viewer-toolbar {position: relative; display: flex; align-items: center; gap: 14px; min-width: 0; font-size: 12px; color: var(--ink);}
 .pdf-viewer-toolbar.inline {padding: 8px 12px; flex-wrap: wrap; background: var(--surface); border-bottom: 1px solid var(--line);}
 .pdf-page-navigation, .pdf-page-navigation label, .pdf-zoom-control, .pdf-presentation-control {display: flex; align-items: center; gap: 6px; flex: none;}
 .pdf-viewer-toolbar button {width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: inherit; font-size: 17px; line-height: 1; cursor: pointer;}
@@ -1228,6 +1276,13 @@ onBeforeUnmount(() => {
 .pdf-viewer-toolbar .pdf-tool-button {display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: var(--muted);}
 .pdf-tool-button svg {width: 17px; height: 17px;}
 .pdf-viewer-toolbar .pdf-tool-button.active {color: var(--brand-strong); background: var(--brand-soft);}
+.pdf-viewer-toolbar .pdf-hypothesis-toggle {width: auto; min-height: 28px; height: auto; margin-inline-start: auto; padding: 3px 7px; color: var(--muted); font: inherit; text-align: start;}
+.pdf-viewer-toolbar .pdf-hypothesis-toggle[aria-pressed="true"] {color: var(--brand-strong); background: var(--brand-soft);}
+.pdf-hypothesis-toggle:focus-visible, .pdf-hypothesis-feedback :is(a, summary):focus-visible {outline: 2px solid var(--brand); outline-offset: 2px;}
+.pdf-hypothesis-feedback {margin-top: 4px; color: var(--muted);}
+.pdf-hypothesis-feedback p {margin: 4px 0;}
+.pdf-hypothesis-feedback summary {cursor: pointer;}
+.pdf-hypothesis-feedback a {color: var(--brand-strong);}
 .pdf-menu-panel {position: absolute; top: calc(100% + 8px); left: 0; white-space: nowrap; z-index: 30; display: flex; align-items: center; gap: 6px; max-width: calc(100vw - 16px); box-sizing: border-box; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px #10182826;}
 .pdf-search-panel input {width: min(220px, calc(100vw - 176px)); min-width: 0; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); color: var(--ink); font: inherit; font-size: 12.5px; outline: none;}
 .pdf-search-panel input:focus {border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft);}

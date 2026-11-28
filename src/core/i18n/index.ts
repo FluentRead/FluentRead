@@ -49,16 +49,19 @@ function ownMessage(catalog: MessageCatalog | undefined, key: string): string | 
 function getMessageLegacyCatalog(language: UiLanguage, bundle: UiLanguageBundle): MessageCatalog {
     let catalog = messageLegacyCatalogs.get(language);
     if (!catalog) {
-        catalog = Object.fromEntries(
-            Object.entries(defaultMessages).map(([key, source]) => [source, ownMessage(bundle.messages, key) ?? source]),
-        );
+        const built = Object.create(null) as Record<string, string>;
+        for (const key of Object.keys(defaultMessages)) {
+            const source = defaultMessages[key]!;
+            built[source] = ownMessage(bundle.messages, key) ?? source;
+        }
+        catalog = built;
         messageLegacyCatalogs.set(language, catalog);
     }
     return catalog;
 }
 
 function formatMessage(template: string, params?: TranslationParams): string {
-    if (!params) return template;
+    if (!params || !template.includes('{')) return template;
     return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (placeholder, name: string) => {
         const value = Object.hasOwn(params, name) ? params[name] : undefined;
         return value === undefined || value === null ? placeholder : String(value);
@@ -86,7 +89,8 @@ export function translate(key: string, language: UiLanguage, params?: Translatio
     return formatMessage(template, params);
 }
 
-function preserveWhitespace(value: string, translated: string): string {
+function preserveWhitespace(value: string, trimmed: string, translated: string): string {
+    if (value.length === trimmed.length) return translated;
     const leading = value.match(/^\s*/u)![0];
     const trailing = value.match(/\s*$/u)![0];
     // Only nonblank source text reaches this helper; both zero-or-more patterns always match.
@@ -146,13 +150,16 @@ function getExactLegacyText(value: string, language: UiLanguage): string | undef
     return bundle && (ownMessage(bundle.legacyText, value) ?? ownMessage(getMessageLegacyCatalog(language, bundle), value));
 }
 
+const LEGACY_PLACEHOLDER_PATTERN = /\{(\d+)\}/gu;
+
 function* applyLegacyPatterns(patterns: readonly CompiledLegacyPattern[], value: string, language: UiLanguage): Generator<string, string | undefined, string> {
     for (const {pattern, template, localizedCaptures} of patterns) {
         const match = pattern.exec(value);
         if (!match) continue;
+        if (!template.includes('{')) return template;
         let translated = '';
         let cursor = 0;
-        for (const placeholder of template.matchAll(/\{(\d+)\}/gu)) {
+        for (const placeholder of template.matchAll(LEGACY_PLACEHOLDER_PATTERN)) {
             const capture = match[Number(placeholder[1])] ?? '';
             translated += template.slice(cursor, placeholder.index);
             cursor = placeholder.index + placeholder[0].length;
@@ -188,21 +195,21 @@ export function translateLegacyText(value: string, language: UiLanguage): string
         if (!text.trim()) return text;
         const trimmed = text.trim();
         const exact = getExactLegacyText(trimmed, language);
-        if (exact) return preserveWhitespace(text, exact);
+        if (exact) return preserveWhitespace(text, trimmed, exact);
         const patterns = getCompiledLegacyPatterns(language, bundle!);
         const dynamic = yield* applyLegacyPatterns(patterns.early, trimmed, language);
-        if (dynamic !== undefined) return preserveWhitespace(text, dynamic);
+        if (dynamic !== undefined) return preserveWhitespace(text, trimmed, dynamic);
         for (const separator of [' · ', ' → ']) {
             const compound = trimmed.split(separator);
             if (compound.length <= 1) continue;
             const translatedParts: string[] = [];
             for (const part of compound) translatedParts.push(yield part);
             const translatedCompound = translatedParts.join(separator);
-            if (translatedCompound !== trimmed) return preserveWhitespace(text, translatedCompound);
+            if (translatedCompound !== trimmed) return preserveWhitespace(text, trimmed, translatedCompound);
         }
         // 复合状态先于 late 兜底；子句逐次交给显式工作栈，保留深嵌套语义而不增长 JS 调用栈。
         const fallback = yield* applyLegacyPatterns(patterns.late, trimmed, language);
-        return fallback === undefined ? text : preserveWhitespace(text, fallback);
+        return fallback === undefined ? text : preserveWhitespace(text, trimmed, fallback);
     }
     const pending = [evaluate(value)];
     let result: string | undefined;

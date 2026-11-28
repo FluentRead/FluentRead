@@ -58,6 +58,18 @@ function canvasPorts(options:PortOptions={}){
 }
 afterEach(()=>vi.unstubAllGlobals());
 
+it('漫画临时栅格层先继承排版语言，再绘制译文字形',()=>{
+    const port=canvasPorts({
+        onCall:(layer,method)=>{
+            if(layer===0&&method==='fillText')expect(port.layers[0].canvas.lang).toBe('ja');
+        },
+    });
+    const result=rasterizeMangaGlyphs(plan,box,[],{...styles,language:'ja'},createMangaGlyphRasterLedger());
+    expect(result.kind).toBe('accepted');
+    expect(port.layers[0].calls.some(([name])=>name==='fillText')).toBe(true);
+    if(result.kind==='accepted')result.dispose();
+});
+
 describe('实际非零alpha的严格像素支持规则',()=>{
     it('alpha1/2都算字形，隐藏RGB的alpha0不算，空字形不伪造成功',()=>{
         expect(audit([[4,4,255,255,255,1]])).toBe('safe');

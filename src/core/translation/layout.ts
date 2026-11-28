@@ -1,8 +1,8 @@
 /**
  * @file src/core/translation/layout.ts
  *
- * 文件职责：判定页面元素的语义块、内联关系和可重组边界，为候选引擎选择合理翻译粒度并保护页面布局；站点非原子行内容器保留直属正文，受信 man 手册说明段在悬浮和全文中共享正文块边界。
- * 主要内容：按统一的按钮语义（原生 button、按钮型 input、ARIA 控件角色、按钮类名）与呈标签形态的交互外壳区分正文与控件；识别 heading、block、inline、纯文本正文 pre、结构标签、嵌入式 aside、可选放开的侧边栏区域和 reparent 边界，保持交互控件对内部标签的翻译所有权，并在 tooltip 边界停止向外归属，限制直接子节点探测数量，复验已渲染候选时把已验证原文槽视为透明包装，并提供候选目标及内联 run 相关的布局函数。 可核对的公开符号包括 isSemanticHeadingElement、getElementDisplay、isBlockBoundary、isStructuralContainer、hasStructuralAncestor、isTranslationControlElement、findTranslationControlOwner、hasDirectReadableText、hasReadableBlockChild。
+ * 文件职责：判定页面元素的语义块、内联关系和可重组边界，为候选引擎选择合理翻译粒度并保护页面布局；站点非原子行内容器保留直属正文，受信 man 手册说明段在悬浮和全文中共享正文块边界，并在通用层识别旧式连续换行分段容器（含 inline font/span 包装）。
+ * 主要内容：按统一的按钮语义（原生 button、按钮型 input、ARIA 控件角色、按钮类名）与呈标签形态的交互外壳区分正文与控件；识别 heading、block、inline、纯文本正文 pre、结构标签、嵌入式 aside、可选放开的侧边栏区域和 reparent 边界，保持交互控件对内部标签的翻译所有权，并在 tooltip 边界停止向外归属，限制直接子节点探测数量，复验已渲染候选时把已验证原文槽视为透明包装，提供候选目标、旧式双 br 分段屏障及内联 run 相关的布局函数。 可核对的公开符号包括 isSemanticHeadingElement、getElementDisplay、isBlockBoundary、isStructuralContainer、hasStructuralAncestor、isTranslationControlElement、findTranslationControlOwner、hasDirectReadableText、hasReadableBlockChild、collectDoubleBrParagraphBarriers。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
@@ -48,6 +48,10 @@ const inlineTags = new Set([
     'mark', 'q', 'ruby', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u',
     'wbr',
 ]);
+
+// 旧式静态网页与 CMS 常把整篇按 <br><br> 分段的正文放进透明 inline <font>/<span> 包装中。
+const genericBrInlineWrapperTags = new Set(['font', 'span']);
+const minGenericDoubleBrParagraphs = 3;
 
 const inlineDisplays = new Set([
     'inline', 'inline-block', 'inline-flex', 'inline-grid', 'ruby', 'ruby-base',
@@ -291,13 +295,21 @@ export function getAllScopeCandidateKind(element: Element): TranslationCandidate
  * 内联强调和链接沿用最近正文/控件的文本所有权，避免扩大范围后把现有段落细分成嵌套
  * 译文。普通应用 div/span 不形成该语义边界，因此独立标签仍可作为原位控件发现。
  */
-function hasAllScopeSemanticOwner(element: Element): boolean {
+function hasAllScopeSemanticOwner(
+    element: Element,
+    shouldStayOriginal?: (element: Element) => boolean,
+    protectionCache?: TranslationTextProtectionCache,
+    protectionOptions?: TranslationTextProtectionOptions,
+): boolean {
     let crossedUIBoundary = false;
     return hasComposedAncestor(element, (ancestor) => {
         crossedUIBoundary = crossedUIBoundary || isStructuralContainer(ancestor) ||
             allScopeUIRoles.has(ancestor.getAttribute('role')?.trim().toLowerCase() ?? '');
-        return !crossedUIBoundary &&
-            (isAllScopeControl(ancestor) || getAllScopeCandidateKind(ancestor) === 'content');
+        return !crossedUIBoundary && (
+            isAllScopeControl(ancestor) ||
+            getAllScopeCandidateKind(ancestor) === 'content' ||
+            collectDoubleBrParagraphBarriers(ancestor, shouldStayOriginal, protectionCache, protectionOptions) !== null
+        );
     });
 }
 
@@ -373,6 +385,91 @@ export function hasReadableBlockChild(
             protectionOptions,
         );
     });
+}
+
+const doubleBrBarrierCaches = new WeakMap<TranslationTextProtectionCache, WeakMap<Element, ReadonlySet<Element> | null>>();
+
+function computeDoubleBrParagraphBarriers(
+    element: Element,
+    shouldStayOriginal?: (element: Element) => boolean,
+    protectionCache?: TranslationTextProtectionCache,
+    protectionOptions?: TranslationTextProtectionOptions,
+): ReadonlySet<Element> | null {
+    // 至少两组双 <br> 才会产生三段；沿 firstChild/nextSibling 单趟扫描并在超限时立即退出，
+    // 避免在宽容器上分配 childNodes/children 集合，也不对普通节点触发 getComputedStyle。
+    let count = 0;
+    let barriers: Set<Element> | null = null;
+    let firstBr: Element | null = null;
+    for (let child = element.firstChild; child; child = child.nextSibling) {
+        count += 1;
+        if (count > maxDirectRunNodes) return null;
+        if (child.nodeType === 1 && getElementTagName(child as Element) === 'br') {
+            const br = child as Element;
+            if (!firstBr) {
+                firstBr = br;
+            } else {
+                barriers ??= new Set();
+                barriers.add(firstBr);
+                barriers.add(br);
+            }
+            continue;
+        }
+        if ((child.nodeType === 3 && !/\S/u.test((child as Text).data)) || child.nodeType === 8) {
+            continue;
+        }
+        firstBr = null;
+    }
+    if (!barriers || barriers.size < 4) return null;
+
+    const tag = getElementTagName(element);
+    if (!isBlockBoundary(element) && !genericBrInlineWrapperTags.has(tag)) return null;
+
+    let paragraphs = 0;
+    let current: ChildNode[] = [];
+    const flushParagraph = () => {
+        if (current.length > 0 && (
+            current.some((node) => node.nodeType === 1 &&
+                (node as Element).matches('[data-fr-translation-segment="true"]')) ||
+            hasMeaningfulTranslationTextInNodes(current, shouldStayOriginal, protectionCache, protectionOptions)
+        )) {
+            paragraphs += 1;
+        }
+        current = [];
+    };
+
+    for (let child = element.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType === 1 && (barriers.has(child as Element) || isBlockBoundary(child as Element))) {
+            flushParagraph();
+            continue;
+        }
+        current.push(child);
+    }
+    flushParagraph();
+    return paragraphs >= minGenericDoubleBrParagraphs ? barriers : null;
+}
+
+/**
+ * 识别由连续 `<br>`（至少两个直接子级换行标签，中间仅隔空白或注释）构成的旧式段落边界。
+ * 只有分出至少三段有效内容或已物化分段槽时才返回屏障集合，避免拆开常规双段评论、短推文或诗行。
+ */
+export function collectDoubleBrParagraphBarriers(
+    element: Element,
+    shouldStayOriginal?: (element: Element) => boolean,
+    protectionCache?: TranslationTextProtectionCache,
+    protectionOptions?: TranslationTextProtectionOptions,
+): ReadonlySet<Element> | null {
+    let cache: WeakMap<Element, ReadonlySet<Element> | null> | undefined;
+    if (protectionCache) {
+        cache = doubleBrBarrierCaches.get(protectionCache);
+        if (!cache) {
+            cache = new WeakMap();
+            doubleBrBarrierCaches.set(protectionCache, cache);
+        }
+        if (cache.has(element)) return cache.get(element)!;
+    }
+    const result = computeDoubleBrParagraphBarriers(element, shouldStayOriginal, protectionCache, protectionOptions);
+    cache?.set(element, result);
+    return result;
 }
 
 /**
@@ -469,7 +566,7 @@ export function classifyGenericCandidate(
         (isInteractiveSurface(element) &&
             isControlLabelSurface(element, shouldStayOriginal, protectionCache, protectionOptions));
     if (isTranslationControlElement(element) ||
-        (interactiveControl && !hasAllScopeSemanticOwner(element))) {
+        (interactiveControl && !hasAllScopeSemanticOwner(element, shouldStayOriginal, protectionCache, protectionOptions))) {
         // 内层按钮保留独立候选，避免外层控件吞并独立操作。
         if (hasNestedTranslationControl(element)) return null;
         if (!hasMeaningfulTranslationTextInNodes(
@@ -482,7 +579,8 @@ export function classifyGenericCandidate(
     }
 
     const block = isBlockBoundary(element);
-    if (!block && (scope === 'content' || hasAllScopeSemanticOwner(element))) return null;
+    if (!block && (scope === 'content' ||
+        hasAllScopeSemanticOwner(element, shouldStayOriginal, protectionCache, protectionOptions))) return null;
     // GitHub Primer 等组件用 display:flex 的 span 排版按钮标签。后序发现必须等到
     // 控件本身再选 control，否则标签会抢先成为 content 并在固定高度按钮里插入双语行。
     const controlOwner = findTranslationControlOwner(element);

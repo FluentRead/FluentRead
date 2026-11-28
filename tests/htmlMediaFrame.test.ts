@@ -34,6 +34,11 @@ it('does not start twice in a top frame or invalid context', async () => {
     page(undefined, true); await startHtmlMediaFrameApp(ctx()); page(); const invalid = ctx(); Object.defineProperty(invalid, 'isInvalid', {value: true});
     await startHtmlMediaFrameApp(invalid); expect(ports.actions).toBeUndefined();
 });
+it('keeps the HTML media fallback available in an embedded Coursera lecture', async () => {
+    page('https://www.coursera.org/learn/python/lecture/Ab12/introduction');
+    await startHtmlMediaFrameApp(ctx());
+    expect(ports.activate).toBeDefined();
+});
 it('loads the subtitle module only after media appears and respects scanner cleanup', async () => {
     await startHtmlMediaFrameApp(ctx()); expect(ports.activate).toBeDefined(); expect(ports.mount).not.toHaveBeenCalled();
     const dispose = ports.activate!(); await vi.waitFor(() => expect(ports.mount).toHaveBeenCalledOnce());

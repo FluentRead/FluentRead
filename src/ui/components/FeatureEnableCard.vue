@@ -22,18 +22,18 @@ const emit = defineEmits<{'update:modelValue': [value: boolean]}>();
 <style scoped>
 .feature-enable-card { margin: 0 0 var(--fr-card-gap, 20px); border: var(--fr-card-outline, 1px solid var(--line, #d7dce5)); border-radius: var(--fr-card-radius, 14px); background: var(--fr-card-background, var(--surface, #fff)); box-shadow: var(--fr-card-shadow, none); overflow: hidden; }
 .feature-enable-card.enabled { background: var(--fr-card-background, var(--surface, #fff)); }
-.feature-enable-card button { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; min-height: 76px; padding: 18px var(--fr-card-padding-inline, 20px); border: 0; color: var(--ink, #172033); background: transparent; font: inherit; text-align: start; cursor: pointer; }
-.feature-enable-card button:hover:not(:disabled) { background: color-mix(in srgb, var(--brand, #ef4776) 5%, transparent); }
-.feature-enable-card button:focus-visible { outline: 2px solid var(--brand, #ef4776); outline-offset: -3px; }
+.feature-enable-card button { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; min-height: 74px; padding: 16px var(--fr-card-padding-inline, 20px); border: 0; color: var(--ink, #161b26); background: transparent; font: inherit; text-align: start; cursor: pointer; transition: background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease); }
+.feature-enable-card button:hover:not(:disabled) { background: var(--surface-soft, #f6f7f9); }
+.feature-enable-card button:focus-visible { outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand-strong)); outline-offset: -3px; }
 .feature-enable-copy { display: block; min-width: 0; flex: 1; }
 .feature-enable-control { display: flex; align-items: center; gap: 10px; flex: none; }
-.feature-enable-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 28px; }
-.feature-enable-heading strong { font-size: 14px; font-weight: 650; }
-.feature-enable-description { display: block; margin-top: 4px; color: var(--muted, #667085); font-size: 12px; line-height: 1.6; }
-.feature-enable-card i { display: flex; box-sizing: border-box; flex: none; align-items: center; width: 50px; height: 28px; padding: 3px; border: 1px solid color-mix(in srgb, var(--muted, #667085) 65%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--muted, #667085) 46%, var(--surface, #fff)); }
-.feature-enable-card b { width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.16); transition: transform 150ms ease; }
+.feature-enable-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 26px; }
+.feature-enable-heading strong { font-size: var(--fr-text-md, 14px); font-weight: 600; }
+.feature-enable-description { display: block; margin-top: 3px; color: var(--muted, #5b6476); font-size: var(--fr-text-sm, 12px); line-height: 1.55; }
+.feature-enable-card i { display: flex; box-sizing: border-box; flex: none; align-items: center; width: 48px; height: 28px; padding: 3px; border: 1px solid color-mix(in srgb, var(--muted, #5b6476) 55%, transparent); border-radius: var(--fr-radius-full, 9999px); background: color-mix(in srgb, var(--muted, #5b6476) 42%, var(--surface, #fff)); transition: background-color var(--fr-duration-fast, 160ms) var(--fr-ease-out, ease), border-color var(--fr-duration-fast, 160ms) var(--fr-ease-out, ease); }
+.feature-enable-card b { width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .16); transition: transform var(--fr-duration-normal, 220ms) var(--fr-ease-in-out, ease); }
 .enabled i { background: var(--brand, #ef4776); border-color: var(--brand, #ef4776); }
-.enabled b { transform: translateX(22px); }
+.enabled b { transform: translateX(20px); }
 .feature-enable-card button:disabled { opacity: .55; cursor: not-allowed; }
 @media (max-width: 600px) { .feature-enable-card button { gap: 12px; padding: 15px var(--fr-card-padding-inline, 16px); } }
 @media (prefers-reduced-motion: reduce) { .feature-enable-card b { transition: none; } }

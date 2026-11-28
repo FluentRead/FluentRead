@@ -10,7 +10,7 @@
     ref="floatingBall"
     class="fr-floating-ball"
     :class="{'floating-ball-expanded': isMenuExpanded, dragging: isDragging, 'is-touch-capable': touchSized,
-      'is-compact': presentation.compact, 'manga-reader': !!manga?.available, 'viewport-sync': syncingViewport}"
+      'is-compact': presentation.compact, 'is-tucked': dock.tucked, 'manga-reader': !!manga?.available, 'viewport-sync': syncingViewport}"
     :data-position="side"
     :data-tools-display="presentation.toolsDisplay"
     :data-translation-status="displayTranslationStatus"
@@ -204,7 +204,7 @@ const DEFAULT_PRESENTATION: FloatingBallPresentation = {
   clickAction: 'translate',
   compact: false,
   settingsEntryVisible: true,
-  collapsedOpacity: 52,
+  collapsedOpacity: 36,
   defaultMargin: 0,
   popoutMargin: 20,
   theme: 'auto',
@@ -286,16 +286,16 @@ const dock = computed(() => {
   const bounds = viewport.value;
   const size = ballSize.value;
   const {defaultMargin, popoutMargin, toolsDisplay} = presentation.value;
-  const dockX = (margin: number) => {
-    // 桌面自定义负边距仍保留可拖动部分；触屏保留完整的 44px 点击目标。
-    const min = touchSized.value ? 0 : Math.min(0, 28 - size);
-    const inset = clamp(margin, min, bounds.width - size);
-    return side.value === 'left' ? bounds.left + inset : bounds.right - size - inset;
-  };
-  const restX = dockX(defaultMargin);
-  const x = toolsDisplay === 'hover' && isMenuExpanded.value && !touchExpanded.value ? dockX(popoutMargin) : restX;
+  const dockX = (inset: number) => side.value === 'left' ? bounds.left + inset : bounds.right - size - inset;
+  // 自定义负边距保留可拖动部分；触屏始终保留完整点击区。
+  const min = touchSized.value ? 0 : Math.min(0, 28 - size);
+  const max = bounds.width - size;
+  // 桌面悬停模式的 0 / 正边距组合在闲置时半藏；相同边距保持原地。
+  const tucked = !touchSized.value && toolsDisplay === 'hover' && defaultMargin === 0 && popoutMargin > 0;
+  const restX = dockX(tucked ? -size / 2 : clamp(defaultMargin, min, max));
+  const x = toolsDisplay === 'hover' && isMenuExpanded.value && !touchExpanded.value ? dockX(clamp(popoutMargin, min, max)) : restX;
   const y = bounds.top + resolveFloatingBallCenterY(verticalPosition.value, bounds.height, size) - size / 2;
-  return {x, y, restX};
+  return {x, y, restX, tucked};
 });
 
 type Tool = 'translate' | 'reading' | 'settings' | 'hide';
@@ -352,10 +352,14 @@ const toolLayout = computed(() => {
 });
 
 const rootStyle = computed<CSSProperties>(() => {
-  const {x, y, restX} = dock.value;
+  const {x, y, restX, tucked} = dock.value;
   const bounds = viewport.value;
   const size = ballSize.value;
   const {mangaTop} = toolLayout.value;
+  const collapsedRatio = clamp(presentation.value.collapsedOpacity, 20, 100) / 100;
+  // 半隐停靠时进一步柔和透明度，保留 100% 明确设定与最低可见度；同时降低闲置图标饱和度减少干扰。
+  const restOpacity = tucked ? Math.max(0.2, Number((collapsedRatio ** 1.3).toFixed(3))) : collapsedRatio;
+  const restGrayscale = Number(clamp((1 - collapsedRatio) / 0.4, 0, 0.85).toFixed(3));
   return {
     '--fr-ball-x': `${x}px`,
     '--fr-ball-y': `${y}px`,
@@ -367,7 +371,8 @@ const rootStyle = computed<CSSProperties>(() => {
     '--fr-manga-x': `${clamp(x, bounds.left, bounds.right - size) - x}px`,
     '--fr-ball-hit-left': `${Math.max(0, x - restX)}px`,
     '--fr-ball-hit-right': `${Math.max(0, restX - x)}px`,
-    '--fr-ball-collapsed-opacity': String(presentation.value.collapsedOpacity / 100),
+    '--fr-ball-collapsed-opacity': String(restOpacity),
+    '--fr-ball-collapsed-grayscale': String(restGrayscale),
   };
 });
 
@@ -773,12 +778,12 @@ watch(() => presentation.value.toolsDisplay, () => {
 
 <style scoped>
 .fr-floating-ball {
-  --fr-surface: #fffdfd;
-  --fr-border: #28203324;
-  --fr-ink: #514b59;
-  --fr-accent: #b8275e;
-  --fr-active: #fbeaf1;
-  --fr-shadow: 0 2px 7px #25182c21;
+  --fr-surface: #ffffff;
+  --fr-border: rgba(23, 32, 51, 0.14);
+  --fr-ink: #172033;
+  --fr-accent: #d4235a;
+  --fr-active: #fff0f5;
+  --fr-shadow: 0 2px 8px rgba(17, 24, 39, 0.1);
   --fr-face-inset: 0px;
   color: var(--fr-ink);
   position: fixed;
@@ -787,30 +792,30 @@ watch(() => presentation.value.toolsDisplay, () => {
   left: 0;
   width: var(--fr-ball-size);
   height: var(--fr-ball-size);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   user-select: none;
   pointer-events: none;
   transform: translate3d(var(--fr-drag-x, var(--fr-ball-x)), var(--fr-drag-y, var(--fr-ball-y)), 0);
-  transition: transform 180ms cubic-bezier(.2, .75, .25, 1);
+  transition: transform 180ms cubic-bezier(.22, 1, .36, 1);
 }
 
 .fr-floating-ball[data-theme="dark"] {
-  --fr-surface: #28252c;
-  --fr-border: #efcfe53d;
-  --fr-ink: #eee4ee;
-  --fr-accent: #ff9cc0;
-  --fr-active: #493044;
-  --fr-shadow: 0 2px 9px #0005;
+  --fr-surface: #171b24;
+  --fr-border: rgba(240, 243, 248, 0.14);
+  --fr-ink: #f0f3f8;
+  --fr-accent: #ff7fa3;
+  --fr-active: rgba(239, 71, 118, 0.18);
+  --fr-shadow: 0 4px 12px rgba(0, 0, 0, 0.36);
 }
 
 @media (prefers-color-scheme: dark) {
   .fr-floating-ball:not([data-theme="light"]) {
-    --fr-surface: #28252c;
-    --fr-border: #efcfe53d;
-    --fr-ink: #eee4ee;
-    --fr-accent: #ff9cc0;
-    --fr-active: #493044;
-    --fr-shadow: 0 2px 9px #0005;
+    --fr-surface: #171b24;
+    --fr-border: rgba(240, 243, 248, 0.14);
+    --fr-ink: #f0f3f8;
+    --fr-accent: #ff7fa3;
+    --fr-active: rgba(239, 71, 118, 0.18);
+    --fr-shadow: 0 4px 12px rgba(0, 0, 0, 0.36);
   }
 }
 
@@ -904,6 +909,8 @@ watch(() => presentation.value.toolsDisplay, () => {
   display: block;
   object-fit: contain;
   pointer-events: none;
+  filter: grayscale(var(--fr-ball-collapsed-grayscale));
+  transition: filter 140ms ease;
 }
 
 .floating-ball-manga {
@@ -914,9 +921,17 @@ watch(() => presentation.value.toolsDisplay, () => {
 .floating-ball-manga svg { width: 18px; height: 18px; }
 
 .fr-floating-ball.floating-ball-expanded :is(.floating-ball-main, .floating-ball-manga),
+.fr-floating-ball:not(.is-touch-capable) :is(.floating-ball-main, .floating-ball-manga):hover,
 .fr-floating-ball :is(.floating-ball-main, .floating-ball-manga):focus-visible,
 .fr-floating-ball.dragging .floating-ball-main {
   opacity: 1;
+}
+
+.fr-floating-ball.floating-ball-expanded .floating-ball-mascot,
+.fr-floating-ball:not(.is-touch-capable) .floating-ball-main:hover .floating-ball-mascot,
+.fr-floating-ball .floating-ball-main:focus-visible .floating-ball-mascot,
+.fr-floating-ball.dragging .floating-ball-mascot {
+  filter: none;
 }
 
 .floating-ball-tools {
@@ -962,12 +977,12 @@ watch(() => presentation.value.toolsDisplay, () => {
   right: 2px;
   bottom: 2px;
   display: grid;
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   place-items: center;
   border: 1px solid var(--fr-surface);
   border-radius: 50%;
-  background: #26764b;
+  background: #15803d;
   color: #fff;
   font: 700 9px/1 system-ui, sans-serif;
   pointer-events: none;
@@ -979,7 +994,7 @@ watch(() => presentation.value.toolsDisplay, () => {
   right: auto;
 }
 
-.translation-indicator[data-status="error"] { background: #9a5711; }
+.translation-indicator[data-status="error"] { background: #b45309; }
 .translation-indicator[data-status="translating"] { background: var(--fr-accent); color: var(--fr-surface); }
 
 .manga-progress {

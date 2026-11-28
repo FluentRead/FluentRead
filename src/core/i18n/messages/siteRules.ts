@@ -8,7 +8,7 @@ import type {RegisteredUiLanguage} from '../types';
 type Row = readonly [string, string, string, string, string, string, string];
 export const siteRuleTextRows: readonly Row[] = [
   ['仅显示译文网站', 'Translation-only sites', '訳文のみを表示するサイト', '번역만 표시하는 사이트', 'Sites avec traduction seule', 'Сайты только с переводом', 'Sitios con solo traducción'],
-  ["仅此网站使用仅译文，其他网站沿用全局显示模式；谷歌翻译仅支持双语", "Use translation only on this site; other sites follow the global mode. Google Translate supports bilingual mode only.", "このサイトでは訳文のみを表示し、他のサイトは全体設定に従います。Google 翻訳は対訳表示のみ対応します。", "이 사이트에서는 번역만 표시하며 다른 사이트는 전역 설정을 따릅니다. Google 번역은 이중 언어만 지원합니다.", "Traduction seule sur ce site ; les autres suivent le mode global. Google Traduction ne prend en charge que le mode bilingue.", "Только перевод на этом сайте; другие используют общий режим. Google Переводчик поддерживает только двуязычный режим.", "Solo traducción en este sitio; los demás siguen el modo global. Google Traductor solo admite el modo bilingüe."],
+  ["仅此网站使用仅译文，其他网站沿用全局显示模式", "Use translation only on this site; other sites follow the global mode.", "このサイトでは訳文のみを表示し、他のサイトは全体設定に従います。", "이 사이트에서는 번역만 표시하며 다른 사이트는 전역 설정을 따릅니다.", "Traduction seule sur ce site ; les autres suivent le mode global.", "Только перевод на этом сайте; другие используют общий режим.", "Solo traducción en este sitio; los demás siguen el modo global."],
   ["此网站已设为仅译文，可在网站偏好中修改", "This site uses translation only. Change it in Site preferences.", "このサイトは訳文のみの表示です。サイト設定で変更できます。", "이 사이트는 번역만 표시합니다. 사이트 환경설정에서 변경하세요.", "Ce site affiche uniquement la traduction. Modifiez ce choix dans les préférences du site.", "На этом сайте показан только перевод. Измените это в настройках сайта.", "Este sitio muestra solo la traducción. Cámbialo en las preferencias del sitio."],
   ["全局翻译模式", "Global translation mode", "全体の翻訳モード", "전역 번역 모드", "Mode de traduction global", "Общий режим перевода", "Modo de traducción global"],
   ["译文显示", "Translation display", "訳文の表示", "번역 표시", "Affichage de la traduction", "Отображение перевода", "Visualización de la traducción"],
@@ -37,7 +37,6 @@ export const siteRuleTextRows: readonly Row[] = [
   ['插件已关闭', 'Extension is off', '拡張機能はオフです', '확장 기능 꺼짐', 'Extension désactivée', 'Расширение выключено', 'Extensión desactivada'],
   ['显示悬浮球', 'Show floating button', 'フローティングボタンを表示', '플로팅 버튼 표시', 'Afficher le bouton flottant', 'Показать плавающую кнопку', 'Mostrar botón flotante'],
   ['网站偏好、正文适配与生效预览', 'Site preferences, content rules and effective preview', 'サイト設定・本文ルール・適用プレビュー', '사이트 설정, 본문 규칙 및 적용 미리보기', 'Préférences, règles de contenu et aperçu', 'Настройки сайтов, правила содержимого и предпросмотр', 'Preferencias, reglas de contenido y vista previa'],
-  ["按网站调整翻译与显示偏好，扩展正文适配，并检查规则为何生效", 'Adjust translation and display by site, extend content rules, and understand why rules apply.', 'サイトごとに翻訳と表示を設定し、本文ルールを追加して適用理由を確認します。', '사이트별 번역과 표시를 조정하고 본문 규칙을 확장하며 적용 이유를 확인하세요.', 'Réglez traduction et affichage par site, ajoutez des règles et comprenez leur application.', 'Настраивайте перевод и показ по сайтам, добавляйте правила и проверяйте причины их действия.', 'Ajusta traducción y presentación por sitio, añade reglas y comprueba por qué se aplican.'],
   ["网站偏好按主域名生效，正文适配可指定路径和内容区域；预览仅检查已保存配置，不访问网站", 'Site lists apply to the root domain. Content rules also target paths and regions. Preview checks saved settings without visiting sites.', 'サイトリストは親ドメインに適用します。本文ルールはパスと領域も指定できます。プレビューは保存設定だけ確認し、サイトにアクセスしません。', '목록은 주 도메인에 적용됩니다. 본문 규칙은 경로와 영역도 지정합니다. 미리보기는 사이트에 접속하지 않고 저장된 설정만 확인합니다.', 'Les listes ciblent le domaine principal. Les règles ciblent aussi chemins et zones. L’aperçu vérifie les réglages enregistrés sans visiter le site.', 'Списки действуют на основной домен, правила также задают пути и области. Предпросмотр проверяет настройки без посещения сайтов.', 'Las listas abarcan el dominio principal. Las reglas también indican rutas y áreas. La vista comprueba ajustes guardados sin visitar sitios.'],
   ['网站、域名、网址、主域名、自动翻译、始终翻译、禁用扩展、子域、网站适配、兼容、隐藏悬浮球、生效预览、规则目录、可视化编辑、导入导出、JSON、自定义规则、正文、保护区域', 'Sites, domains, URLs, root domains, automatic translation, always translate, disable extension, subdomains, content rules, compatibility, floating button, preview, catalog, visual editor, import, export, JSON, custom rules, content, protection', 'サイト・ドメイン・URL・自動翻訳・拡張機能無効・サブドメイン・本文ルール・互換性・ボタン非表示・プレビュー・一覧・フォーム・インポート・エクスポート・JSON・保護領域', '사이트, 도메인, URL, 자동 번역, 항상 번역, 확장 기능 끄기, 하위 도메인, 본문 규칙, 호환성, 버튼 숨기기, 미리보기, 목록, 편집, 가져오기, 내보내기, JSON, 보호 영역', 'Sites, domaines, URL, traduction automatique, désactivation, sous-domaines, règles, compatibilité, bouton, aperçu, catalogue, éditeur visuel, import, export, JSON, contenu, protection', 'Сайты, домены, URL, автоперевод, постоянный перевод, отключение, поддомены, правила, совместимость, кнопка, предпросмотр, каталог, редактор, импорт, экспорт, JSON, содержимое, защита', 'Sitios, dominios, URL, traducción automática, desactivar, subdominios, reglas, compatibilidad, botón, vista previa, catálogo, editor visual, importar, exportar, JSON, contenido, protección'],
   ['网站偏好', 'Site preferences', 'サイト設定', '사이트 설정', 'Préférences par site', 'Настройки сайтов', 'Preferencias por sitio'],
@@ -180,4 +179,16 @@ export const siteRuleTextRows: readonly Row[] = [
 const columns = {'en-US': 1, 'ja-JP': 2, 'ko-KR': 3, 'fr-FR': 4, 'ru-RU': 5, 'es-ES': 6} as const;
 export function createSiteRuleText(language: RegisteredUiLanguage): Readonly<Record<string, string>> {
   return Object.fromEntries(siteRuleTextRows.map(row => [row[0], row[columns[language]]]));
+}
+
+const extensionSiteActionRows: readonly Row[] = [
+  ['官方规则', 'Official rules', '公式ルール', '공식 규칙', 'Règles officielles', 'Официальные правила', 'Reglas oficiales'],
+  ['检查规则更新', 'Check for rule updates', 'ルールの更新を確認', '규칙 업데이트 확인', 'Vérifier les mises à jour', 'Проверить обновления правил', 'Buscar actualizaciones de reglas'],
+  ["查看原网页","View original webpage","元のページを開く","원래 웹페이지 보기","Voir la page d’origine","Открыть исходную страницу","Ver la página original"],
+  ["无法打开原网页","Could not open the original webpage","元のページを開けませんでした","원래 웹페이지를 열 수 없습니다","Impossible d’ouvrir la page d’origine","Не удалось открыть исходную страницу","No se pudo abrir la página original"],
+];
+
+/** 官方规则更新和已保存网页正文的文案仅随扩展资源生成。 */
+export function createExtensionSiteActionText(language: RegisteredUiLanguage): Readonly<Record<string, string>> {
+  return Object.fromEntries(extensionSiteActionRows.map(row => [row[0], row[columns[language]]]));
 }

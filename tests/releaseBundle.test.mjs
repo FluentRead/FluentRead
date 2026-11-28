@@ -46,7 +46,7 @@ async function fixture(t) {
     await zip(root, `.output/${prefix}-sources.zip`, {
         'package.json': {version: productVersion, userscriptVersion},
         '.nvmrc': '22.23.4', 'pnpm-lock.yaml': 'lockfileVersion: 9.0', 'pnpm-workspace.yaml': 'overrides: {}',
-        'patches/ppu-paddle-ocr@6.6.0.patch': 'patch fixture', 'wxt.config.ts': 'export default {}',
+        'scripts/patches/ppu-paddle-ocr@6.6.0.patch': 'patch fixture', 'wxt.config.ts': 'export default {}',
     });
     const zoteroManifest = {version: '3.1.4', applications: {zotero: {id: 'fluentread@fixture'}}};
     await write(root, 'integrations/zotero/manifest.json', zoteroManifest);

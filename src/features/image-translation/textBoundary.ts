@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/textBoundary.ts
- * 文件职责：判断图片 OCR 跨行衔接处是否为东亚书写边界。
- * 主要内容：按 Unicode 码点从行末有界逆向读取变体选择符与半角浊音，保留合法韩文 Jamo 与东亚文字的跨行衔接。
+ * 文件职责：判断图片 OCR 的东亚跨行边界及识别和绘字共用的横排方向。
+ * 主要内容：按 Unicode 码点从行末有界逆向读取变体选择符与半角浊音，保留合法韩文 Jamo 与东亚文字的跨行衔接。按首个字母判断阿拉伯文等从右向左的段落。
  * 模块边界：只读取文本，不规范化原文、不推断语言、不操作图像或翻译服务。
  */
 const EAST_ASIAN = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\uac00-\ud7af\uff66-\uff9d]$/u;
@@ -10,6 +10,19 @@ const PICTOGRAPHIC = /^\p{Extended_Pictographic}$/u;
 const HANGUL_LETTER = /^(?=\p{L})\p{Script=Hangul}$/u;
 const HANGUL_FILLERS = new Set([0x115F, 0x1160, 0x3164, 0xFFA0]);
 const HALF_WIDTH_KANA = /^[\uFF66-\uFF9D]$/u;
+const RIGHT_TO_LEFT_LETTER = /(?=\p{L})[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Adlam}]/u;
+
+/** OCR 可能把拉丁编号放在右到左正文开头，首字母无法判断是否需要保留混排词序。 */
+export function containsRightToLeftLetters(text: string): boolean {
+    return RIGHT_TO_LEFT_LETTER.test(text);
+}
+
+export function getImageTextDirection(text:string):'ltr'|'rtl' {
+    // 编号后的同一行文字决定底层方向，绘制时仍使用完整译文。
+    const letterAfterCode = text.match(/^[ \t]*[A-Z]{1,3}[0-9]{1,4}[ \t\u00a0\u3000]+(\p{L})/u)?.[1];
+    const firstLetter = letterAfterCode ?? text.match(/\p{L}/u)?.[0] ?? '';
+    return containsRightToLeftLetters(firstLetter) ? 'rtl' : 'ltr';
+}
 
 /** 用 UTF-16 偏移逆向读取单个码点，不复制此前整段文本。 */
 function previousCodePoint(text: string, end: number): {start: number; value: number} {

@@ -33,7 +33,7 @@ vi.mock('node:worker_threads', async () => {
     }};
 });
 
-const names = ['fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm', 'fluent-read-ai/wllama.wasm',
+const names = ['fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm', 'fluent-read-ai/wllama.wasm',
     'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm'];
 const root = process.cwd(), date = new Date('2001-02-03T04:05:06Z');
 const source = (index: number) => Buffer.from((`WASM fixture ${index}: reusable lossless byte sequence.\0`).repeat(2000));

@@ -27,6 +27,8 @@ Press **Escape** inside the text panel to close it and return to an available en
 
 Recognized decomposed Hangul, extended Han characters, and their variation selectors keep their original text form. Layout avoids splitting combining characters and emoji. Complex unbroken words may still require smaller text in older browsers; use the text panel to read them.
 
+Image and manga translations use the target language when measuring and drawing text. This helps the browser choose the appropriate glyph forms available on your device for Japanese, Simplified Chinese, Traditional Chinese, and other languages.
+
 During automatic wrapping in ordinary images, closing punctuation stays with the preceding character and opening punctuation with the following text. Small Japanese kana and prolonged sound marks also stay attached. Explicit line breaks are preserved.
 
 When the last line of a short paragraph is much shorter than the others, line widths can be balanced while retaining the current font size, line count and complete words.
@@ -35,13 +37,33 @@ Ordinary images use the actual glyph bounds of your device's fonts to reduce cli
 
 For fine ruled paper in ordinary images, repair preserves the background and fills line segments hidden by text when the source supports consistent direction, spacing and color. This reduces broad smudges. Dashed lines, crossing patterns, curved textures and uncertain regions keep the existing repair method.
 
+When a horizontal line of text covers an angled edge in an opaque image, repair can continue the edge if the source colors agree on all four sides of the erasure box.
+
+When a recognition box clips a thin outline in a photo, repair can use nearby background samples that agree across several rows. This reduces streaking inside the erasure area.
+
+For one line of uppercase text on a solid background, the default Paddle model can repair clipped edges when the glyphs match the recognition evidence individually. This also works for some serif lettering clipped at both edges when only the antialiasing joins the glyphs and detection covers the middle of the strokes.
+
+Some fine serifs also benefit from matching weaker strokes to their original glyphs and detector evidence when one crop edge cuts off the same part of the line.
+
+Small detached decorations included in a solid label's OCR box can stay in the translated image when the original glyphs are individually confirmed and the translation fits beside the decoration.
+
+For a small hollow decoration at the end of an image label, the extension checks for a clear gap and an enclosed area of the original background, even when the decoration is absent from the OCR result. The translation fits beside the decoration. If you have imported the optional text segmentation model, the extension can also clean up connected strokes just outside the original erasure bounds when segmentation confirms them.
+
+When full stroke repair needs the optional segmentation model, verified solid colors can still fill the old ink inside the existing erasure bounds. This reduces streaks from clipped strokes along the edge.
+
+For a translated image on a solid background with clipped source strokes, importing the optional text segmentation model lets you regenerate the affected translation. On the same page, switch to the original and select Translate again.
+
 Horizontal text uses confirmed source glyph widths and heights from individual lines to estimate font size and align translations within the existing region. This reduces enlargement caused by padding in recognition boxes. Complex fonts, backgrounds and perspective can still affect the result; these estimates do not recover the original font family or decorative style.
 
-On solid backgrounds, reliable source text colors are retained when their contrast is sufficient. Single horizontal lines can receive a little extra drawing height after the entire added area is confirmed to be the same opaque background color and clear of other text. Nearby artwork and transparency limit expansion. Complex backgrounds or uncertain color relationships keep the default dark or white text.
+On solid backgrounds, reliable source text colors are retained when their contrast is sufficient. Single horizontal lines can receive a little extra drawing height after the entire added area is confirmed to be the same opaque background color and clear of other text. Nearby artwork and transparency limit expansion. On photographs, automatic text color uses samples beneath each laid-out line. A contrasting outline can help when a line crosses light and dark areas.
 
-Text on a smooth gradient can also retain a verified source color, with a thin contrasting outline. This reduces white or colored headings being rendered as dark text. Uncertain mixed colors and textures keep their existing handling.
+Text on a smooth gradient can also retain a verified source color, with a thin contrasting outline. This reduces white or colored headings being rendered as dark text. Sampling that encounters transparent pixels uses the existing color selection.
 
 Manga translations use the direction of their paragraph when measuring and drawing text. This helps keep numbers, brackets and punctuation in Arabic and Hebrew text from following an unrelated default canvas direction.
+
+When recognized words match a full right-to-left row, image and manga translation use that reading order. Text separated by a large gap keeps its own region.
+
+Manga layout measures the visible sides of glyphs, including their outlines. When strokes or marks extend to one side, the translation can shift within the original text box, wrap, or use a smaller font to reduce clipping.
 
 Manga wrapping tries to keep complete words and graphemes together, reducing splits within short Chinese words. Word boundaries depend on the browser's language support; words that exceed the available width can still wrap at complete graphemes.
 
@@ -57,11 +79,13 @@ Individual translation requests include bounded neighboring text from the same i
 
 Some numbered descriptions made of several uppercase words are passed to the current translation service, reducing cases where a whole caption is skipped as a model name. The source text and number remain intact; names returned unchanged by the service stay in the original image.
 
-With a prompt-based AI service (or a composite containing one) and **AI context** enabled, each text region can reference up to two recognized regions before and after it, without an extra summary request. Repeated short phrases retain their own positions and neighboring context; changed context cannot reuse a translation cached for another meaning. Turning the setting off keeps the existing translation behavior. Context can help resolve ambiguity, but recognition errors and model mistakes still require checking the original.
+With a prompt-based AI service (or a composite containing one) and **AI context** enabled, each text region can reference up to two recognized regions before and after it, without an extra summary request. Repeated short phrases retain their own positions and neighboring context; changed context cannot reuse a translation cached for another meaning. Turning the setting off keeps the existing translation behavior. If a translation includes a marker added to identify neighboring text, FluentRead retries that region once without the reference. If the marker appears again, the translation reports an error. Context can help resolve ambiguity, but recognition errors and model mistakes still require checking the original.
 
-When Google native batching is enabled, complete sentences from an image can share context in groups of up to four, while headings remain separate. The extension checks region identifiers and sentence endings, then falls back to independent translation if a result loses a region, mixes positions or changes an independent sentence into a comma continuation. Repeated phrases keep their positions and group context in the cache. Only recognized text is sent, not the original image; check specific meanings against the source.
+When Google native batching is enabled, complete sentences from an image can share context in groups of up to four. Headings stay separate. In an ordinary image, a short label can borrow the sentence on each side when all three lines align in the same column and use similar text sizes. The translated label keeps its punctuation-free form. The extension checks region identifiers and sentence endings, then falls back to independent translation if a result loses a region, mixes positions or changes a sentence ending into a comma. The cache keeps repeated phrases tied to their positions and context. Google receives the recognized text.
 
 Ordinary rotated, scaled, mirrored and perspective images follow the page's native transforms. Styling changes reuse the existing recognition and translation. If overlay alignment or shared ancestor clipping cannot be verified, the original stays visible with an entry to read the translated text. Examples include fixed positioning with rotation, or a rotated image inside an overflow-clipping container that does not establish its positioning reference. A supported layout can display the existing translation again.
+
+Switching back to the original uses the page's responsive image source. Inline styles added or changed by the page while a translation is visible are preserved. If the page leaves the styles alone, FluentRead restores the original declaration as written.
 
 Nearby centered small text uses the image's blank space and smooth background to identify continued lines, reducing sentences split across translation requests. Verified spacing corrections retain their original layout relationship. Columns and intervening text or artwork still keep regions separate.
 
@@ -70,6 +94,8 @@ Adjacent horizontal text on the same paper also checks actual glyph bounds and c
 Scaling small text on solid backgrounds, or dark text on slightly varying light gray backgrounds, can join English words and identifiers. When both model evidence and the original glyph gaps support it, missing spaces can be restored, for example from `ROUTEC4` to `ROUTE C4`, or `ISAVED` to `I SAVED`. Tightly cropped text on light tinted backgrounds also checks the background and glyphs, for example restoring `FIELDNOTE 12` to `FIELD NOTE 12`. Existing letters, digits and source bounds stay unchanged.
 
 Bright text on dark backgrounds also checks complete blank columns and model evidence when strokes touch the recognition crop edges, for example restoring `CHECKTHE OXYGEN` to `CHECK THE OXYGEN`. Existing spaces, characters and positions are preserved. Mixed colors, uncertain backgrounds, connected strokes or insufficient evidence retain the original recognition result.
+
+For tightly cropped colored text with a verified word break, image translation checks new spaces against the spacing on the same line to avoid splitting a word such as `OUTDOOR`.
 
 Image translation also checks text detection evidence alongside recognition to reduce highlights, textures and decorative lines being mistaken for text.
 
@@ -81,7 +107,7 @@ Independent labels on a shared background use their actual ink spacing to stay s
 
 In manga mode, neighboring gradient headings with a clear shared left or right edge can keep that alignment for single-line translations. This helps short translations preserve the original hierarchy. Centered text, wrapping, transparency avoidance or insufficient space retain the existing layout.
 
-The default **PaddleOCR (standard model)** prepares about **30 MB** on the first translation and shares its resources with manga. **Tesseract (lightweight model)** uses packs for the selected source language. Changing recognition engines makes the next translation recognize the image again; selecting an engine alone does not start a download.
+The default **PaddleOCR (standard model)** prepares about **30 MB** on the first translation and shares its resources with manga. **Tesseract (lightweight model)** uses packs for the selected source language. Single-image translation uses Tesseract when you explicitly select Russian, Korean, Arabic, or Hebrew as the source. If a pack is missing, you can prepare it and continue from the current image. Switching to another language restores your preferred engine. The next translation uses your selected engine to recognize the image again. Downloads start when you translate or choose to prepare a pack.
 
 PaddleOCR automatically enhances recognition contrast for some colored text on light backgrounds and bright text on dark backgrounds, without another model download. Very faint, thin lettering and complex backgrounds can still lose text; check the original or text panel.
 
@@ -101,6 +127,8 @@ By default, FluentRead prepares the next **3 images** already loaded by the webs
 
 Failed pages keep their originals while other pages continue. Switch to originals and back to retry. Changing chapters, leaving the page, or disabling manga translation stops old work. Image translation and floating-button switches are independent of manga; adjust its separate entry under **Standalone manga button**.
 
+With PaddleOCR, short Latin labels turned 90° on a narrow dark strip can be recovered as separate lines, such as captions on book spines or panel edges. When their direction and extent are clear, the translation follows the original orientation within the tight text box. If the surrounding background agrees along each column and the original strokes can be identified, cleanup restores the shading across the spine. If the translation would be too small or its placement is uncertain, the image keeps the original there and any translated text remains available in the text panel.
+
 When the original background opacity can be established, transparent cutouts are protected. Text flows around them inside the original text box, preserving its size and whole words where possible. Less available space can still require smaller text; open the text panel to read the full translation. Very complex cutouts or a fully blocked text area leave the original page with an error message.
 
 Search **Supported websites** by name or domain and check the reader type. Some support continuous translation; others offer **Select manga area to translate**, which requires area translation and a drag over visible artwork. Listing a site does not verify every chapter. Login, paid, and protected content still depends on what the website can display. Elsewhere, try a single image or [area translation](/en/guide/area-translation).
@@ -110,7 +138,7 @@ Search **Supported websites** by name or domain and check the reader type. Some 
 
 ### Download manga models
 
-Manga normally uses local PaddleOCR, with LaMa to repair lettering on complex backgrounds. Recognition needs about **30 MB** and repair about **197 MB**. Single-image PaddleOCR does not load the manga repair model. For Russian or Korean manga, explicitly select the source language to use its language pack; the automatic manga model does not contain these scripts.
+Manga normally uses local PaddleOCR, with LaMa to repair lettering on complex backgrounds. Recognition needs about **30 MB** and repair about **197 MB**. Single-image PaddleOCR does not load the manga repair model. For Russian, Korean, Arabic, or Hebrew manga, select the source language to prepare the corresponding Tesseract pack.
 
 View resource status under **Image/manga translation → Recognition resources**. Expand download management to remove resources or import existing files. Failed connections or checks retry automatically. Complete files are kept and only missing files are downloaded; an incomplete individual file must restart. Imports must match the required names, sizes, and integrity checks and stay on your device.
 

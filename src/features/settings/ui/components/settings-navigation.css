@@ -12,27 +12,28 @@
   min-width: 0;
   margin: 0;
   padding: 4px;
-  border: 1px solid var(--line, #e4e7ef);
-  border-radius: 12px;
+  border: 1px solid var(--line, #e3e6ed);
+  border-radius: var(--fr-radius-md, 10px);
   background: var(--surface, #fff);
 }
 .settings-subnavigation { overflow-x: auto; scrollbar-width: thin; overscroll-behavior-x: contain; }
 .settings-subnavigation > button {
   flex: none;
-  padding: 7px 12px;
+  padding: 6px 12px;
   border: 0;
-  border-radius: 8px;
-  color: var(--muted, #7c8598);
+  border-radius: var(--fr-radius-xs, 6px);
+  color: var(--muted, #5b6476);
   background: transparent;
   font: inherit;
-  font-size: 13px;
-  font-weight: 550;
+  font-size: var(--fr-text-base, 13px);
+  font-weight: 500;
   line-height: 1.4;
   white-space: nowrap;
   overflow-wrap: normal;
   cursor: pointer;
+  transition: color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease);
 }
-.settings-subnavigation > button:hover { color: var(--ink, #172033); background: var(--surface-soft, #f5f6fa); }
-.settings-subnavigation > button[aria-current] { color: var(--brand-strong, #d63260); background: var(--brand-soft, #fff0f5); font-weight: 650; }
-.settings-subnavigation > button:focus-visible { outline: 2px solid var(--brand, #ef4776); outline-offset: -2px; border-radius: 8px; box-shadow: none; }
+.settings-subnavigation > button:hover { color: var(--ink, #161b26); background: var(--surface-soft, #f6f7f9); }
+.settings-subnavigation > button[aria-current] { color: var(--brand-strong, #d4235a); background: var(--brand-soft, #fff0f5); font-weight: 600; }
+.settings-subnavigation > button:focus-visible { outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand-strong)); outline-offset: -2px; border-radius: var(--fr-radius-xs, 6px); box-shadow: none; }
 .settings-subnavigation > button:disabled { cursor: default; opacity: .6; }

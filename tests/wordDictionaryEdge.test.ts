@@ -155,22 +155,21 @@ describe('optional full ECDICT asset', () => {
         expect(await readCachedFullEcdict()).toBeNull();
     });
 
-    it('serves uncommon words after background download while keeping the first lookup nonblocking', async () => {
+    it('serves words from cached full ECDICT after nonblocking background download', async () => {
         const {stored} = optionalDictionaryCache();
-        vi.stubGlobal('browser', {runtime: {getURL: () => 'moz-extension://fixture/ecdict-core.json'}});
-        const core = new Uint8Array(readFileSync(resolve(process.cwd(), 'public/ecdict-core.json')));
+        vi.stubGlobal('browser', {runtime: {getURL: () => 'moz-extension://fixture/'}});
         const full = fullEcdictBytes();
         const requested: string[] = [];
         setRuntimeFetch(async input => {
             requested.push(String(input));
-            return new Response(String(input).startsWith('moz-extension:') ? core : full);
+            return new Response(full);
         });
         const local = provider(createDefaultWordDictionaryProviders(), 'ecdict-local');
 
         expect(await local.lookup('puma')).toBeNull();
         await vi.waitFor(() => expect(stored.size).toBe(1));
         await vi.waitFor(async () => expect((await local.lookup('puma'))?.word).toBe('puma'));
-        expect(requested.filter(url => url.startsWith('moz-extension:'))).toHaveLength(1);
+        expect(requested.filter(url => url.startsWith('moz-extension:'))).toHaveLength(0);
         expect(requested.filter(url => url.startsWith('https:'))).toHaveLength(1);
 
         const reopened = provider(createDefaultWordDictionaryProviders(), 'ecdict-local');
@@ -180,14 +179,11 @@ describe('optional full ECDICT asset', () => {
 
     it('waits for connectivity and deduplicates an in-flight optional download', async () => {
         optionalDictionaryCache();
-        vi.stubGlobal('browser', {runtime: {getURL: () => 'moz-extension://fixture/ecdict-core.json'}});
+        vi.stubGlobal('browser', {runtime: {getURL: () => 'moz-extension://fixture/'}});
         vi.stubGlobal('navigator', {onLine: false});
-        const core = new Uint8Array(readFileSync(resolve(process.cwd(), 'public/ecdict-core.json')));
         const full = fullEcdictBytes();
         const pending: Array<(response: Response) => void> = [];
-        setRuntimeFetch(async input => String(input).startsWith('moz-extension:')
-            ? new Response(core)
-            : new Promise<Response>(resolve => { pending.push(resolve); }));
+        setRuntimeFetch(async () => new Promise<Response>(resolve => { pending.push(resolve); }));
         const local = provider(createDefaultWordDictionaryProviders(), 'ecdict-local');
 
         expect(await local.lookup('puma')).toBeNull();
@@ -201,23 +197,21 @@ describe('optional full ECDICT asset', () => {
         expect(pending).toHaveLength(1);
     });
 
-    it('backs off after all fixed asset mirrors fail', async () => {
+    it('backs off after all four fixed asset mirrors fail', async () => {
         optionalDictionaryCache();
-        vi.stubGlobal('browser', {runtime: {getURL: () => 'moz-extension://fixture/ecdict-core.json'}});
-        const core = new Uint8Array(readFileSync(resolve(process.cwd(), 'public/ecdict-core.json')));
+        vi.stubGlobal('browser', {runtime: {getURL: () => 'moz-extension://fixture/'}});
         let remoteRequests = 0;
-        setRuntimeFetch(async input => {
-            if (String(input).startsWith('moz-extension:')) return new Response(core);
+        setRuntimeFetch(async () => {
             remoteRequests += 1;
             return new Response('', {status: 503});
         });
         const local = provider(createDefaultWordDictionaryProviders(), 'ecdict-local');
 
         expect(await local.lookup('puma')).toBeNull();
-        await vi.waitFor(() => expect(remoteRequests).toBe(3));
+        await vi.waitFor(() => expect(remoteRequests).toBe(4));
         await new Promise(resolve => setTimeout(resolve, 0));
         expect(await local.lookup('bis')).toBeNull();
-        expect(remoteRequests).toBe(3);
+        expect(remoteRequests).toBe(4);
     });
 });
 
@@ -456,35 +450,35 @@ describe('word dictionary defensive provider parsing', () => {
 });
 
 describe('word dictionary provider network adapters', () => {
-    it('ships the first 3,000 frequency-ranked entries and preserves the full optional asset', () => {
-        const core = JSON.parse(readFileSync(resolve(process.cwd(), 'public/ecdict-core.json'), 'utf8')) as string[][];
+    it('externalizes bundled ECDICT and preserves the verified 20,000-entry optional asset', () => {
         const rows = JSON.parse(readFileSync(resolve(process.cwd(), 'assets/optional/ecdict-core-full.json'), 'utf8')) as string[][];
-        expect(core).toHaveLength(3_000);
         expect(rows).toHaveLength(20_000);
         expect(rows.every(row => Array.isArray(row) && row.length === 4 && row.every(cell => typeof cell === 'string'))).toBe(true);
-        expect(core).toEqual(rows.slice(0, 3_000));
-        expect(rows.every(row => row.length === 4 && row.every(value => typeof value === 'string'))).toBe(true);
         const originalShape = rows.map(([w, p, d, t]) => ({w, p, d, t, pos: ''}));
         expect(createHash('sha256').update(JSON.stringify(originalShape)).digest('hex'))
             .toBe('e50fd32d4a859b184fd5bae15d0278e6bf2b621acbe5c854bf460817668c8822');
     });
 
-    it('loads and memoizes the browser-local ECDICT index while filtering malformed rows', async () => {
-        const getURL = vi.fn(() => 'moz-extension://fixture/ecdict-core.json');
-        vi.stubGlobal('browser', {runtime: {getURL}});
-        const fetchMock = vi.fn(async () => response([null, {}, {w: ''}, ['broken'], ['', '', '', ''], ['Local', 'ləʊkəl', 'adj. local', 'adj. 本地']]));
-        vi.stubGlobal('fetch', fetchMock);
+    it('memoizes the cached verified ECDICT index across lookups without extra network requests', async () => {
+        const {stored} = optionalDictionaryCache();
+        vi.stubGlobal('browser', {runtime: {getURL: () => 'moz-extension://fixture/'}});
+        const full = fullEcdictBytes();
+        stored.set('https://fluentread.app/__optional_assets__/ecdict/b0f0768e6730dfd07b895527ff56169f4d44904c58532b4cdd750aa97374071a.json',
+            new Response(full));
+        const fetchMock = vi.fn();
+        setRuntimeFetch(fetchMock);
         const local = provider(createDefaultWordDictionaryProviders(), 'ecdict-local');
 
-        expect(await local.lookup('missing')).toBeNull();
-        expect((await local.lookup('local'))?.meanings[0]?.definitions[0]).toEqual({definition: 'local', translatedDefinition: '本地'});
-        expect(fetchMock).toHaveBeenCalledTimes(1);
-        expect(getURL).toHaveBeenCalledWith('ecdict-core.json');
+        expect(await local.lookup('nonexistentwordxyz')).toBeNull();
+        expect((await local.lookup('puma'))?.word).toBe('puma');
+        expect((await local.lookup('bis'))?.word).toBe('bis');
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it('supports chrome runtime, no runtime and throwing runtime access', async () => {
-        vi.stubGlobal('chrome', {runtime: {getURL: () => 'chrome-extension://fixture/ecdict-core.json'}});
-        vi.stubGlobal('fetch', vi.fn(async () => response('not-an-array')));
+    it('supports chrome runtime, no runtime and throwing runtime access without throwing', async () => {
+        optionalDictionaryCache();
+        vi.stubGlobal('chrome', {runtime: {getURL: () => 'chrome-extension://fixture/'}});
+        vi.stubGlobal('navigator', {onLine: false});
         expect(await provider(createDefaultWordDictionaryProviders(), 'ecdict-local').lookup('word')).toBeNull();
 
         vi.unstubAllGlobals();
@@ -494,16 +488,17 @@ describe('word dictionary provider network adapters', () => {
         expect(await provider(createDefaultWordDictionaryProviders(), 'ecdict-local').lookup('word')).toBeNull();
     });
 
-    it('retries the local index after a transient response failure', async () => {
-        vi.stubGlobal('browser', {runtime: {getURL: () => 'moz-extension://fixture/ecdict-core.json'}});
+    it('recovers when a subsequent mirror succeeds after earlier mirrors fail transiently', async () => {
+        optionalDictionaryCache();
+        vi.stubGlobal('browser', {runtime: {getURL: () => 'moz-extension://fixture/'}});
         const fetchMock = vi.fn()
-            .mockResolvedValueOnce(response({}, false, 500))
-            .mockResolvedValueOnce(response([{w: 'recover', d: 'v. recover'}]));
-        vi.stubGlobal('fetch', fetchMock);
+            .mockResolvedValueOnce(new Response('', {status: 500}))
+            .mockResolvedValueOnce(new Response(fullEcdictBytes()));
+        setRuntimeFetch(fetchMock);
         const local = provider(createDefaultWordDictionaryProviders(), 'ecdict-local');
 
-        await expect(local.lookup('recover')).rejects.toThrow('local dictionary request failed: 500');
-        expect((await local.lookup('recover'))?.meanings[0]?.definitions[0]?.definition).toBe('recover');
+        expect(await local.lookup('puma')).toBeNull();
+        await vi.waitFor(async () => expect((await local.lookup('puma'))?.word).toBe('puma'));
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 

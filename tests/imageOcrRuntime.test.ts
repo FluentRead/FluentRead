@@ -37,6 +37,17 @@ describe('图片 OCR 处理与结果缓存', () => {
     let context: {drawImage: Mock; getImageData: Mock; putImageData: Mock; fillRect: Mock; fillStyle: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string};
     let onImageCreated: (() => void) | undefined;
 
+    it.each([
+        ['he', 'image', 'eng+heb'],
+        ['iw-IL', 'image', 'eng+heb'],
+        ['he', 'area', 'heb+eng'],
+        ['he', 'document', 'heb+eng'],
+        ['ar', 'image', 'ara+eng'],
+    ] as const)('希伯来语单图优先识别混排编号：%s / %s', async (language, profile, models) => {
+        await recognizeImage('mixed-script-packs', language, undefined, {profile});
+        expect(recognize.mock.calls[0][1]).toBe(models);
+    });
+
     it('缓存命中的竖排列框与每个调用独立，外部修改不能污染后续清字范围',async()=>{
         const boxes=[{x0:54,y0:20,x1:68,y1:80},{x0:28,y0:20,x1:42,y1:80}];
         recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:boxes.map((bbox,i)=>({text:i?'左列':'右列',bbox,

@@ -19,7 +19,7 @@ function hoverConfigIdentity(source: Config): string {
     });
     return JSON.stringify([
         source.on, source.hotkey, source.customHotkey, source.mouseHoverTranslationDelay, source.quickTranslationProfiles, quickHoverServices,
-        source.translationScope, source.minTranslationTextLength, source.sidebarTranslationEnabled,
+        source.translationScope, source.minTranslationTextLength, source.sidebarTranslationEnabled, source.excludedTags,
         service, model, isModelThinkingEnabled(source.modelThinking, service, model),
         source.from, source.to, source.excludedLanguages, source.useCache,
         source.enableAIContext, source.nativeBatchTranslationEnabled[service],

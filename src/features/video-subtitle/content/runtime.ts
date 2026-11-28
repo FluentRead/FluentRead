@@ -52,7 +52,7 @@ import {
   applyVideoDisplayState,
   installVideoSubtitleStyle
 } from './ui';
-import {XCaptionSource} from './xCaptionSource';
+import {XCaptionSource, isXNativeCaptionControl} from './xCaptionSource';
 import {XHlsAudioReader} from './hlsAudioRuntime';
 import {XSubtitleLoader} from './xSubtitleLoader';
 import {VideoTranslationCache} from './translationCache';
@@ -111,6 +111,7 @@ import {createVideoPlayerBinding, type VideoPlayerBinding} from './videoPlayerBi
 import {getVideoTranscriptionCacheRequest, getVideoTranscriptionMediaTransition, VideoTranscriptionCacheClient} from './transcriptionCacheClient';
 import type {VideoAiSubtitleCacheSource} from '../transcriptionCache';
 import {getCaptionPlatform} from './platforms';
+import {getCourseCaptionRequest} from './courseCaptionData';
 import {mountPlatformCaptions} from './platformRuntime';
 import {createYoutubeNativeCaptionVisibility} from './youtubeNativeCaptionVisibility';
 import {BilibiliAiSource} from './bilibiliAiSource';
@@ -123,6 +124,7 @@ import {TimedTextTrackCache} from './timedTextTrackCache';
 import {createVideoSubtitleDownloads} from './downloads';
 import {confirmVideoSubtitleExport} from './exportPrompt';
 import {createSubtitleLayoutObserver} from './subtitleLayoutObserver';
+import {clearVideoSubtitleModeNotice, handleVideoSubtitleModeShortcutKeydown, notifyVideoSubtitleModeSwitch} from './modeShortcut';
 
 type VideoConfigPatch = Partial<Pick<Config, 'videoTranslationEnabled' | 'videoSubtitleVisible' | 'videoSubtitleDisplayMode' | 'videoSubtitleFontSize' | 'videoSubtitleOffsetMs' | 'videoLocalModel' | 'videoSubtitleAppearance'>>;
 
@@ -148,7 +150,10 @@ const isMediaSubtitlePage = () => isXVideoPage() || isHtmlMediaPage();
 
 function mountVideoSubtitleRuntime(): () => void {
   const platform = getCaptionPlatform(window.location);
-  if (platform) return mountPlatformCaptions({
+  // Coursera 只在播放器已发布可读取的完整轨时使用课程入口，其余播放器沿用 HTML 媒体路径。
+  const courseraHasTrack = import.meta.env.BROWSER !== 'userscript' && platform === 'coursera'
+    && Array.from(document.querySelectorAll('video')).some(video => getCourseCaptionRequest('coursera', new URL(window.location.href), video));
+  if (platform && (platform !== 'coursera' || courseraHasTrack)) return mountPlatformCaptions({
     document, window, config, subscribe: subscribeConfig,
     createBilibiliAi: platform === 'bilibili' && browserCapabilities.extensionDom
       && window.location.protocol === 'https:' && typeof OfflineAudioContext === 'function'
@@ -167,7 +172,7 @@ function mountVideoSubtitleRuntime(): () => void {
     translate: translateVideoText,
     patch: patch => { void requestConfigPatch(patch, sendRuntimeMessage).catch(() => undefined); },
     label: text => localizeVideoUiText(text, getVideoUiLanguage(config.uiLanguage)),
-    download: (srt, language) => downloadSubtitleSrt(srt, language),
+    download: downloadSubtitleSrt,
     iconUrl: browser.runtime.getURL('icon/128.png'),
     openSettings: () => { void sendRuntimeMessage({type: 'openOptionsPage', section: 'settings-video'}).catch(() => undefined); },
   });
@@ -292,6 +297,7 @@ function mountVideoSubtitleRuntime(): () => void {
   // 身份，不能让用户刚完成的模型下载失去启动识别的资格。
   let observedMediaEpoch = 0;
   let mediaMissingTimer: ReturnType<typeof setTimeout> | undefined;
+  let xNativeCaptionSyncTimer: ReturnType<typeof setTimeout> | undefined;
   let activeVideoLanguage = config.videoSourceLanguage;
   const htmlMediaHost = isHtmlMediaPage() ? createHtmlMediaHost(scheduleSubtitleLayout) : null;
   const playerLocator = createVideoPlayerLocator(htmlMediaHost ? {includeAudio: true, getPlayer: htmlMediaHost.getPlayer} : {});
@@ -305,7 +311,7 @@ function mountVideoSubtitleRuntime(): () => void {
   };
   const aiSubtitleSession = new VideoAiSubtitleSession({
     readRequest: currentCacheRequest,
-    canRestore: () => !destroyed && canReadVideo() && !isAiFullActive() && !xCaptionSource.readNativeTrack() && xSubtitleCues.length === 0,
+    canRestore: () => !destroyed && canReadVideo() && !isAiFullActive() && !xCaptionSource.hasNativeTracks() && !xCaptionSource.readNativeTrack() && xSubtitleCues.length === 0,
     get: request => transcriptCache.get(request), set: (request, cues) => transcriptCache.set(request, cues),
     restore: cues => { resetAiSubtitleCues(); aiCaptureError = ''; return aiFullCapture!.restore(cues); },
   });
@@ -441,6 +447,7 @@ function mountVideoSubtitleRuntime(): () => void {
     if (!container) return '';
     if (!hasAdjustedTimeline()) return readVisibleCaptionText(container);
     if (isYouTubeVideoPage() && document.querySelector('.ytp-subtitles-button')?.getAttribute('aria-pressed') === 'false') return '';
+    if (isXVideoPage() && !isAiFullActive() && !xCaptionSource.isNativeCaptionActive()) return '';
     return getAdjustedCaptionCue()?.text || '';
   };
 
@@ -544,6 +551,7 @@ function mountVideoSubtitleRuntime(): () => void {
 
   const primeUpcomingVideoCaptions = () => {
     if (destroyed || !canTranslateVideo() || !observedVideo || pretranslationCues.length === 0) return;
+    if (isXVideoPage() && !isAiFullActive() && !xCaptionSource.isNativeCaptionActive()) return;
     videoTranslator.primeUpcoming(pretranslationCues, observedVideo.currentTime * 1000 - subtitleOffsetMs,
       getVideoPretranslationWindowMs(config.videoService || config.service), observedVideo.playbackRate, getCachedVideoTranslation);
   };
@@ -633,6 +641,8 @@ function mountVideoSubtitleRuntime(): () => void {
       setPretranslationTrack('ai:capture', { url: 'ai:capture', cues: aiCues });
       return;
     }
+
+    if (isXVideoPage() && !xCaptionSource.isNativeCaptionActive()) return;
 
     if (native) {
       setPretranslationTrack(`x:native:${native.languageCode}`, {url: 'x:native', cues: native.cues});
@@ -1310,17 +1320,29 @@ function mountVideoSubtitleRuntime(): () => void {
     return button;
   };
 
+  const scheduleXNativeCaptionSync = () => {
+    if (xNativeCaptionSyncTimer !== undefined) clearTimeout(xNativeCaptionSyncTimer);
+    xNativeCaptionSyncTimer = setTimeout(() => {
+      xNativeCaptionSyncTimer = undefined;
+      if (destroyed) return;
+      ensurePretranslationTrack(); syncXVideoCaptionSource(); scheduleUpdate(); schedulePretranslation();
+    }, 0);
+  };
   const handleDocumentClick = (event: MouseEvent) => {
-    if (!event.isTrusted) return;
-    if (!menuElement?.isConnected || menuElement.hidden) return;
     const target = event.target;
-    if (!(target instanceof Node)) return;
+    if (isXVideoPage() && target instanceof Element) {
+      const player = playerLocator.getTarget()?.player, control = target.closest('button, [role="button"]');
+      if (player && control && player.contains(control) && isXNativeCaptionControl(control)) scheduleXNativeCaptionSync();
+    }
+    if (!event.isTrusted) return;
+    if (!menuElement?.isConnected || menuElement.hidden || !(target instanceof Node)) return;
     if (buttonElement?.contains(target) || menuElement.contains(target)) return;
     closeMenu();
   };
 
   const handleDocumentKeydown = (event: KeyboardEvent) => {
     if (!event.isTrusted) return;
+    if (handleVideoSubtitleModeShortcutKeydown(event, {document, config, isActive: () => !destroyed && config.on && config.videoTranslationEnabled && isSupportedVideoPage() && Boolean(observedVideo || playerLocator.getTarget()), isVisible: () => config.videoSubtitleVisible !== false, applyMode: selectMenuMode, notify: mode => notifyVideoSubtitleModeSwitch(mode, videoUi)})) return;
     if (event.key !== 'Escape' || !menuElement || menuElement.hidden) return;
     // 全屏 Escape 属于浏览器；菜单可以同时收尾，但不能阻止退出全屏。
     if (!document.fullscreenElement) event.preventDefault();
@@ -1811,7 +1833,7 @@ function mountVideoSubtitleRuntime(): () => void {
   });
 
   return () => {
-    destroyed = true;
+    destroyed = true; clearVideoSubtitleModeNotice();
     reading.destroy();
     learning.destroy();
     learningPlacement.dispose();
@@ -1835,6 +1857,7 @@ function mountVideoSubtitleRuntime(): () => void {
     pendingTranslationSource = '';
     pendingTranslationOverlay = null;
     if (mediaMissingTimer) clearTimeout(mediaMissingTimer);
+    if (xNativeCaptionSyncTimer !== undefined) clearTimeout(xNativeCaptionSyncTimer);
     cancelStableCaption();
     clearPretranslationState(true);
     stopCaptionClock();

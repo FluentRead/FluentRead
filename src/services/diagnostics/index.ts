@@ -72,7 +72,7 @@ export function normalizeDiagnostic(value: unknown): Diagnostic | undefined {
   const candidate = record(value);
   if (!DIAGNOSTIC_CODES.includes(candidate.code as DiagnosticCode)) return undefined;
   const code = candidate.code as DiagnosticCode;
-  return makeDiagnostic(code, code === 'rate-limit' ? duration(candidate.retryAfterMs) : undefined);
+  return makeDiagnostic(code, code === 'rate-limit' || code === 'provider' ? duration(candidate.retryAfterMs) : undefined);
 }
 
 const kinds: readonly TranslationErrorKind[] = [
@@ -107,7 +107,8 @@ export function diagnoseFailure(error: unknown, context: DiagnosticContext = {})
   if (kind === 'rate-limit') return makeDiagnostic('rate-limit', duration(candidate.retryAfterMs));
   if (kind === 'timeout') return makeDiagnostic('timeout');
   if (kind === 'network') return makeDiagnostic(context.online === false ? 'offline' : 'network');
-  if (kind === 'provider' || kind === 'response') return makeDiagnostic('provider');
+  if (kind === 'provider' || kind === 'response') return makeDiagnostic('provider',
+    status === 503 ? duration(candidate.retryAfterMs) : undefined);
   if (kind === 'bad-request') {
     return makeDiagnostic(/model|deployment|模型/iu.test(code + ' ' + message) ? 'model-configuration' : 'configuration');
   }

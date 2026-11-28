@@ -1,12 +1,13 @@
 /**
  * @file src/features/image-translation/ocrLanguages.ts
  * 文件职责：定义图片 OCR 支持的语言包目录、推荐组合和持久化键，并把用户源语言映射为 Tesseract 实际需要加载的语言代码。
- * 主要内容：包含八种源语言元数据、推荐简繁中英日集合、语言包选择与竖排模型展开；漫画明确选择俄语或韩语时改用已有 Tesseract 包，其他语言仍使用漫画专用模型，不从网站界面语言猜测正文。
+ * 主要内容：维护源语言元数据、推荐简繁中英日集合、按需下载与竖排模型展开。单图与漫画明确选择标准模型字表之外的俄语、韩语、阿拉伯语或希伯来语时使用对应的 Tesseract 包。
  * 模块边界：此文件只描述受支持语言与规范化规则，不下载资源或访问 storage；下载由后台 Offscreen OCR runtime 执行，状态持久化由 ocrLanguageRepository 和设置组件协调。
  */
 import {getChineseScript} from '@/src/core/language/chinese';
 
-export type ImageOcrLanguageCode = 'eng' | 'chi_sim' | 'chi_tra' | 'jpn' | 'spa' | 'kor' | 'fra' | 'rus';
+type MangaTesseractPack = 'kor' | 'rus' | 'ara' | 'heb';
+export type ImageOcrLanguageCode = 'eng' | 'chi_sim' | 'chi_tra' | 'jpn' | 'spa' | 'fra' | MangaTesseractPack;
 
 export type ImageOcrLanguagePack = {
     code: ImageOcrLanguageCode;
@@ -23,6 +24,7 @@ export const IMAGE_OCR_SOURCE_LANGUAGES = [
     {value: 'zh-Hans', label: '简体中文'}, {value: 'zh-Hant', label: '繁體中文'},
     {value: 'ja', label: '日本語'}, {value: 'es', label: 'Español'},
     {value: 'ko', label: '한국어'}, {value: 'fr', label: 'Français'}, {value: 'ru', label: 'Русский'},
+    {value: 'ar', label: 'العربية'}, {value: 'he', label: 'עברית'},
 ] as const;
 
 /** 仅公开任务阶段与错误，不保存凭据、图片或用户文本；完成状态以语言仓库为准。 */
@@ -80,6 +82,8 @@ export const IMAGE_OCR_LANGUAGE_PACKS: ImageOcrLanguagePack[] = [
     {code: 'kor', icon: '한', label: '한국어', description: '识别韩语图片文字', size: '约 2 MB', recommended: false},
     {code: 'fra', icon: 'FR', label: 'Français', description: '识别法语图片文字', size: '约 1 MB', recommended: false},
     {code: 'rus', icon: 'RU', label: 'Русский', description: '识别俄语图片文字', size: '约 5 MB', recommended: false},
+    {code: 'ara', icon: 'ع', label: 'العربية', description: '识别阿拉伯语图片文字', size: '约 2 MB', recommended: false},
+    {code: 'heb', icon: 'א', label: 'עברית', description: '识别希伯来语图片文字', size: '约 1 MB', recommended: false},
 ];
 
 export const IMAGE_OCR_RECOMMENDED_LANGUAGES: ImageOcrLanguageCode[] = ['chi_sim', 'chi_tra', 'eng', 'jpn'];
@@ -89,6 +93,13 @@ export const IMAGE_OCR_RECOMMENDED_LANGUAGES: ImageOcrLanguageCode[] = ['chi_sim
  * 下载、加载和删除，用户只管理「日本語」这一张卡片。
  */
 const IMAGE_OCR_VERTICAL_MODELS: Readonly<Partial<Record<ImageOcrLanguageCode, string>>> = {jpn: 'jpn_vert'};
+
+const MANGA_TESSERACT_PACKS = new Map<string, MangaTesseractPack>([
+    ['ko', 'kor'], ['ru', 'rus'], ['ar', 'ara'], ['he', 'heb'], ['iw', 'heb'],
+]);
+const OCR_PACK_BY_SOURCE = new Map<string, ImageOcrLanguageCode>([
+    ...MANGA_TESSERACT_PACKS, ['en', 'eng'], ['ja', 'jpn'], ['es', 'spa'], ['fr', 'fra'],
+]);
 
 /** 把语言包展开为 Tesseract 实际加载的模型；竖排模型紧跟其横排模型，主语言顺序不变。 */
 export function getImageOcrModelLanguages(languages: readonly ImageOcrLanguageCode[]): string[] {
@@ -103,20 +114,25 @@ export function getRequiredImageOcrLanguages(sourceLanguage: string): ImageOcrLa
     const script = getChineseScript(source);
     if (script === 'Hans') return ['chi_sim', 'eng'];
     if (script === 'Hant') return ['chi_tra', 'eng'];
-    const language = source.split('-')[0];
-    const languagePacks: Readonly<Record<string, ImageOcrLanguageCode>> = {
-        en: 'eng', ja: 'jpn', es: 'spa', ko: 'kor', fr: 'fra', ru: 'rus',
-    };
-    const code = Object.hasOwn(languagePacks, language) ? languagePacks[language] : undefined;
+    const code = OCR_PACK_BY_SOURCE.get(source.split('-')[0]);
     if (code) return code === 'eng' ? ['eng'] : [code, 'eng'];
     // 自动源语言同时覆盖简繁、英文与日文，避免默认配置把繁体识别成简体后丢失脚本信息。
     return [...IMAGE_OCR_RECOMMENDED_LANGUAGES];
 }
 
-/** 漫画专用字表不含俄语和韩文；源语言明确时选择已有语言模型，自动模式保留原有识别行为。 */
-export function getMangaOcrEngine(sourceLanguage: string): 'paddle' | 'tesseract' {
+/** 源语言明确指定标准字表之外的文字时，返回识别与下载提示共用的主语言包。 */
+export function getMangaTesseractPack(sourceLanguage: string): MangaTesseractPack | undefined {
     const language = sourceLanguage.trim().replace(/_/gu, '-').toLowerCase().split('-')[0];
-    return language === 'ru' || language === 'ko' ? 'tesseract' : 'paddle';
+    return MANGA_TESSERACT_PACKS.get(language);
+}
+
+export function getMangaOcrEngine(sourceLanguage: string): 'paddle' | 'tesseract' {
+    return getMangaTesseractPack(sourceLanguage) ? 'tesseract' : 'paddle';
+}
+
+/** 单图标准识别使用同一字表，明确选择字表外的受支持语言时沿用轻量语言包。 */
+export function getImageOcrEngine(sourceLanguage: string, preferred: 'paddle' | 'tesseract' = 'tesseract'): 'paddle' | 'tesseract' {
+    return preferred === 'paddle' ? getMangaOcrEngine(sourceLanguage) : preferred;
 }
 
 export function normalizeImageOcrLanguageCodes(value: unknown): ImageOcrLanguageCode[] {

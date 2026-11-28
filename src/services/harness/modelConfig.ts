@@ -76,7 +76,7 @@ export function transformBody(service: string, config: Config, model: string, bo
   const defaults = service === services.deepseek
     ? {...body, thinking: {type: isModelThinkingEnabled(config.modelThinking, service, model) ? 'enabled' : 'disabled'}}
     : body;
-  return normalizeChatCompletionRequest(endpoint, {...defaults, ...parameters});
+  return normalizeChatCompletionRequest(endpoint, {...defaults, ...parameters}, service);
 }
 
 /** 将 provider 错误归一为不泄露 API Key 的用户可见错误。 */

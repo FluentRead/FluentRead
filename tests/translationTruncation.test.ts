@@ -1839,6 +1839,48 @@ describe('source line materialization', () => {
         expect(materializeCandidate({...candidate, nodes: new Array<ChildNode>(1)})).toBeNull();
         expect(paragraph.innerHTML).toBe('Replacement line.');
     });
+
+    it('materializes, translates, restores, and re-discovers inline font br paragraphs cleanly', () => {
+        const {document} = parseHTML(`<html><body><table><tbody><tr><td>
+            <img src="title.gif" alt=""><br><br>
+            <font id="essay" size="2">First paragraph with <a href="/guide">link</a>.<br><br>Second <b>bold</b> paragraph.<br><br>Third paragraph.</font>
+        </td></tr></tbody></table></body></html>`);
+        const font = document.getElementById('essay')!;
+        const original = font.innerHTML;
+        const breaks = Array.from(font.querySelectorAll('br'));
+        const splitRuns = (): ChildNode[][] => {
+            const runs: ChildNode[][] = [];
+            let current: ChildNode[] = [];
+            for (const child of Array.from(font.childNodes)) {
+                if (child.nodeType === 1 && (child as Element).localName === 'br') {
+                    if (current.length) runs.push(current);
+                    current = [];
+                } else {
+                    current.push(child);
+                }
+            }
+            if (current.length) runs.push(current);
+            return runs;
+        };
+
+        const segments: HTMLElement[] = [];
+        for (const nodes of splitRuns()) {
+            const rendered = materializeCandidate({element: font, nodes, kind: 'content', reason: 'test', sourceLine: true})!;
+            expect(rendered.synthetic).toBe(true);
+            rendered.node.setAttribute('data-fr-translation-segment', 'true');
+            const attempt = beginTranslation(rendered.node, 'bilingual', 'content', true, rendered.node.textContent ?? '')!;
+            attempt.state.phase = 'translated';
+            segments.push(rendered.node);
+        }
+        expect(segments).toHaveLength(3);
+        expect(breaks.every(br => br.parentElement === font)).toBe(true);
+        expect(font.querySelector('a')?.getAttribute('href')).toBe('/guide');
+        expect(font.querySelector('b')?.textContent).toBe('bold');
+
+        for (const segment of segments) expect(restoreTranslation(segment)).toBe(true);
+        expect(font.innerHTML).toBe(original);
+        expect(font.querySelector('[data-fr-translation-segment="true"]')).toBeNull();
+    });
 });
 
 describe('visual hover chunk materialization', () => {

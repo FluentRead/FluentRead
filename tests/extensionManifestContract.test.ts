@@ -13,12 +13,20 @@ import {FREE_PROVIDER_ORIGINS} from '@/src/core/config/freeProviderOrigins';
 import {GOOGLE_DRIVE_DEFAULT_CLIENT_ID, GOOGLE_DRIVE_EXTENSION_ID, GOOGLE_DRIVE_EXTENSION_PUBLIC_KEY, GOOGLE_DRIVE_SCOPES} from '@/src/platform/google-drive/constants';
 import {createDriveAuth, type DriveAuthPorts} from '@/src/platform/google-drive/auth';
 import type {Entrypoint, EntrypointGroup, UserManifest} from 'wxt';
-import {remoteConfigStorageBuildPlugin, createExtensionManifest, extendRemoteConfigBuildConfig, groupModuleWorkers, finalizeExtensionZip, createSafariBackgroundPage, configureSafariBackgroundPage, configureStableContentUiResources, configureExtensionUiChunks} from '@/wxt.config';
+import {remoteConfigStorageBuildPlugin, createExtensionManifest, extendRemoteConfigBuildConfig, subframePageContextBuildPlugin, extendSubframePageContextBuildConfig, pruneEntrypointVitePlugins, attachRolldownTransformFilters, groupModuleWorkers, finalizeExtensionZip, createSafariBackgroundPage, configureSafariBackgroundPage, configureStableContentUiResources, configureExtensionUiChunks} from '@/wxt.config';
 import type {InlineConfig} from 'vite';
 
 const PROJECT_ROOT = resolve(__dirname, '..');
 
 describe('native translation sidepanel artifact contract', () => {
+    it('registers the assignable translation window shortcut only on supported builds', () => {
+        for (const browser of ['chrome', 'edge', 'firefox'] as const) {
+            const manifest = createExtensionManifest({browser, manifestVersion: browser === 'firefox' ? 2 : 3});
+            expect(manifest.commands?.['open-translation-window']).toEqual({description: 'Open translation window'});
+        }
+        const safari = createExtensionManifest({browser: 'safari', manifestVersion: 2});
+        expect(safari.commands?.['open-translation-window']).toBeUndefined();
+    });
     it.each(['Chrome', 'Firefox'])('%s validates its own final native panel declaration', async browser => {
         const {verifyTranslationSidepanelManifest} = await import(/* @vite-ignore */ pathToFileURL(resolve(PROJECT_ROOT, 'scripts/testing/verify-extension-manifests.mjs')).href);
         const manifest = browser === 'Chrome' ? {permissions: ['sidePanel']}
@@ -47,7 +55,7 @@ describe('stable public content UI resources', () => {
         {resources: [...uiFiles.slice(0, 3), 'i18n/*.json'], matches: ['<all_urls>'], use_dynamic_url: true},
         {resources: [uiFiles[3]], matches: ['<all_urls>'], use_dynamic_url: true},
         {resources: [uiFiles[4]], matches: ['https://*.mail.163.com/*'], use_dynamic_url: true},
-        {resources: [uiFiles[5]], matches: ['https://mail.qq.com/*'], use_dynamic_url: true},
+        {resources: [uiFiles[5]], matches: ['https://mail.qq.com/*', 'https://courses.edx.org/*'], use_dynamic_url: true},
         {resources: ['content-scripts/unrelated.css', 'private.js'], extension_ids: ['other-extension'], use_dynamic_url: true},
     ];
 
@@ -60,7 +68,9 @@ describe('stable public content UI resources', () => {
         for (const resource of uiFiles) {
             const rule = rules.find(rule => rule.resources.includes(resource))!;
             expect(rule.use_dynamic_url).toBe(false);
-            expect(rule.matches).toEqual(before.web_accessible_resources.find(rule => rule.resources.includes(resource))!.matches);
+            const stylesScope = resource === uiFiles[5] ? ['https://courses.edx.org/*']
+                : before.web_accessible_resources.find(rule => rule.resources.includes(resource))!.matches;
+            expect(rule.matches).toEqual(stylesScope);
         }
         expect(rules.find(rule => rule.resources.includes('i18n/*.json'))).toEqual({
             resources: ['i18n/*.json'], matches: ['<all_urls>'], use_dynamic_url: true,
@@ -111,6 +121,15 @@ describe('stable public content UI resources', () => {
             [['icon/128.png'], false], [['i18n/*.json'], true],
         ]);
     });
+    it('不把缺少 edX 匹配的共用 frame 样式扩大到 edX 网页', () => {
+        const manifest = {web_accessible_resources: [{
+            resources: [uiFiles[5], 'other.js'], matches: ['https://mail.qq.com/*'], use_dynamic_url: true,
+        }]};
+        configureStableContentUiResources({browser: 'chrome', manifestVersion: 3}, manifest);
+        expect(manifest.web_accessible_resources).toEqual([
+            {resources: ['other.js'], matches: ['https://mail.qq.com/*'], use_dynamic_url: true},
+        ]);
+    });
 });
 
 describe('frame UI CSS artifact contract', () => {
@@ -147,17 +166,17 @@ describe('frame UI CSS artifact contract', () => {
                         match_about_blank: true, run_at: 'document_end'},
                     {matches: [...sharedMatches], js: [jsFile('supportedFrame')], all_frames: true, run_at: 'document_end'},
                 ],
-                web_accessible_resources: version === 2 ? ui.map(cssFile) : ui.map(name => ({
+                web_accessible_resources: version === 2 ? [...ui.map(cssFile), cssFile('supportedFrame')] : [...ui.map(name => ({
                     resources: [cssFile(name)], matches: name === 'content' ? ['<all_urls>'] : [...neteaseMatches], use_dynamic_url: false,
-                })),
+                })), {resources: [cssFile('supportedFrame')], matches: ['https://courses.edx.org/*'], use_dynamic_url: false}],
             },
-            files: [...ui.flatMap(name => [jsFile(name), cssFile(name)]), jsFile('supportedFrame')],
+            files: [...ui.flatMap(name => [jsFile(name), cssFile(name)]), jsFile('supportedFrame'), cssFile('supportedFrame')],
             scripts: {...Object.fromEntries(ui.map(name => [jsFile(name), script(name)])),
-                [jsFile('supportedFrame')]: '(()=>{browser.runtime.getURL("icon/32.png");})();'},
+                [jsFile('supportedFrame')]: '(()=>{browser.runtime.getURL("icon/32.png");browser.runtime.getURL("content-scripts/supportedFrame.css");})();'},
         };
     }
 
-    it.each([['Chrome', 3], ['Edge', 3], ['Firefox', 2]] as const)('%s MV%s 保留真正消费的 CSS，并允许 supported frame 无 CSS', async (browser, version) => {
+    it.each([['Chrome', 3], ['Edge', 3], ['Firefox', 2]] as const)('%s MV%s 保留顶层、网易邮箱和 edX 按需消费的 CSS', async (browser, version) => {
         const {verifyFrameUiStyles} = await verifier();
         const {manifest, files, scripts} = fixture(version);
         expect(() => verifyFrameUiStyles(manifest, files, scripts, browser)).not.toThrow();
@@ -233,13 +252,15 @@ describe('frame UI CSS artifact contract', () => {
         }
     });
 
-    it('supported frame 不得保留 CSS 文件、精确或通配 WAR、Shadow CSS 加载器', async () => {
+    it('supported frame 只保留 edX 消费的样式，拒绝缺失资源、过宽的 WAR 或通用 Shadow CSS 加载器', async () => {
         const {verifyFrameUiStyles} = await verifier();
         const edits: ((value: FrameFixture) => void)[] = [
-            value => {value.files.push(cssFile('supportedFrame'));},
+            value => {value.files.splice(value.files.indexOf(cssFile('supportedFrame')), 1);},
+            value => {value.manifest.web_accessible_resources.pop();},
+            value => {value.manifest.web_accessible_resources[value.manifest.web_accessible_resources.length - 1] = {resources: [cssFile('supportedFrame')], matches: [...sharedMatches], use_dynamic_url: false};},
             value => {value.manifest.web_accessible_resources.push({resources: [cssFile('supportedFrame')], matches: [...sharedMatches]});},
             value => {value.manifest.web_accessible_resources.push({resources: ['content-scripts/supported*.css'], matches: [...sharedMatches]});},
-            value => {value.scripts[jsFile('supportedFrame')] += ';q.runtime.getURL("/content-scripts/supportedFrame.css")';},
+            value => {value.scripts[jsFile('supportedFrame')] = '(()=>{browser.runtime.getURL("icon/32.png");})();';},
             value => {value.scripts[jsFile('supportedFrame')] += ';q.runtime.getURL("/content-scripts/other.css")';},
             ...['WXT Shadow Root Reset', 'wxt-shadow-root-document-styles', 'Failed to load styles @'].map(marker =>
                 (value: FrameFixture) => {value.scripts[jsFile('supportedFrame')] += JSON.stringify(marker);}),
@@ -1226,9 +1247,14 @@ describe('extension manifest capability contract', () => {
         };
         const firefox = {
             manifest_version: 2,
-            name: 'FluentRead',
+            name: '__MSG_extensionName__',
             version: '0.0.35',
             background: {scripts: ['background.js']},
+            browser_action: {default_title: '__MSG_extensionToolbarTitle__', default_popup: 'popup.html'},
+            commands: {
+                'open-translation-window': {description: 'Open translation window'},
+                '_execute_message_display_action': {description: 'Translate current message'},
+            },
             permissions: ['storage', '<all_urls>'],
             browser_specific_settings: {gecko: {
                 id: '{3096bd53-3bda-4556-b076-ebf47442a5c1}',
@@ -1240,6 +1266,11 @@ describe('extension manifest capability contract', () => {
         const mail = createThunderbirdManifest(firefox);
         expect(mail.manifest_version).toBe(2);
         expect(mail.background).toEqual(firefox.background);
+        expect(mail.browser_action).toEqual({default_title: '__MSG_extensionName__', default_popup: 'popup.html'});
+        expect(mail.commands).toEqual({'_execute_message_display_action': firefox.commands._execute_message_display_action});
+        expect(createThunderbirdManifest({...firefox, commands: {
+            'open-translation-window': firefox.commands['open-translation-window'],
+        }}).commands).toBeUndefined();
         expect(mail.content_scripts).toBeUndefined();
         expect(mail.permissions).toContain('messagesModify');
         expect(mail.permissions).not.toContain('contextMenus');
@@ -1468,5 +1499,127 @@ describe('extension manifest capability contract', () => {
         const library: InlineConfig = {build: {lib: {entry: 'fixture.ts', name: 'fixture'}}};
         configureExtensionUiChunks([{type: 'popup'}], library);
         expect(library.build!.rolldownOptions).toBeUndefined();
+    });
+
+    it('受限子 frame 内容脚本跳过 Defuddle 正文提取器，顶层网页与扩展页保留完整提取器', () => {
+        const plugin = subframePageContextBuildPlugin();
+        expect(plugin.enforce).toBe('pre');
+        const expected = resolve(PROJECT_ROOT, 'src/services/translation/context/subframeReadableExtractor.ts');
+        expect(plugin.resolveId(resolve(PROJECT_ROOT, 'src/services/translation/context/readableExtractor'))).toBe(expected);
+        expect(plugin.resolveId(resolve(PROJECT_ROOT, 'src/services/translation/context/readableExtractor.ts'))).toBe(expected);
+        expect(plugin.resolveId('./readableExtractor', resolve(PROJECT_ROOT, 'src/services/translation/context/browser.ts'))).toBe(expected);
+        expect(plugin.resolveId('./readableExtractor', resolve(PROJECT_ROOT, 'src/services/translation/other.ts'))).toBeNull();
+        expect(plugin.resolveId(resolve(PROJECT_ROOT, 'src/services/translation/context/browser.ts'))).toBeNull();
+
+        for (const name of ['youtubeEmbed', 'supportedFrame', 'neteaseMailFrame']) {
+            const config: {plugins?: unknown[]} = {plugins: ['existing']};
+            extendSubframePageContextBuildConfig([{type: 'content-script', name}], config);
+            expect(config.plugins).toEqual(['existing', expect.objectContaining({name: 'fluentread-subframe-page-context'})]);
+        }
+        for (const group of [
+            [],
+            [{type: 'content-script', name: 'content'}],
+            [{type: 'content-script', name: 'youtubeEmbed'}, {type: 'content-script', name: 'content'}],
+            [{type: 'popup', name: 'popup'}],
+            [{type: 'background', name: 'background'}],
+        ]) {
+            const config: {plugins?: unknown[]} = {plugins: []};
+            extendSubframePageContextBuildConfig(group, config);
+            expect(config.plugins).toEqual([]);
+        }
+    });
+
+    it('正文提取器与词汇 UI 按需加载入口满足缓存复用、失败重置和子 frame 空实现契约', async () => {
+        const {loadReadablePageExtractor: loadSubframeExtractor} = await import('@/src/services/translation/context/subframeReadableExtractor');
+        await expect(loadSubframeExtractor()).resolves.toBeNull();
+
+        vi.resetModules();
+        vi.doMock('defuddle', () => {
+            throw new Error('transient defuddle load failure');
+        });
+        try {
+            const failingModule = await import('@/src/services/translation/context/readableExtractor');
+            await expect(failingModule.loadReadablePageExtractor()).rejects.toThrow();
+            vi.doUnmock('defuddle');
+            const first = failingModule.loadReadablePageExtractor();
+            const second = failingModule.loadReadablePageExtractor();
+            expect(second).toBe(first);
+            const loaded = await first;
+            expect(typeof loaded?.Defuddle).toBe('function');
+            expect(typeof loaded?.createReadablePageMarkdown).toBe('function');
+        } finally {
+            vi.doUnmock('defuddle');
+        }
+
+        const stubWorkspace = {name: 'StubMaterialWorkspace'};
+        const stubBook = {name: 'StubVocabularyBook'};
+        vi.resetModules();
+        vi.doMock('@/src/features/vocabulary/ui/MaterialWorkspace.vue', () => ({default: stubWorkspace}));
+        vi.doMock('@/src/features/vocabulary/ui/VocabularyBook.vue', () => ({default: stubBook}));
+        try {
+            const vocabUi = await import('@/src/features/vocabulary/ui/public');
+            expect(vocabUi.VocabularyBook).toBe(stubBook);
+            expect(vocabUi.MaterialWorkspace).toBeDefined();
+            await expect(vocabUi.loadMaterialWorkspace()).resolves.toBe(stubWorkspace);
+        } finally {
+            vi.doUnmock('@/src/features/vocabulary/ui/MaterialWorkspace.vue');
+            vi.doUnmock('@/src/features/vocabulary/ui/VocabularyBook.vue');
+        }
+    });
+
+    it('按入口类型裁剪无关 Vite 插件并保留各构建组必需插件', () => {
+        const samplePlugins = [
+            {name: 'vite:vue'},
+            {name: 'fluentread-shared-onnx'},
+            {name: 'fluentread-defuddle-entity-decoder'},
+            {name: 'fluentread-deferred-franc-models'},
+            {name: 'escape-extension-noncharacters'},
+        ];
+        const bridgeConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
+        pruneEntrypointVitePlugins([{type: 'content-script', name: 'youtubeBridge'}], bridgeConfig);
+        expect((bridgeConfig.plugins as {name: string}[]).map(plugin => plugin.name)).toEqual(['escape-extension-noncharacters']);
+
+        const contentConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
+        pruneEntrypointVitePlugins([{type: 'content-script', name: 'content'}], contentConfig);
+        expect((contentConfig.plugins as {name: string}[]).map(plugin => plugin.name)).toEqual([
+            'vite:vue',
+            'fluentread-defuddle-entity-decoder',
+            'fluentread-deferred-franc-models',
+            'escape-extension-noncharacters',
+        ]);
+
+        const subframeConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
+        pruneEntrypointVitePlugins([{type: 'content-script', name: 'youtubeEmbed'}], subframeConfig);
+        expect((subframeConfig.plugins as {name: string}[]).map(plugin => plugin.name)).toEqual([
+            'vite:vue',
+            'fluentread-deferred-franc-models',
+            'escape-extension-noncharacters',
+        ]);
+
+        const pageConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
+        pruneEntrypointVitePlugins([{type: 'options', name: 'options'}], pageConfig);
+        expect((pageConfig.plugins as {name: string}[]).map(plugin => plugin.name)).toEqual(samplePlugins.map(plugin => plugin.name));
+    });
+
+    it('为 unimport 与定点构建插件挂接 Rolldown 原生 transform 过滤器而不改写原插件实例', () => {
+        const originalUnimport = {name: 'unimport', transform: () => null};
+        const originalDefuddle = {name: 'fluentread-defuddle-entity-decoder', transform: () => null};
+        const untouched = {name: 'vite:vue', transform: () => null};
+        const config: {plugins?: unknown[]} = {plugins: [[originalUnimport], originalDefuddle, untouched]};
+        attachRolldownTransformFilters(config);
+
+        expect(typeof originalUnimport.transform).toBe('function');
+        const wrappedUnimport = (config.plugins![0] as {transform: {filter: {id: {exclude: RegExp[]}; code: RegExp}; handler: unknown}}[])[0];
+        expect(wrappedUnimport.transform.handler).toBe(originalUnimport.transform);
+        expect(wrappedUnimport.transform.filter.id.exclude.some(rule => rule.test('/app/src/core/i18n/messages/zh-CN.ts'))).toBe(true);
+        expect(wrappedUnimport.transform.filter.id.exclude.some(rule => rule.test('/app/src/app/background/runtime.ts'))).toBe(false);
+        expect(wrappedUnimport.transform.filter.code.test('browser.runtime.sendMessage({})')).toBe(true);
+        expect(wrappedUnimport.transform.filter.code.test('export const plain = 1;')).toBe(false);
+
+        const wrappedDefuddle = config.plugins![1] as {transform: {filter: {id: RegExp}; handler: unknown}};
+        expect(wrappedDefuddle.transform.handler).toBe(originalDefuddle.transform);
+        expect(wrappedDefuddle.transform.filter.id.test('/node_modules/defuddle/dist/index.js')).toBe(true);
+        expect(wrappedDefuddle.transform.filter.id.test('/src/app/content/runtime.ts')).toBe(false);
+        expect(config.plugins![2]).toBe(untouched);
     });
 });

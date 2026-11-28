@@ -6,29 +6,31 @@
  -->
 <template>
   <SettingsGroup :title="t('paragraphCopy.settings.title')" :description="t('paragraphCopy.settings.description')">
-    <SettingsItem :label="t('paragraphCopy.settings.enabled')" :description="t('paragraphCopy.settings.enabledDescription', {shortcut: hotkeyDisplayName})">
+    <template #heading-extra>
       <el-switch v-model="props.config.paragraphCopyEnabled" class="settings-toggle" :aria-label="t('paragraphCopy.settings.enabled')" />
-    </SettingsItem>
-    <SettingsItem :label="t('paragraphCopy.settings.hotkey')" :description="t('paragraphCopy.settings.hotkeyDescription')" :disabled="!props.config.paragraphCopyEnabled">
-      <div class="hotkey-config">
-        <el-select :model-value="props.config.paragraphCopyHotkey" data-testid="paragraph-copy-hotkey" :aria-label="t('paragraphCopy.settings.hotkey')" :disabled="!props.config.paragraphCopyEnabled" @change="handleHotkeyChange">
-          <el-option v-for="item in PARAGRAPH_COPY_HOTKEY_OPTIONS" :key="item.value" :value="item.value" :label="item.label" data-i18n-ignore />
-          <el-option value="custom" :label="t('paragraphCopy.settings.hotkeyCustom')" />
-        </el-select>
-        <div v-if="props.config.paragraphCopyHotkey === 'custom'" class="paragraph-copy-hotkey-custom">
-          <span v-if="props.config.customParagraphCopyHotkey" class="paragraph-copy-hotkey-text" data-i18n-ignore>{{ hotkeyDisplayName }}</span>
-          <span v-else class="paragraph-copy-hotkey-text paragraph-copy-hotkey-placeholder">{{ t('paragraphCopy.settings.hotkeyCustomEmpty') }}</span>
-          <el-button size="small" type="text" :aria-label="t('paragraphCopy.settings.hotkeyEdit')" :title="t('paragraphCopy.settings.hotkeyEdit')" @click="openCustomHotkeyDialog">
-            <el-icon><Edit /></el-icon>
-          </el-button>
+    </template>
+    <template v-if="props.config.paragraphCopyEnabled">
+      <SettingsItem :label="t('paragraphCopy.settings.hotkey')" :description="t('paragraphCopy.settings.hotkeyDescription')">
+        <div class="hotkey-config">
+          <el-select :model-value="props.config.paragraphCopyHotkey" data-testid="paragraph-copy-hotkey" :aria-label="t('paragraphCopy.settings.hotkey')" @change="handleHotkeyChange">
+            <el-option v-for="item in PARAGRAPH_COPY_HOTKEY_OPTIONS" :key="item.value" :value="item.value" :label="item.label" data-i18n-ignore />
+            <el-option value="custom" :label="t('paragraphCopy.settings.hotkeyCustom')" />
+          </el-select>
+          <div v-if="props.config.paragraphCopyHotkey === 'custom'" class="paragraph-copy-hotkey-custom">
+            <span v-if="props.config.customParagraphCopyHotkey" class="paragraph-copy-hotkey-text" data-i18n-ignore>{{ hotkeyDisplayName }}</span>
+            <span v-else class="paragraph-copy-hotkey-text paragraph-copy-hotkey-placeholder">{{ t('paragraphCopy.settings.hotkeyCustomEmpty') }}</span>
+            <el-button size="small" type="text" :aria-label="t('paragraphCopy.settings.hotkeyEdit')" :title="t('paragraphCopy.settings.hotkeyEdit')" @click="openCustomHotkeyDialog">
+              <el-icon><Edit /></el-icon>
+            </el-button>
+          </div>
         </div>
-      </div>
-    </SettingsItem>
-    <SettingsItem :label="t('paragraphCopy.settings.content')" :description="t(`paragraphCopy.settings.content.${props.config.paragraphCopyContent}Description`)" :disabled="!props.config.paragraphCopyEnabled">
-      <el-select v-model="props.config.paragraphCopyContent" data-testid="paragraph-copy-content" :aria-label="t('paragraphCopy.settings.content')" :disabled="!props.config.paragraphCopyEnabled">
-        <el-option v-for="mode in PARAGRAPH_COPY_CONTENT_MODES" :key="mode" :value="mode" :label="t(`paragraphCopy.settings.content.${mode}`)" />
-      </el-select>
-    </SettingsItem>
+      </SettingsItem>
+      <SettingsItem :label="t('paragraphCopy.settings.content')" :description="t(`paragraphCopy.settings.content.${props.config.paragraphCopyContent}Description`)">
+        <el-select v-model="props.config.paragraphCopyContent" data-testid="paragraph-copy-content" :aria-label="t('paragraphCopy.settings.content')">
+          <el-option v-for="mode in PARAGRAPH_COPY_CONTENT_MODES" :key="mode" :value="mode" :label="t(`paragraphCopy.settings.content.${mode}`)" />
+        </el-select>
+      </SettingsItem>
+    </template>
   </SettingsGroup>
   <CustomHotkeyInput
     v-model="showCustomHotkeyDialog"
@@ -53,6 +55,7 @@ import {
 import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation';
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
 import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation';
+import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
 import {canonicalizeHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
 import {
     findEnabledQuickTranslationHotkeyConflict,
@@ -101,7 +104,13 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
                 : '',
             feature: t('sectionTranslation.settings.title'),
         },
-        {hotkey: inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger), feature: translateLegacy('输入框翻译')},
+        {
+            hotkey: props.config.videoSubtitleModeHotkeyEnabled
+                ? resolveVideoSubtitleModeHotkey(props.config.videoSubtitleModeHotkey, props.config.customVideoSubtitleModeHotkey)
+                : '',
+            feature: t('video.modeShortcut.title'),
+        },
+        {hotkey: inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger, props.config.customInputBoxTranslationHotkey), feature: translateLegacy('输入框翻译')},
     ];
 }
 

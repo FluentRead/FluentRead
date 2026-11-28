@@ -1,7 +1,9 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {createHash} from 'node:crypto';
 import {imageMaskBoxes,inpaintTextRegions,planImageGradientRepair} from '@/src/features/image-translation/services/inpainting';
+import {IMAGE_DIRECTIONAL_REPAIR_BUDGET,repairDirectionalImageBackground} from '@/src/features/image-translation/services/directionalTextRepair';
 import {ImageAlphaProtectionUnavailableError,type MangaAlphaProtection} from '@/src/features/image-translation/services/mangaAlphaProtection';
+import {rotatedSpineFixture} from './helpers/rotatedSpineFixture';
 
 function solidPixels(width: number, height: number, color = [180, 200, 220, 255]): Uint8ClampedArray {
     const result = new Uint8ClampedArray(width * height * 4);
@@ -12,6 +14,88 @@ function solidPixels(width: number, height: number, color = [180, 200, 220, 255]
 function line(x0: number, y0: number, x1: number, y1: number) {
     return {text: '文字', bbox: {x0, y0, x1, y1}};
 }
+
+function clippedOutlineFixture(side: 'top' | 'bottom', count = 9, connected = false) {
+    const width = 92, height = 64, region = line(24, 21, 63, 37);
+    const source = solidPixels(width, height);
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        source.set([122 + x % 26 * 5, 131 + y * 2, 181 + (x + y) % 13 * 3, 255], (y * width + x) * 4);
+    }
+    const original = source.slice();
+    const [mask] = imageMaskBoxes(region, width, height);
+    const edge = side === 'top' ? mask.y0 - 1 : mask.y1;
+    const direction = side === 'top' ? 1 : -1;
+    const mark = (x: number, y: number) => source.set([14, 18, 23, 255], (y * width + x) * 4);
+    for (let y = mask.y0 + 4; y < mask.y1 - 4; y++) for (let x = 27; x < 51; x++) mark(x, y);
+    for (let x = 28; x < 28 + count; x++) {
+        mark(x, edge);
+        if (connected) {mark(x, edge + direction);mark(x, edge + direction * 2);}
+    }
+    const referenceWithoutSamples = source.slice();
+    // 此透明点在扩散通常读取的单像素外沿之外，只拒绝新的多层取样。
+    referenceWithoutSamples[((mask.y0 - 4) * width + mask.x0 - 3) * 4 + 3] = 254;
+    const before = inpaintTextRegions(referenceWithoutSamples, width, height, [region]);
+    const interior = (data: Uint8ClampedArray) => {
+        const rows = [];
+        for (let y = mask.y0; y < mask.y1; y++) rows.push(...data.slice((y * width + mask.x0) * 4, (y * width + mask.x1) * 4));
+        return rows;
+    };
+    return {source, original, width, height, region, edge, direction, mask, before, interior};
+}
+
+describe('普通不透明图的外沿重新取样', () => {
+    it.each(['top', 'bottom'] as const)('仅用可靠外层颜色降低 %s 侧在框内形成的暗带，保留整个框外', side => {
+        const {source, original, width, height, region, edge, direction, mask, before} = clippedOutlineFixture(side);
+        const saved = source.slice(), after = inpaintTextRegions(source, width, height, [region], true);
+        expect(after).toBe(source);
+        const point = ((edge + direction) * width + 31) * 4;
+        expect(Math.abs(after[point] - original[point])).toBeLessThan(Math.abs(before[point] - original[point]));
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            if (x >= mask.x0 && x < mask.x1 && y >= mask.y0 && y < mask.y1) continue;
+            const start = (y * width + x) * 4;
+            if (after.subarray(start, start + 4).some((value, i) => value !== saved[start + i]))
+                throw new Error(`像素 ${x}, ${y} 超出擦除范围`);
+        }
+    });
+
+    it.each([{count: 3, connected: false}, {count: 9, connected: true}])('离群样本稀疏或连续进入内部时沿用扩散 %j', ({count, connected}) => {
+        const {source, width, height, region, before, interior} = clippedOutlineFixture('top', count, connected);
+        expect(interior(inpaintTextRegions(source, width, height, [region]))).toEqual(interior(before));
+    });
+
+    it('外层取样接近另一个擦除框时，对处理顺序保持一致', () => {
+        const {source, width, height, region, before, interior} = clippedOutlineFixture('top');
+        const neighbor = line(23, 5, 32, 16);
+        const first = inpaintTextRegions(source.slice(), width, height, [region, neighbor], true);
+        const last = inpaintTextRegions(source.slice(), width, height, [neighbor, region], true);
+        expect(interior(first)).toEqual(interior(before));
+        expect(interior(last)).toEqual(interior(before));
+    });
+
+    it.each([200, 400])('密集独立框耗尽外层扫描或分离核对预算后继续普通扩散 %i', count => {
+        const fixture = clippedOutlineFixture('top');
+        const {mask, region} = fixture, columns = 20;
+        const tile = {x:mask.x0 - 4, y:mask.y0 - 4, width:mask.x1 - mask.x0 + 8, height:mask.y1 - mask.y0 + 8};
+        const width = tile.width * columns, height = tile.height * Math.ceil(count / columns);
+        const bitmap = new Uint8ClampedArray(width * height * 4);
+        const regions = Array.from({length: count}, (_, i) => {
+            const x = i % columns * tile.width, y = Math.floor(i / columns) * tile.height;
+            for (let row = 0; row < tile.height; row++) {
+                const src = ((row + tile.y) * fixture.width + tile.x) * 4;
+                bitmap.set(fixture.source.subarray(src, src + tile.width * 4), ((y + row) * width + x) * 4);
+            }
+            return line(region.bbox.x0 - tile.x + x, region.bbox.y0 - tile.y + y,
+                region.bbox.x1 - tile.x + x, region.bbox.y1 - tile.y + y);
+        });
+        const repaired = inpaintTextRegions(bitmap, width, height, regions, true);
+        const first = ((mask.y0 - tile.y) * width + 31 - tile.x) * 4;
+        const prior = fixture.before[(mask.y0 * fixture.width + 31) * 4];
+        const lastTile = count - 1;
+        const last = first + ((lastTile % columns) * tile.width + Math.floor(lastTile / columns) * tile.height * width) * 4;
+        expect(repaired[first]).not.toBe(prior);
+        expect(repaired[last]).toBe(prior);
+    });
+});
 
 function protectedRuns(height:number,coordinates:Array<[number,number,number]>):MangaAlphaProtection {
     const sorted=coordinates.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
@@ -66,9 +150,111 @@ function knownHoleFixture() {
     return {source, width, height, boxes};
 }
 
+function diagonalImage(direction: number) {
+    const width = 160, height = 96, clean = new Uint8ClampedArray(width * height * 4);
+    const region = line(31, 34, 129, 49);
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        const distance = x - direction * (y - 41);
+        const start = distance < 65 ? [26, 70, 125] : [230, 222, 200];
+        const color = distance < 78 ? start : [155, 58, 29];
+        clean.set([...color, 255], (y * width + x) * 4);
+    }
+    const source = clean.slice();
+    for (let y = 34; y < 49; y++) for (let x = 31; x < 129; x++) {
+        if (x % 8 < 3 || y === 34 || y === 48) source.set([245, 244, 242, 255], (y * width + x) * 4);
+    }
+    return {source, clean, width, height, region};
+}
+
+function directionalFrame(direction = 1) {
+    const {source, clean, width, height, region} = diagonalImage(direction);
+    const [box] = imageMaskBoxes(region, width, height);
+    return {source, clean, width, height, left: box.x0 - 1, top: box.y0 - 1,
+        columns: box.x1 - box.x0 + 2, rows: box.y1 - box.y0 + 2};
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe('图片文字背景修复', () => {
+    it.each([-1, 1])('沿四边可核实的斜向背景恢复字框里的图案 %s', direction => {
+        const {source, clean, width, height, region} = diagonalImage(direction);
+        const original = source.slice();
+        expect(inpaintTextRegions(source, width, height, [region])).toEqual(clean);
+        expect(source).toEqual(original);
+    });
+    it('沿半像素斜向采样时只修补框内，已核实的斜边没有被摊开成色带', () => {
+        const {source, clean, width, left, top, columns, rows} = directionalFrame(.5);
+        const original = source.slice();
+        expect(repairDirectionalImageBackground(source, width, left, top, columns, rows,
+            {remaining: IMAGE_DIRECTIONAL_REPAIR_BUDGET})).toBe(true);
+        let edgePixels = 0, outsideChanges = 0;
+        for (let y = 0; y < source.length / (width * 4); y++) for (let x = 0; x < width; x++) {
+            const offset = (y * width + x) * 4;
+            if (x <= left || x >= left + columns - 1 || y <= top || y >= top + rows - 1) {
+                for (let c = 0; c < 4; c++) {
+                    if (source[offset + c] !== original[offset + c]) outsideChanges++;
+                }
+            } else if (source[offset] !== clean[offset]) edgePixels++;
+        }
+        expect(outsideChanges).toBe(0);
+        expect(edgePixels).toBeLessThanOrEqual(2 * rows);
+    });
+    it.each([[47, 20], [90, 8], [150, 57], [60, 35], [350, 56]])(
+        '过窄、过深或过大的观察区保持原样 %s × %s', (columns, rows) => {
+            const width = columns + 2, source = solidPixels(width, rows + 2), original = source.slice();
+            const budget = {remaining: IMAGE_DIRECTIONAL_REPAIR_BUDGET};
+            expect(repairDirectionalImageBackground(source, width, 1, 1, columns, rows, budget)).toBe(false);
+            expect(source).toEqual(original);
+            expect(budget.remaining).toBe(IMAGE_DIRECTIONAL_REPAIR_BUDGET);
+        },
+    );
+    it.each(['budget', 'transparent', 'poor-match', 'independent-columns', 'repeated', 'left-side', 'right-side'] as const)(
+        '斜向条件未确认则不改写原像素 %s', kind => {
+            const {source, width, left, top, columns, rows} = directionalFrame();
+            const right = left + columns - 1, bottom = top + rows - 1;
+            const maxShift = Math.min(32, Math.floor((columns - 1) / 4), Math.floor((rows - 1) * 1.5));
+            const at = (x: number, y: number) => (y * width + x) * 4;
+            if (kind === 'transparent') source[at(left + 12, top + 10) + 3] = 120;
+            if (kind === 'poor-match') {
+                for (let x = left; x <= right; x++) {
+                    const offset = at(x, bottom);
+                    for (let c = 0; c < 3; c++) source[offset + c] = Math.min(255, source[offset + c] + 58);
+                }
+            }
+            if (kind === 'independent-columns') {
+                const parity = (maxShift + rows - 1 + 1) % 2;
+                for (let x = left + parity; x <= right; x += 2) source.set([255, 0, 255, 255], at(x, bottom));
+            }
+            if (kind === 'repeated') {
+                for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) {
+                    const color = ((x - y + 140) % 7) < 3 ? [20, 54, 72, 255] : [224, 198, 140, 255];
+                    source.set(color, at(x, y));
+                }
+            }
+            if (kind === 'left-side' || kind === 'right-side') {
+                const x = kind === 'left-side' ? left : right;
+                for (let y = top + 1; y < bottom; y++) source.set([255, 0, 255, 255], at(x, y));
+            }
+            const budget = {remaining: kind === 'budget' ? 1 : IMAGE_DIRECTIONAL_REPAIR_BUDGET};
+            const original = source.slice(), remaining = budget.remaining;
+            expect(repairDirectionalImageBackground(source, width, left, top, columns, rows, budget)).toBe(false);
+            expect(source).toEqual(original);
+            if (kind === 'budget') expect(budget.remaining).toBe(remaining);
+            else expect(budget.remaining).toBeLessThan(remaining);
+        },
+    );
+    it('普通图片的独立旋转字框恢复书脊逐列原像素，未知、相接或组合框沿用既有修补',()=>{
+        const f=rotatedSpineFixture(),before=f.pixels.slice(),{width,height,region}=f;
+        expect(inpaintTextRegions(f.pixels,width,height,[region])).toEqual(f.background);
+        expect(f.pixels).toEqual(before);
+        const normal={...region,quarterTurn:undefined};
+        const neighbour={text:'OTHER',bbox:{x0:57,y0:24,x1:69,y1:38}};
+        expect(inpaintTextRegions(f.pixels,width,height,[region,neighbour])).toEqual(inpaintTextRegions(f.pixels,width,height,[normal,neighbour]));
+        const sourceBoxes=[region.bbox,neighbour.bbox];
+        expect(inpaintTextRegions(f.pixels,width,height,[{...region,sourceBoxes}])).toEqual(inpaintTextRegions(f.pixels,width,height,[{...normal,sourceBoxes}]));
+        f.pixels[f.offset(40,12)]++;
+        expect(inpaintTextRegions(f.pixels,width,height,[region])).toEqual(inpaintTextRegions(f.pixels,width,height,[normal]));
+    });
     it.each([
         [0,1,1,4,4],[12,-1,1,4,4],[12,1,-1,4,4],[12,1,1,2,4],[12,1,1,4,2],
         [12,10,1,4,4],[12,1,10,4,4],[12,1.5,1,4,4],[NaN,1,1,4,4],

@@ -1,7 +1,7 @@
 /**
  * @file src/providers/translation/bilibili-free.ts
  * 文件职责：适配 B站 Index-Translate 官方匿名文本翻译 API。
- * 主要内容：固定模型与端点、关闭思考输出，提示保留表情符号和完整内部占位符；预算内的多行文本优先整段翻译并恢复原换行，行数不匹配、译文为空或截断时回退到保留术语标记的有界分块。保护文本槽和边缘空白，透传取消和 HTTP 状态，主动终止未读的错误正文。
+ * 主要内容：固定模型与端点、关闭思考输出，提示保留表情符号和完整内部占位符；预算内的多行文本优先整段翻译并恢复原换行，布局异常或短多行请求遇到可恢复的 504 时，回退到保留术语标记的逐行分块。保护文本槽和边缘空白，透传取消和其余 HTTP 错误，主动终止未读的错误正文。
  * 模块边界：仅通过 runtimeFetch 请求官方服务，不读取用户密钥、Cookie、代理或可编辑请求体；Origin 兼容由扩展后台网络层处理，独立入口与免费池共用协议，调度与换线由上层编排负责。
  */
 import {translateFreeTextChunks} from './freeTextChunks';
@@ -12,11 +12,12 @@ import {rebuildTranslationSlots} from '@/src/core/translation/slotProtocol';
 import {getTranslationGlossarySourceSlots, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderRequest} from '@/src/services/translation/types';
 import {abortErrorFromSignal, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
-import {createHttpStatusError, readJsonResponse} from '@/src/platform/http/errors';
+import {createHttpStatusError, readJsonResponse, readRetryAfterMs} from '@/src/platform/http/errors';
 
 export const BILIBILI_FREE_TRANSLATION_URL = `https://${BILIBILI_FREE_TRANSLATION_DOMAIN}/v1/chat/completions`;
 export {BILIBILI_FREE_TRANSLATION_MODEL};
 const MAX_CHUNK_CODEPOINTS = 2000;
+const MAX_GATEWAY_FALLBACK_LINES = 4;
 
 function checkAbort(signal?: AbortSignal): void {
     if (signal?.aborted) throw abortErrorFromSignal(signal);
@@ -28,7 +29,7 @@ function languageName(code: string): string {
     return name;
 }
 
-async function translateChunk(text: string, sourceName: string, targetName: string, signal?: AbortSignal, allowLayoutFallback = false): Promise<string> {
+async function translateChunk(text: string, sourceName: string, targetName: string, signal?: AbortSignal, layoutLineCount?: number): Promise<string> {
     checkAbort(signal);
     const response = await runtimeFetch(BILIBILI_FREE_TRANSLATION_URL, {
         method: 'POST', credentials: 'omit', signal,
@@ -42,7 +43,13 @@ async function translateChunk(text: string, sourceName: string, targetName: stri
     });
     try {
         checkAbort(signal);
-        if (!response.ok) throw createHttpStatusError(response, 'B站翻译请求失败');
+        const allowLayoutFallback = layoutLineCount !== undefined;
+        if (!response.ok) {
+            // 仅拆分短多行合并请求，并服从服务端给出的等待时间。
+            if (response.status === 504 && allowLayoutFallback && layoutLineCount <= MAX_GATEWAY_FALLBACK_LINES
+                && !readRetryAfterMs(response.headers)) return '';
+            throw createHttpStatusError(response, 'B站翻译请求失败');
+        }
         const data = await readJsonResponse<{choices?: Array<{finish_reason?: unknown; message?: {content?: unknown}}> } | null>(response, 'B站翻译返回的不是有效 JSON');
         checkAbort(signal);
         const choice = data?.choices?.[0];
@@ -61,17 +68,21 @@ async function translateChunk(text: string, sourceName: string, targetName: stri
 
 async function translatePlain(text: string, sourceName: string, targetName: string, signal?: AbortSignal): Promise<string> {
     const content = text.trim();
-    if (/[\r\n]/u.test(content) && Array.from(content).length <= MAX_CHUNK_CODEPOINTS) {
-        const translation = await translateChunk(content, sourceName, targetName, signal, true);
+    const fitsCombinedRequest = /[\r\n]/u.test(content) && Array.from(content).length <= MAX_CHUNK_CODEPOINTS;
+    if (fitsCombinedRequest) {
         const nonemptyLine = /\S[^\r\n]*/gu;
+        const lineCount = content.match(nonemptyLine)?.length;
+        const translation = await translateChunk(content, sourceName, targetName, signal, lineCount);
         const translatedLines = translation.match(nonemptyLine);
-        if (translatedLines && translatedLines.length === content.match(nonemptyLine)?.length) {
+        if (translatedLines && translatedLines.length === lineCount) {
             // 用同一条逐行回填路径恢复源文本空白，不把模型生成的空行写回。
             let index = 0;
             return translateFreeTextChunks(text, text.length, async () => translatedLines[index++]!.trimEnd(), signal);
         }
     }
-    return translateFreeTextChunks(text, MAX_CHUNK_CODEPOINTS, chunk => translateChunk(chunk, sourceName, targetName, signal), signal);
+    // 合并请求已校验正文总长。逐行请求会先去除边缘空白，回退时每行只需发送一次。
+    const lineLimit = fitsCombinedRequest ? text.length : MAX_CHUNK_CODEPOINTS;
+    return translateFreeTextChunks(text, lineLimit, chunk => translateChunk(chunk, sourceName, targetName, signal), signal);
 }
 
 export async function translateBilibiliFree(request: TranslationProviderRequest<string>): Promise<string> {

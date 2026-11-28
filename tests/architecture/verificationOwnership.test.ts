@@ -9,18 +9,17 @@ import {auditVueOwners, isDeclarativeVue, sourceHash, type VueOwner} from '../he
 const PROJECT_ROOT = resolve(__dirname, '../..');
 const AUDITED_EXTENSIONS = /\.(?:cjs|css|html|js|mjs|ts|vue)$/u;
 const PRODUCT_ROOTS = [
+    'assets/styles',
     'docs/.vitepress',
     'entrypoints',
-    'examples',
     'scripts',
     'src',
-    'styles',
+    'tests/config',
+    'tests/fixtures/document-translation',
     'userscript',
 ] as const;
 const ROOT_FILES = [
     'vitest.config.ts',
-    'vitest.coverage.config.ts',
-    'vitest.cloud-backup.config.ts',
     'wxt.config.ts',
 ] as const;
 const PRODUCT_TOOL_SCRIPTS = [
@@ -75,7 +74,7 @@ function listFiles(directory: string): string[] {
             const absolute = resolve(current, entry);
             if (statSync(absolute).isDirectory()) {
                 visit(absolute);
-            } else if (AUDITED_EXTENSIONS.test(entry) && !entry.endsWith('.d.ts')) {
+            } else if (AUDITED_EXTENSIONS.test(entry) && !/\.d(?:\.[^./]+)?\.ts$/u.test(entry)) {
                 files.push(relativePath(absolute));
             }
         }
@@ -86,7 +85,7 @@ function listFiles(directory: string): string[] {
 }
 
 function coverageSourcePaths(): Set<string> {
-    const file = projectPath('vitest.coverage.config.ts');
+    const file = projectPath('tests/config/vitest.coverage.config.ts');
     const sourceFile = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const declaration = sourceFile.statements.find(ts.isExportAssignment);
     if (!declaration || !ts.isCallExpression(declaration.expression)
@@ -121,7 +120,7 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
     if (path.startsWith('components/')
         || path.startsWith('entrypoints/')
         || path.startsWith('src/')
-        || path.startsWith('styles/')
+        || path.startsWith('assets/styles/')
         || path === 'wxt.config.ts') {
         owners.add('chrome-firefox-build');
     }
@@ -136,7 +135,7 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
     if (path.startsWith('docs/.vitepress/')) owners.add('docs-build');
     if (path === 'scripts/verify-docs-build.mjs' || path === 'scripts/verify-storybook-build.mjs') owners.add('docs-build');
     if (path === 'scripts/verify-brand-copy.mjs') owners.add('brand-copy-functional');
-    if (path.startsWith('examples/')) owners.add('isolated-browser-regression');
+    if (path.startsWith('tests/fixtures/document-translation/')) owners.add('isolated-browser-regression');
     if (path.startsWith('scripts/run-') || path.startsWith('scripts/site-translation/')
         || path === 'scripts/quality/review-browser.cjs'
         || path === 'scripts/capture-docs-ui.cjs') {
@@ -150,6 +149,7 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
         || path.startsWith('scripts/quality/')
         || path.startsWith('scripts/agent-bridge/')
         || path.startsWith('scripts/wasm/')
+        || path.startsWith('scripts/i18n/')
         || PRODUCT_TOOL_SCRIPTS.includes(path)
         || DOCS_TOOL_SCRIPTS.includes(path)
         || QUALITY_TOOL_SCRIPTS.includes(path)
@@ -164,7 +164,8 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
         || path === 'scripts/verify-userscript-standalone-build.mjs'
         || path === 'scripts/export-site-rule-pack.mjs'
         || path === 'scripts/update-readme-contributors.mjs'
-        || path.startsWith('vitest.')) {
+        || path.startsWith('vitest.')
+        || path.startsWith('tests/config/')) {
         owners.add('test-infrastructure-contract');
     }
 
@@ -175,29 +176,48 @@ const classificationCompilerOptions = Object.freeze({module: ts.ModuleKind.ESNex
 const classificationOptions = JSON.stringify([classificationCompilerOptions, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS, ts.ScriptKind.TS]);
 type ModuleClassification = Readonly<{typeOnly: boolean; pureBarrel: boolean}>;
 const moduleClassifications = new Map<string, {source: string; options: string; result: ModuleClassification}>();
+function hasDefiniteRuntimeStatement(sourceFile: ts.SourceFile): boolean {
+    for (const statement of sourceFile.statements) {
+        const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) ?? [] : [];
+        if (modifiers.some(modifier => modifier.kind === ts.SyntaxKind.DeclareKeyword)) continue;
+        if (ts.isFunctionDeclaration(statement) && statement.body) return true;
+        if (ts.isClassDeclaration(statement)) return true;
+        if (ts.isEnumDeclaration(statement) && !modifiers.some(modifier => modifier.kind === ts.SyntaxKind.ConstKeyword)) return true;
+        if (ts.isVariableStatement(statement) || ts.isExportAssignment(statement)) return true;
+        if (ts.isExpressionStatement(statement) || ts.isIfStatement(statement) || ts.isForStatement(statement)
+            || ts.isForOfStatement(statement) || ts.isForInStatement(statement) || ts.isWhileStatement(statement)
+            || ts.isDoStatement(statement) || ts.isSwitchStatement(statement) || ts.isTryStatement(statement)
+            || ts.isThrowStatement(statement)) return true;
+    }
+    return false;
+}
+
 function classifyModule(path: string): ModuleClassification {
     const source = readFileSync(projectPath(path), 'utf8');
     const cached = moduleClassifications.get(path);
     if (cached?.source === source && cached.options === classificationOptions) return cached.result;
-    // 仍按实际输出判断纯声明；只缓存两个布尔结果，不共享可变 AST 或模块执行状态。
-    const emitted = ts.transpileModule(source, {compilerOptions: classificationCompilerOptions}).outputText;
-    const runtime = ts.createSourceFile(path + '.js', emitted, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
-    const typeOnly = runtime.statements.every((statement) => ts.isEmptyStatement(statement)
-        || (ts.isExportDeclaration(statement)
-            && !statement.moduleSpecifier
-            && !!statement.exportClause
-            && ts.isNamedExports(statement.exportClause)
-            && statement.exportClause.elements.length === 0));
+    // 先用单次 AST 判定明确的运行时语句，仅对模糊模块（纯声明/重导出/const enum）调用 transpileModule，保证分类与原输出完全一致。
     const original = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const pureBarrel = original.statements.length > 0
         && original.statements.every((statement) => ts.isExportDeclaration(statement));
+    let typeOnly = false;
+    if (!hasDefiniteRuntimeStatement(original)) {
+        const emitted = ts.transpileModule(source, {compilerOptions: classificationCompilerOptions}).outputText;
+        const runtime = ts.createSourceFile(path + '.js', emitted, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+        typeOnly = runtime.statements.every((statement) => ts.isEmptyStatement(statement)
+            || (ts.isExportDeclaration(statement)
+                && !statement.moduleSpecifier
+                && !!statement.exportClause
+                && ts.isNamedExports(statement.exportClause)
+                && statement.exportClause.elements.length === 0));
+    }
     const result = Object.freeze({typeOnly, pureBarrel});
     moduleClassifications.set(path, {source, options: classificationOptions, result});
     return result;
 }
 
 function isTypeOnlyModule(path: string): boolean {
-    if (path.endsWith('.d.ts')) return true;
+    if (/\.d(?:\.[^./]+)?\.ts$/u.test(path)) return true;
     return path.endsWith('.ts') && classifyModule(path).typeOnly;
 }
 
@@ -225,7 +245,7 @@ const BUILD_ONLY_SRC_ALLOWLIST = new Set([
     'src/core/i18n/messages/ko-KR.ts',
     'src/core/i18n/messages/ru-RU.ts',
     'src/core/i18n/messages/zh-CN.ts',
-    'src/ui/i18n.ts',
+    'src/ui/i18n/runtime.ts',
     // WXT ShadowRootUi/Vue 挂载适配器绑定真实 DOM 与组件生命周期；由 shadowUi 单测和双浏览器构建验证。
     'src/platform/shadow-ui/vue.ts',
     // 内容脚本构建专用的纯远程配置端口，只调用严格覆盖的 createRemoteConfigStorage；替换规则由 manifest/构建契约测试验证。

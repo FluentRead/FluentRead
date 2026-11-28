@@ -12,11 +12,23 @@ import {Worker} from 'node:worker_threads';
 import {inflateRawSync} from 'node:zlib';
 import JSZip from 'jszip';
 
-const WASM_FILES = [
+const ONNX_WASM_CANDIDATES = [
+    'fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm',
     'fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm',
+] as const;
+const FIXED_WASM_FILES = [
     'fluent-read-ai/wllama.wasm',
     'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm',
 ] as const;
+
+function resolveTargetWasmFiles(entries: readonly {name: string}[]): readonly string[] {
+    const presentOnnx = ONNX_WASM_CANDIDATES.filter(name => entries.some(entry => entry.name === name));
+    requireZip(presentOnnx.length === 1, presentOnnx.length === 0
+        ? `缺少固定 WASM 条目（${ONNX_WASM_CANDIDATES.join(' 或 ')}）`
+        : `同时包含多个 ONNX WASM 条目：${presentOnnx.join(', ')}`);
+    for (const name of FIXED_WASM_FILES) requireZip(entries.some(entry => entry.name === name), `缺少固定 WASM 条目 ${name}`);
+    return [presentOnnx[0]!, ...FIXED_WASM_FILES];
+}
 const COMPRESSOR_VERSION = '1.0.15';
 const CACHE_FORMAT = `sha256-zopfli-${COMPRESSOR_VERSION}-deflate-iterations-1`;
 
@@ -29,7 +41,7 @@ interface ZipEntry {
     originalSize: number;
     spanEnd: number;
 }
-interface ZipLayout {entries: ZipEntry[]; centralOffset: number; endOffset: number; localStart: number}
+interface ZipLayout {entries: ZipEntry[]; targetWasmFiles: readonly string[]; centralOffset: number; endOffset: number; localStart: number}
 export interface CompactExtensionZipResult {
     beforeBytes: number;
     afterBytes: number;
@@ -103,8 +115,8 @@ function parseZip(bytes: Buffer): ZipLayout {
         entry.spanEnd = localOrder[index + 1]?.localOffset ?? centralOffset;
         requireZip(entry.dataOffset + entry.compressedSize <= entry.spanEnd, '本地条目重叠');
     });
-    for (const name of WASM_FILES) requireZip(entries.some(entry => entry.name === name), `缺少固定 WASM 条目 ${name}`);
-    return {entries, centralOffset, endOffset, localStart: localOrder[0]!.localOffset};
+    const targetWasmFiles = resolveTargetWasmFiles(entries);
+    return {entries, targetWasmFiles, centralOffset, endOffset, localStart: localOrder[0]!.localOffset};
 }
 
 async function compressInWorker(data: Buffer, root: string, timeoutMs: number): Promise<Buffer> {
@@ -204,7 +216,7 @@ export async function verifyExtensionZipPreservation(original: Buffer, output: B
         requireZip(metadata.equals(entry.central), '重打包改变了 ZIP 元数据');
         const local = Buffer.from(output.subarray(rebuilt.localOffset, rebuilt.dataOffset)); local.writeUInt32LE(entry.compressedSize, 18);
         requireZip(local.equals(original.subarray(entry.localOffset, entry.dataOffset)), '重打包改变了本地元数据');
-        if (!(WASM_FILES as readonly string[]).includes(entry.name)) requireZip(
+        if (!layout.targetWasmFiles.includes(entry.name)) requireZip(
             original.subarray(entry.localOffset, entry.spanEnd).equals(output.subarray(rebuilt.localOffset, rebuilt.spanEnd)),
             '重打包改变了非 WASM 条目字节');
         requireZip(original.subarray(entry.dataOffset + entry.compressedSize, entry.spanEnd).equals(
@@ -224,7 +236,7 @@ export async function compactExtensionZip(zipPath: string, root: string,
     requireZip(version === COMPRESSOR_VERSION, '压缩器版本与缓存格式不一致');
     const cache = options.cacheDirectory ?? resolve(root, '.wxt/zip-wasm-deflate', CACHE_FORMAT);
     const replacements = new Map<string, Buffer>(), entries: CompactExtensionZipResult['entries'] = [];
-    for (const name of WASM_FILES) {
+    for (const name of layout.targetWasmFiles) {
         const entry = layout.entries.find(candidate => candidate.name === name)!;
         requireZip(entry.central.readUInt16LE(10) === 8, `固定 WASM 条目不是 DEFLATE：${name}`);
         const file = before.files[name]; requireZip(Boolean(file), 'ZIP 解码后的文件名发生变化');

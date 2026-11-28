@@ -14,6 +14,7 @@ import ToolbarClickSetting from '@/src/features/settings/ui/components/ToolbarCl
 import SelectionSettings from '@/src/features/settings/ui/SelectionSettings.vue';
 import ReadingAssistanceSettings from '@/src/features/settings/ui/ReadingAssistanceSettings.vue';
 import ExcludedLanguageSettings from '@/src/features/settings/ui/ExcludedLanguageSettings.vue';
+import ExcludedTagSettings from '@/src/features/settings/ui/ExcludedTagSettings.vue';
 import HarnessPromptSettings from '@/src/features/settings/ui/HarnessPromptSettings.vue';
 import {Config} from '@/src/core/config/model';
 import {EMPTY_DICTIONARY_FIELDS} from '@/src/core/config/dictionaryWorkspace';
@@ -111,25 +112,17 @@ it('normalizes paragraph thresholds and changes paragraph layout through real te
     expect(index===0?config.minTranslationTextLength:config.eagerTranslationCharacters).toBe((index===0?normalizeMinTranslationTextLength:normalizeEagerTranslationCharacters)(raw===''?undefined:Number(raw)));
   }
   const before=config.longParagraphLineBreakEnabled;await click(ui.host.querySelector('[role="switch"]')!);expect(config.longParagraphLineBreakEnabled).toBe(!before);
-  const options=ui.host.querySelectorAll('[data-page-translation-order] button');
-  await click(options[1]);expect(config.translationBeforeOriginal).toBe(true);
-  await click(options[0]);expect(config.translationBeforeOriginal).toBe(false);
-  config.display=0;await flush();expect([...options].every(node=>node.hasAttribute('disabled'))).toBe(true);
-  expect(config.translationBeforeOriginal).toBe(false);
-  await click(button(ui.host,'settings.translationStyle.switchToBilingual'));expect(config.display).toBe(1);
-  expect([...options].every(node=>!node.hasAttribute('disabled'))).toBe(true);
 });
 it.each(['bilingual','translation-only','disabled'] as const)('preserves the previous enabled selection mode from %s',async mode=>{
-  const config=reactive(new Config());config.selectionTranslatorMode=mode;const navigate=vi.fn();const ui=mount(SelectionSettings,{config,onNavigate:navigate});await click(ui.host.querySelector('[data-learning-navigation]')!);expect(navigate).toHaveBeenCalledWith('settings-vocabulary');
+  const config=reactive(new Config());config.selectionTranslatorMode=mode;const ui=mount(SelectionSettings,{config});
   const toggle=ui.host.querySelector('[role="switch"]')!;await click(toggle);
   if(mode==='disabled'){expect(config.selectionTranslatorMode).toBe('bilingual');expect(config.disableSelectionTranslator).toBe(false);}
-  else{expect(config.selectionTranslatorMode).toBe('disabled');expect(config.disableSelectionTranslator).toBe(true);await click(toggle);expect(config.selectionTranslatorMode).toBe(mode);}
-  await click(button(ui.host,'句子'));expect(ui.host.querySelector('output')).toBeTruthy();await click(button(ui.host,'单词'));expect(ui.host.querySelector('output')).toBeNull();
+  else{expect(config.selectionTranslatorMode).toBe('disabled');expect(config.disableSelectionTranslator).toBe(true);expect(ui.host.querySelector('[data-testid="selection-dictionary-source"]')).toBeNull();await click(toggle);expect(config.selectionTranslatorMode).toBe(mode);}
 });
 it.each(['chrome','userscript'] as const)('updates dictionary source through the actual settings template in %s',async browser=>{
   selectionBrowser.browser=browser;
   vi.stubEnv('BROWSER',browser);
-  const config=reactive(new Config());const ui=mount(SelectionSettings,{config});
+  const config=reactive(new Config());config.selectionTranslatorMode='bilingual';const ui=mount(SelectionSettings,{config});
   const field=ui.host.querySelector<HTMLInputElement>('[data-testid="selection-dictionary-source"] input')!;
   expect(field.value).toBe('auto');
   expect(ui.host.querySelectorAll('[data-dictionary-option]')).toHaveLength(7);
@@ -140,7 +133,7 @@ it.each(['chrome','userscript'] as const)('updates dictionary source through the
   await input(field,'auto');expect(config.selectionDictionarySource).toBe('auto');
 });
 it('selects an imported dictionary, switches back to built-in lookup and accepts legacy drafts',async()=>{
-  const config=reactive(new Config());
+  const config=reactive(new Config());config.selectionTranslatorMode='bilingual';
   config.selectionDictionaryWorkspace.recipes=[{id:'study',name:'My dictionary',kind:'json',url:'https://example.test/{{word}}',headers:{},fields:{...EMPTY_DICTIONARY_FIELDS},script:'',localId:''}];
   const ui=mount(SelectionSettings,{config});
   const field=()=>ui.host.querySelector<HTMLInputElement>('[data-testid="selection-dictionary-source"] input')!;
@@ -148,11 +141,11 @@ it('selects an imported dictionary, switches back to built-in lookup and accepts
   expect(ui.host.querySelector('[data-dictionary-option="recipe:study"]')?.textContent).toBe('My dictionary');
   await input(field(),'recipe:study');expect(config.selectionDictionaryRecipe).toBe('study');expect(field().value).toBe('recipe:study');
   await input(field(),'free-dictionary');expect(config.selectionDictionaryRecipe).toBe('');expect(config.selectionDictionarySource).toBe('free-dictionary');
-  const legacy=reactive(new Config());delete (legacy as Partial<Config>).selectionDictionaryWorkspace;
+  const legacy=reactive(new Config());legacy.selectionTranslatorMode='bilingual';delete (legacy as Partial<Config>).selectionDictionaryWorkspace;
   ui.props.config=legacy;await flush();expect(field().value).toBe('auto');expect(ui.host.querySelectorAll('[data-dictionary-option]')).toHaveLength(7);
 });
 it('hides extension dictionary recipes in userscript drafts and keeps built-in switching usable',async()=>{
-  const config=reactive(new Config());
+  const config=reactive(new Config());config.selectionTranslatorMode='bilingual';
   config.selectionDictionaryWorkspace.recipes=[{id:'study',name:'My dictionary',kind:'json',url:'https://example.test/{{word}}',headers:{},fields:{...EMPTY_DICTIONARY_FIELDS},script:'',localId:''}];
   config.selectionDictionaryRecipe='study';
   vi.stubEnv('BROWSER','userscript');selectionBrowser.browser='userscript';
@@ -210,6 +203,54 @@ it('preserves selected uncommon languages when collapsed, normalizes toggles, cl
   await click(button(ui.host,'settings.excludedLanguages.more'));expect(ui.host.querySelectorAll('[data-language]')).toHaveLength(options.to.length);
   locale.value.value='en';await flush();expect(ui.host.querySelector(`[data-language="${first.value}"] span`)!.textContent).toBe(getMultilingualTargetLanguageLabel(first.value,first.label,'en').split(' / ')[0]);
   await click(button(ui.host,'settings.excludedLanguages.less'));await click(button(ui.host,'settings.excludedLanguages.clear'));expect(ui.props.modelValue).toEqual([]);expect(ui.host.querySelectorAll('.excluded-language-actions button')).toHaveLength(1);
+});
+
+it('toggles preset excluded tags, adds validated custom selectors, reports invalid or disallowed entries, removes chips and clears all',async()=>{
+  let ui:ReturnType<typeof mount>;
+  ui=mount(ExcludedTagSettings,{modelValue:[], 'onUpdate:modelValue':(value:string[])=>{ui.props.modelValue=value;}});
+  await click(ui.host.querySelector('[data-tag="blockquote"]')!);
+  expect(ui.props.modelValue).toEqual(['blockquote']);
+  await click(ui.host.querySelector('[data-tag="blockquote"]')!);
+  expect(ui.props.modelValue).toEqual([]);
+
+  const field=ui.host.querySelector('.excluded-tag-input') as HTMLInputElement;
+  const addBtn=ui.host.querySelector('.excluded-tag-add') as HTMLButtonElement;
+  expect(addBtn.hasAttribute('disabled')).toBe(true);
+  await input(field,'   ');
+  field.dispatchEvent(Object.assign(new win.Event('keydown',{bubbles:true,cancelable:true}),{key:'Enter'}));await flush();
+  expect(ui.props.modelValue).toEqual([]);
+
+  await input(field,'H4, .no-trans，:is(h5, h6)');
+  await click(addBtn);
+  expect(ui.props.modelValue).toEqual(['h4','.no-trans',':is(h5, h6)']);
+  expect(field.value).toBe('');
+  expect(ui.host.querySelectorAll('[data-custom-tag]')).toHaveLength(3);
+
+  await input(field,'.valid-box, div[broken');
+  field.dispatchEvent(Object.assign(new win.Event('keydown',{bubbles:true,cancelable:true}),{key:'Enter'}));await flush();
+  expect(ui.props.modelValue).toContain('.valid-box');
+  expect(ui.host.querySelector('[role="alert"]')?.textContent).toBe('settings.excludedTags.invalid');
+  expect(field.value).toBe('div[broken');
+
+  await input(field,'body, #sidebar');
+  expect(ui.host.querySelector('[role="alert"]')).toBeNull();
+  await click(addBtn);
+  expect(ui.props.modelValue).toContain('#sidebar');
+  expect(ui.host.querySelector('[role="alert"]')?.textContent).toBe('settings.excludedTags.disallowed');
+  expect(field.value).toBe('body');
+
+  await input(field,'html');
+  await click(addBtn);
+  expect(ui.host.querySelector('[role="alert"]')?.textContent).toBe('settings.excludedTags.disallowed');
+  expect(field.value).toBe('html');
+
+  await click(ui.host.querySelector('[data-custom-tag=".no-trans"]')!);
+  expect(ui.props.modelValue).not.toContain('.no-trans');
+  expect(ui.host.querySelector('[role="alert"]')).toBeNull();
+
+  await click(button(ui.host,'settings.excludedTags.clear'));
+  expect(ui.props.modelValue).toEqual([]);
+  expect(ui.host.querySelector('.excluded-tag-actions')).toBeNull();
 });
 
 it('ignores a late insertion click from a detached prompt toolbar',async()=>{

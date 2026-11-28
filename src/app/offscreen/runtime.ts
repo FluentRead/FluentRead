@@ -153,6 +153,7 @@ export function startOffscreenApp(): void {
                 request.language,
                 request.voice,
                 signal,
+                request.speed,
             ),
             prepare: (request) => downloads.track(LOCAL_TTS_DOWNLOAD_ID, report => prepareLocalTtsModel(request.keepWarm === true, report)),
             status: getLocalTtsModelStatus,

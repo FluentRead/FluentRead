@@ -18,7 +18,7 @@ const runtime = createRequire(
 const { chromium } = runtime('playwright')
 const helper = require(arg('helper'))
 const out = path.resolve(
-  arg('output', path.join(root, 'marketing/source/screenshots'))
+  arg('output', path.join(root, 'docs/maintainers/marketing/source/screenshots'))
 )
 const english = arg('locale', 'zh-CN') === 'en'
 const exampleModel = english ? 'Reading demo' : '阅读示例'

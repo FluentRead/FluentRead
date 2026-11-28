@@ -1,0 +1,31 @@
+{
+  "asset": "FluentReadRareIdeographs-Regular.woff2",
+  "license": "SIL Open Font License 1.1",
+  "licenseFile": "OFL.txt",
+  "source": {
+    "name": "HanaMinA.ttf",
+    "version": "2017-09-04",
+    "repository": "googlefonts/chinese",
+    "revision": "801aa43acbf9f5411f1131ec22dc3f75fda899e8",
+    "path": "fonts/HanaMin/HanaMinA.ttf",
+    "licensePath": "fonts/HanaMin/LICENSE.txt",
+    "sha256": "7ca87559414474848fc513a8d8eb42d5b0f8194c30c2abdfbfedff5398ec88d7"
+  },
+  "generator": "../../scripts/fonts/build-image-rare-ideographs.py",
+  "tools": {
+    "python": "3.9",
+    "fontTools": "4.38.0",
+    "node": "24.22.3"
+  },
+  "repertoire": {
+    "jisX0213SupplementaryIdeographs": 303,
+    "additionalCodepoints": [
+      "U+20000",
+      "U+20BB7"
+    ],
+    "variationSequences": 485,
+    "totalCodepoints": 305
+  },
+  "bytes": 97900,
+  "sha256": "5838e2c04202de0b50af23052f4ee1c518ac2eac5f9ecde71bf8a0d101162761"
+}

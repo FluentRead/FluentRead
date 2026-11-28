@@ -4,6 +4,7 @@
  * 主要内容：完整不透明外周校验双线性背景，所有显著差异限于原物理字框四像素内，以包含真实OCR框外的抗锯齿尾缘；从实际重复墨色中选取主色，再验证每个墨迹像素都能由同一颜色与局部背景混合得到。渐变容忍仅覆盖八位量化，不用它授予清字权限；纯色底的框外空处要求逐字节一致。单项六万五千像素、四千颜色和一百二十八物理框有硬上限，整页预算由调用方预付。
  * 模块边界：不修改像素、不返回掩码或修补计划，不推断字体、语义或艺术归属；纯色沿用4.5的局部对比门槛，渐变至少3并另给细对比描边，均不代表缩放后页面的可访问性认证。混色、纹理、透明或证据不足时保持未知。
  * 字形边界：单个物理源框完成全部颜色验证后复用已有墨迹索引给出紧边界，供独立字号核对；多框不把总包围框冒充单行字高，也不授予额外清字范围。
+ * 旋转标签：同一源字框的上下静区逐列一致时，按列观察书脊的局部底色，再用同一墨色与完整外围核对源色。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import {imageMatteObservationBox,type ImageMattePalette} from './imageMatteRepair';
@@ -27,7 +28,7 @@ export function matchesImageSourceInk(pixel:readonly number[],background:readonl
 }
 
 /** 仅在已通过页预算的候选上调用；结果不允许扩张或替代原清字范围。 */
-export function observeImageSourceInk(pixels:Uint8ClampedArray,width:number,height:number,bounds:Box,sources:readonly Box[]):ImageSourceInk|undefined {
+export function observeImageSourceInk(pixels:Uint8ClampedArray,width:number,height:number,bounds:Box,sources:readonly Box[],rotatedLabel=false):ImageSourceInk|undefined {
     const roi=imageMatteObservationBox(width,height,bounds);
     if(!roi||pixels.length<width*height*4||!sources.length||sources.length>128)return;
     if(sources.some(b=>b.x1<=b.x0||b.y1<=b.y0))return;
@@ -38,9 +39,17 @@ export function observeImageSourceInk(pixels:Uint8ClampedArray,width:number,heig
     const read=(x:number,y:number):[number,number,number,number]=>{const p=((top+y)*width+left+x)*4;return [pixels[p],pixels[p+1],pixels[p+2],pixels[p+3]];};
     const corners=[read(0,0),read(w-1,0),read(0,h-1),read(w-1,h-1)];
     if(corners.some(c=>c[3]!==255))return;
-    const flat=corners.every(c=>c.every((v,i)=>v===corners[0][i]));
-    if(!flat&&Math.max(...[0,1,2].map(c=>Math.max(...corners.map(p=>p[c]))-Math.min(...corners.map(p=>p[c]))))<4)return;
+    let columns:ReturnType<typeof read>[]|undefined;
+    if(rotatedLabel&&sources.length===1){
+        const samples=Array.from({length:w},(_,x)=>read(x,0));
+        if(samples.every((rgba,x)=>rgba[3]===255&&[1,h-2,h-1].every(y=>read(x,y).every((value,c)=>value===rgba[c]))))
+            columns=samples;
+    }
+    const backgroundSamples=columns??corners;
+    const flat=backgroundSamples.every(c=>c.every((v,i)=>v===backgroundSamples[0][i]));
+    if(!flat&&!columns&&Math.max(...[0,1,2].map(c=>Math.max(...corners.map(p=>p[c]))-Math.min(...corners.map(p=>p[c]))))<4)return;
     const background=(x:number,y:number)=>{
+        if(columns)return columns[x];
         if(flat)return corners[0].slice(0,3);
         const u=x/(w-1),v=y/(h-1);
         return [0,1,2].map(c=>(corners[0][c]*(1-u)+corners[1][c]*u)*(1-v)+(corners[2][c]*(1-u)+corners[3][c]*u)*v);

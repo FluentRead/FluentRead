@@ -274,6 +274,11 @@ const VIDEO_DISPLAY_MODE_LABELS = new Map<unknown, string>([
     ['translation-only', '只显示译文'],
     ['original-only', '只显示原文'],
 ]);
+const VIDEO_SUBTITLE_MODE_HOTKEY_ACTION_LABELS = new Map<unknown, string>([
+    ['bilingual-original', '双语 ↔ 原文'],
+    ['cycle-display', '双语 → 译文 → 原文'],
+    ['cycle-all', '双语 → 译文 → 原文 → 关闭'],
+]);
 const SIDE_LABELS = new Map<unknown, string>([
     ['left', '左侧'],
     ['right', '右侧'],
@@ -618,7 +623,12 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     selectionTtsVoices: {group: 'translation', label: '划词朗读音色'},
     selectionTtsMode: {group: 'translation', label: '朗读合成策略', format: (value) => formatEnum(value, LOCAL_TTS_MODE_LABELS)},
     selectionTtsLocalVoice: {group: 'translation', label: '本地朗读音色'},
+    selectionTtsRate: {group: 'translation', label: '朗读语速', format: (value) => formatNumber(value, 'x')},
+    selectionTtsOnlineSources: {group: 'translation', label: '在线朗读来源顺序'},
+    selectionTtsOpenAiModel: {group: 'translation', label: 'OpenAI 朗读模型'},
+    selectionTtsOpenAiVoice: {group: 'translation', label: 'OpenAI 朗读音色'},
     inputBoxTranslationTrigger: {group: 'translation', label: '输入框翻译触发方式', format: (value) => formatEnum(value, INPUT_TRIGGER_LABELS)},
+    customInputBoxTranslationHotkey: {group: 'translation', label: '自定义输入框翻译快捷键'},
     inputBoxTranslationTarget: {group: 'translation', label: '输入框翻译目标语言', format: (value) => formatEnum(value, LANGUAGE_LABELS)},
     inputBoxTranslationOutputMode: {group: 'translation', label: '输入框翻译输出方式', format: (value) => formatEnum(value, INPUT_OUTPUT_LABELS)},
     inputBoxTranslationInterval: {group: 'translation', label: '输入框翻译触发间隔', format: (value) => formatNumber(value, ' ms')},
@@ -636,6 +646,8 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     quickTranslationProfiles: {group: 'translation', label: '快捷翻译方案', format: formatQuickTranslationProfiles},
     excludedLanguages: {group: 'translation', label: '不翻译的语言', format: value => Array.isArray(value)
         ? value.map(language => formatEnum(language, LANGUAGE_LABELS)).join('、') || '无' : '无'},
+    excludedTags: {group: 'translation', label: '不翻译的标签', format: value => Array.isArray(value)
+        ? formatArray(value) : formatValue(value)},
     glossaryEnabled: {group: 'translation', label: '术语库', format: formatBoolean},
     glossaryLibraries: {group: 'translation', label: '术语库内容', format: formatGlossaryLibraries},
 
@@ -678,6 +690,10 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     videoGlossaryIds: {group: 'videoSubtitles', label: '字幕术语库', format: formatGlossarySelection},
     videoSubtitleVisible: {group: 'videoSubtitles', label: '显示视频字幕', format: formatBoolean},
     videoSubtitleDisplayMode: {group: 'videoSubtitles', label: '视频字幕显示模式', format: (value) => formatEnum(value, VIDEO_DISPLAY_MODE_LABELS)},
+    videoSubtitleModeHotkeyEnabled: {group: 'videoSubtitles', label: '视频字幕显示模式快捷键', format: formatBoolean},
+    videoSubtitleModeHotkey: {group: 'videoSubtitles', label: '视频字幕模式切换组合键', format: value => value === 'custom' ? '自定义快捷键' : formatValue(value)},
+    customVideoSubtitleModeHotkey: {group: 'videoSubtitles', label: '自定义视频字幕模式快捷键', format: formatValue},
+    videoSubtitleModeHotkeyAction: {group: 'videoSubtitles', label: '视频字幕快捷键切换方式', format: value => formatEnum(value, VIDEO_SUBTITLE_MODE_HOTKEY_ACTION_LABELS)},
     videoSubtitleFontSize: {group: 'videoSubtitles', label: '视频字幕字号', format: (value) => formatNumber(value, '%')},
     videoSubtitleOffsetMs: {group: 'videoSubtitles', label: '字幕时间偏移', format: (value) => formatNumber(value, 'ms')},
     videoSubtitleAppearance: {group: 'videoSubtitles', label: '视频字幕外观'},

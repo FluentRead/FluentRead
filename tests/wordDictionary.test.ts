@@ -237,4 +237,82 @@ describe('word dictionary online backups', () => {
         expect(merged.phonetics).toHaveLength(2);
         expect(merged.sources.map(item => item.id)).toEqual(['free-dictionary', 'wiktapi']);
     });
+
+    it('requests English WiktApi entries and extracts etymology and inflections', async () => {
+        const requestedUrls: string[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            requestedUrls.push(url);
+            if (url.includes('api.wiktapi.dev')) {
+                return response({
+                    word: 'run',
+                    entries: [
+                        {
+                            pos: 'noun',
+                            etymology_text: 'From Middle English <i>runnen</i>',
+                            senses: [{ glosses: ['An act of running.'] }],
+                            forms: [
+                                null,
+                                { form: '' },
+                                { form: '-', tags: ['plural'] },
+                                { form: 'no-table-tags', tags: ['table-tags'] },
+                                { form: 'en-noun', tags: ['inflection-template'] },
+                                { form: 'run' },
+                                { form: 'runs', tags: ['plural'] },
+                                { form: 'runs', tags: ['plural'] },
+                            ],
+                        },
+                        {
+                            pos: 'verb',
+                            etymology: 'Fallback etymology ignored when origin exists.',
+                            senses: [{ glosses: ['To move swiftly on foot.'] }],
+                            forms: [
+                                { form: 'running', tags: ['present', 'participle'] },
+                                { form: 'ran', tags: ['past'] },
+                                { form: 'run', tags: ['participle', 'past'] },
+                                { form: 'runneth' },
+                            ],
+                        },
+                    ],
+                });
+            }
+            throw new Error('unexpected provider: ' + url);
+        }));
+
+        const card = await lookupWord('run', 'wiktapi');
+
+        expect(requestedUrls).toEqual(['https://api.wiktapi.dev/v1/en/word/run?lang=en']);
+        expect(card?.origin).toBe('From Middle English runnen');
+        expect(card?.inflections).toBe('runs (plural); running (present, participle); ran (past); run (participle, past); runneth');
+    });
+
+    it('falls back to WiktApi etymology field and caps merged inflections cleanly', () => {
+        const first = parseWiktApiEntry({
+            word: 'go',
+            pos: 'verb',
+            etymology: 'From Old English <b>gān</b>',
+            senses: [{ glosses: ['To move.'] }],
+            forms: [
+                { form: 'goes', tags: ['present', 'singular', 'third-person', 'extra'] },
+                { form: 'going', tags: ['participle', 'present'] },
+                { form: 'went', tags: ['past'] },
+                { form: 'gone', tags: ['participle', 'past'] },
+                { form: 'goest', tags: ['second-person'] },
+                { form: 'goeth', tags: ['third-person'] },
+                { form: 'gan', tags: ['past'] },
+                { form: 'yede', tags: ['past'] },
+                { form: 'overflow', tags: ['past'] },
+            ],
+        }, 'go');
+        expect(first.origin).toBe('From Old English gān');
+        expect(first.inflections?.split('; ')).toHaveLength(8);
+        expect(first.inflections).not.toContain('overflow');
+        expect(first.inflections).toContain('goes (present, singular, third-person)');
+
+        const merged = mergeWordCardData(
+            { word: 'go', normalizedWord: 'go', phonetics: [], meanings: [], inflections: 'goes (present); ; went (past)', sources: [] },
+            { word: 'go', normalizedWord: 'go', phonetics: [], meanings: [], inflections: 'went (past); gone (past); f3; f4; f5; f6; f7; f8; f9', sources: [] },
+        );
+        expect(merged.inflections).toBe('goes (present); went (past); gone (past); f3; f4; f5; f6; f7');
+    });
 });

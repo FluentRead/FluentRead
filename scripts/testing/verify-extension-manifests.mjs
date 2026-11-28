@@ -87,24 +87,31 @@ function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
 
-/** 校验真实产物中的七语安装说明，防止占位符未接线、语言缺失或静态描述漂移。 */
+/** 校验真实产物中的七语安装说明和工具栏提示，检查 manifest 引用和文案。 */
 export async function verifyLocalizedExtensionMetadata(directory, manifest) {
     assert(manifest.name === '__MSG_extensionName__' && manifest.description === '__MSG_extensionDescription__',
         '扩展名称和说明必须通过浏览器本地化 metadata 解析');
     assert(manifest.default_locale === 'en', '扩展安装 metadata 必须提供英文默认语言');
+    const action = manifest.manifest_version === 2 ? manifest.browser_action : manifest.action;
+    assert(action?.default_title === '__MSG_extensionToolbarTitle__', '工具栏提示必须通过浏览器本地化 metadata 解析');
     const descriptions = JSON.parse(await readFile(path.join(PROJECT_ROOT, 'src/core/i18n/messages/product-descriptions.json'), 'utf8'));
+    const toolbarDescriptions = JSON.parse(await readFile(path.join(PROJECT_ROOT, 'src/core/i18n/messages/toolbar-descriptions.json'), 'utf8'));
     const locales = Object.entries(descriptions).map(([language, description]) => ({
-        locale: language === 'zh-CN' ? 'zh_CN' : language.split('-')[0], description,
+        locale: language === 'zh-CN' ? 'zh_CN' : language.split('-')[0],
+        description,
+        toolbarDescription: toolbarDescriptions[language],
     }));
     const actualLocales = (await readdir(path.join(directory, '_locales'), {withFileTypes: true}))
         .filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
     assert(isDeepStrictEqual(actualLocales, locales.map(({locale}) => locale).sort()), '扩展安装 metadata 的语言集合与源目录不一致');
-    for (const {locale, description} of locales) {
+    for (const {locale, description, toolbarDescription} of locales) {
         const messages = JSON.parse(await readFile(path.join(directory, '_locales', locale, 'messages.json'), 'utf8'));
         const name = messages.extensionName?.message;
         assert(typeof name === 'string' && name.trim().length > 0, `${locale} 缺少本地化扩展名称`);
         assert(messages.extensionDescription?.message === description && description.trim().length > 0
             && description.length <= 132 && !/[\r\n]/u.test(description), `${locale} 扩展说明缺失、漂移或超过 132 字符`);
+        assert(typeof toolbarDescription === 'string' && toolbarDescription.trim().length > 0 && !/[\r\n]/u.test(toolbarDescription)
+            && messages.extensionToolbarTitle?.message === `${name} · ${toolbarDescription}`, `${locale} 工具栏提示缺失、漂移或包含换行`);
     }
     return actualLocales;
 }
@@ -246,12 +253,23 @@ export function verifyFrameUiStyles(manifest, files, scripts, browser) {
     const supported = entries.find(entry => entry.js?.includes('content-scripts/supportedFrame.js'));
     assert(!supported.css?.length && supported.match_origin_as_fallback !== true,
         `${browser} 共用子 frame 不应自动注入 CSS 或扩大来源匹配`);
-    assert(!files.includes(supportedCss) && cssRules(supportedCss).length === 0,
-        `${browser} 共用子 frame 保留了无消费的 UI CSS 文件或资源声明`);
     const source = scripts['content-scripts/supportedFrame.js'];
-    assert(typeof source === 'string' && !/["'`]\/?content-scripts\/[^"'`\s]+\.css["'`]/u.test(source)
+    assert(typeof source === 'string' && files.includes(supportedCss)
+        && /\.getURL\s*\(\s*(["'`])\/?content-scripts\/supportedFrame\.css\1\s*\)/u.test(source),
+        `${browser} 共用子 frame 缺少 edX 学习面板样式或实际加载地址`);
+    const cssLiterals = [...source.matchAll(/(["'`])(\/?content-scripts\/[^"'`\s]+\.css)\1/gu)]
+        .map(match => match[2].replace(/^\//u, ''));
+    assert(cssLiterals.every(url => url === supportedCss)
         && !source.includes('WXT Shadow Root Reset') && !source.includes('wxt-shadow-root-document-styles')
-        && !source.includes('Failed to load styles @'), `${browser} 共用子 frame 仍引入 Shadow UI CSS 加载路径`);
+        && !source.includes('Failed to load styles @'), `${browser} 共用子 frame 保留了未消费的 UI CSS 加载路径`);
+    const [edxRule, ...duplicateRules] = cssRules(supportedCss);
+    if (manifest.manifest_version === 3) {
+        assert(edxRule && typeof edxRule === 'object' && !duplicateRules.length && edxRule.resources.includes(supportedCss)
+            && isDeepStrictEqual(edxRule.matches, ['https://courses.edx.org/*']) && !edxRule.extension_ids?.length
+            && edxRule.use_dynamic_url === false, `${browser} 共用子 frame 的 edX 样式资源范围变化`);
+    } else {
+        assert(edxRule === supportedCss && !duplicateRules.length, `${browser} 共用子 frame 的 edX 样式需要精确路径`);
+    }
 }
 
 export function findUnexpectedCurrentVersionArchives(outputFiles, version, expectedArchives) {
@@ -389,7 +407,7 @@ async function main() {
             firefoxArchives.map((archive) => listArchiveArtifacts(path.join(outputDir, archive))),
         );
         for (const file of ['.nvmrc', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'wxt.config.ts',
-            'src/app/background/runtime.ts', 'scripts/wasm/package-diagnostics.ts', 'patches/ppu-paddle-ocr@6.6.0.patch']) {
+            'src/app/background/runtime.ts', 'scripts/wasm/package-diagnostics.ts', 'scripts/patches/ppu-paddle-ocr@6.6.0.patch']) {
             assert(sourceArchive.includes(file), `Firefox 审核源码包缺少 ${file}`);
         }
         assert(!sourceArchive.some(file => /(?:^|\/)\.env(?:$|\.)|^(?:node_modules|coverage)\//u.test(file)),

@@ -1,11 +1,11 @@
 /**
  * @file src/features/local-tts/offscreen/modelCache.ts
  * 文件职责：下载、检查和清除 Kokoro 本地 TTS 模型及少量默认音色文件。
- * 主要内容：固定版本与文件清单，优先验证固定缓存，仅在未命中时检查旧 main 别名来源；保留精确固定版本的历史镜像缓存而不再访问该旧下载源；仅显式准备时迁移已验证旧别名，合并真实字节进度并管理下载与清除互斥。
+ * 主要内容：固定版本与文件清单，优先验证固定缓存，仅在未命中时检查旧 main 别名来源并释放未读响应流；下载会话内记住可用下载源偏好以避免逐文件重复超时；保留精确固定版本的历史镜像缓存而不再访问该旧下载源；仅显式准备时迁移已验证旧别名，合并真实字节进度并管理下载与清除互斥。
  * 模块边界：只负责缓存文件，不初始化推理 Worker，不决定朗读策略，也不访问网页。
  */
 
-import {isModelCacheSource, withModelDownload} from '@/src/platform/http/modelDownloads';
+import {isModelCacheSource, withModelDownload, type ModelSourcePreference} from '@/src/platform/http/modelDownloads';
 import {
     createDownloadProgressTracker,
     type DownloadFileProgress,
@@ -50,6 +50,14 @@ const MODEL_FILE_DOWNLOAD_TIMEOUT_MS = 300_000;
 const pendingDownloads = new Map<string, Promise<void>>();
 let removingFiles = false;
 
+function cancelResponseBody(response: Response | undefined): void {
+    try {
+        void response?.body?.cancel?.().catch(() => undefined);
+    } catch {
+        // 忽略已锁或不可取消的底层响应流。
+    }
+}
+
 function usableCachedResponse(response: Response | undefined, sourceUrl: string, allowUnmarked: boolean): boolean {
     if (!response?.ok) return false;
     const source = response.headers.get('X-FluentRead-Model-Source');
@@ -78,24 +86,37 @@ async function fetchIntoCache(
     sourceUrl: string,
     cacheUrls: readonly string[],
     progress: DownloadFileProgress,
+    preference: ModelSourcePreference,
+    onResolvedSource: (source: string) => void,
 ): Promise<void> {
     const existing = await (async (): Promise<Response | undefined> => {
         for (const cacheUrl of cacheUrls) {
             const response = await cache.match(cacheUrl);
             if (usableCachedResponse(response, sourceUrl, cacheUrl === sourceUrl)) return response;
+            cancelResponseBody(response);
         }
         return undefined;
     })();
     if (existing) {
-        progress.cached(Number(existing.headers.get('Content-Length')));
-        // 显式准备才迁移已验证旧 main 副本；状态查询不改变文件缓存。
-        if (!usableCachedResponse(await cache.match(sourceUrl), sourceUrl, true)) {
-            await cache.put(sourceUrl, existing.clone());
-        }
-        for (const cacheUrl of cacheUrls) {
-            if (cacheUrl !== sourceUrl && usableCachedResponse(await cache.match(cacheUrl), sourceUrl, false)) {
-                await cache.delete(cacheUrl);
+        try {
+            progress.cached(Number(existing.headers.get('Content-Length')));
+            // 显式准备才迁移已验证旧 main 副本；状态查询不改变文件缓存。
+            const pinnedMatch = await cache.match(sourceUrl);
+            const hasPinned = usableCachedResponse(pinnedMatch, sourceUrl, true);
+            cancelResponseBody(pinnedMatch);
+            if (!hasPinned) {
+                await cache.put(sourceUrl, existing.clone());
             }
+            for (const cacheUrl of cacheUrls) {
+                if (cacheUrl !== sourceUrl) {
+                    const aliasMatch = await cache.match(cacheUrl);
+                    const hasProvenAlias = usableCachedResponse(aliasMatch, sourceUrl, false);
+                    cancelResponseBody(aliasMatch);
+                    if (hasProvenAlias) await cache.delete(cacheUrl);
+                }
+            }
+        } finally {
+            cancelResponseBody(existing);
         }
         return;
     }
@@ -107,7 +128,8 @@ async function fetchIntoCache(
             statusText: response.statusText,
             headers,
         }));
-    }, {timeoutMs: MODEL_FILE_DOWNLOAD_TIMEOUT_MS, onProgress: progress.advance});
+        onResolvedSource(source);
+    }, {timeoutMs: MODEL_FILE_DOWNLOAD_TIMEOUT_MS, preference, onProgress: progress.advance});
     progress.complete();
 }
 
@@ -119,15 +141,21 @@ async function cacheLocalTtsModelNow(onProgress?: (progress: DownloadProgress) =
         LOCAL_TTS_MODEL.downloadSizeMb * 1_000_000,
         progress => onProgress?.(progress),
     );
+    // 同一轮下载内一旦某个来源可用即沿用，避免主源不可达时其余文件重复经历超时回退。
+    let resolvedPreference: ModelSourcePreference = 'auto';
+    const rememberSource = (source: string) => {
+        if (source.startsWith('https://huggingface.co/')) resolvedPreference = 'official';
+        else if (source.startsWith('https://hf-mirror.com/')) resolvedPreference = 'mirror';
+    };
     const cache = await caches.open(LOCAL_TTS_MODEL_CACHE_NAME);
     for (const file of LOCAL_TTS_MODEL_FILES) {
         const pinnedUrl = getLocalTtsModelFileUrl(file);
-        await fetchIntoCache(cache, pinnedUrl, [pinnedUrl, getLocalTtsModelLoaderUrl(file)], tracker.file());
+        await fetchIntoCache(cache, pinnedUrl, [pinnedUrl, getLocalTtsModelLoaderUrl(file)], tracker.file(), resolvedPreference, rememberSource);
     }
 
     const voiceCache = await caches.open(LOCAL_TTS_VOICE_CACHE_NAME);
     for (const voice of LOCAL_TTS_VOICES) {
-        await fetchIntoCache(voiceCache, getLocalTtsVoiceRemoteUrl(voice), [getLocalTtsVoiceCacheUrl(voice)], tracker.file());
+        await fetchIntoCache(voiceCache, getLocalTtsVoiceRemoteUrl(voice), [getLocalTtsVoiceCacheUrl(voice)], tracker.file(), resolvedPreference, rememberSource);
     }
 }
 
@@ -151,12 +179,20 @@ export async function isLocalTtsModelCached(): Promise<boolean> {
         const pinnedUrl = getLocalTtsModelFileUrl(file);
         const loaderUrl = getLocalTtsModelLoaderUrl(file);
         const pinned = await modelCache.match(pinnedUrl);
-        return usableCachedResponse(pinned, pinnedUrl, true)
-            || usableCachedResponse(await modelCache.match(loaderUrl), pinnedUrl, false);
+        const pinnedOk = usableCachedResponse(pinned, pinnedUrl, true);
+        cancelResponseBody(pinned);
+        if (pinnedOk) return true;
+        const loader = await modelCache.match(loaderUrl);
+        const loaderOk = usableCachedResponse(loader, pinnedUrl, false);
+        cancelResponseBody(loader);
+        return loaderOk;
     }));
     const voiceFiles = await Promise.all(LOCAL_TTS_VOICES.map(async (voice) => {
         const url = getLocalTtsVoiceCacheUrl(voice);
-        return usableCachedResponse(await voiceCache.match(url), url, true);
+        const cached = await voiceCache.match(url);
+        const ok = usableCachedResponse(cached, url, true);
+        cancelResponseBody(cached);
+        return ok;
     }));
     return modelFiles.every(Boolean) && voiceFiles.every(Boolean);
 }

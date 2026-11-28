@@ -177,4 +177,25 @@ describe('optional content feature 生命周期', () => {
         expect(harness.sectionMount).not.toHaveBeenCalled();
         expect(harness.inputInvalidate).toHaveBeenCalledOnce();
     });
+
+    it('输入框自定义触发只在存在合法自定义快捷键时挂载，清空或非法后卸载', () => {
+        const harness = createHarness({inputBoxTranslationTrigger: 'custom', customInputBoxTranslationHotkey: ''});
+        harness.runtime.sync();
+        expect(harness.inputMount).not.toHaveBeenCalled();
+
+        harness.config.customInputBoxTranslationHotkey = 'Space';
+        harness.runtime.sync();
+        expect(harness.inputMount).not.toHaveBeenCalled();
+
+        harness.config.customInputBoxTranslationHotkey = 'Alt+Enter';
+        harness.runtime.sync();
+        expect(harness.inputMount).toHaveBeenCalledOnce();
+        const signal = harness.inputMount.mock.calls[0][0] as AbortSignal;
+        expect(signal.aborted).toBe(false);
+
+        harness.config.customInputBoxTranslationHotkey = '';
+        harness.runtime.sync();
+        expect(signal.aborted).toBe(true);
+        expect(harness.inputInvalidate).toHaveBeenCalledOnce();
+    });
 });

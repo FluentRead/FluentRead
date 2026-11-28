@@ -1,5 +1,73 @@
 [
   {
+    "id": "x-post-expand-control",
+    "url": "https://x.com/home",
+    "html": "<nav id=\"navigation\">Home timeline controls</nav><main><article id=\"post\" data-testid=\"tweet\"><div id=\"initial-post\" data-testid=\"tweetText\">The first part of an English timeline post appears before its native expansion button.</div><button id=\"show-more\" data-testid=\"tweet-text-show-more-link\">Show more</button></article></main>",
+    "modes": ["full"],
+    "required": ["#initial-post"],
+    "forbidden": ["#navigation", "#show-more"],
+    "restoreSelectors": ["#post"],
+    "dynamic": {
+      "appendHtml": [
+        {
+          "selector": "#post",
+          "click": "#show-more",
+          "html": "<div id=\"expanded-post\" data-testid=\"tweetText\">The expanded timeline post reveals more readable source material without losing the original card.</div>",
+          "required": ["#expanded-post"],
+          "sourceIncludes": ["The expanded timeline post reveals more readable source material"],
+          "sourceExcludes": ["Show more"]
+        }
+      ]
+    },
+    "variants": [
+      {
+        "name": "modern-inline-expand-button",
+        "url": "https://x.com/home",
+        "html": "<nav id=\"navigation\">Home timeline controls</nav><main><article id=\"post\"><div id=\"initial-post\" class=\"max-w-full text-body font-normal text-primary line-clamp-5 whitespace-pre-wrap wrap-break-word\" dir=\"auto\"><span>The first part of a modern English timeline post appears before its inline expansion button.</span> <button id=\"show-more\" class=\"max-w-full text-[length:inherit] font-normal text-brand hover:underline\" type=\"button\">Show more</button></div></article></main>",
+        "modes": ["full"],
+        "required": ["#initial-post"],
+        "forbidden": ["#navigation", "#show-more"],
+        "restoreSelectors": ["#post"],
+        "sourceAssertions": {
+          "required": ["The first part of a modern English timeline post"],
+          "forbidden": ["Home timeline controls", "Show more"]
+        },
+        "dynamic": {
+          "appendHtml": [
+            {
+              "selector": "#post",
+              "click": "#show-more",
+              "html": "<div id=\"expanded-post\" class=\"max-w-full text-body font-normal text-primary whitespace-pre-wrap wrap-break-word\" dir=\"auto\"><span>The expanded modern timeline post reveals more readable source material without removing the card.</span></div>",
+              "required": ["#expanded-post"],
+              "sourceIncludes": ["The expanded modern timeline post reveals more readable source material"],
+              "sourceExcludes": ["Show more"]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "twitch-live-chat",
+    "url": "https://www.twitch.tv/monstercat",
+    "html": "<nav id=\"navigation\">Twitch navigation links</nav><div data-a-target=\"side-nav-bar\"><nav id=\"side-nav\"><a href=\"/nagisekaied\"><div class=\"side-nav-card__title\"><p id=\"channel-name\" data-a-target=\"side-nav-title\"><span>陵本なぎ <span class=\"intl-login\">(nagisekaied)</span></span></p></div></a></nav></div><main><p id=\"intro\">This live channel broadcasts independent electronic music around the clock.</p></main><aside id=\"chat\"><section data-test-selector=\"chat-room-component-layout\"><div id=\"pinned\"><span id=\"pinned-message\" data-a-target=\"chat-message-text\">Important stream announcement for tonight.</span></div><div id=\"messages\" class=\"chat-scrollable-area__message-container\"><div class=\"chat-line__message\"><div class=\"chat-line__message-container\"><p title=\"Previous chat message in reply preview\">回复 <span dir=\"auto\">@Matti533</span> ：<span id=\"reply-preview\" dir=\"auto\">Previous chat message in reply preview</span></p><button id=\"author\">Chat author</button><span id=\"first-message\" data-a-target=\"chat-line-message-body\">Thanks for this wonderful live stream, and greetings to everyone in the chat.</span></div></div></div></section></aside>",
+    "modes": ["full"],
+    "required": ["#channel-name", "#intro", "#pinned-message", "#reply-preview", "#first-message"],
+    "forbidden": ["#navigation", "#author"],
+    "restoreSelectors": ["main", "#chat", "#side-nav"],
+    "dynamic": {
+      "appendHtml": [
+        {
+          "selector": "#messages",
+          "html": "<div class=\"chat-line__message\" style=\"margin-top:140vh\"><span id=\"late-message\" data-a-target=\"chat-message-text\">This new live chat message appears below the fold and enters the translation session after scrolling.</span></div>",
+          "scroll": "#late-message",
+          "required": ["#late-message"],
+          "sourceIncludes": ["This new live chat message appears below the fold"]
+        }
+      ]
+    }
+  },
+  {
     "id": "topic-tag-metadata",
     "url": "https://community.openai.com/hot",
     "html": "<main id=\"reading\"><h2 id=\"title\">How can ChatGPT help readers follow a discussion?</h2><ul class=\"discourse-tags\" id=\"tags\" aria-label=\"Tags\"><li><a class=\"discourse-tag simple\" href=\"/tag/chatgpt/16\">chatgpt</a><span class=\"discourse-tags__tag-separator\">,</span></li><li><a class=\"discourse-tag simple\" href=\"/tag/rate-limit/77\">rate-limit</a></li></ul><a class=\"discourse-tag\" id=\"standalone\" href=\"/tag/plugin-development/20\">plugin-development</a><div class=\"cooked\"><p id=\"body\">This readable discussion explains a topic with enough context for translation.</p><p id=\"mixed\">This paragraph refers to <a class=\"discourse-tag\" id=\"inline\" href=\"/tag/image-generation/42\">image-generation</a> while the surrounding explanation remains readable.</p></div></main>",

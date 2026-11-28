@@ -7,7 +7,7 @@
  */
 import * as ort from 'onnxruntime-web/webgpu';
 import {forceSingleThreadInference, localWasmThreads, paceLocalInference, paceLocalInitialization} from '@/src/shared/onnx/resources';
-import {configureOnnxWasmBackend} from '@/src/shared/onnx/wasmBinary';
+import {configureOnnxWasmBackend, resolveOnnxWasmAssetPaths} from '@/src/shared/onnx/wasmBinary';
 import {createBrowserMangaOcr} from './mangaOcr';
 import {createBrowserMangaInpainter} from './mangaInpainting';
 import type {MangaInferenceMessage, MangaInferenceResponse} from './mangaInferenceClient';
@@ -65,7 +65,7 @@ export function startMangaInferenceWorker(): void {
         if(!bytes)return false;
         progress('initializing');ort.env.wasm.numThreads=localWasmThreads();
         const url=(path:string)=>typeof chrome==='undefined'?new URL(path,self.location.href).href:chrome.runtime.getURL(path);
-        configureOnnxWasmBackend(ort.env.wasm,{mjs:url('/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'),wasm:url('/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm')});
+        configureOnnxWasmBackend(ort.env.wasm,resolveOnnxWasmAssetPaths(url,{leadingSlash:true}));
         const created=await ort.InferenceSession.create(bytes,{executionProviders:!cpu&&(navigator as Navigator&{gpu?:unknown}).gpu?['webgpu','wasm']:['wasm'],graphOptimizationLevel:'all'});
         if(created.inputNames.length!==1||created.inputNames[0]!=='images'||created.outputNames.length!==3||!SEG_OUTPUTS.every(([name],index)=>created.outputNames[index]===name)||!validMetadata(created.inputMetadata,[['images',[1,3,1024,1024]]])||!validMetadata(created.outputMetadata,SEG_OUTPUTS)){
             const error=new SegmentationProtocolError('图片分割模型元数据无效');

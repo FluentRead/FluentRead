@@ -109,7 +109,7 @@ describe('document source location recovery', () => {
 });
 
 async function parsedSample(name: 'sample.docx' | 'sample.epub') {
-    const bytes = Uint8Array.from(readFileSync(new URL(`../examples/document-translation/${name}`, import.meta.url)));
+    const bytes = Uint8Array.from(readFileSync(new URL(`./fixtures/document-translation/${name}`, import.meta.url)));
     const document = await parseDocumentFile({name, arrayBuffer: async () => bytes.slice().buffer, text: async () => {throw new Error('Binary fixture must use its actual bytes');}});
     return {bytes, document};
 }

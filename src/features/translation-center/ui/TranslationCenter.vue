@@ -72,6 +72,7 @@ import {getMissingCredentialMessage} from '@/src/core/config/validation';
 import {getCustomOpenAIProvider, getCustomOpenAIProviderModels, isConfiguredCustomOpenAIProvider, type CustomOpenAIProvider, withCustomOpenAIServiceOptions} from '@/src/core/config/customOpenAI';
 import {getCompositeTranslationConfigFingerprint, isCompositeTranslationProviderId, withCompositeTranslationServiceOptions} from '@/src/core/config/compositeTranslation';
 import {config, configReady, requestConfigPatch, subscribeConfig} from '@/src/services/config/store';
+import {unwrapWrappedParagraphs} from '@/src/core/translation/wrappedParagraphs';
 import {translateText} from '@/src/services/translation/client';
 import {TranslationRequestError} from '@/src/services/translation/errors';
 import {createComparisonSession, isComparisonStale, MAX_COMPARISON_TEXT_LENGTH, type ComparisonCard, type ComparisonState} from '../model/comparison';
@@ -144,7 +145,7 @@ const settledCount = computed(() => currentTaskCards.value.filter(card => card.s
 const shortcutLabel = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ ↵' : 'Ctrl ↵';
 const session = createComparisonSession(state, async (service, input, signal) => {
   try {
-    return await translateText(input.text, 'FluentRead 翻译中心', {
+    return await translateText(unwrapWrappedParagraphs(input.text), 'FluentRead 翻译中心', {
   maxRetries: 0, useCache: false, serviceOverride: service,
   sourceLanguage: input.sourceLanguage, targetLanguage: input.targetLanguage, modelOverride: input.model || undefined, signal,
     });

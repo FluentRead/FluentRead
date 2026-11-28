@@ -78,6 +78,9 @@ describe('document translation presentation', () => {
         pdf.segments = [{id: 0, source: 'Original'}, {id: 1, source: 'Pending'}];
         expect(getDocumentExportPreview(pdf, ['译文', ' '], 'translated')).toBe('译文\n\nPending');
         expect(getDocumentExportPreview(pdf, ['译文'], 'bilingual')).toBe('Original\n译文\n\nPending');
+        const word = parsed('docx', {kind: 'docx', bytes: new Uint8Array(), parts: []});
+        word.segments = [{id: 0, source: 'Read the <g1>guide</g1>.', docxInline: true}];
+        expect(getDocumentExportPreview(word, ['阅读<g1>指南</g1>。'], 'bilingual')).toBe('Read the guide.\n阅读指南。');
     });
 
     it('区分格式族和空态提示', () => {

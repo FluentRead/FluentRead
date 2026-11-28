@@ -227,10 +227,20 @@ describe('语义化公共工具', () => {
     it('中文目标拒绝明确的日文段落，但保留短引用和含日文术语的中文译文', () => {
         const origin = 'There are also restrictions on the first character of this file.';
         const japanese = 'このファイルの最初の文字にも制限があります。簡単にするために、最初の文字として文字を使用できます。';
+        const mixedQuotedJa = '東京近辺に住んでいたゲーマー女子高生。退屈な日々を送っていたある日、下校中に車に轢かれそうになった彼女は異世界に転移してしまう。以降彼女は"JK勇者(とてもつよい)"と自称している。虫と高いところが苦手。';
+        const mixedQuotedJaAsciiPunct = mixedQuotedJa.replaceAll('。', '.').replaceAll('、', ',');
+        const mixedSimplifiedJa = mixedQuotedJa.replace('東京', '东京').replace('車', '车').replace('異', '异');
         expect(isClearlyWrongLanguageResponse(origin, japanese, 'zh-Hans')).toBe(true);
         expect(isClearlyWrongLanguageResponse(origin, japanese, 'zh-Hant')).toBe(true);
         expect(isClearlyWrongLanguageResponse(origin, japanese, 'ja')).toBe(false);
+        expect(isClearlyWrongLanguageResponse(mixedQuotedJa, mixedQuotedJaAsciiPunct, 'zh-Hans')).toBe(true);
+        expect(isClearlyWrongLanguageResponse(mixedQuotedJa, mixedSimplifiedJa, 'zh-Hans')).toBe(true);
+        expect(isLikelyUntranslatedResponse(mixedQuotedJa, mixedQuotedJaAsciiPunct, 'zh-Hans')).toBe(true);
+        expect(isLikelyUntranslatedResponse('Nagi-chan おはよ〜', 'Nagi-chan おはよ〜', 'zh-Hans')).toBe(true);
+        expect(isLikelyUntranslatedResponse('陵本なぎ', '陵本なぎ', 'zh-Hans')).toBe(true);
+        expect(isLikelyUntranslatedResponse('“ありがとう”这个词表示感谢。', '“ありがとう”这个词表示感谢。', 'zh-Hans')).toBe(false);
         expect(isClearlyWrongLanguageResponse(origin, '“ありがとう”这个词表示感谢，日文原句是“ありがとうございます”。', 'zh-Hans')).toBe(false);
+        expect(isClearlyWrongLanguageResponse(origin, '她获得了エクスカリバー和マスターソード和ドラゴンボール，随后开启了新的旅程。', 'zh-Hans')).toBe(false);
         expect(isClearlyWrongLanguageResponse(origin, '日语写作「ありがとう」。', 'zh-Hans')).toBe(false);
         expect(isClearlyWrongLanguageResponse(origin, 'これは日本語です。', 'zh-Hans')).toBe(false);
         expect(isClearlyWrongLanguageResponse(origin, 'あ'.repeat(20), 'zh-Hans')).toBe(true);

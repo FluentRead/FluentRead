@@ -7,6 +7,7 @@
 import {beforeAll, describe, expect, it} from 'vitest';
 import {createMarkdownRenderer} from 'vitepress';
 import {documentSegmentMarkupSources, parseDocument, renderDocument} from '@/src/features/document-translation/core/document';
+import {createDocumentPreviewHtml} from '@/src/features/document-translation/core/preview';
 
 let standardMarkdown: Awaited<ReturnType<typeof createMarkdownRenderer>>;
 beforeAll(async () => {standardMarkdown = await createMarkdownRenderer(process.cwd(), {highlight: value => value});});
@@ -15,8 +16,168 @@ const parse = (markdown: string) => parseDocument('note.md', markdown, {markdown
 const sources = (markdown: string) => parse(markdown).segments.map(segment => segment.source);
 const output = (markdown: string, translations: string[], mode: 'translated' | 'bilingual' = 'translated') => renderDocument(parse(markdown), translations, mode);
 
+describe('Markdown soft-wrapped paragraphs', () => {
+    it.each([
+        ['变量\n说明', '变量 说明'],
+        ['变量 \r\n 说明', '变量   说明'],
+        ['变量\r说明', '变量 说明'],
+    ])('preserves CommonMark whitespace inside a wrapped code span %j', (wrapped, normalized) => {
+        const source = 'This contains `' + wrapped + '` in a code span.';
+        const document = parse(source);
+        const translated = renderDocument(document, ['译文保留 <g1/>。'], 'translated');
+        const code = /<code>([^<]*)<\/code>/u;
+        const originalCode = standardMarkdown.render(source).match(code)?.[1];
+        expect(originalCode).toBe(normalized);
+        expect(standardMarkdown.render(translated).match(code)?.[1]).toBe(originalCode);
+    });
+
+    it.each(['\n', '\r\n', '\r'])('sends each prose paragraph once and preserves original %j line endings', ending => {
+        const first = ['The source is read one line at a time.', 'Its paragraph continues on the next line.'];
+        const second = ['Keep the original code in', '`calculate_bounds()` while translating the prose.'];
+        const source = [...first, '', ...second].join(ending);
+        const document = parse(source);
+        expect(document.segments.map(segment => segment.source)).toEqual([
+            first.join(' '), 'Keep the original code in <g1/> while translating the prose.',
+        ]);
+        const translations = ['这一段一起翻译。', '翻译正文时保留 <g1/>。'];
+        expect(renderDocument(document, [])).toBe(source);
+        expect(renderDocument(document, translations, 'translated')).toBe('这一段一起翻译。' + ending.repeat(2) + '翻译正文时保留 `calculate_bounds()`。');
+        expect(renderDocument(document, translations)).toBe(first.join(ending) + '\n> 这一段一起翻译。' + ending.repeat(2)
+            + second.join(ending) + '\n> 翻译正文时保留 `calculate_bounds()`。');
+    });
+
+    it.each([['https://example.com/帮助', ' '], ['#翻译', '']])(
+        'keeps the CJK prose after %s outside the protected token', (token, separator) => {
+            const source = '请参阅 ' + token + '\r\n然后继续阅读。';
+            const document = parse(source);
+            expect(document.segments.map(segment => segment.source)).toEqual(['请参阅' + separator + '<g1/> 然后继续阅读。']);
+            expect(renderDocument(document, ['See' + separator + '<g1/> then continue reading.'], 'translated'))
+                .toBe('See ' + token + ' then continue reading.');
+            expect(createDocumentPreviewHtml(document, [], 'source')).toContain(token + ' 然后继续阅读。');
+        });
+
+    it('preserves Markdown hard breaks and structural lines', () => {
+        const source = 'A heading\ncontinued\n===\n\nFirst line  \nSecond line\\\nThird line\n\n'
+            + '- One item\n- Another item\n\n> Quoted text\n> Next quote line\n\n'
+            + '| Column |\n| --- |\n| Cell |\n\n' + '~~~text\nnot prose\nnor this\n~~~';
+        expect(sources(source)).toEqual([
+            'A heading', 'continued', '===', 'First line', 'Second line\\', 'Third line',
+            'One item', 'Another item', 'Quoted text', 'Next quote line', 'Column', 'Cell',
+        ]);
+        expect(output(source, [])).toBe(source);
+        expect(sources('Another heading\ncontinued\n--')).toEqual(['Another heading', 'continued', '--']);
+        const longLines = ['abc '.repeat(700).trim(), 'def '.repeat(700).trim(), 'Last line.'];
+        expect(sources(longLines.join('\n'))).toEqual(longLines);
+        const internalSpaces = ['Words' + ' '.repeat(1800) + 'within a line.', 'The paragraph continues.'];
+        expect(sources(internalSpaces.join('\n'))).toEqual([internalSpaces.join(' ')]);
+    });
+
+    it('keeps each preview translation with its own paragraph when another paragraph is pending', () => {
+        const document = parse('First line\ncontinues.\n\nPending line\nstill waiting.\n\n~~~\nkeep this block\n~~~\n\nLast line\ncontinues.');
+        const preview = createDocumentPreviewHtml(document, ['第一段。\n补充。', '', '最后一段。'], 'bilingual');
+        expect(preview).toContain('>First line continues.</p><p class="reader-translation fluentread-translation">第一段。<br>补充。</p>');
+        expect(preview).toContain('>Pending line still waiting.</p></section>');
+        expect(preview).toContain('<pre data-reader-unit><code>keep this block</code></pre>');
+        expect(preview).toContain('>Last line continues.</p><p class="reader-translation fluentread-translation">最后一段。</p>');
+    });
+
+    it('keeps GFM table translations and following prose aligned after a translated soft-wrapped paragraph', () => {
+        const source = 'First line\r\ncontinues.\r\n\r\n| Title | Note |\r\n| :--- | ---: |\r\n| Read | Pending |\r\n\r\nLast line\r\ncontinues.';
+        const document = parse(source);
+        const translations = ['第一段。', '标题', '备注', '阅读', '', '最后一段。'];
+        const preview = createDocumentPreviewHtml(document, translations, 'bilingual');
+        expect(preview).toContain('>First line continues.</p><p class="reader-translation fluentread-translation">第一段。</p>');
+        expect(preview).toContain('<th style="text-align:left">Title<span class="reader-translation fluentread-translation">标题</span></th>');
+        expect(preview).toContain('<td style="text-align:right">Pending</td>');
+        expect(preview).toContain('>Last line continues.</p><p class="reader-translation fluentread-translation">最后一段。</p>');
+        const exported = renderDocument(document, translations, 'bilingual');
+        expect(exported).toContain('First line\r\ncontinues.\n> 第一段。');
+        expect(exported).toContain('| Read<br>阅读 | Pending |');
+    });
+
+    it('keeps legacy previews usable and leaves table delimiters in a different block quote alone', () => {
+        const source = 'Left | Right\n> --- | ---';
+        const document = parse(source);
+        expect(document.markdownTables).toEqual([]);
+        expect(renderDocument(document, [])).toBe(source);
+        const legacy = {...parse('## Heading\n\nA paragraph.'), markdownTables: undefined};
+        const preview = createDocumentPreviewHtml(legacy, ['标题', '一段文字。'], 'bilingual');
+        expect(preview).toContain('>Heading</h2><h2 class="reader-translation fluentread-translation">标题</h2>');
+        expect(preview).toContain('>A paragraph.</p><p class="reader-translation fluentread-translation">一段文字。</p>');
+    });
+});
+
 describe('Markdown whole-sentence translation', () => {
     const line = 'Read the [setup guide](https://example.com/setup) before `npm install` starts, and keep **bold** words.';
+
+    it('translates GFM table cells while preserving alignment, links and row boundaries', () => {
+        const source = [
+            '| Feature | Guide | Count |',
+            '| :--- | ---: | :---: |',
+            '| Retry \\| Continue | [Read more](https://example.com/guide) | 42 |',
+            '| Logging | `a\\|b` | |',
+            '',
+            'After the table.',
+        ].join('\r\n');
+        const doc = parse(source);
+        expect(doc.segments.map(segment => segment.source)).toEqual([
+            'Feature', 'Guide', 'Count', 'Retry \\| Continue', '<g1>Read more</g1>', 'Logging', 'After the table.',
+        ]);
+        const translations = ['功能', '指南', '次数', '重试 | 继续\n下一行', '<g1>阅读更多</g1>', '日志', '表格之后。'];
+        for (const mode of ['bilingual', 'translated'] as const) {
+            const markdown = renderDocument(doc, translations, mode);
+            const html = standardMarkdown.render(markdown);
+            expect(html.match(/<table\b[^>]*>/gu)).toHaveLength(1);
+            expect(html.match(/<th(?:\s[^>]*)?>/gu)).toHaveLength(3);
+            expect(html.match(/<td(?:\s[^>]*)?>/gu)).toHaveLength(6);
+            expect(html).toMatch(/重试\s*\|\s*继续<br\s*\/?\s*>下一行/u);
+            expect(html).toMatch(/<a href="https:\/\/example\.com\/guide"[^>]*>阅读更多<\/a>/u);
+            expect(html).toContain('<code>a|b</code>');
+            expect(markdown.split('\r\n')[1]).toBe('| :--- | ---: | :---: |');
+            expect(markdown).toContain(mode === 'bilingual' ? 'Feature<br>功能' : '| 功能 | 指南 | 次数 |');
+        }
+        expect(renderDocument(doc, [], 'bilingual')).toBe(source);
+        const preview = createDocumentPreviewHtml(doc, translations, 'bilingual');
+        expect(preview).toContain('<table class="markdown-preview-table"');
+        expect(preview).toContain('<th style="text-align:left">Feature<span class="reader-translation fluentread-translation">功能</span></th>');
+        expect(preview).toContain('重试 | 继续<br>下一行');
+    });
+
+    it('keeps short rows, nested tables and following blocks in their original containers', () => {
+        const source = ['> Item | Value', '> --- | ---', '> Without second cell', '> Quantity | 42 | hidden column',
+            '> # Next heading', '', '- | Item | Value |', '  | --- | --- |', '  | Read more | [Read](guide.md) |',
+            '- Next item', '', '```md', '| Example | Row |', '| --- | --- |', '```'].join('\n');
+        const doc = parse(source);
+        const inputs = doc.segments.map(segment => segment.source);
+        expect(inputs).toEqual(['Item', 'Value', 'Without second cell', 'Quantity', 'Next heading',
+            'Item', 'Value', 'Read more', '<g1>Read</g1>', 'Next item']);
+        const translations = inputs.map((input, index) => index === 0 ? '# 标题'
+            : index === 2 ? '缺列' : index === 3 ? '数量\\' : input);
+        const markdown = renderDocument(doc, translations, 'translated');
+        expect(markdown).toContain('> | # 标题 | Value\n> --- | ---');
+        expect(markdown).toContain('> | 缺列\n> | 数量\\\\ | 42 | hidden column');
+        const rendered = standardMarkdown.render(markdown);
+        expect(rendered.match(/<table\b/gu)).toHaveLength(2);
+        expect(rendered).toContain('<th># 标题</th>');
+        expect(rendered).toContain('缺列</td>');
+        expect(rendered).toContain('Next heading');
+        expect(rendered).toContain('>Next item</li>');
+        for (const mode of ['source', 'translated'] as const) {
+            const preview = createDocumentPreviewHtml(doc, translations, mode);
+            expect(preview.match(/<table\b/gu)).toHaveLength(2);
+            expect(preview).toContain('<td colspan="1"></td>');
+            expect(preview).toContain(mode === 'source' ? '<th>Item</th>' : '<th># 标题</th>');
+        }
+    });
+
+    it('preserves GFM escape parity and ignores a mismatched or non-delimiter row', () => {
+        const samples = ['A \\| escaped\n| --- | --- |', '| A | B |\n| --- |', '| A | B |\n| --- | prose |'];
+        for (const source of samples) expect(parse(source).markdownTables).toEqual([]);
+        const source = '| A | B |\n| --- | --- |\n| x | y |';
+        const markdown = renderDocument(parse(source), ['一', '二', '甲\\|乙\\\\|丙', '丁'], 'translated');
+        expect(markdown).toContain('| 甲\\|乙\\\\\\|丙 | 丁 |');
+        expect(standardMarkdown.render(markdown).match(/<td>/gu)).toHaveLength(2);
+    });
 
     it('gives the proofreading view the original markup of placeholder segments only', () => {
         expect([...documentSegmentMarkupSources(parse(`${line}\n\nPlain sentence.`))]).toEqual([[0, line]]);

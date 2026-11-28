@@ -5,6 +5,7 @@
  * 模块边界：属于文档二进制服务；远程仅下载无用户内容或凭据的字体数据，不执行远程 JS/WASM，不进入内容脚本字体或界面字体注册链路。不保存字体解析器或导出文档的全局引用。
  */
 import type {PDFDocument, PDFFont, PDFPage, PDFPageDrawTextOptions} from 'pdf-lib';
+import {buildGithubAssetMirrorUrls, rememberPreferredMirrorOrigin} from '@/src/core/assets/mirrors';
 import {isPdfReadingVariationSelector} from '../core/pdfTextLayout';
 import {cancelUnreadResponseBody} from '@/src/platform/http/runtime';
 
@@ -17,11 +18,7 @@ export const PDF_READING_FONT_CACHE_KEY = `https://fluentread.app/__optional_ass
 
 /** 语言仅提供尝试顺序提示，不探测所在地；各来源必须返回同一固定版本的字体。 */
 export function getPdfReadingFontSources(locale: string): string[] {
-    const resource = `FluentRead/FluentRead@${PDF_READING_FONT_REVISION}/public${PDF_READING_FONT_PATH}`;
-    const china = [`https://cdn.jsdmirror.com/gh/${resource}`, `https://jsd.onmicrosoft.cn/gh/${resource}`];
-    const global = [`https://cdn.jsdelivr.net/gh/${resource}`,
-        `https://raw.githubusercontent.com/FluentRead/FluentRead/${PDF_READING_FONT_REVISION}/public${PDF_READING_FONT_PATH}`];
-    return /^zh(?:$|-CN|-Hans)/iu.test(locale) ? [...china, ...global] : [...global, ...china];
+    return [...buildGithubAssetMirrorUrls('FluentRead/FluentRead', PDF_READING_FONT_REVISION, `public${PDF_READING_FONT_PATH}`, locale)];
 }
 
 export interface PdfReadingFontLoaderDependencies {
@@ -110,6 +107,7 @@ export function createPdfReadingFontLoader(overrides: Partial<PdfReadingFontLoad
                     signal: controller.signal, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store',
                 }), controller.signal);
                 const bytes = await readVerified(response, controller.signal);
+                rememberPreferredMirrorOrigin(source);
                 signal.throwIfAborted();
                 if (cache) await withAbort(() => cache.put(PDF_READING_FONT_CACHE_KEY,
                     new Response(bytes, {headers: {'Content-Type': 'font/woff2'}})), signal).catch(() => undefined);

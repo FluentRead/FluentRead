@@ -12,7 +12,7 @@ Translate an article or selected section, compare both languages, and return to 
 
 While choosing a translation service in the popup, press **Esc** to return to the service overview. Press it again to return to the popup home screen.
 
-Display mode is saved and updates existing translations without another request. Google Translate supports bilingual display only; switch back to bilingual before using it.
+Display mode is saved and updates existing translations without another request.
 
 For translation-only display on selected websites, enable **Translation only** under **Tools & learning → Website rules → Site preferences**. Other websites keep the global mode. See [Website reading area](/en/config/site-adaptation).
 
@@ -80,6 +80,8 @@ Manage, disable, or delete up to 100 rules under **Section translation → Remem
 If a notice icon appears on the popup's translation button, select it to see the reason and available recovery actions.
 
 Retry individual failed passages directly. With the full-page progress panel enabled, **Locate failed passage** and **Retry failed items** handle failures in the current session while keeping successful text and your reading position. Passages you have not scrolled to are not failures.
+
+When the service specifies a cooldown, retrying early shows the remaining wait. You can keep reading or restore the original during the wait.
 
 A blocking dialog is translated first; closing it resumes the page. Restoring the original also cancels pending work, and old retry controls cannot restart it. A navigation that changes reading rules may restore the original first; start translation again on the new page.
 

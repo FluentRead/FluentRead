@@ -11,7 +11,6 @@ import {LlmTransportError as SharedError} from '@/src/providers/translation/ai-s
 import {translateWithOpenAICompatibleAiSdk as direct} from '@/userscript/openaiCompatible';
 import {translateWithOpenAICompatibleAiSdk as sdk} from '@/src/providers/translation/ai-sdk/openai-compatible';
 import * as endpoints from '@/src/providers/translation/ai-sdk/endpoints';
-import * as templates from '@/src/services/translation/templates';
 import {setRuntimeFetch} from '@/src/platform/http/runtime';
 import {attachTranslationImageInput, attachTranslationModelUsageObserver, attachTranslationRequestScheduler, attachTranslationProviderConfig, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import {createTranslationRequestScheduler} from '@/src/services/translation/requestScheduler';
@@ -54,11 +53,11 @@ describe('shared OpenAI request and response boundary', () => {
     expect(SharedError).toBe(LlmTransportError);
   });
 
-  it.each(['{', 'null', '3', '[]', '{"model":4,"messages":[]}', '{"model":" ","messages":[]}', '{"model":"valid","messages":{}}'])
-  ('rejects a malformed payload at the preparation boundary before dispatch: %s', async body => {
-    vi.spyOn(templates, 'commonMsgTemplate').mockReturnValueOnce(body);
+  it.each(['{"model":4,"messages":[]}', '{"model":" ","messages":[]}', '{"model":"valid","messages":{}}'])
+  ('rejects invalid advanced payload fields before dispatch: %s', async body => {
     const run = vi.fn();
-    await expect(translateOpenAICompatible(request(), execution(run))).rejects.toMatchObject({kind: 'bad-request', retryable: false});
+    const source = request({}, {customBody: {custom: body}});
+    await expect(translateOpenAICompatible(source, execution(run))).rejects.toMatchObject({kind: 'bad-request', retryable: false});
     expect(run).not.toHaveBeenCalled();
   });
 
@@ -123,6 +122,33 @@ describe('shared OpenAI request and response boundary', () => {
     }));
     expect(schedule).toHaveBeenCalledWith(expect.any(Function), expect.objectContaining({signal: undefined, countConcurrency: false}));
     expect(observe).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not report model usage for an attempt cancelled before getting a transport slot', async () => {
+    const scheduler = createTranslationRequestScheduler(() => ({maxConcurrentTranslations: 1}));
+    let release!: () => void;
+    const held = scheduler.scheduleAttempt(() => new Promise<void>(resolve => {release = resolve;}),
+      {countConcurrency: true});
+    const upstream = vi.fn(async () => textResponse());
+    setRuntimeFetch(upstream);
+    const observe = vi.fn();
+    const abort = new AbortController();
+    const source = attachTranslationModelUsageObserver(
+      attachTranslationRequestScheduler(request({abortSignal: abort.signal}), scheduler, {quotaScope: 'waiting'}), observe);
+    const result = translateOpenAICompatible(source, execution(async call => {
+      const response = await call.fetch('https://fixture.invalid/v1/chat/completions', {signal: call.signal});
+      return response.text();
+    })).catch(error => error);
+    try {
+      await flush();
+      abort.abort();
+      await expect(result).resolves.toMatchObject({retryable: false});
+      expect(upstream).not.toHaveBeenCalled();
+      expect(observe).not.toHaveBeenCalled();
+    } finally {
+      release();
+      await held;
+    }
   });
 
   it('retains explicit attempt settlement on the caller lease and defaults older snapshots to two retries', async () => {

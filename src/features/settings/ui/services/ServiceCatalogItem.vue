@@ -44,16 +44,17 @@ defineEmits<{ select: [service: string]; remove: [service: string] }>()
 const { t } = useUiI18n()
 </script>
 <style scoped>
-.library-item { display: flex; align-items: center; min-width: 0; border: 1px solid transparent; border-radius: 12px; background: transparent; }
-.library-item:hover { border-color: var(--line, #e4e7ef); background: var(--surface-soft, #f7f8fb); }
-.library-item.active { border-color: var(--brand-border, #f3c4d1); background: var(--brand-soft); box-shadow: 0 4px 12px color-mix(in srgb, var(--brand) 5%, transparent); }
-.library-select { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; min-height: 44px; padding: 6px 4px 6px 8px; border: 0; background: transparent; color: var(--ink, #172033); text-align: left; cursor: pointer; border-radius: 8px; }
-.library-remove { display: grid; flex: none; place-items: center; width: 32px; height: 36px; margin-inline-end: 4px; padding: 0; border: 0; border-radius: 8px; color: var(--muted, #737c8f); background: transparent; cursor: pointer; }
-.library-remove:hover:not(:disabled) { color: var(--brand-strong, #bd2853); background: var(--brand-soft); }
-.library-remove:disabled { opacity: .4; cursor: default; }
-.library-name { display: flex; align-items: flex-start; flex: 1; gap: 6px; min-width: 0; }
-.library-name strong { min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; font-size: 13px; font-weight: 600; }
-.library-metadata { display: flex; align-items: center; flex: none; flex-wrap: nowrap; gap: 4px; min-width: 0; max-width: calc(100% - 64px); }
+.library-item { display: flex; align-items: center; min-width: 0; border: 1px solid transparent; border-radius: var(--fr-control-radius, 8px); background: transparent; transition: background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), border-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease); }
+.library-item:hover { border-color: var(--line, #e3e6ed); background: var(--surface, #fff); }
+.library-item.active { border-color: color-mix(in srgb, var(--brand) 36%, var(--line)); background: var(--brand-soft); box-shadow: none; }
+.library-select { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; min-height: 44px; padding: 6px 4px 6px 8px; border: 0; background: transparent; color: var(--ink, #161b26); text-align: left; cursor: pointer; border-radius: var(--fr-control-radius, 8px); }
+.library-remove { display: grid; flex: none; place-items: center; width: 32px; height: 36px; margin-inline-end: 4px; padding: 0; border: 0; border-radius: var(--fr-radius-xs, 6px); color: var(--muted, #5b6476); opacity: .45; background: transparent; cursor: pointer; transition: opacity var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease), background-color var(--fr-duration-instant, 120ms) var(--fr-ease-out, ease); }
+.library-item:is(:hover, :focus-within) .library-remove:not(:disabled) { opacity: 1; }
+.library-remove:hover:not(:disabled) { color: var(--brand-strong, #d4235a); background: var(--brand-soft); }
+.library-remove:disabled { opacity: .25; cursor: default; }
+.library-name { display: flex; align-items: center; flex-wrap: wrap; flex: 1; gap: 3px 6px; min-width: 0; }
+.library-name strong { min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; font-size: 13px; font-weight: 600; }
+.library-metadata { display: flex; align-items: center; flex: 0 1 auto; flex-wrap: wrap; gap: 4px; min-width: 0; max-width: 100%; }
 .library-metadata:empty { display: none; }
 .library-item :deep(.service-brand-icon) { width: 28px; height: 28px; border-radius: 8px; }
 button:focus-visible { outline: 2px solid var(--brand-strong, #bd2853); outline-offset: 2px; }

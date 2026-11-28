@@ -2,10 +2,12 @@
  * @file src/features/document-translation/services/importWorkflow.ts
  * 文件职责：拥有文档文件、在线 PDF 与本地历史重新打开的导入生命周期。
  * 主要内容：在同一取消代次中校验格式和大小、读取格式、恢复 OCR 与人工校订历史以及当前任务的重译缓存策略；历史不可读取时标记任务以阻止旧记录被自动覆盖；取消后丢弃迟到读取，失败文件独立入队，不改写已有文档的译文或翻译错误。
+ * 旧 Markdown 和 Word 快照从原文件恢复格式标记，按原文回填仍能匹配的校订；表格文件恢复上次选择的列。
  * 模块边界：不持有任务队列、当前选择、进度或历史提交副本；读取、任务提交和展示均经显式端口，历史保存仍由页面的 historyCommitter 负责。
  */
 import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
-import {getDocumentFormat, getDocumentMaxBytes, type ParsedDocument} from '../core/document';
+import {getDocumentFormat, getDocumentMaxBytes, normalizeDelimitedColumns, type ParsedDocument} from '../core/document';
+import {webArticleIdentityBytes} from '../core/webArticle';
 import type {parseDocumentFile} from './binary';
 import type {fetchOnlinePdf, PdfDownloadProgress} from './pdfSource';
 import {documentHistoryId, restoreDocumentHistoryPdfOcr, restoreDocumentHistoryRevisions, type DocumentHistory} from './history';
@@ -71,7 +73,9 @@ export function createDocumentImportWorkflow(ports: DocumentImportPorts) {
                 if (ports.history) {
                     const bytes = parsed.binary?.bytes ?? new Uint8Array(await file.arrayBuffer());
                     if (!operation.current()) return;
-                    const historyId = await documentHistoryId(bytes);
+                    const historyId = await documentHistoryId(
+                        parsed.format === 'html' && sourceUrl ? webArticleIdentityBytes(sourceUrl, bytes) : bytes,
+                    );
                     if (!operation.current()) return;
                     const result = historyId ? await ports.history.loadChecked(historyId) : {status: 'unavailable' as const};
                     if (!operation.current()) return;
@@ -84,6 +88,7 @@ export function createDocumentImportWorkflow(ports: DocumentImportPorts) {
                         task.document = restored.document;
                         Object.assign(task, restoreDocumentHistoryRevisions(saved, restored.document, ports.parsedVersion, restored.segmentOrigins),
                             {fingerprint: saved.fingerprint, bypassCache: saved.bypassCache === true});
+                        task.delimitedColumns = normalizeDelimitedColumns(restored.document, saved.delimitedColumns);
                         // 同版本记录刚被读取，未经编辑不应立刻生成新写入身份干扰其他页面。
                         if (saved.parsedVersion === ports.parsedVersion) task.savedRevision = 0;
                     }
@@ -139,10 +144,13 @@ export function createDocumentImportWorkflow(ports: DocumentImportPorts) {
                 || pdf.bytes.length !== record.bytes.length || pdf.bytes !== record.bytes && pdf.bytes.some((byte, index) => byte !== record.bytes[index])
                 // 旧版把 OCR 空结果标成 scanned:false；重新检查原图，恢复这类历史记录的重试入口。
                 || !Array.isArray(pdf.pages) || pdf.pages.some(page => !page || !Array.isArray(page.blocks) || page.scanned === false && page.blocks.length === 0));
-            if (!snapshot?.segments || invalidPdf) {await readFiles([file], record.sourceUrl, operation);return;}
+            const outdatedMarkdown = snapshot?.format === 'markdown' && !Array.isArray(snapshot.markdownTables);
+            const outdatedDocx = snapshot?.binary?.kind === 'docx' && snapshot.binary.inlineFormatting !== true;
+            if (!snapshot?.segments || invalidPdf || outdatedMarkdown || outdatedDocx) {await readFiles([file], record.sourceUrl, operation);return;}
             const task = ports.createTask(file, record.sourceUrl);
             Object.assign(task, {document: snapshot, historyId: record.id, historyVersion: result.version, bytes: record.bytes, mimeType: record.mimeType,
                 ...restoreDocumentHistoryRevisions(record, snapshot, ports.parsedVersion), fingerprint: record.fingerprint,
+                delimitedColumns: normalizeDelimitedColumns(snapshot, record.delimitedColumns),
                 bypassCache: record.bypassCache === true,
                 savedRevision: 0});
             ports.appendTask(task, true);

@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/toolbarActionRuntime.ts
  * 文件职责：把浏览器工具栏图标的点击行为与用户的一键翻译偏好同步，并保留快捷面板入口。
- * 主要内容：启动时同步注册 action/browserAction 监听，配置就绪后串行更新原生 popup；逐标签页排队点击，回源读取当前全文状态，复用翻译、恢复、PDF 与失败反馈；导航和关闭后废弃旧操作。
+ * 主要内容：同步注册工具栏点击与独立翻译窗口命令；配置就绪后串行更新原生 popup；按标签页排队处理全文翻译、恢复、PDF 与失败反馈，导航和关闭作废旧操作。
  * 模块边界：只编排浏览器入口和现有全文消息，不实现翻译、不增加权限；快捷面板以固定来源标签页打开，持久化仍由统一配置服务负责。
  */
 import {config, configReady, subscribeConfig} from '@/src/services/config/store';
@@ -40,9 +40,23 @@ export function handleToolbarQuickPanelClick(menuItemId: unknown, tab: ContextMe
 }
 
 export function installToolbarActionRuntime(states: TabTranslationStateStore): void {
+    const manifest = browser.runtime.getManifest();
+    if (manifest.commands?.['open-translation-window'] && browser.commands?.onCommand && browser.windows?.create) {
+        let opening = false;
+        browser.commands.onCommand.addListener(async (command: string) => {
+            if (command !== 'open-translation-window' || opening) return;
+            opening = true;
+            try {
+                await browser.windows.create({url: browser.runtime.getURL('/sidepanel.html'), type: 'popup', width: 520, height: 680});
+            } catch (error) {
+                console.error('[FluentRead] 翻译窗口打开失败', error);
+            } finally {
+                opening = false;
+            }
+        });
+    }
     const action = browser.action ?? browser.browserAction;
     if (!action?.setPopup || !action.onClicked) return;
-    const manifest = browser.runtime.getManifest();
     const defaultPopup = manifest.action?.default_popup || manifest.browser_action?.default_popup;
     // Thunderbird 邮件按钮已有独立运行时；没有默认快捷面板的宿主不改写其入口。
     if (!defaultPopup) return;

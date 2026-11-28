@@ -37,6 +37,7 @@ export function createLocalTtsOffscreenAdapter(client: OffscreenClient = extensi
             language: string,
             voice: string,
             signal?: AbortSignal,
+            speed?: number,
         ): Promise<LocalTtsAudio> {
             const id = requestId();
             const response = await sendOffscreenRequest(client, {
@@ -45,6 +46,7 @@ export function createLocalTtsOffscreenAdapter(client: OffscreenClient = extensi
                 text,
                 language,
                 voice,
+                ...(speed !== undefined ? {speed} : {}),
             }, {
                 signal,
                 timeoutMs: 120_000,

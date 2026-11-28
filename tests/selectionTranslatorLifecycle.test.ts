@@ -871,7 +871,7 @@ describe('explicit free selection explanation', () => {
     });
 });
 
-describe('selection card language configuration without header switches', () => {
+describe('selection card language configuration and quick header switch', () => {
     it.each([
         ['Ceci est une phrase française complète.', 'fr', 'de', false, false, 'fr', 'de'],
         ['这是完整的中文选文。', 'auto', 'zh-Hans', true, false, 'zh-Hans', 'en'],
@@ -915,6 +915,144 @@ describe('selection card language configuration without header switches', () => 
         await Vue.nextTick();
         expect(fixture.state.translationResult).toBe('A fresh English answer.');
         expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+    });
+
+    it('switches the active card target language from the header without mutating global config and rejects stale responses', async () => {
+        const fixture = mountSelection(false, undefined, {}, true);
+        fixture.config.harness = {...fixture.config.harness, enabled: true};
+        fixture.state.selectionConfigVersion += 1;
+        await Vue.nextTick();
+        const text = '我使用 markedit 的 file explorer 打开文件列表，希望以 tab 方式打开。';
+        let resolveChinese!: (value: string) => void;
+        fixture.translateText.mockImplementationOnce(() => new Promise<string>(resolve => {resolveChinese = resolve;}));
+        fixture.translateText.mockResolvedValueOnce('I use the file explorer extension in markedit to open the file list in tabs.');
+        fixture.translateText.mockResolvedValueOnce('我使用 markedit 的文件浏览器以标签页方式打开文件列表。');
+        fixture.state.snapshot = fixture.selectedSnapshot(text);
+        fixture.state.selectedText = text;
+        fixture.state.openTooltip();
+        await Vue.nextTick();
+
+        const trigger = fixture.renderPort!.root.querySelector<HTMLButtonElement>('.fr-selection-target-trigger')!;
+        expect(trigger).not.toBeNull();
+        expect(trigger.getAttribute('aria-label')).toBe('selection.targetLanguage');
+        expect(trigger.getAttribute('aria-haspopup')).toBe('listbox');
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        expect(fixture.renderPort!.root.querySelector('.fr-selection-target-text')?.textContent).toBe('简体中文');
+        expect(fixture.renderPort!.root.querySelector('.fr-selection-target-menu')).toBeNull();
+        const firstOptions = fixture.translateText.mock.calls[0][2];
+        expect(firstOptions.targetLanguage).toBe('zh-Hans');
+
+        const openAndSelect = async (value: string) => {
+            await fixture.renderPort!.click(trigger);
+            await Vue.nextTick();
+            expect(trigger.getAttribute('aria-expanded')).toBe('true');
+            const option = fixture.renderPort!.root.querySelector<HTMLButtonElement>(`.fr-selection-target-option[data-value="${value}"]`)!;
+            expect(option).not.toBeNull();
+            await fixture.renderPort!.click(option);
+            await Promise.resolve();
+            await Vue.nextTick();
+        };
+
+        // 打开自定义语言弹层，确认选项顺序与搜索过滤有效
+        await fixture.renderPort!.click(trigger);
+        await Vue.nextTick();
+        expect(Array.from(fixture.renderPort!.root.querySelectorAll('.fr-selection-target-option')).slice(0, 3).map(option => option.getAttribute('data-value'))).toEqual(['zh-Hans', 'zh-Hant', 'en']);
+        fixture.state.targetSearchQuery = 'english';
+        await Vue.nextTick();
+        expect(Array.from(fixture.renderPort!.root.querySelectorAll('.fr-selection-target-option')).map(option => option.getAttribute('data-value'))).toEqual(['en']);
+        // Escape 先关闭语言弹层而不关闭划词卡片
+        const escEvent = {isTrusted: true, key: 'Escape', target: trigger, preventDefault: vi.fn(), stopPropagation: vi.fn()};
+        Object.assign(fixture.document, {getElementById: vi.fn(() => fixture.renderPort!.root)});
+        fixture.state.handleKeydown(escEvent);
+        await Vue.nextTick();
+        expect(fixture.state.targetMenuOpen).toBe(false);
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(escEvent.preventDefault).toHaveBeenCalledOnce();
+
+        // 切换到英文：中止旧请求、不改全局默认配置，并用 auto -> en 重译
+        await openAndSelect('en');
+
+        expect(firstOptions.signal.aborted).toBe(true);
+        expect(fixture.config.to).toBe('zh-Hans');
+        expect(fixture.state.effectiveSourceLanguage).toBe('auto');
+        expect(fixture.state.effectiveTargetLanguage).toBe('en');
+        expect(fixture.translateText).toHaveBeenLastCalledWith(text, '', expect.objectContaining({sourceLanguage: 'auto', targetLanguage: 'en'}));
+        expect(fixture.state.translationResult).toBe('I use the file explorer extension in markedit to open the file list in tabs.');
+        expect(fixture.renderPort!.root.querySelector('.fr-selection-target')?.classList.contains('is-overridden')).toBe(true);
+        expect(fixture.renderPort!.root.querySelector('.fr-selection-target-text')?.textContent).toBe('English');
+        expect(fixture.state.targetMenuOpen).toBe(false);
+
+        // 旧方向的迟到响应不得覆盖新译文
+        resolveChinese('过期的中文结果');
+        await Promise.resolve();
+        await Vue.nextTick();
+        expect(fixture.state.translationResult).toBe('I use the file explorer extension in markedit to open the file list in tabs.');
+
+        // 选择相同目标语言不重复请求
+        const callCount = fixture.translateText.mock.calls.length;
+        fixture.state.chooseSelectionTarget('en');
+        expect(fixture.translateText).toHaveBeenCalledTimes(callCount);
+
+        // 在弹窗控件聚焦期间收到 selectionchange 不得误关卡片
+        const host = fixture.renderPort!.root;
+        Object.assign(fixture.document, {activeElement: host, getElementById: vi.fn(() => host)});
+        fixture.state.lastTrustedSelectionInteractionAt = Date.now();
+        fixture.state.handleSelectionChange({isTrusted: true});
+        vi.advanceTimersByTime(300);
+        expect(fixture.state.showTooltip).toBe(true);
+
+        // 切回中文目标语言后重新翻译，关闭或切换新选区后恢复默认方向
+        await openAndSelect('zh-Hans');
+        expect(fixture.state.effectiveTargetLanguage).toBe('zh-Hans');
+        expect(fixture.state.translationResult).toBe('我使用 markedit 的文件浏览器以标签页方式打开文件列表。');
+
+        // 进入阅读模式隐藏语言切换，点回翻译标签不因覆盖/手动请求误关卡片
+        fixture.state.selectionTargetOverride = 'en';
+        fixture.state.readingMode = true;
+        await Vue.nextTick();
+        expect(fixture.renderPort!.root.querySelector('.fr-selection-target-trigger')).toBeNull();
+        expect(fixture.renderPort!.root.querySelector('.fr-selection-target-menu')).toBeNull();
+        fixture.state.openTooltip();
+        await Vue.nextTick();
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.state.readingMode).toBe(false);
+
+        fixture.state.hideAll();
+        expect(fixture.state.selectionTargetOverride).toBeNull();
+        expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+    });
+
+    it('keeps the selection card header single-row without native select and supports keyboard navigation in the custom language popover', async () => {
+        const source = readFileSync('src/features/selection-translation/ui/SelectionTranslator.vue', 'utf8');
+        expect(source).toMatch(/\.fr-study-navigation \{[^}]*flex-wrap:\s*nowrap;/);
+        expect(source).toMatch(/\.fr-study-toolbar \{[^}]*flex-wrap:\s*nowrap;/);
+        expect(source).not.toContain('<select');
+
+        const fixture = mountSelection(false, undefined, {}, true);
+        const text = 'Clear layout keeps focus on reading.';
+        fixture.translateText.mockResolvedValue('清晰的布局让阅读更专注。');
+        fixture.state.snapshot = fixture.selectedSnapshot(text);
+        fixture.state.selectedText = text;
+        fixture.state.openTooltip();
+        await Vue.nextTick();
+
+        const trigger = fixture.renderPort!.root.querySelector<HTMLButtonElement>('.fr-selection-target-trigger')!;
+        expect(trigger).not.toBeNull();
+        fixture.state.handleTargetTriggerKeydown({key: 'ArrowDown', preventDefault: vi.fn(), stopPropagation: vi.fn()});
+        await Vue.nextTick();
+        expect(fixture.state.targetMenuOpen).toBe(true);
+        expect(fixture.state.highlightedTargetIndex).toBe(0);
+
+        fixture.state.handleTargetMenuKeydown({key: 'ArrowDown', preventDefault: vi.fn(), stopPropagation: vi.fn()});
+        fixture.state.handleTargetMenuKeydown({key: 'ArrowDown', preventDefault: vi.fn(), stopPropagation: vi.fn()});
+        expect(fixture.state.filteredTargetOptions[fixture.state.highlightedTargetIndex]?.value).toBe('en');
+
+        fixture.state.handleTargetMenuKeydown({key: 'Enter', preventDefault: vi.fn(), stopPropagation: vi.fn()});
+        await Promise.resolve();
+        await Vue.nextTick();
+        expect(fixture.state.effectiveTargetLanguage).toBe('en');
+        expect(fixture.state.targetMenuOpen).toBe(false);
         expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
     });
 });
@@ -1303,6 +1441,12 @@ describe('SelectionTranslator lifecycle after extension reload', () => {
         release({success: true, data: {...card('read'), origin: 'old source'}});await previous;
         expect(fixture.state.wordCard.origin).toBe('selected source');
         expect(fixture.state.isWordCardSupportLoading).toBe(false);
+        fixture.state.wordCard = {...card('read'), origin: 'Old English rǣdan', inflections: 'reads (plural); reading (present participle)'};
+        await Vue.nextTick();
+        expect(fixture.state.dictionaryToolEntry).toMatchObject({
+            etymology: 'Old English rǣdan',
+            inflections: 'reads (plural); reading (present participle)',
+        });
         fixture.state.showTooltip = false;
         const messageCount = fixture.browser.runtime.sendMessage.mock.calls.length;
         fixture.config.selectionDictionarySource = 'wiktionary-rest';fixture.notifyConfig();
@@ -2828,6 +2972,22 @@ describe('context menu selection ownership', () => {
         expect(translateSelectionThroughBridge('Good ideas deserve attention.')).toBe(false);
     });
 
+    it('opens a translation card for an explicit highlighted range without replacing the native selection', async () => {
+        const fixture = await prepareMenu();
+        fixture.getSelection.mockReturnValue(null);
+        fixture.state.clickSelection.toggle();
+        expect(fixture.state.translateExplicitRange(fixture.range)).toBe(false);
+        expect(fixture.translateText).not.toHaveBeenCalled();
+        fixture.state.clickSelection.cancel();
+        expect(fixture.state.translateExplicitRange(fixture.range)).toBe(true);
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.state.selectedText).toBe('Good ideas deserve attention.');
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+        fixture.node.isConnected = false;
+        expect(fixture.state.translateExplicitRange(fixture.range)).toBe(false);
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+    });
+
     it.each(['chrome', 'userscript'] as const)('registers and cleans native listeners only for the extension target %s while keeping its live-selection bridge', browserTarget => {
         const fixture = mountSelection(false, undefined, browserTarget);
         expect(fixture.registerContextMenu).toHaveBeenCalledOnce();
@@ -3138,6 +3298,187 @@ describe('context menu selection ownership', () => {
         expect(fixture.state.translateSelectionFromContextMenu('Good ideas deserve attention.')).toBe(false);
         expect(fixture.translateText).not.toHaveBeenCalled();
     });
+
+    it('reads open Shadow DOM selections for both floating hover trigger and right-click context menu translation', async () => {
+        const fixture = mountSelection();
+        const doc = fixture.document as unknown as Document;
+        fixture.config.selectionTranslatorTrigger = 'icon';
+        fixture.config.selectionTranslatorDelay = 0;
+        fixture.state.selectionConfigVersion += 1;
+        await Vue.nextTick();
+
+        const host = doc.createElement('shreddit-post');
+        const shadow = host.attachShadow({mode: 'open'});
+        const paragraph = doc.createElement('p');
+        const text = 'Reddit comment inside open Shadow DOM.';
+        paragraph.textContent = text;
+        shadow.appendChild(paragraph);
+        doc.body.appendChild(host);
+        const textNode = paragraph.firstChild!;
+        const rect = {left: 40, right: 320, top: 180, bottom: 204, width: 280, height: 24};
+        const shadowRange = Vue.markRaw({
+            startContainer: textNode,
+            endContainer: textNode,
+            commonAncestorContainer: textNode,
+            startOffset: 0,
+            endOffset: text.length,
+            collapsed: false,
+            getClientRects: () => [rect],
+            getBoundingClientRect: () => rect,
+            cloneRange: () => shadowRange,
+            toString: () => text,
+        });
+        const activeShadowSelection: Record<string, unknown> = {
+            rangeCount: 1,
+            isCollapsed: false,
+            anchorNode: textNode,
+            anchorOffset: 0,
+            getRangeAt: () => shadowRange,
+            toString: () => text,
+            containsNode: () => false,
+        };
+        let shadowSelection: Record<string, unknown> | null = null;
+        Object.assign(shadow, {getSelection: () => shadowSelection});
+        // Chromium 在 Shadow DOM 内拖选时，window.getSelection() 返回空/折叠选区。
+        Object.assign(fixture.window, {getSelection: () => ({rangeCount: 0, isCollapsed: true, toString: () => ''})});
+
+        const composedEvent = (extra: Record<string, unknown>) => ({
+            isTrusted: true,
+            target: host,
+            composedPath: () => [paragraph, shadow, host, doc.body, doc],
+            ...extra,
+        });
+
+        // 1. 划词悬浮入口正常出现（拖选开始时无旧选区，松开前形成新 Shadow DOM 选区）
+        fixture.state.handlePointerDown(composedEvent({button: 0, pointerType: 'mouse'}));
+        shadowSelection = activeShadowSelection;
+        fixture.state.handlePointerUp(composedEvent({button: 0, pointerType: 'mouse'}));
+        await vi.advanceTimersByTimeAsync(20);
+        expect(fixture.state.showIndicator).toBe(true);
+        expect(fixture.state.selectedText).toBe(text);
+
+        // 2. 右键触发前或右键菜单期间即使页面清空原生选区，仍能通过已审核快照完成右键翻译
+        fixture.state.handlePointerDown(composedEvent({button: 2, pointerType: 'mouse'}));
+        shadowSelection = null;
+        fixture.state.handleContextMenu(composedEvent({}));
+        expect(fixture.state.contextMenuSelection).not.toBeNull();
+        expect(fixture.contextMenuHandler(text)).toBe(true);
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+        await Vue.nextTick();
+        expect(fixture.state.translationResult).toBe('这是译文');
+        expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+    });
+
+    it('rejects right-click context menu on a native input inside an open Shadow DOM even when target is retargeted to the host', async () => {
+        const fixture = mountSelection();
+        const doc = fixture.document as unknown as Document;
+        const host = doc.createElement('custom-panel');
+        const shadow = host.attachShadow({mode: 'open'});
+        const input = doc.createElement('input');
+        const paragraph = doc.createElement('p');
+        const text = 'Visible shadow text.';
+        paragraph.textContent = text;
+        shadow.appendChild(paragraph);
+        shadow.appendChild(input);
+        doc.body.appendChild(host);
+        const textNode = paragraph.firstChild!;
+        const rect = {left: 40, right: 240, top: 180, bottom: 204, width: 200, height: 24};
+        const shadowRange = Vue.markRaw({
+            startContainer: textNode,
+            endContainer: textNode,
+            commonAncestorContainer: textNode,
+            startOffset: 0,
+            endOffset: text.length,
+            collapsed: false,
+            getClientRects: () => [rect],
+            getBoundingClientRect: () => rect,
+            cloneRange: () => shadowRange,
+            toString: () => text,
+        });
+        Object.assign(shadow, {
+            getSelection: () => ({
+                rangeCount: 1,
+                isCollapsed: false,
+                anchorNode: textNode,
+                anchorOffset: 0,
+                getRangeAt: () => shadowRange,
+                toString: () => text,
+            }),
+        });
+        Object.assign(fixture.window, {getSelection: () => ({rangeCount: 0, isCollapsed: true, toString: () => ''})});
+
+        const inputRightClick = {
+            isTrusted: true,
+            button: 2,
+            target: host,
+            composedPath: () => [input, shadow, host, doc.body, doc],
+        };
+        fixture.state.handlePointerDown(inputRightClick);
+        fixture.state.handleContextMenu(inputRightClick);
+        expect(fixture.state.contextMenuSourceRejected).toBe(true);
+        expect(fixture.state.contextMenuSelection).toBeNull();
+        expect(fixture.contextMenuHandler(text)).toBe(false);
+        expect(fixture.translateText).not.toHaveBeenCalled();
+    });
+
+    it('translates an open Shadow DOM selection resolved through standard getComposedRanges when shadowRoot.getSelection is absent', async () => {
+        const fixture = mountSelection();
+        const doc = fixture.document as unknown as Document;
+        const host = doc.createElement('safari-shadow-card');
+        const shadow = host.attachShadow({mode: 'open'});
+        const paragraph = doc.createElement('p');
+        const text = 'WebKit composed range text.';
+        paragraph.textContent = text;
+        shadow.appendChild(paragraph);
+        doc.body.appendChild(host);
+        const textNode = paragraph.firstChild!;
+        const rect = {left: 50, right: 310, top: 200, bottom: 224, width: 260, height: 24};
+        Object.assign(doc, {
+            createRange: () => {
+                let start: Node = textNode;
+                let startOffset = 0;
+                let end: Node = textNode;
+                let endOffset = 0;
+                const built = Vue.markRaw({
+                    get startContainer() {return start;},
+                    get startOffset() {return startOffset;},
+                    get endContainer() {return end;},
+                    get endOffset() {return endOffset;},
+                    get commonAncestorContainer() {return start;},
+                    get collapsed() {return start === end && startOffset === endOffset;},
+                    setStart(node: Node, offset: number) {start = node; startOffset = offset;},
+                    setEnd(node: Node, offset: number) {end = node; endOffset = offset;},
+                    getClientRects: () => [rect],
+                    getBoundingClientRect: () => rect,
+                    cloneRange: () => built,
+                    toString: () => text.slice(startOffset, endOffset),
+                });
+                return built;
+            },
+        });
+        Object.assign(fixture.window, {
+            getSelection: () => ({
+                rangeCount: 0,
+                isCollapsed: true,
+                toString: () => '',
+                getComposedRanges: ({shadowRoots}: {shadowRoots: ShadowRoot[]}) => shadowRoots.includes(shadow)
+                    ? [{startContainer: textNode, startOffset: 0, endContainer: textNode, endOffset: text.length, collapsed: false}]
+                    : [],
+            }),
+        });
+
+        fixture.state.handleContextMenu({
+            isTrusted: true,
+            target: host,
+            composedPath: () => [paragraph, shadow, host, doc.body, doc],
+        });
+        expect(fixture.state.contextMenuSelection).not.toBeNull();
+        expect(fixture.contextMenuHandler(text)).toBe(true);
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.state.selectedText).toBe(text);
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+    });
 });
 
 describe('selection card on an extension PDF page', () => {
@@ -3315,9 +3656,10 @@ describe('selection card bounded layout work', () => {
         expect(fixture.range.getClientRects).not.toHaveBeenCalled();
     });
 
-    it('repositions growing content, keeps the cap stable and releases it after content shrinks', async () => {
+    it('keeps placement locked without jumping when content grows, caps and shrinks', async () => {
         const fixture = await automaticCard();
-        expect(fixture.state.tooltipStyle.top).toBe('140px');
+        expect(fixture.state.tooltipStyle.top).toBe('260px');
+        expect(fixture.state.popupPlacement).toBe('bottom');
         fixture.setHeight(520);
         fixture.state.scheduleAutomaticPopupResize(); await vi.advanceTimersByTimeAsync(32);
         expect(fixture.state.tooltipStyle).toMatchObject({top: '260px', maxHeight: '228px'});
@@ -3328,9 +3670,30 @@ describe('selection card bounded layout work', () => {
         }
         fixture.setHeight(100);
         fixture.state.scheduleAutomaticPopupResize(); await vi.advanceTimersByTimeAsync(32);
-        expect(fixture.state.tooltipStyle).toMatchObject({top: '120px', maxHeight: '368px'});
+        expect(fixture.state.tooltipStyle).toMatchObject({top: '260px', maxHeight: '228px'});
+        expect(fixture.state.popupPlacement).toBe('bottom');
         expect(fixture.state.anchoredPopupMaxHeight).toBeNull();
         expect(fixture.range.getClientRects).not.toHaveBeenCalled();
+    });
+
+    it('flips above near the bottom edge, keeps stickyTop when shrinking, and ignores sub-pixel ResizeObserver jitter', async () => {
+        const fixture = await automaticCard(700, 560, 584);
+        expect(fixture.state.popupPlacement).toBe('top');
+        expect(fixture.state.tooltipStyle.top).toBe('470px');
+        fixture.setHeight(240);
+        fixture.state.scheduleAutomaticPopupResize(); await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.state.popupPlacement).toBe('top');
+        expect(fixture.state.tooltipStyle.top).toBe('310px');
+        // 内容缩短或切换短标签时不向下回弹跳动
+        fixture.setHeight(130);
+        fixture.state.scheduleAutomaticPopupResize(); await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.state.popupPlacement).toBe('top');
+        expect(fixture.state.tooltipStyle.top).toBe('310px');
+        // 亚像素尺寸噪声不触发重排
+        fixture.cardRect.mockClear();
+        fixture.state.scheduleAutomaticPopupResize([{contentRect: {width: 388.4, height: 130.8}} as ResizeObserverEntry]);
+        await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.cardRect).not.toHaveBeenCalled();
     });
 
     it('releases an old automatic cap when the visible viewport expands', async () => {
@@ -5427,12 +5790,12 @@ it('connects rendered reading navigation, evidence and source playback to the cu
     const anchor=selectionPorts.evidence;
     await port.click(port.root.querySelector('[data-reading-check]')!);await port.click(port.root.querySelector('[data-reading-locate]')!);await port.click(port.root.querySelector('[data-reading-clear]')!);
     expect(anchor.check).toHaveBeenCalledOnce();expect(anchor.locate).toHaveBeenCalledWith('source quote');expect(anchor.suspend).toHaveBeenCalledOnce();
-    await port.click(port.root.querySelector('[data-reading-view]')!);await Vue.nextTick();expect(port.root.querySelector('[data-reading-port]')!.getAttribute('data-history')).toBe('false');expect([...port.root.querySelectorAll('.fr-study-toolbar button')].find(button=>button.textContent==='词性与句法')!.getAttribute('aria-pressed')).toBe('');
+    await port.click(port.root.querySelector('[data-reading-view]')!);await Vue.nextTick();expect(port.root.querySelector('[data-reading-port]')!.getAttribute('data-history')).toBe('false');expect([...port.root.querySelectorAll('.fr-study-toolbar button')].find(button=>button.textContent==='句法')!.getAttribute('aria-pressed')).toBe('');
     anchor.invalidate();await Vue.nextTick();expect(anchor.suspend).toHaveBeenCalledTimes(2);expect(port.root.querySelector('[data-reading-port]')!.getAttribute('data-revision')).toBe('1');
     prepareTts(fixture,[Promise.resolve({success:true,transport:'offscreen'})]);await port.click(port.root.querySelector('[data-reading-play]')!);await Promise.resolve();await Vue.nextTick();expect(fixture.state.isPlaying).toBe(true);
     await port.click(port.root.querySelector('[data-reading-change]')!);expectAudioReset(fixture.state);
     await port.click([...port.root.querySelectorAll('.fr-study-toolbar button')].find(button=>button.textContent==='翻译')!);await Vue.nextTick();expect(fixture.state.readingMode).toBe(false);expect(port.root.querySelector('.fr-original-text')).not.toBeNull();
-    await port.click([...port.root.querySelectorAll('.fr-study-toolbar button')].find(button=>button.textContent==='词性与句法')!);await Vue.nextTick();expect(fixture.state.readingInitialAction).toBe('grammar');expect(fixture.state.readingMode).toBe(true);
+    await port.click([...port.root.querySelectorAll('.fr-study-toolbar button')].find(button=>button.textContent==='句法')!);await Vue.nextTick();expect(fixture.state.readingInitialAction).toBe('grammar');expect(fixture.state.readingMode).toBe(true);
     await port.click(port.root.querySelector('.fr-close-btn')!);expect(anchor.dispose).toHaveBeenCalledOnce();expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
 });
 
@@ -5441,6 +5804,23 @@ it('shares only the currently displayed completed translation from the actual to
     const text='Share this selected source.';Object.assign(fixture.state,{snapshot:{text,parts:[{kind:'text',text}],range:{}},selectedText:text,translationResult:'当前已完成的译文',showTooltip:true});await Vue.nextTick();
     const port=fixture.renderPort!;await port.click(port.root.querySelector('.fr-share-card-entry')!);expect(selectionPorts.share).toHaveBeenCalledWith({original:text,translation:'当前已完成的译文'});
     fixture.state.isLoading=true;await Vue.nextTick();expect(port.root.querySelector('.fr-share-card-entry')).toBeNull();
+});
+
+it.each([
+    {mode: 'bilingual', translated: '所选句子的译文。', labels: ['原文', '译文']},
+    {mode: 'translation-only', translated: '所选句子的译文。', labels: ['译文']},
+    {mode: 'translation-only', translated: 'Read this selected sentence.', labels: ['原文']},
+] as const)('renders selection blocks in reading order for $mode and $translated', async ({mode, translated, labels}) => {
+    const fixture = mountSelection(false, {acceptsRange: () => true}, {}, true);
+    fixture.config.selectionTranslatorMode = mode;
+    fixture.notifyConfig();
+    const text = 'Read this selected sentence.';
+    Object.assign(fixture.state, {snapshot: fixture.selectedSnapshot(text), selectedText: text, translationResult: translated, translationParts: [{kind: 'text', text: translated}], showTooltip: true});
+    await Vue.nextTick();
+    const blocks = [...fixture.renderPort!.root.querySelectorAll('.fr-translation-container > .fr-text-block')];
+    expect(blocks.map(block => block.querySelector('.fr-text-label')?.textContent)).toEqual(labels);
+    expect(blocks.map(block => block.querySelector('pre')?.textContent)).toEqual(labels.map(label => label === '原文' ? text : translated));
+    expect(blocks.map(block => block.querySelector('[data-copy-kind]')?.getAttribute('data-copy-kind'))).toEqual(labels.map(label => label === '原文' ? 'source' : 'translation'));
 });
 
 it('retries the dictionary from its rendered error, copies the selected word and translation, and toggles Chinese support',async()=>{
@@ -5458,6 +5838,35 @@ it('retries the dictionary from its rendered error, copies the selected word and
     await port.click(port.root.querySelector('[data-copy-kind="source"]')!);await port.click(port.root.querySelector('[data-copy-kind="translation"]')!);await Vue.nextTick();expect(writeText.mock.calls.map(([text])=>text)).toEqual(['hello','你好']);
     await port.click(port.root.querySelector('.fr-word-heading-audio')!);await Vue.nextTick();expect(fixture.state.isPlaying).toBe(true);expect(ttsMessages(fixture,'selectionTts')[0].text).toBe('hello');
     await port.click(port.root.querySelector('.fr-word-heading-audio')!);expectAudioReset(fixture.state);expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+});
+
+it('hides the redundant Chinese-support toolbar and uses compact single-sense rows for direct Chinese dictionary entries', async () => {
+    const fixture = mountSelection(false, {acceptsRange: () => true}, {}, true);
+    await Vue.nextTick();
+    const card = {
+        word: 'sequence',
+        normalizedWord: 'sequence',
+        phonetics: [{label: '美式', text: "/'si:kwəns/"}, {label: '英式', text: "/'si:kwəns/"}],
+        sources: [{id: 'youdao-web', label: '有道词典', url: 'https://dict.youdao.com/'}],
+        meanings: [
+            {partOfSpeech: '名词', definitions: [{definition: '顺序，次序；连续事件'}]},
+            {partOfSpeech: '动词', definitions: [{definition: '按顺序排列'}]},
+        ],
+    };
+    Object.assign(fixture.state, {
+        snapshot: fixture.selectedSnapshot('sequence'),
+        selectedText: 'sequence',
+        translationResult: '序列',
+        translationParts: [{kind: 'text', text: '序列'}],
+        wordCard: card,
+        showTooltip: true,
+    });
+    await Vue.nextTick();
+    const port = fixture.renderPort!;
+    expect(port.root.querySelector('.fr-word-meaning-toolbar')).toBeNull();
+    expect(port.root.querySelectorAll('.fr-word-meaning--single')).toHaveLength(2);
+    expect(port.root.querySelector('.fr-word-card-footer')?.textContent?.trim()).toBe('有道词典');
+    expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
 });
 
 it('copies both sentence fields and plays the translated text through the real sentence toolbar',async()=>{

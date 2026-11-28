@@ -17,6 +17,7 @@ import {
     AZURE_TRANSLATOR_ENDPOINT,
     DEFAULT_OLLAMA_ENDPOINT,
     getAliyunTranslationEndpoint,
+    getHuanYuanEndpoint,
     urls,
     VOLC_TRANSLATION_ENDPOINT,
 } from '@/src/core/config/constants';
@@ -106,6 +107,10 @@ describe('云服务厂商目录', () => {
         expect(getAliyunTranslationEndpoint()).toBe('https://mt.cn-hangzhou.aliyuncs.com/');
         expect(getAliyunTranslationEndpoint('ap-southeast-1')).toBe('https://mt.ap-southeast-1.aliyuncs.com/');
         expect(getAliyunTranslationEndpoint('evil.example.com/')).toBe('https://mt.cn-hangzhou.aliyuncs.com/');
+        expect(getHuanYuanEndpoint()).toBe('https://tokenhub-intl.tencentmaas.com/v1/chat/completions');
+        expect(getHuanYuanEndpoint('ap-singapore')).toBe('https://tokenhub-intl.tencentmaas.com/v1/chat/completions');
+        expect(getHuanYuanEndpoint('ap-guangzhou')).toBe('https://tokenhub.tencentmaas.com/v1/chat/completions');
+        expect(getHuanYuanEndpoint('evil.example.com/')).toBe('https://tokenhub-intl.tencentmaas.com/v1/chat/completions');
     });
 
     it('目录中“云服务厂商”分组位于机器翻译与 AI 翻译之间，且不重复列出免费端点', () => {

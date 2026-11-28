@@ -262,17 +262,17 @@ async function main() {
         return target?.getAttribute('data-display-mode') === mode && target.disabled === disabled;
       }, {mode, disabled});
       assert.equal(await button.getAttribute('title'), null, '显示模式不应再使用浏览器原生提示');
-      const expected = disabled ? 'Google 翻译仅支持双语显示' : mode === 'bilingual' ? '只显示译文' : '显示原文和译文';
+      const expected = mode === 'bilingual' ? '只显示译文' : '显示原文和译文';
       assert.equal(await button.getAttribute('aria-label'), '显示原文和译文', '显示模式开关应保持稳定功能名，由 aria-pressed 表达当前状态');
-      assert.equal(await button.getAttribute('aria-description'), disabled ? 'Google 翻译仅支持双语显示' : null, '不可用原因应通过说明提供，不能覆盖开关功能名');
+      assert.equal(await button.getAttribute('aria-description'), null, '可用状态不应附加禁用说明');
       await popup.getByTestId('page-translation').focus();
       if (keyboard) await button.focus();
       else {await popup.mouse.move(1, 1); await button.hover();}
       const tooltip = popup.getByTestId('display-mode-tooltip');
       await tooltip.waitFor({state: 'visible', timeout: 5000});
-      assert.equal(await tooltip.innerText(), expected, '显示模式提示应直接说明点击后的操作或不可用原因');
+      assert.equal(await tooltip.innerText(), expected, '显示模式提示应直接说明点击后的操作');
       assert.equal(await tooltip.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " translation-tool-tooltip ")]').count(), 1, '显示模式提示应与字体提示使用统一浮层');
-      await shot(popup, `07-mode-tooltip-${disabled ? 'google-disabled' : mode}-${keyboard ? 'keyboard' : 'hover'}`);
+      await shot(popup, `07-mode-tooltip-${mode}-${keyboard ? 'keyboard' : 'hover'}`);
       await popup.keyboard.press('Escape');
       await tooltip.waitFor({state: 'hidden'});
       await popup.getByTestId('page-translation').hover();
@@ -595,12 +595,15 @@ async function main() {
     await untilConfig(config => config.display === 1);
     assert.equal(await popup.getByTestId('page-font-entry').getAttribute('data-font-state'), fontStateBeforeMode, '显示模式切换不得更改全局字体选择');
     await patchConfig({service: 'google'});
-    await inspectDisplayModeTooltip('bilingual', false, true);
-    assert.equal((await readConfig()).display, 1, 'Google 禁用状态不得修改显示模式');
+    await inspectDisplayModeTooltip('bilingual');
+    await popup.getByTestId('popup-display-mode').click();
+    await untilConfig(config => config.display === 0);
+    await inspectDisplayModeTooltip('translation-only');
+    await popup.getByTestId('popup-display-mode').click();
+    await untilConfig(config => config.display === 1);
     await patchConfig({service});
-    await popup.waitForFunction(() => !document.querySelector('[data-testid="popup-display-mode"]').disabled);
     await noNewRequests(count, 'display mode and tooltip checks without translated content');
-    report.checks.push('real display-mode clicks switch bilingual/translation-only without changing font choice; both action tooltips support hover, keyboard focus and Escape, and Google disabled hover explains the restriction');
+    report.checks.push('real display-mode clicks switch bilingual/translation-only without changing font choice, including for Google Translate; both action tooltips support hover, keyboard focus and Escape');
 
     // 主面板开关在窄屏与深浅色主题下保留两态反馈，并且没有横向溢出。
     diagnostics.setPhase('light-dark-responsive-font-states');

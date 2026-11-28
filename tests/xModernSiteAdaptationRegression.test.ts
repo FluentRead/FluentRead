@@ -532,4 +532,34 @@ describe('X modern public DOM functional regression', () => {
             attributes: true, attributeOldValue: true,
         });
     });
+
+    it.each(['content', 'all'] as const)('keeps the real captured inline 显示更多 button omitted without splitting the quoted post body in %s scope', scope => {
+        const document = publicPage();
+        const quoteBody = document.querySelector<HTMLElement>('[data-href="/thsottiaux/status/2107575657014468879"] div[dir="auto"]')!;
+        const showMore = quoteBody.querySelector<HTMLButtonElement>('button[type="button"]')!;
+        expect(showMore.textContent).toBe('显示更多');
+
+        const core = createTranslationCore({url: URL_X, scope});
+        const discovered = core.discover(document);
+        const bodyCandidates = discovered.filter(candidate => quoteBody.contains(candidate.element));
+        expect(bodyCandidates).toHaveLength(1);
+        expect(bodyCandidates[0]).toMatchObject({
+            element: quoteBody,
+            kind: scope === 'content' ? 'content' : 'control',
+        });
+        expect(bodyCandidates[0]!.nodes).toBeUndefined();
+        expect(core.shouldOmitFromTranslation(showMore)).toBe(true);
+        expect(core.resolve(showMore.firstChild)).toBeNull();
+
+        const snapshot = createTranslationSourceSnapshot(
+            quoteBody,
+            core.shouldStayOriginal,
+            undefined,
+            undefined,
+            core.shouldOmitFromTranslation,
+        );
+        expect(snapshot.slots.map(slot => slot.source).join(' ')).toContain('Roundup of Day 2/');
+        expect(snapshot.slots.map(slot => slot.source).join(' ')).not.toContain('显示更多');
+        expect(snapshot.clone.textContent).not.toContain('显示更多');
+    });
 });

@@ -61,6 +61,13 @@ describe('快捷键设置草稿生命周期', () => {
         config.value.inputBoxTranslationTrigger = 'none';state.handleInputBoxTranslationTriggerChange('ctrl_enter');
         expect(config.value.inputBoxTranslationTrigger).toBe('none');expect(state.quickTranslationConflictMessage('Ctrl+Enter')).toContain('两点选取');
         config.value.selectionClickSelectEnabled = false;state.handleInputBoxTranslationTriggerChange('ctrl_enter');expect(config.value.inputBoxTranslationTrigger).toBe('ctrl_enter');
+        config.value.inputBoxTranslationTrigger = 'disabled';config.value.customInputBoxTranslationHotkey = '';
+        state.handleInputBoxTranslationTriggerChange('custom');expect(config.value.inputBoxTranslationTrigger).toBe('disabled');
+        config.value.customInputBoxTranslationHotkey = 'Alt+Enter';
+        state.handleInputBoxTranslationTriggerChange('custom');expect(config.value.inputBoxTranslationTrigger).toBe('custom');
+        expect(state.quickTranslationConflictMessage('Alt+Enter')).toContain('输入框翻译');
+        state.handleHotkeyChange('Alt+Enter');expect(config.value.floatingBallHotkey).toBe('Alt+Q');
+        expect(notices.message.warning).toHaveBeenCalled();
     });
     it.each(groups)('$name 快速改选不会让迟到弹窗重新打开或取消覆盖新选择', async group => {
         const {state, config} = mount();

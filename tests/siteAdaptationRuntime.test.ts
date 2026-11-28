@@ -6,6 +6,11 @@ vi.mock('@/src/core/site-adaptation/catalog', () => ({builtinSiteRulePack: {vers
 }]}}));
 vi.mock('@/src/core/translation/current', () => ({
     setCurrentTranslationAdapters: () => effects.events.push('apply'),
+    setCurrentTranslationExcludedSelectors: (selectors: unknown) => {
+        const normalized = Array.isArray(selectors) ? selectors.map(String) : [];
+        effects.events.push(`excluded:${normalized.join(',')}`);
+        return normalized;
+    },
     setCurrentTranslationSidebarRegions: (enabled: boolean) => effects.events.push(`sidebar:${enabled}`),
 }));
 vi.mock('@/src/core/translation/text', () => ({
@@ -38,12 +43,13 @@ describe('content site adaptation composition', () => {
         expect(session.routeChanged(new URL('https://example.test/settings'))).toBe(false);
     });
 
-    it('publishes paragraph length and sidebar scope to the shared core, reporting only real changes', () => {
-        expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4, sidebarTranslationEnabled: true}))).toBe(true);
-        expect(effects.events).toEqual(['min:4', 'sidebar:true']);
+    it('publishes paragraph length, sidebar scope and excluded tags to the shared core, reporting only real changes', () => {
+        expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4, sidebarTranslationEnabled: true, excludedTags: ['blockquote']}))).toBe(true);
+        expect(effects.events).toEqual(['min:4', 'sidebar:true', 'excluded:blockquote']);
         effects.events = [];
-        expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4, sidebarTranslationEnabled: true}))).toBe(false);
-        expect(effects.events).toEqual(['min:4', 'sidebar:true']);
+        expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4, sidebarTranslationEnabled: true, excludedTags: ['blockquote']}))).toBe(false);
+        expect(effects.events).toEqual(['min:4', 'sidebar:true', 'excluded:blockquote']);
+        expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4, sidebarTranslationEnabled: true, excludedTags: ['blockquote', '.ad']}))).toBe(true);
         expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 4}))).toBe(true);
         expect(applyCoreTranslationPreferences(preferences({minTranslationTextLength: 9}))).toBe(true);
     });
@@ -56,5 +62,20 @@ describe('content site adaptation composition', () => {
         const child = createContentSiteAdaptationRuntime(undefined, new URL('https://example.test/docs/start'), () => effects.events.push('suspend-frame'));
         child.update({enabled: false});
         expect(effects.events).toEqual(['apply', 'suspend-frame', 'apply']);
+    });
+
+    it('uses the verified catalog with the same user override and disable precedence', () => {
+        const root = new URL('https://example.test/');
+        const library = {id: 'library', name: 'Library', match: {hosts: ['example.test'], paths: ['/library/*']}, content: [{css: ['p']}]};
+        const session = createContentSiteAdaptationRuntime(undefined, new URL('/library/one', root), undefined, {
+            revision: 101, minimumVersion: '0.0.42', pack: {version: 1, rules: [library]},
+        });
+        expect(session.routeChanged(new URL('/library/two', root))).toBe(false);
+        expect(session.routeChanged(new URL('/docs/start', root))).toBe(true);
+        session.update({custom: {version: 1, rules: [{...library, match: {...library.match, paths: ['/override/*']}}]}});
+        expect(session.routeChanged(new URL('/library/three', root))).toBe(false);
+        expect(session.routeChanged(new URL('/override/start', root))).toBe(true);
+        session.update({disabledRuleIds: [library.id]});
+        expect(session.routeChanged(new URL('/override/next', root))).toBe(false);
     });
 });

@@ -175,6 +175,60 @@ describe('网站正文规则目录', () => {
         expect(document.querySelector('#label')!.textContent).toBe('Category:Internationalization');
     });
 
+    it('Paul Graham 文章按直接 br 拆分 td > inline font 正文，保留链接、强调与嵌套页脚表格边界', () => {
+        const document = documentFor(`
+            <table><tbody><tr>
+                <td><img src="sidebar.gif" alt="Essays"></td>
+                <td><img src="spacer.gif" alt=""></td>
+                <td id="outer-td">
+                    <img src="title.gif" alt="How to Do Great Work"><br><br>
+                    <table id="essay-table"><tbody><tr><td id="inner-td">
+                        <img src="banner.gif" alt=""><br><br>
+                        <font id="essay-font" size="2" face="verdana">
+                            July 2023<br><br>
+                            If you collected lists of techniques for doing great work in a lot of different fields, what would the intersection look like? [<a id="fn-ref" href="#f1n"><font color="#000000">1</font></a>]<br><br>
+                            The first step is to decide what to work on, and read <a id="inline-link" href="read.html">the related essay</a> with <b>care</b>.<br><br>
+                            <code>skip_code_line()</code><br><br>
+                            <b>Notes</b><br><br>
+                            [<a name="f1n"><font color="#000000">1</font></a>] Footnote explaining an earlier observation.
+                        </font>
+                    </td></tr></tbody></table>
+                    <table id="footer-table"><tbody><tr><td id="footer-td"><font id="footer-font" size="2">You'll find this essay and 14 others in Hackers &amp; Painters.</font></td></tr></tbody></table>
+                </td>
+            </tr></tbody></table>
+        `);
+        const adapter = adapterById.get('paulgraham-essays')!;
+        for (const raw of ['https://paulgraham.com/greatwork.html', 'https://www.paulgraham.com/greatwork.html']) {
+            const url = new URL(raw);
+            expect(adapter.matches(url), raw).toBe(true);
+            const core = new TranslationCandidateCore({url, adapters: [adapter]});
+            const font = document.getElementById('essay-font')!;
+            const candidates = core.discover(document);
+            const essayRuns = candidates.filter(candidate => candidate.element === font);
+            expect(essayRuns, raw).toHaveLength(5);
+            expect(essayRuns.every(candidate => candidate.adapterId === 'paulgraham-essays' && candidate.sourceLine === true)).toBe(true);
+            expect(essayRuns.map(candidate => extractTranslationTextFromNodes(candidate.nodes!, core.shouldStayOriginal))).toEqual([
+                'July 2023',
+                'If you collected lists of techniques for doing great work in a lot of different fields, what would the intersection look like? [ ]',
+                'The first step is to decide what to work on, and read the related essay with care .',
+                'Notes',
+                '[ ] Footnote explaining an earlier observation.',
+            ]);
+            // 脚注数字本身受 live-data 保护，但对应链接与嵌套 <font> 仍完整保留在该段节点中。
+            expect(essayRuns[1]!.nodes).toContain(document.getElementById('fn-ref'));
+            expect(document.getElementById('fn-ref')!.textContent).toBe('1');
+            // 外层与内层 td 不应再把整篇 67 KB 正文吞并成一个大候选。
+            expect(candidates.some(candidate => candidate.element.id === 'outer-td' || candidate.element.id === 'inner-td')).toBe(false);
+            // 无 br 的页脚单元格保留常规通用发现。
+            expect(candidates.some(candidate => candidate.element.id === 'footer-td')).toBe(true);
+            // 悬浮命中文本、链接和嵌套脚注 <font> 均回到对应段落，命中 <br> 或独立 <code> 返回 null。
+            expect(core.resolve(document.getElementById('fn-ref')!.firstChild!.firstChild)?.nodes).toEqual(essayRuns[1]!.nodes);
+            expect(core.resolve(document.getElementById('inline-link')!.firstChild)?.nodes).toEqual(essayRuns[2]!.nodes);
+            expect(core.resolve(font.querySelector('br'))).toBeNull();
+            expect(core.resolve(font.querySelector('code')!.firstChild)).toBeNull();
+        }
+    });
+
     it('BBC 主图只保护独立署名，主图内正文和真正图注仍可翻译', () => {
         const fixture = fixtures.find(item => item.id === 'bbc-news')!;
         const url = new URL('https://www.bbc.com/future/article/20261001-five-exercises-to-help-reduce-neck-pain');
@@ -1045,7 +1099,7 @@ describe('网站正文规则目录', () => {
             if (standalone.content?.length) {
                 expect(standalone.protect, rule.id).toEqual(expect.arrayContaining(['code', 'pre', 'input', 'textarea']));
                 // 只补充文章 header 正文的规则沿用通用侧边栏设置，避免强制排除导航。
-                if (['jetbrains-idea-whatsnew', 'llamaperf-mac'].includes(rule.id)) {
+                if (['inco-blog', 'jetbrains-idea-whatsnew', 'llamaperf-mac'].includes(rule.id)) {
                     expect(standalone.exclude).toBeUndefined();
                 } else {
                     expect(standalone.exclude, rule.id).toContain('nav');
@@ -1244,4 +1298,122 @@ describe('网站正文规则目录', () => {
             }
         },
     );
+
+    it('Google 搜索识别多种 AI Overview 正文结构，保留行内引用按钮并排除来源卡片与交互控件', () => {
+        const adapter = adapterById.get('google-search')!;
+        for (const host of ['www.google.com', 'google.com', 'www.google.com.hk', 'www.google.com.tw', 'www.google.co.jp', 'www.google.co.uk', 'www.google.com.sg', 'www.google.ca', 'www.google.com.au', 'www.google.fr', 'www.google.co.kr']) {
+            expect(adapter.matches(new URL(`https://${host}/search?q=photosynthesis`)), host).toBe(true);
+        }
+        expect(adapter.matches(new URL('https://www.google.com.evil.invalid/search?q=photosynthesis'))).toBe(false);
+
+        const url = new URL('https://www.google.com/search?q=how+does+photosynthesis+work');
+        const core = new TranslationCandidateCore({url, adapters: [adapter]});
+        const document = documentFor(`
+            <nav id="nav"><a href="/settings">Search settings</a></nav>
+            <div id="m-x-content">
+                <div id="main-col-wrap" data-container-id="main-col">
+                    <div id="outer-wrap" class="obfuscated-outer">
+                        <div id="section-wrap" class="obfuscated-section">
+                            <div id="div-para-1" class="obfuscated-para">
+                                <span>Photosynthesis converts sunlight into chemical energy in green plants.</span>
+                                <div class="inline-cite-wrap"><button id="cite-btn-1" aria-label="View related links">1</button></div>
+                            </div>
+                        </div>
+                        <div class="obfuscated-section">
+                            <div id="div-heading" role="heading" aria-level="3">Key stages of photosynthesis</div>
+                            <ul>
+                                <li id="bullet-1"><strong>Light reactions:</strong> Chlorophyll absorbs light energy.<span role="button" id="cite-btn-2">2</span></li>
+                                <li id="bullet-2"><strong>Calvin cycle:</strong> Carbon dioxide becomes glucose using <code>ATP</code>.</li>
+                            </ul>
+                        </div>
+                        <div class="obfuscated-section">
+                            <table>
+                                <tbody>
+                                    <tr><th id="cell-heading">Input</th><td id="cell-body">Water and carbon dioxide</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="show-more-wrap">
+                        <button id="native-show-more">Show more</button>
+                        <div role="button" id="aria-show-more" tabindex="0">Show more in AI Mode</div>
+                    </div>
+                </div>
+                <div data-container-id="rhs-col">
+                    <div id="rhs-card"><a href="https://example.org/bio">Right rail source title</a><cite>example.org</cite></div>
+                </div>
+                <aside><div id="aside-card">Sidebar citation metadata</div></aside>
+            </div>
+            <div data-subtree="aimc">
+                <div data-mcpr="true">
+                    <div class="rot-wrap"><div id="aimc-div-para" class="rot-para">Charged solar particles collide with upper atmosphere gases.</div></div>
+                </div>
+                <div data-attrid="VisualDigestWebResult"><div id="web-result-card">Cited web card title</div></div>
+                <div data-attrid="VisualDigestVideoResult"><div id="video-result-card">Cited video card title</div></div>
+            </div>
+            <div data-tr-rsts="true"><div id="tr-rsts-para">Rich response prose remains translatable across layout variants.</div></div>
+            <div data-attrid="AIOverview"><div id="attrid-aio-para">Overview attribute prose also enters full-page translation.</div></div>
+            <div data-subtree="aimp" id="aimp-direct">Direct subtree paragraph text is discovered without an inner wrapper.</div>
+            <div id="search">
+                <h3 id="organic-title">Organic search result title</h3>
+                <div class="VwiC3b" id="organic-snippet">Organic result snippet continues working normally.</div>
+                <div id="organic-chrome">People also ask metadata stays untouched</div>
+            </div>
+            <div id="unrelated-banner">Unrelated search chrome stays original</div>
+        `);
+
+        const candidates = core.discover(document);
+        const ids = candidates.map(candidate => candidate.element.id);
+        expect(ids).toEqual(expect.arrayContaining([
+            'div-para-1',
+            'div-heading',
+            'bullet-1',
+            'bullet-2',
+            'cell-heading',
+            'cell-body',
+            'aimc-div-para',
+            'tr-rsts-para',
+            'attrid-aio-para',
+            'aimp-direct',
+            'organic-title',
+            'organic-snippet',
+        ]));
+        for (const wrapperId of ['m-x-content', 'main-col-wrap', 'outer-wrap', 'section-wrap', 'show-more-wrap']) {
+            expect(ids, `wrapper should not become candidate: ${wrapperId}`).not.toContain(wrapperId);
+        }
+        for (const excludedId of ['nav', 'cite-btn-1', 'cite-btn-2', 'native-show-more', 'aria-show-more', 'rhs-card', 'aside-card', 'web-result-card', 'video-result-card', 'organic-chrome', 'unrelated-banner']) {
+            const element = document.getElementById(excludedId)!;
+            expect(candidates.some(candidate => candidate.element === element || element.contains(candidate.element)), excludedId).toBe(false);
+        }
+        for (const hoverNullId of ['native-show-more', 'aria-show-more', 'cite-btn-2', 'rhs-card', 'aside-card', 'web-result-card', 'video-result-card', 'organic-chrome', 'unrelated-banner']) {
+            const element = document.getElementById(hoverNullId)!;
+            expect(core.resolve(element.firstChild ?? element), `hover ${hoverNullId}`).toBeNull();
+        }
+        for (const proseId of ['div-para-1', 'div-heading', 'bullet-1', 'aimc-div-para', 'tr-rsts-para', 'attrid-aio-para', 'aimp-direct']) {
+            const element = document.getElementById(proseId)!;
+            const walker = document.createTreeWalker(element, 4);
+            let readable = walker.nextNode();
+            while (readable && (!readable.textContent?.trim() || (readable.parentElement && core.shouldStayOriginal(readable.parentElement)))) {
+                readable = walker.nextNode();
+            }
+            expect(readable, `readable text in ${proseId}`).not.toBeNull();
+            expect(core.resolve(readable)?.element, `hover ${proseId}`).toBe(element);
+        }
+
+        const paraSnapshot = createTranslationSourceSnapshot(document.getElementById('div-para-1')!, core.shouldStayOriginal);
+        expect(paraSnapshot.slots.map(slot => slot.source).join(' ')).toContain('Photosynthesis converts sunlight');
+        expect(paraSnapshot.slots.map(slot => slot.source).join(' ')).not.toContain('View related links');
+        const paraTranslated = applyTranslationsToSnapshot(paraSnapshot, paraSnapshot.slots.map(() => '光合作用将阳光转化为化学能。'));
+        expect(paraTranslated).toContain('光合作用将阳光转化为化学能。');
+        expect(paraTranslated).toContain('id="cite-btn-1"');
+
+        const bulletSnapshot = createTranslationSourceSnapshot(document.getElementById('bullet-2')!, core.shouldStayOriginal);
+        expect(bulletSnapshot.slots.map(slot => slot.source).join(' ')).not.toContain('ATP');
+
+        // 动态展开新增的嵌套 div 段落同样会被增量发现识别。
+        document.getElementById('outer-wrap')!.insertAdjacentHTML('beforeend',
+            '<div class="obfuscated-section"><div id="expanded-div-para" class="obfuscated-para">Expanded AI Overview prose appears after clicking show more.</div></div>');
+        const expandedCandidates = core.discover(document.getElementById('outer-wrap')!.lastElementChild!);
+        expect(expandedCandidates.map(candidate => candidate.element.id)).toEqual(['expanded-div-para']);
+    });
 });

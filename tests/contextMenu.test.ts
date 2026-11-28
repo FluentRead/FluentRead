@@ -477,8 +477,7 @@ describe('后台右键菜单生命周期', () => {
         await install();
         await settle();
         const created = api.contextMenus.create.mock.calls
-            .map((call: unknown[]) => call[0] as Record<string, unknown>)
-            .filter(menu => menu.id !== 'fluentread-toolbar-hypothesis');
+            .map((call: unknown[]) => call[0] as Record<string, unknown>);
         expect(created.map((menu) => menu.id)).toEqual([
             contextMenuItemId('selection', 'translateSelection'),
             contextMenuItemId('page', 'translatePage'),
@@ -505,7 +504,7 @@ describe('后台右键菜单生命周期', () => {
         );
     });
 
-    it('关闭网页右键菜单后，保留工具栏批注菜单且丢弃旧网页菜单点击', async () => {
+    it('关闭网页右键菜单后，丢弃旧网页菜单点击', async () => {
         const api = stubBrowser();
         await install();
         await settle();
@@ -513,7 +512,7 @@ describe('后台右键菜单生命周期', () => {
         state.config.contextMenuEnabled = false;
         subscriptions.at(-1)!(state.config);
         await settle();
-        expect(api.contextMenus.create).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({id: 'fluentread-toolbar-hypothesis'}));
+        expect(api.contextMenus.create).not.toHaveBeenCalled();
         const [handler] = api.contextMenus.onClicked.addListener.mock.calls[0];
         handler({menuItemId: contextMenuItemId('page', 'translatePage')}, {id: 9});
         await settle();

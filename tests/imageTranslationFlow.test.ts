@@ -2,14 +2,14 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {translate, translateLegacyText, type UiLanguage} from '@/src/core/i18n';
 import {createImageOperationRegistry, createImageTranslationBackgroundHandlers, IMAGE_TRANSLATE_MESSAGE_TYPE, IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, IMAGE_CANCEL_MESSAGE_TYPE} from '@/src/features/image-translation/background/handlers';
-import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, normalizeImageProgress} from '@/src/features/image-translation/progress';
+import {IMAGE_PROGRESS_MESSAGE_TYPE, imageLoadingProgress, isImageTranslationStage, normalizeImageProgress} from '@/src/features/image-translation/progress';
 import {createOpenOptionsPageHandler} from '@/src/features/settings/background';
 import {IMAGE_LOCAL_FAILURES, imageLocalFailureMessage, imageTranslationFailureCode, imageTranslationFailureResponse, createImageTranslationFailure} from '@/src/features/image-translation/failure';
 import {createImageControls} from '@/src/features/image-translation/content/controls';
 import {IMAGE_READER_CSS} from '@/src/features/image-translation/content/textReader';
 import {sendCancellableImageOperation, prepareImageOcrLanguages} from '@/src/features/image-translation/services/client';
 import {imageTranslationProgressTransport} from '@/src/features/image-translation/background/offscreenAdapter';
-import {getTranslationRequestControl, attachTranslationGlossaryContext} from '@/src/services/translation/requestSnapshot';
+import {getImageLabelSlots, getTranslationRequestControl, attachTranslationGlossaryContext} from '@/src/services/translation/requestSnapshot';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 import {Config} from '@/src/core/config/model';
 import {normalizePrivacyPolicy} from '@/src/core/privacy/policy';
@@ -25,6 +25,38 @@ function setup(extra = {}) {
     const handlers=createImageTranslationBackgroundHandlers(dependencies);
     return {dependencies, handler:(type:string)=>handlers.find(h=>h.type===type)!};
 }
+
+it('同栏标签随筛选后的数组重新定位，缺少真实相邻位置时不携带标签标记', async () => {
+    const translateTexts = vi.fn(async ({origin}: {origin: string[]}) => origin.map(() => '译文'));
+    const type = IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE;
+    const h = setup({supportsBatchTranslation: () => true, translateTexts});
+    const texts = ['123', 'Look at the notary stamp.', 'CHECK THE SEAL', 'Compare the stamp.'];
+    await expect(h.handler(type).handle({type, texts, imageLabelSlots: [2]})).resolves.toMatchObject({success: true});
+    expect(translateTexts.mock.calls[0][0].origin).toEqual(texts.slice(1));
+    expect(getImageLabelSlots(translateTexts.mock.calls[0][0])).toEqual([1]);
+    await expect(h.handler(type).handle({type, texts: [texts[1], '123', ...texts.slice(2)], imageLabelSlots: [2]}))
+        .resolves.toMatchObject({success: true});
+    expect(getImageLabelSlots(translateTexts.mock.calls[1][0])).toBeUndefined();
+    await expect(h.handler(type).handle({type, texts, imageLabelSlots: [2, 2, 2, 2, 2]})).resolves.toMatchObject({success: true});
+    expect(getImageLabelSlots(translateTexts.mock.calls[2][0])).toBeUndefined();
+});
+
+it.each(['ru-RU','ko-KR','ar-SA','he-IL'])('单图语言模型 %s 在后台先确认语言包，再使用轻量识别',async sourceLanguage=>{
+    const assertLanguagesDownloaded=vi.fn()
+        .mockRejectedValueOnce(new Error('图片文字识别需要先下载对应语言包'))
+        .mockResolvedValueOnce(undefined);
+    const translateImage=vi.fn(async (..._args:unknown[])=>({image:'data:image/png,fixture',lines:[]}));
+    const current=setup({getImageOcrEngine:()=> 'paddle',assertLanguagesDownloaded,translateImage});
+    const type=IMAGE_TRANSLATE_MESSAGE_TYPE;
+    const request={type,sourceLanguage,image:'data:image/png;base64,fixture'};
+    await expect(current.handler(type).handle(request)).rejects.toThrow('需要先下载对应语言包');
+    expect(translateImage).not.toHaveBeenCalled();
+    await expect(current.handler(type).handle(request)).resolves.toMatchObject({success:true});
+    expect(assertLanguagesDownloaded.mock.calls).toEqual([[sourceLanguage],[sourceLanguage]]);
+    const options=translateImage.mock.calls[0]?.[3];
+    expect(options).toBeDefined();
+    expect(options).not.toHaveProperty('ocrEngine');
+});
 
 it.each(['mask','block','damaged'] as const)('图片编号说明与真实broker隐私边界兼容：%s',async mode=>{
     const config=new Config();config.service='google';config.from='en';config.to='zh-Hans';
@@ -47,7 +79,8 @@ it.each(['mask','block','damaged'] as const)('图片编号说明与真实broker�
     const outcome=await current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts,title:'Image notes'})
         .then(value=>({value,error:undefined}),error=>({value:undefined,error}));
     if(mode==='mask'){
-        expect(outcome.error).toBeUndefined();expect(outcome.value).toEqual({success:true,translations:texts.map(convert)});
+        expect(outcome.error).toBeUndefined();
+        expect(outcome.value).toEqual({success:true,translations:texts.map(convert),targetLanguage:'zh-Hans'});
         expect(provider).toHaveBeenCalledOnce();
     }else{
         expect(outcome.error).toBeInstanceOf(Error);
@@ -64,7 +97,7 @@ it('单段翻译携带相邻原文参考，保留已是目标语言的标题且�
     const current = setup({getGlossaryConfig: () => ({glossaryEnabled:false,glossaryLibraries:[],from:'auto',to:'zh-CN'})});
     const texts = ['银行服务', 'Account', 'Close', 'Your account will be closed.', 'Contact support', 'Unrelated footer'];
     const response = await current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts,title:'Bank settings'});
-    expect(response).toMatchObject({success:true});
+    expect(response).toMatchObject({success:true,targetLanguage:'zh-CN'});
     const requests = current.dependencies.translateTexts.mock.calls.map(call => call[0]) as unknown as Array<{origin:string;context:string;pageContext:string}>;
     const close = requests.find(request => request.origin === 'Close')!;
     expect(close.context).toBe('Bank settings\nOther text from the same image (reference only):\n银行服务\nAccount\nYour account will be closed.\nContact support');
@@ -109,6 +142,59 @@ it('AI 图片邻文走篇章通道，重复短句保留各自位置且已是目�
         expect(request).toMatchObject({pageContext:'',enableAIContext:true});
         expect(request.discourseContext).not.toContain('Unrelated webpage title');
     }
+});
+
+it.each(['fresh','cached','repeated'] as const)('AI 图片译文出现邻文边界时恢复完整译文：%s',async mode=>{
+    const config=Object.assign(new Config(),{service:'openai',from:'en',to:'zh-Hans',enableAIContext:true,useCache:true});
+    const stored=new Map<string,string>();
+    const cache={
+        get:vi.fn(async(key:string)=>stored.get(key)??null),
+        set:vi.fn(async(key:string,value:string)=>{stored.set(key,value);return true;}),
+        clear:vi.fn(async()=>{}),cleanup:vi.fn(async()=>{}),
+    };
+    const clean='向右转。';
+    const echoed=mode==='repeated'?'向右转。</DISCOURSE_EVIDENCE>':'向右转。<discourse_evidence>路线</discourse_evidence>';
+    const provider=vi.fn(async(request:TranslationProviderRequest)=>
+        mode==='repeated'||(mode==='fresh'&&request.pageContext)?echoed:clean);
+    const broker=createTranslationBroker({
+        ready:Promise.resolve(),getConfig:()=>config,providers:{openai:provider},cache,
+        serviceTypes:{machine:new Set(),isAI:service=>service==='openai',isAiSdk:()=>false,isUseAIContext:()=>true},
+        endpointResolver:{resolveOpenAICompatibleEndpoint:()=>({endpoint:'https://translation.invalid/v1'}),aiSdkTransportProfile:'test'},
+        promptBuilder:{buildPageSummaryPrompt:text=>text,buildPageSummarySystemPrompt:()=>''},
+        getMissingCredentialMessage:()=>null,getTranslationLanguages:()=>({sourceLanguage:config.from,targetLanguage:config.to}),
+        resolveConfiguredModel:(selected,custom)=>custom||selected||'',buildTranslationCacheKey:identity=>JSON.stringify(identity),
+        logger:{warn:vi.fn()},
+    });
+    const current=setup({
+        getTranslationService:()=> 'openai',getGlossaryConfig:()=>config,
+        isTextContextEnabled:()=>true,translateTexts:(request:TranslationRequestMessage)=>broker.translateWithCache(request),
+    });
+    const type=IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE;
+    const call=()=>current.handler(type).handle({type,texts:['路线说明','TURN RIGHT.'],title:'Image directions'});
+    const expected={success:true,translations:['路线说明',clean],targetLanguage:'zh-Hans'};
+    if(mode==='cached'){
+        await expect(call()).resolves.toEqual(expected);
+        expect(stored.size).toBe(1);
+        const key=stored.keys().next().value!;
+        stored.set(key,echoed);
+        provider.mockClear();cache.set.mockClear();
+    }
+    if(mode==='repeated'){
+        await expect(call()).rejects.toThrow('图片第 2 段文字翻译失败');
+        expect(cache.set).toHaveBeenCalledTimes(0);
+    }else{
+        await expect(call()).resolves.toEqual(expected);
+        expect([...stored.values()]).toEqual([clean]);
+        expect(cache.set).toHaveBeenCalledExactlyOnceWith(expect.any(String),clean);
+        await expect(call()).resolves.toEqual(expected);
+    }
+    const calls=provider.mock.calls.map(([request])=>request);
+    expect(calls).toHaveLength(mode==='cached'?1:2);
+    if(mode!=='cached'){
+        expect(calls[0].pageContext).toContain('<discourse_evidence>');
+        expect(calls[0].pageContext).toContain('路线说明');
+    }
+    expect(calls.at(-1)).toMatchObject({origin:'TURN RIGHT.',context:'',pageContext:''});
 });
 
 it('图片篇章证据限制 JSON 编码预算且不截断 Unicode 码点，单独一段不添加参考', async () => {
@@ -330,12 +416,12 @@ it.each([
     expect(ui.reader.hidden).toBe(false);
     if (outcome === 'resolve') operation.resolve();else operation.reject(new Error('late clipboard failure'));
     await Promise.resolve();
-    expect(ui.reader.querySelector('[role=status]')!.textContent).toContain('本地 OCR');
+    expect(ui.reader.querySelector('[role=status]')!.textContent).toContain('识别内容仅供参考');
     expect(vi.getTimerCount()).toBe(0);ui.dispose();
 });
 
 describe('图片翻译流程优化',()=>{
-    it.each(['ru', 'ko-KR'])('漫画 %s 先核对语言包，继续携带漫画模式且不采用单图引擎设置', async sourceLanguage => {
+    it.each(['ru', 'ko-KR', 'ar-SA', 'iw'])('漫画 %s 先核对语言包，继续携带漫画模式且不采用单图引擎设置', async sourceLanguage => {
         const {handler, dependencies} = setup({getImageOcrEngine: () => 'paddle'});
         const message = {type: IMAGE_TRANSLATE_MESSAGE_TYPE, image: 'data:image/png,x', sourceLanguage, manga: true};
         await handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle(message);
@@ -357,29 +443,43 @@ describe('图片翻译流程优化',()=>{
         expect(await handler('fluentReadMangaModelRemove').handle({type:'fluentReadMangaModelRemove'})).toEqual({success:true});expect(removeMangaModels).toHaveBeenCalledOnce();
         await expect(handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_MESSAGE_TYPE,image:'data:image/png,x',sourceLanguage:'en',manga:'true'} as never)).rejects.toThrow('漫画翻译模式无效');
     });
-    it('识别进度接受有效百分比，语言刷新保留数值，完成或失败清除百分比', () => {
+    it('识别进度接受有效百分比，支持平滑阶段换算与隐藏文本百分比，语言刷新保留数值，完成或失败清除百分比', () => {
         for (const invalid of [undefined, null, '50', NaN, Infinity, -1, 101]) expect(normalizeImageProgress(invalid)).toBeUndefined();
         expect(normalizeImageProgress(0)).toBe(0); expect(normalizeImageProgress(100)).toBe(100);
+        expect(imageLoadingProgress()).toBe(8);
+        expect(imageLoadingProgress('preparing')).toBe(12);
+        expect(imageLoadingProgress('initializing', undefined, 12)).toBe(22);
+        expect(imageLoadingProgress('recognizing', undefined, 22)).toBe(38);
+        expect(imageLoadingProgress('recognizing', 50, 38)).toBe(45);
+        expect(imageLoadingProgress('recognizing', 0, 45)).toBe(45);
+        expect(imageLoadingProgress('translating', undefined, 45)).toBe(72);
+        expect(imageLoadingProgress('cleaning', undefined, 72)).toBe(82);
+        expect(imageLoadingProgress('cleaning', 100, 82)).toBe(90);
+        expect(imageLoadingProgress('rendering', undefined, 90)).toBe(94);
         const {document} = parseHTML('<html><body></body></html>'); vi.stubGlobal('document', document);
         let language: UiLanguage = 'en-US';
         const ui = createImageControls({onAction(){},onPrepare(){},translate:source=>translateLegacyText(source,language)});
-        ui.update('loading','正在识别图片文字…',{progress:42.9});
+        ui.update('loading','首次准备中…',{progress:42.9});
         expect(ui.status.textContent).toContain('42%');
         language='ja-JP';ui.refreshLanguage();expect(ui.status.textContent).toContain('42%');
-        ui.update('loading','正在翻译文字…');expect(ui.status.textContent).not.toContain('%');
+        ui.update('loading','翻译中…',{progress:72, showPercent:false});
+        expect(ui.status.textContent).not.toContain('%');
+        expect(ui.feedback.querySelector<HTMLElement>('[role=progressbar]')!.hidden).toBe(false);
+        expect(ui.feedback.querySelector('[role=progressbar]')!.getAttribute('aria-valuenow')).toBe('72');
+        ui.update('loading','翻译中…');expect(ui.status.textContent).not.toContain('%');
         ui.update('error','识别失败',{progress:42});expect(ui.status.textContent).not.toContain('%');
         ui.dispose();
     });
 
-    it('漫画处理显示轻量进度，失败才在所属图片边缘提供恢复动作，完成和原图撤下', () => {
+    it('漫画处理显示边缘轻量进度，单图加载把取消整合进左下角轻胶囊，完成和原图撤下', () => {
         const {document} = parseHTML('<html><body></body></html>');vi.stubGlobal('document', document);
         const ui = createImageControls({onAction(){},onPrepare(){}});
-        ui.update('loading', '正在识别图片文字…', {quiet:true, progress:42});
+        ui.update('loading', '翻译中…', {quiet:true, progress:42, showPercent:false});
         expect(ui.feedback.hidden).toBe(false);expect(ui.element.hidden).toBe(true);
-        expect(ui.element.getAttribute('aria-busy')).toBe('true');expect(ui.status.textContent).toContain('42%');
+        expect(ui.element.getAttribute('aria-busy')).toBe('true');expect(ui.status.textContent).toBe('翻译中…');
         const bar=ui.feedback.querySelector<HTMLElement>('[role=progressbar]')!;
         expect(bar.hidden).toBe(false);expect(bar.getAttribute('aria-valuenow')).toBe('42');
-        ui.update('loading','正在翻译文字…',{quiet:true});expect(ui.feedback.hidden).toBe(false);
+        ui.update('loading','翻译中…',{quiet:true});expect(ui.feedback.hidden).toBe(false);
         expect(bar.hidden).toBe(true);expect(bar.getAttribute('aria-valuenow')).toBeNull();expect(ui.status.textContent).not.toContain('%');
         ui.update('error', '翻译失败', {quiet:true});
         expect(ui.feedback.hidden).toBe(false);expect(ui.element.hidden).toBe(true);
@@ -387,18 +487,22 @@ describe('图片翻译流程优化',()=>{
         expect(ui.feedback.querySelector<HTMLElement>('.fr-image-feedback-title')!.hidden).toBe(true);
         ui.setLines([{text:'译文'}]);ui.update('translated', '查看译图', {quiet:true});expect(ui.element.hidden).toBe(true);expect(ui.feedback.hidden).toBe(true);
         ui.update('idle','查看译图',{quiet:true});expect(ui.feedback.hidden).toBe(true);expect(ui.element.hidden).toBe(true);
-        ui.update('loading', '正在读取图片…');expect(ui.feedback.hidden).toBe(false);expect(ui.element.hidden).toBe(false);
-        expect(ui.button.parentElement!.parentElement).toBe(ui.element);expect(ui.feedback.querySelector('button')).toBeNull();ui.dispose();
+        ui.update('loading', '翻译中…', {progress:22, showPercent:false});
+        expect(ui.feedback.hidden).toBe(false);expect(ui.element.hidden).toBe(true);
+        expect(bar.hidden).toBe(false);expect(bar.getAttribute('aria-valuenow')).toBe('22');
+        expect(ui.button.parentElement!.parentElement).toBe(ui.feedback);expect(ui.button.textContent).toBe('取消');
+        ui.update('idle','翻译图片');expect(ui.button.parentElement!.parentElement).toBe(ui.element);
+        ui.dispose();
     });
 
     it('漫画单页排队时提供取消操作，开始处理后恢复普通轻量进度', () => {
         const {document} = parseHTML('<html><body></body></html>');vi.stubGlobal('document', document);
         const ui = createImageControls({onAction(){},onPrepare(){},translate:source=>translateLegacyText(source,'en-US')});
-        ui.update('loading', '等待上一项任务结束…', {quiet:true, queued:true});
+        ui.update('loading', '排队中…', {quiet:true, queued:true});
         expect(ui.feedback.hidden).toBe(false);expect(ui.feedback.dataset.queued).toBe('true');
-        expect(ui.status.textContent).toBe('Waiting for the previous task…');
+        expect(ui.status.textContent).toBe('Queued…');
         expect(ui.button.parentElement!.parentElement).toBe(ui.feedback);expect(ui.button.textContent).toBe('Cancel');
-        ui.update('loading', '正在识别图片文字…', {quiet:true});
+        ui.update('loading', '翻译中…', {quiet:true});
         expect(ui.feedback.dataset.queued).toBe('false');expect(ui.feedback.querySelector('button')).toBeNull();
         expect(ui.button.parentElement!.parentElement).toBe(ui.element);ui.dispose();
     });
@@ -416,8 +520,9 @@ describe('图片翻译流程优化',()=>{
         const visible=Array.from(row.children).filter(n=>n.tagName==='BUTTON'&&!(n as HTMLButtonElement).hidden);
         expect(visible.map(n=>n.className)).toEqual([primary]);expect(more.open).toBe(false);
         more.open=true;ui.refreshLanguage();expect(more.open).toBe(true);
-        ui.update('loading','正在识别');expect(more.hidden).toBe(true);expect(ui.button.parentElement).toBe(row);
-        expect(row.parentElement).toBe(ui.element);expect(row.firstElementChild).toBe(ui.button);ui.dispose();
+        ui.update('loading','翻译中…');expect(more.hidden).toBe(true);expect(ui.button.parentElement).toBe(row);
+        expect(row.parentElement).toBe(ui.feedback);expect(row.firstElementChild).toBe(ui.button);
+        ui.update('idle','翻译图片');expect(row.parentElement).toBe(ui.element);ui.dispose();
     });
 
     it('漫画错误恢复保留详情、键盘和设置入口，拒绝合成动作且不触发宿主翻页快捷键', () => {
@@ -456,8 +561,8 @@ describe('图片翻译流程优化',()=>{
         expect(details.open).toBe(true);expect(details.querySelector('p')!.textContent).toBe(longDetail);
         expect(ui.button.closest('.fr-image-more')).not.toBeNull();expect(ui.dismiss.parentElement).toBe(ui.button.parentElement);expect(row.parentElement).toBe(ui.feedback);
         recoveryBeforeDetails();
-        ui.update('loading','正在翻译文字…',{quiet});expect(details.hidden).toBe(true);expect(details.open).toBe(false);
-        expect(row.parentElement).toBe(ui.element);
+        ui.update('loading','翻译中…',{quiet});expect(details.hidden).toBe(true);expect(details.open).toBe(false);
+        expect(row.parentElement).toBe(quiet ? ui.element : ui.feedback);
         ui.update('error','仍未完成',{quiet,errorDetails:'new exact error'});recoveryBeforeDetails();
         expect(details.querySelector('p')!.textContent).toBe('new exact error');ui.dispose();
     });
@@ -513,7 +618,7 @@ describe('图片翻译流程优化',()=>{
         const {handler}=setup({supportsBatchTranslation:()=>batch,translateTexts,getGlossaryConfig:()=>({glossaryEnabled:false,glossaryLibraries:[],from:'auto',to:'zh-CN'})});
         const texts=['FIELD SKETCH 09','GPT-6','CHECK POINT 12','OpenAI GPT-6','FIELD SKETCH 09','NVIDIA RTX 5090','22%','https://example.com','INTEL CORE 9'];
         const response=await handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts});
-        expect(response).toEqual({success:true,translations:['现场速写 09','GPT-6','检查点 12','OpenAI GPT-6','现场速写 09','NVIDIA RTX 5090','22%','https://example.com','INTEL CORE 9']});
+        expect(response).toEqual({success:true,translations:['现场速写 09','GPT-6','检查点 12','OpenAI GPT-6','现场速写 09','NVIDIA RTX 5090','22%','https://example.com','INTEL CORE 9'],targetLanguage:'zh-CN'});
         expect(requested).toEqual(batch?['FIELD SKETCH 09','CHECK POINT 12','FIELD SKETCH 09','INTEL CORE 9']:['FIELD SKETCH 09','CHECK POINT 12','INTEL CORE 9']);
         // 普通词加整数也可能是名称；供应商原样返回时仍保留原文，不能声称语法能辨认所有品牌。
         expect(texts[0]).toBe('FIELD SKETCH 09');
@@ -532,7 +637,7 @@ describe('图片翻译流程优化',()=>{
         })});
         const texts = ['docs.sglang.io/cookbook', '22%'];
         await expect(handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type: IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, texts}))
-            .resolves.toEqual({success: true, translations: ['译:docs.sglang.io/cookbook', '22%']});
+            .resolves.toEqual({success: true, translations: ['译:docs.sglang.io/cookbook', '22%'], targetLanguage:'zh-Hans'});
         expect(dependencies.translateTexts).toHaveBeenCalledOnce();
     });
     it('技术标识的固定译名仍受可信页面和源语言范围限制', async () => {
@@ -542,11 +647,11 @@ describe('图片翻译流程优化',()=>{
         })});
         const message = {type: IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, texts: ['docs.sglang.io/cookbook'], sourceLanguage: 'en', glossaryRevision: 'revision'};
         await expect(handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle(message))
-            .resolves.toEqual({success: true, translations: message.texts});
+            .resolves.toEqual({success: true, translations: message.texts, targetLanguage:'zh-Hans'});
         expect(dependencies.translateTexts).not.toHaveBeenCalled();
         const trusted = attachTranslationGlossaryContext(message, {pageUrl: 'https://docs.example.com/article', context: 'page'});
         await expect(handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle(trusted))
-            .resolves.toEqual({success: true, translations: ['译:docs.sglang.io/cookbook']});
+            .resolves.toEqual({success: true, translations: ['译:docs.sglang.io/cookbook'], targetLanguage:'zh-Hans'});
         expect(dependencies.translateTexts).toHaveBeenCalledOnce();
     });
     it('图片读取服务配置时取消同一任务，批量和逐条模式都不得启动翻译', async () => {
@@ -682,12 +787,12 @@ describe('图片翻译流程优化',()=>{
         const focusEventsBeforeProgress = focusEvents;
         const blurEventsBeforeProgress = blurEvents;
 
-        ui.update('loading', '正在识别图片文字…', {progress: 40});
-        ui.update('loading', '正在识别图片文字…', {progress: 70});
+        ui.update('loading', '翻译中…', {progress: 40, showPercent: false});
+        ui.update('loading', '翻译中…', {progress: 70, showPercent: false});
 
-        expect(row.parentElement).toBe(ui.element);
+        expect(row.parentElement).toBe(ui.feedback);
         expect(ui.button.parentElement).toBe(row);
-        expect(ui.feedback.contains(ui.button)).toBe(false);
+        expect(ui.feedback.contains(ui.button)).toBe(true);
         expect(focusEvents).toBe(focusEventsBeforeProgress);
         expect(blurEvents).toBe(blurEventsBeforeProgress);
         expect(append).not.toHaveBeenCalled();
@@ -991,6 +1096,7 @@ it('普通图片未绘制译文时显示可操作提示，并在文字面板标�
     ui.update('translated','部分译文未绘制，请查看图片文字',{warning:true,warningAction:true});
     const warning=ui.feedback.querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
     expect(ui.feedback.hidden).toBe(false);expect(warning?.hidden).toBe(false);
+    expect(warning.getAttribute('aria-label')).toBe('部分译文未绘制，请查看图片文字');
     const click=(trusted:boolean)=>{const event=new window.Event('click',{bubbles:true});Object.defineProperty(event,'isTrusted',{value:trusted});warning.dispatchEvent(event);};
     click(false);expect(ui.reader.hidden).toBe(true);click(true);expect(ui.reader.hidden).toBe(false);
     expect(ui.reader.textContent).toContain('为保留原文，此译文未绘制到图片');expect(ui.reader.textContent).toContain('你好');
@@ -1006,7 +1112,7 @@ it('普通窄图提示使用短图标和完整本地化名称，键盘与触摸�
     ui.feedback.style.maxWidth='64px';ui.setLines([{text:'Bonjour',sourceText:'Hello',renderSkipped:true}]);
     ui.update('translated','部分译文未绘制，请查看图片文字',{warning:true,warningAction:true});
     const warning=ui.feedback.querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
-    expect(warning.textContent).toBe('!');expect(warning.getAttribute('aria-label')).toContain(translateLegacyText('部分译文未绘制，请查看图片文字','fr-FR'));expect(warning.getAttribute('aria-label')).toContain(translateLegacyText('查看图片文字','fr-FR'));
+    expect(warning.textContent).toBe('!');expect(warning.getAttribute('aria-label')).toBe(translateLegacyText('部分译文未绘制，请查看图片文字','fr-FR'));
     const host=vi.fn();for(const type of ['keydown','touchstart','touchend'])document.body.addEventListener(type,host);
     for(const type of ['keydown','touchstart','touchend']){const event=new window.Event(type,{bubbles:true,cancelable:true});warning.dispatchEvent(event);expect(event.defaultPrevented).toBe(false);}
     expect(host).not.toHaveBeenCalled();const click=new window.Event('click',{bubbles:true});Object.defineProperty(click,'isTrusted',{value:true});warning.dispatchEvent(click);
@@ -1030,7 +1136,7 @@ describe('普通图片提示入口的焦点与恢复', () => {
         const ui=createImageControls({onAction(){},onPrepare(){}});document.body.append(ui.element,ui.feedback);
         ui.setLines([{text:'完整旧译文',sourceText:'SOURCE',renderSkipped:true}]);ui.update(phase,'状态检查',{retainedReading:true});
         const inspect=document.querySelector<HTMLButtonElement>('[aria-label="查看完整译文"]')!;
-        expect(inspect.hidden).toBe(false);expect(inspect.closest('.fr-image-more')).toBeNull();expect(ui.element.hidden).toBe(false);
+        expect(inspect.hidden).toBe(false);expect(inspect.closest('.fr-image-more')).toBeNull();expect(ui.feedback.hidden).toBe(false);expect(ui.feedback.contains(inspect)).toBe(true);
         let active:Element=inspect;Object.defineProperty(document,'activeElement',{configurable:true,get:()=>active});
         vi.spyOn(ui.reader,'focus').mockImplementation(()=>{active=ui.reader;});const focus=vi.spyOn(inspect,'focus').mockImplementation(()=>{active=inspect;});
         const click=()=>{const event=new window.Event('click',{bubbles:true});Object.defineProperties(event,{isTrusted:{value:true},detail:{value:0}});inspect.dispatchEvent(event);};

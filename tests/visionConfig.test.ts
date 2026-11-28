@@ -112,6 +112,8 @@ it('automatically routes verified native models to vision and respects explicit 
     ['claude', 'claude-opus-5-5'],
     ['tongyi', 'qwen3.8-flash'],
     ['tongyi', 'qwen3.8-27b'],
+    ['huanYuan', 'hy4'],
+    ['huanYuan', 'hy4-flash'],
     ['doubao', 'doubao-seed-2-1-lite-260915'],
     ['jieyue', 'step-3.7-flash'],
     ['groq', 'qwen/qwen3.8-27b'],

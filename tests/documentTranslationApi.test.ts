@@ -673,6 +673,21 @@ describe('document translation transient AI batching', () => {
 });
 
 describe('document incremental translation and resume', () => {
+    it('sends only selected spreadsheet cells and retains globally indexed translations when switching scope', async () => {
+        const segments = ['Column headline', 'Private name', 'Message to translate', 'Another private name'].map((source, id) => ({source, id}));
+        const initialTranslations = ['', '既有校订', '', ''];
+        const onSegment = vi.fn(), onProgress = vi.fn(), onRequestPrepared = vi.fn();
+        mocks.translateTextBatch.mockImplementation(async (sources: readonly string[]) => sources.map(source => `译文 ${source}`));
+        const result = await translateDocumentSegments(segments, {fileName: 'inventory.csv', initialTranslations,
+            segmentIds: new Set([0, 2]), onSegment, onProgress, onRequestPrepared});
+        expect(result).toEqual(['译文 Column headline', '既有校订', '译文 Message to translate', '']);
+        expect(mocks.translateTextBatch.mock.calls[0][0]).toEqual(['Column headline', 'Message to translate']);
+        expect(onSegment.mock.calls.map(([event]) => event.id)).toEqual([0, 2]);
+        expect(onProgress).toHaveBeenLastCalledWith({completed: 2, total: 2});
+        expect(onRequestPrepared.mock.calls[0][0].segments.map((segment: {id: number}) => segment.id)).toEqual([0, 2]);
+        await expect(translateDocumentSegments(segments, {fileName: 'inventory.csv', initialTranslations: result, segmentIds: new Set()})).resolves.toEqual(result);
+        expect(mocks.translateTextBatch).toHaveBeenCalledOnce();
+    });
     const segments = Array.from({length: 18}, (_, id) => ({id, source: `Paragraph ${id}`}));
 
     it.each(['microsoft', 'openai'])('服务 %s 并发失败后收齐成功内容，换服务或模型只请求失败及尚未派发段落', async service => {

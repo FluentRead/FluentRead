@@ -47,6 +47,11 @@ beforeEach(() => {vi.clearAllMocks();host = document.createElement('div');docume
 afterEach(() => {app?.unmount();app = undefined;host.remove();});
 
 describe('PopupSiteRule 真实组件的网站规则与事件归属', () => {
+    it('网站区只显示两个网站开关', async () => {
+        await mount();
+        expect([...host.querySelectorAll('button')]).toEqual([button('always'), button('disabled')]);
+    });
+
     it('显示域名、作用域与可访问状态，发送开启和关闭意图', async () => {
         const {props} = await mount();
         expect(button('always').getAttribute('aria-checked')).toBe('false');

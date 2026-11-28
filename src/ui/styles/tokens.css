@@ -1,22 +1,76 @@
 /**
  * @file src/ui/styles/tokens.css
- * 文件职责：声明扩展页面共享的基础视觉语义变量，为 Popup、Options、文档页和可复用组件提供一致的品牌、文字、边框与表面颜色。
- * 主要内容：在 :root 定义 fr-color-brand、brand-strong、brand-soft、ink、muted、line、surface 等 token，统一选择菜单圆角和亮暗阴影，并保留旧短变量名到新命名空间的兼容别名；卡片、设置行、服务表单列宽和控件尺寸及焦点 token 统一层级和间距，颜色继续取自当前主题语义值。
- * 模块边界：这里只提供视觉语义值和迁移别名，为反馈色与层级阴影提供亮暗值，不包含具体组件选择器或页面布局，不改写各皮肤已登记的配色；各 app 页面在自己的 CSS 中消费并按场景覆盖。
+ * 文件职责：声明 FluentRead 跨扩展页面共享的权威 Design Tokens，为 Popup、Options、侧边栏、文档页、Storybook 及可复用组件提供统一的色彩、排版、间距、圆角、阴影、动效物理与焦点语义。
+ * 主要内容：在 :root 定义分层对比度校验的澄明中性灰阶与亮玫红品牌体系（正文与品牌文字严格 WCAG 2.2 AA ≥4.5:1，图形图标复用 Logo 同色 --brand ≥3.0:1，主操作 CTA 提供贴近 Logo 的鲜亮色阶、同色微渐变与克制漫射阴影，状态指示灯独立于文字成功色）、五级同心圆角、4px 空间栅格、7 级可读排版比例、层级阴影与 Emil 物理缓动曲线，并保留旧短变量名到新命名空间的兼容别名；在 :root.dark 中统一深色画布与表面，避免各页面暗色底色漂移；保留反馈色与常暗皮肤选择器的既有契约。
+ * 模块边界：这里只提供视觉语义变量与迁移别名，不包含具体组件选择器或页面布局，不覆盖各皮肤已登记的专属配色；各 app 页面在自身 CSS 中消费并按场景覆盖。
  */
-/* 跨扩展页面共享的视觉语义。旧变量名保留为别名，迁移不改变现有主题表现。 */
+/* 跨扩展页面共享的权威视觉语义。旧短变量名保留为兼容别名，确保默认主题与全部皮肤无缝协同。 */
 :root {
+  /* 品牌与核心操作色：图标复用 Logo 同色 #ef4776（≥3.0:1 图形 AA），小字品牌文本用 #d4235a（≥4.5:1 文本 AA），主按钮采用贴近 Logo 的鲜亮玫红与同色微渐变 */
   --fr-color-brand: #ef4776;
-  --fr-color-brand-strong: #dc315f;
-  --fr-color-brand-soft: #fff0f4;
-  --fr-color-ink: #172033;
-  --fr-color-muted: #737c8f;
-  --fr-color-line: #e5e8ef;
-  --fr-color-surface: #fff;
-  --fr-color-surface-soft: #f7f8fb;
-  --fr-menu-radius: 14px;
-  --fr-menu-shadow: 0 8px 28px rgba(27, 36, 57, .12), 0 2px 6px rgba(27, 36, 57, .04);
+  --fr-color-brand-action: #eb3a70;
+  --fr-color-brand-action-hover: #dc2d63;
+  --fr-color-brand-action-gradient: linear-gradient(135deg, #f45686, #e53268);
+  --fr-color-brand-action-gradient-hover: linear-gradient(135deg, #eb4677, #d6265c);
+  --fr-color-brand-strong: #d4235a;
+  --fr-color-brand-soft: #fff0f5;
+  --fr-color-brand-border: color-mix(in srgb, var(--fr-color-brand) 32%, var(--fr-color-line));
 
+  /* 中性阅读表面与文字阶梯（亮色：ink 16.27:1，muted 5.77:1 / 5.44:1） */
+  --fr-color-canvas: #f6f7fa;
+  --fr-color-surface: #ffffff;
+  --fr-color-surface-soft: #f7f8fb;
+  --fr-color-surface-hover: #eff1f6;
+  --fr-color-ink: #172033;
+  --fr-color-muted: #5d6678;
+  --fr-color-line: #e7eaf1;
+  --fr-color-line-strong: #d2d7e2;
+
+  /* 空间栅格（4px 基准） */
+  --fr-space-1: 4px;
+  --fr-space-2: 8px;
+  --fr-space-3: 12px;
+  --fr-space-4: 16px;
+  --fr-space-5: 20px;
+  --fr-space-6: 24px;
+  --fr-space-8: 32px;
+
+  /* 同心圆角阶梯（5 级收敛，取代零散圆角） */
+  --fr-radius-xs: 6px;
+  --fr-radius-sm: 8px;
+  --fr-radius-md: 10px;
+  --fr-radius-lg: 12px;
+  --fr-radius-full: 9999px;
+
+  /* 排版阶梯与等宽字体（禁止 <11px 正文或交互标签） */
+  --fr-text-xs: 11px;
+  --fr-text-sm: 12px;
+  --fr-text-base: 13px;
+  --fr-text-md: 14px;
+  --fr-text-lg: 15px;
+  --fr-text-xl: 18px;
+  --fr-text-2xl: 24px;
+  --fr-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* 层级阴影（默认主卡片使用极轻阴影增加透气感，主操作按钮带克制同色漫射，浮层与模态按层级递进） */
+  --fr-shadow-xs: 0 1px 3px rgba(23, 32, 51, .04);
+  --fr-shadow-brand-action: 0 4px 12px rgba(233, 50, 103, .20);
+  --fr-shadow-brand-action-hover: 0 5px 14px rgba(220, 45, 99, .26);
+  --fr-shadow-md: 0 8px 24px rgba(22, 27, 38, .10), 0 1px 3px rgba(22, 27, 38, .05);
+  --fr-shadow-lg: 0 18px 44px rgba(22, 27, 38, .16), 0 2px 8px rgba(22, 27, 38, .06);
+
+  /* 动效物理（Emil Design Engineering：缓出为主、短促克制、仅限合成器属性） */
+  --fr-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --fr-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --fr-duration-instant: 120ms;
+  --fr-duration-fast: 160ms;
+  --fr-duration-normal: 220ms;
+
+  /* 浮层、卡片与控件语义 Token */
+  --fr-menu-radius: var(--fr-radius-lg);
+  --fr-menu-shadow: var(--fr-shadow-md);
+
+  /* 兼容短别名：保证皮肤与既有页面平滑消费 */
   --brand: var(--fr-color-brand);
   --brand-strong: var(--fr-color-brand-strong);
   --brand-soft: var(--fr-color-brand-soft);
@@ -26,29 +80,55 @@
   --surface: var(--fr-color-surface);
   --surface-soft: var(--fr-color-surface-soft);
 
-  --fr-card-radius: 14px;
+  --fr-card-radius: var(--fr-radius-lg);
   --fr-card-border: var(--line);
   --fr-card-outline: 1px solid var(--fr-card-border);
   --fr-card-background: var(--surface);
   --fr-card-heading-background: var(--surface);
-  --fr-card-shadow: 0 2px 8px rgba(23, 32, 51, .025);
-  --fr-card-gap: 20px;
-  --fr-card-padding-inline: 20px;
-  --fr-card-heading-padding-block: 16px;
-  --fr-card-title-size: 16px;
-  --fr-card-description-size: 12px;
-  --fr-settings-row-min-height: 66px;
+  --fr-card-shadow: var(--fr-shadow-xs);
+  --fr-card-gap: var(--fr-space-5);
+  --fr-card-padding-inline: var(--fr-space-5);
+  --fr-card-heading-padding-block: var(--fr-space-4);
+  --fr-card-title-size: var(--fr-text-lg);
+  --fr-card-description-size: var(--fr-text-sm);
+  --fr-settings-row-min-height: 62px;
   --fr-settings-row-padding-block: 14px;
-  --fr-settings-row-gap: 24px;
+  --fr-settings-row-gap: var(--fr-space-6);
   --fr-service-label-width: 140px;
-  --fr-service-column-gap: 16px;
+  --fr-service-column-gap: var(--fr-space-4);
   --fr-service-control-width: 640px;
-  --fr-service-control-height: 40px;
-  --fr-control-radius: 9px;
+  --fr-service-control-height: 38px;
+  --fr-control-radius: var(--fr-radius-sm);
   --fr-control-min-height: 38px;
-  --fr-action-gap: 8px;
+  --fr-action-gap: var(--fr-space-2);
   --fr-focus-width: 2px;
   --fr-focus-color: var(--brand-strong);
+  --fr-focus-ring: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+
+/* 统一暗色默认主题：柔和深炭灰画布与表面，避免纯黑刺眼及跨页面暗色漂移。 */
+:root.dark {
+  --fr-color-brand: #f46590;
+  --fr-color-brand-action: #e6376b;
+  --fr-color-brand-action-hover: #ef4778;
+  --fr-color-brand-action-gradient: linear-gradient(135deg, #f35484, #df2e63);
+  --fr-color-brand-action-gradient-hover: linear-gradient(135deg, #f66591, #e83b6e);
+  --fr-color-brand-strong: #ff85ab;
+  --fr-color-brand-soft: rgba(244, 101, 144, .16);
+  --fr-color-canvas: #14171c;
+  --fr-color-surface: #1c2028;
+  --fr-color-surface-soft: #232833;
+  --fr-color-surface-hover: #2b313e;
+  --fr-color-ink: #f1f3f7;
+  --fr-color-muted: #a5aebf;
+  --fr-color-line: #2f3542;
+  --fr-color-line-strong: #434b5c;
+  --fr-shadow-xs: 0 1px 3px rgba(0, 0, 0, .24);
+  --fr-shadow-brand-action: 0 4px 14px rgba(239, 71, 118, .24);
+  --fr-shadow-brand-action-hover: 0 5px 16px rgba(239, 71, 118, .32);
+  --fr-shadow-md: 0 10px 30px rgba(0, 0, 0, .34), 0 2px 6px rgba(0, 0, 0, .18);
+  --fr-shadow-lg: 0 22px 52px rgba(0, 0, 0, .48), 0 4px 12px rgba(0, 0, 0, .24);
+  color-scheme: dark;
 }
 
 /* 设置卡片的窄屏密度统一在变量层切换；具体皮肤可用同名变量保留自己的间距。 */
@@ -57,33 +137,37 @@
     --fr-card-gap: 14px;
     --fr-card-padding-inline: 16px;
     --fr-card-heading-padding-block: 14px;
-    --fr-settings-row-min-height: 62px;
+    --fr-settings-row-min-height: 58px;
     --fr-settings-row-padding-block: 12px;
   }
 }
 
-/* 反馈色用于状态与提示，不把成功、警告或错误混作品牌强调。 */
+/* 反馈色用于状态与提示，不把成功、警告或错误混作品牌强调；状态指示灯独立于文字成功色以保持鲜活通透。 */
 :root {
-  --fr-success: #267260;
-  --fr-success-soft: #eaf8f4;
-  --fr-warning: #94651c;
-  --fr-warning-soft: #fff5df;
-  --fr-danger: #b1435e;
+  --fr-success: #147e5c;
+  --fr-success-soft: #eaf7f3;
+  --fr-success-indicator: #24b47e;
+  --fr-success-indicator-ring: 0 0 0 3px rgba(36, 180, 126, .16);
+  --fr-warning: #8f5f16;
+  --fr-warning-soft: #fff6e2;
+  --fr-danger: #b42348;
   --fr-danger-soft: #fff0f3;
-  --fr-info: #306ba3;
-  --fr-info-soft: #eaf3ff;
+  --fr-info: #2563a6;
+  --fr-info-soft: #edf4ff;
 }
 :root.dark,
 :root[data-interface-skin="xuanqing"],
 :root[data-interface-skin="wujin"] {
-  --fr-menu-shadow: 0 10px 32px rgba(0, 0, 0, .28);
-  --fr-card-shadow: 0 2px 8px rgba(0, 0, 0, .12);
-  --fr-success: #9edcc8;
-  --fr-success-soft: #1c342d;
-  --fr-warning: #e7c17e;
-  --fr-warning-soft: #392f1f;
-  --fr-danger: #f1a7bc;
-  --fr-danger-soft: #3c222b;
-  --fr-info: #a6c9ee;
-  --fr-info-soft: #243346;
+  --fr-menu-shadow: 0 10px 30px rgba(0, 0, 0, .34), 0 2px 6px rgba(0, 0, 0, .18);
+  --fr-card-shadow: none;
+  --fr-success: #8ce0c4;
+  --fr-success-soft: #19322b;
+  --fr-success-indicator: #34d399;
+  --fr-success-indicator-ring: 0 0 0 3px rgba(52, 211, 153, .20);
+  --fr-warning: #ebca84;
+  --fr-warning-soft: #382e1d;
+  --fr-danger: #f5a3b8;
+  --fr-danger-soft: #3b2029;
+  --fr-info: #9bc5f2;
+  --fr-info-soft: #1f3045;
 }

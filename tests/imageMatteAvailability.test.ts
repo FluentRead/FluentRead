@@ -16,6 +16,7 @@ vi.mock('@/src/features/image-translation/services/imageEncoding',()=>({encodeIm
 vi.mock('@/src/features/image-translation/services/mangaInferenceClient',()=>({mangaInferenceClient:{prepareTextSegmentation:mocks.prepareSeg,segmentText:mocks.segment}}));
 import {translateImageInOffscreen} from '@/src/features/image-translation/services/offscreenRuntime';
 import * as imageInpainting from '@/src/features/image-translation/services/inpainting';
+import * as imageRendering from '@/src/features/image-translation/services/rendering';
 import * as mattePage from '@/src/features/image-translation/services/imageMattePage';
 import {ImageAlphaProtectionUnavailableError} from '@/src/features/image-translation/services/mangaAlphaProtection';
 import {produceImageParagraphGapProofs,createImageParagraphGapConsumer,bindImageParagraphGapEvidence} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
@@ -63,6 +64,7 @@ function fixture(alpha=224):Fixture {
 }
 let source:Surface=fixture();
 let translations=['FULL TEXT'];
+let targetLanguage:string|undefined;
 let canvases:PixelCanvas[]=[];
 let images:PixelImage[]=[];
 let encoded:Uint8ClampedArray[]=[];
@@ -91,6 +93,7 @@ function color(value:string):Rgba {
 /** Small explicit Canvas port, extending the existing compositor test's source-over fake. */
 class PixelCanvas implements Surface {
     private w=0;private h=0;
+    lang='';
     pixels=new Pixels();
     private path:Rect[]=[];
     private allowed=(_x:number,_y:number)=>true;
@@ -208,6 +211,7 @@ async function detectionEvidence(regions:ImageTextRegion[],image:string,width:nu
 }
 beforeEach(()=>{
     vi.clearAllMocks();source=fixture();translations=['FULL TEXT'];canvases=[];images=[];encoded=[];fills=[];action=undefined;metrics='complete';glyphSupport=new Set<number>();detectorCore=MODEL_CORE;evidenceMode='valid';inputImage=STATIC_PNG;measureWidth=undefined;
+    targetLanguage=undefined;
     mocks.prepareSeg.mockReset().mockResolvedValue(false);mocks.segment.mockReset();
     setRegions([{...originalLine}]);mocks.recognize.mockResolvedValue([]);mocks.mangaRecognize.mockImplementation(async(image:string)=>{const regions=recognized.map(r=>({...r,bbox:{...r.bbox},...(r.sourceBoxes?{sourceBoxes:r.sourceBoxes.map(b=>({...b}))}:{})}));await detectionEvidence(regions,image,source.width,source.height,detectorCore,evidenceMode);return regions;});
     mocks.encode.mockImplementation(async(canvas:PixelCanvas,signal?:AbortSignal)=>{
@@ -215,10 +219,21 @@ beforeEach(()=>{
         encoded.push(new Pixels(canvas.pixels));return 'data:image/png;base64,matte-final';
     });
     vi.stubGlobal('Image',PixelImage);vi.stubGlobal('document',{createElement:()=>new PixelCanvas()});
-    vi.stubGlobal('chrome',{runtime:{sendMessage:(message:{type:string},callback:(value?:unknown)=>void)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations}:undefined)}});
+    vi.stubGlobal('chrome',{runtime:{sendMessage:(message:{type:string},callback:(value?:unknown)=>void)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations,targetLanguage}:undefined)}});
 });
 
 describe('RGBA救援全文预算和原始源相位边界',()=>{
+    it('普通透明修补降级时仍保护旋转标签的方向，整图保持原像素',async()=>{
+        const f=install(fixture(224)),bbox={x0:106,y0:16,x1:124,y1:65};
+        fill(f.pixels,f.width,{x0:104,y0:14,x1:126,y1:67},mattes[255]);
+        setRegions([f.line,{text:'READ EDGE',bbox,sourceBoxes:[bbox],fontSize:18,textAlign:'center',quarterTurn:1}]);
+        translations=['FULL TEXT','EDGE'];
+        const result=await translate();
+        expect(result).toMatchObject({image:'',imageUnchanged:true});
+        expect(result.lines.map(line=>[line.text,line.renderSkipped])).toEqual([['FULL TEXT',true],['EDGE',true]]);
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();
+        preserved();
+    });
     it.each([false,true])('真实像素续行证据在翻译前合段，已过滤的数字guard仍可阻断%s',async guarded=>{
         const f=fixture(224),width=f.width,height=160,pixels=new Pixels(width*height*4);
         fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},f.matte);
@@ -256,7 +271,9 @@ describe('RGBA救援全文预算和原始源相位边界',()=>{
         expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();released();
     });
     it('真实DB已覆盖时不准备可选模型或分配分割张量',async()=>{
+        targetLanguage='en';
         const f=install(fixture(224));expect((await translate()).image).toBeTruthy();completeGlyphs();checkFrame(f);
+        expect(canvases[0].lang).toBe('en');
         expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();
     });
     it('DB未覆盖但整页/全文已成立时才检查缓存，缺失时保留完整阅读结果',async()=>{
@@ -384,6 +401,248 @@ function pair(){
     source={width,height,pixels};setRegions(lines);detectorCore=[...MODEL_CORE,...MODEL_CORE.map(([x,y,p])=>[x+110,y+60,p]as const)];translations=['FULL TEXT','FULL TEXT'];
     return{width,height,pixels,expected,lines,art};
 }
+
+describe('空心边饰与完整译文渲染',()=>{
+    function enclosed(top=16){
+        const width=128,height=80,matte=mattes[255],pixels=new Pixels(width*height*4);
+        const foreground=[255,255,255,255] as const;
+        const mark={x0:86,y0:35,x1:95,y1:44};
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},matte);
+        for(const x0 of [29,42,55,68])fill(pixels,width,{x0,y0:top,x1:x0+6,y1:46},foreground);
+        fill(pixels,width,mark,foreground);
+        fill(pixels,width,{x0:88,y0:37,x1:93,y1:42},matte);
+        const bounds={x0:24,y0:22,x1:96,y1:52};
+        source={width,height,pixels};
+        setRegions([{text:'OPEN .',bbox:bounds,fontSize:16}]);
+        evidenceMode='missing';
+        return {width,height,matte,pixels,mark};
+    }
+
+    it.each([16,19])('原字顶部 %s 时保留空心标记，框内旧墨迹只用已证底色且译文完整',async top=>{
+        const {width,height,matte,pixels,mark}=enclosed(top),before=pixels.slice();
+        const erase=vi.spyOn(imageInpainting,'inpaintTextRegions');
+        const result=await translate();
+        expect(result).toMatchObject({image:'data:image/png;base64,matte-final',lines:[{text:'FULL TEXT',sourceText:'OPEN .'}]});
+        expect(erase).not.toHaveBeenCalled();
+        expect(mocks.prepareSeg).toHaveBeenCalledTimes(top===16?1:0);
+        expect(result.retryWhenSegmentationReady).toBe(top===16?true:undefined);
+        expect(mocks.segment).not.toHaveBeenCalled();
+        completeGlyphs();
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+            if(!inside(mark,x,y)&&glyphSupport.has(y*width+x))continue;
+            const color=x<85&&y>=19&&y<46?Array.from(matte):at(before,width,x,y);
+            expect(at(encoded[0],width,x,y)).toEqual(color);
+        }
+        expect(pixels).toEqual(before);
+        released();
+    });
+
+    it.each(['supported','unsupported','worker-failed'] as const)('分割 %s 时只更新允许的连续边缘，完整保留边饰',async mode=>{
+        const {width,height,matte,pixels,mark}=enclosed(),before=pixels.slice();
+        mocks.prepareSeg.mockResolvedValue(true);
+        if(mode==='worker-failed')mocks.segment.mockRejectedValue(new Error('optional session unavailable'));
+        else mocks.segment.mockImplementation(async(factory:()=>ImageTextSegmentationSource)=>{
+            const source=factory();
+            expect(source.width).toBe(width);
+            expect(source.height).toBe(height);
+            expect(source.pixels).toEqual(before);
+            return new Uint8Array(1024*1024).fill(mode==='supported'?255:0);
+        });
+        const result=await translate();
+        expect(result.image).toBeTruthy();
+        expect(mocks.segment).toHaveBeenCalledOnce();
+        expect(result.retryWhenSegmentationReady).toBeUndefined();
+        const image=encoded[0];
+        for(let y=16;y<19;y++)for(let x=55;x<61;x++){
+            expect(at(image,width,x,y)).toEqual(mode==='supported'?Array.from(matte):at(before,width,x,y));
+        }
+        for(let y=mark.y0;y<mark.y1;y++)for(let x=mark.x0;x<mark.x1;x++){
+            expect(at(image,width,x,y)).toEqual(at(before,width,x,y));
+        }
+        expect(pixels).toEqual(before);
+        completeGlyphs();
+        released();
+    });
+
+    it.each(['cancelled-signal','cancelled-worker'] as const)('边饰旁分割失败保留取消语义 %s',async mode=>{
+        enclosed();
+        const controller=new AbortController();
+        mocks.prepareSeg.mockResolvedValue(true);
+        mocks.segment.mockImplementation(async()=>{
+            if(mode==='cancelled-signal')controller.abort();
+            throw new DOMException('segmentation cancelled','AbortError');
+        });
+        await expect(translate(controller.signal)).rejects.toMatchObject({name:'AbortError'});
+        preserved();
+    });
+
+    it('边饰旁完整字形度量失败时保留原图并照常提供全文',async()=>{
+        enclosed();
+        metrics='missing';
+        const result=await translate();
+        expect(result).toMatchObject({imageUnchanged:true,lines:[{sourceText:'OPEN .',text:'FULL TEXT',renderSkipped:true}]});
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();
+        preserved();
+    });
+});
+
+describe('不透明原字超出旧清字框时复用模型授权',()=>{
+    function clipped(){
+        const f=fixture(255);
+        for(const r of f.art)fill(f.pixels,f.width,r,f.matte);f.art=[];
+        const r={x0:24,y0:40,x1:33,y1:48};fill(f.pixels,f.width,r,[255,255,255,255]);
+        for(let y=r.y0;y<r.y1;y++)for(let x=r.x0;x<r.x1;x++)f.ink.add(y*f.width+x);
+        install(f);evidenceMode='missing';return f;
+    }
+    it.each(['verified','empty-detection','layout','layout-after-authorization'] as const)('细衬线精确擦除或沿用原回退 %s',async mode=>{
+        const f=fixture(255),{width,height,pixels}=f,oldInk=[25,25,25,255] as const;
+        f.matte=[225,225,225,255];
+        f.art=[];f.ink.clear();
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},f.matte);
+        for(const x0 of [34,44,54,64,74,84]){
+            const box={x0,y0:32,x1:x0+3,y1:52};
+            fill(pixels,width,box,oldInk);
+            for(let y=box.y0;y<box.y1;y++)for(let x=box.x0;x<box.x1;x++)f.ink.add(y*width+x);
+        }
+        fill(pixels,width,{x0:37,y0:43,x1:40,y1:44},[95,95,95,255]);
+        fill(pixels,width,{x0:40,y0:43,x1:41,y1:44},[175,175,175,255]);
+        for(let x=37;x<41;x++)f.ink.add(43*width+x);
+        const box={x0:28,y0:37,x1:103,y1:51};
+        f.line={...f.line,bbox:box,sourceBoxes:[box],fontSize:16};
+        install(f);translations=['OK'];
+        const marks:Array<readonly[number,number,number]>=[];
+        for(let y=39;y<50;y+=3)for(let x=32;x<99;x+=3)marks.push([x,y,.82]);
+        detectorCore=marks;
+        if(mode==='empty-detection')evidenceMode='empty';
+        const layout=vi.spyOn(imageRendering,'canDrawTranslatedImageText');
+        if(mode==='layout')layout.mockReturnValueOnce(false);
+        if(mode==='layout-after-authorization')layout.mockReturnValueOnce(true).mockReturnValueOnce(false);
+        try{
+            const result=await translate();
+            expect(result.image).toBeTruthy();
+            expect(result.lines[0]).toMatchObject({text:'OK',sourceText:'SOURCE',bbox:box});
+            expect(result.retryWhenSegmentationReady).toBeUndefined();
+            expect(mocks.prepareSeg).not.toHaveBeenCalled();
+            expect(layout).toHaveBeenCalledTimes(mode==='verified'||mode==='layout-after-authorization'?2:1);
+            expect(at(encoded[0],width,85,32)).toEqual(mode==='verified'?f.matte:oldInk);
+            if(mode==='verified')checkFrame(f);
+            expect(canvases[0].reads).toEqual([[0,0,width,height]]);
+            released();
+        }finally{layout.mockRestore();}
+    });
+    it.each(['left','right','revoked'] as const)('普通译图处理原擦除框内独立小图案 %s',async mode=>{
+        const f=fixture(255),{width,height,matte,pixels}=f;
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},matte);
+        f.ink.clear();
+        for(const x0 of [34,44,54,64,74,84]){
+            const glyph={x0,y0:34,x1:x0+5,y1:53};
+            fill(pixels,width,glyph,[255,255,255,255]);
+            for(let y=glyph.y0;y<glyph.y1;y++)for(let x=glyph.x0;x<glyph.x1;x++)f.ink.add(y*width+x);
+        }
+        const x0=mode==='left'?29:93,art={x0,y0:31,x1:x0+3,y1:38,rgba:[255,255,255,255] as const};
+        fill(pixels,width,art,art.rgba);f.art=[art];
+        const sourceBox={x0:25,y0:28,x1:101,y1:55};
+        f.line={...f.line,bbox:sourceBox,sourceBoxes:[sourceBox],fontSize:24};
+        install(f);translations=['OK'];
+        if(mode==='revoked'){
+            const authorization=vi.spyOn(mattePage,'authorizeImageMatteWithinExistingMasks').mockReturnValueOnce(undefined);
+            try{
+                const result=await translate();
+                expect(authorization).toHaveBeenCalledOnce();
+                expect(result.imageUnchanged).toBe(true);
+                expect(result.lines[0]).toMatchObject({text:'OK',sourceText:'SOURCE'});
+                expect(mocks.prepareSeg).not.toHaveBeenCalled();
+                preserved();
+            }finally{authorization.mockRestore();}
+            return;
+        }
+        const result=await translate();
+        expect(result.image).toBeTruthy();
+        expect(result.retryWhenSegmentationReady).toBeUndefined();
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();
+        const bitmap=encoded[0];
+        for(let y=art.y0;y<art.y1;y++)for(let x=art.x0;x<art.x1;x++)expect(at(bitmap,width,x,y)).toEqual(art.rgba);
+        expect(at(bitmap,width,86,50)).toEqual(matte);
+        expect(result.lines[0]).toMatchObject({text:'OK',sourceText:'SOURCE',bbox:sourceBox});
+        expect(canvases[0].reads).toEqual([[0,0,width,height]]);
+    });
+    it('仅用真实受控分割授权，清掉旧框外原字并保留样式、单次读回和图外像素',async()=>{
+        const f=clipped();mocks.prepareSeg.mockResolvedValue(true);
+        mocks.segment.mockImplementation(async(factory:()=>ImageTextSegmentationSource)=>{
+            expect(canvases[0].writes).toBe(0);expect(factory().pixels).toEqual(f.pixels);
+            return new Uint8Array(1024*1024).fill(255);
+        });
+        const result=await translate();expect(result.image).toBeTruthy();expect(result.imageUnchanged).toBeUndefined();
+        expect(mocks.prepareSeg).toHaveBeenCalledOnce();expect(mocks.segment).toHaveBeenCalledOnce();
+        completeGlyphs();checkFrame(f);expect(canvases[0].reads).toEqual([[0,0,f.width,f.height]]);
+        expect(canvases[0].uploads.length).toBeGreaterThan(0);
+        for(const rect of canvases[0].uploads){expect(rect.args).toBe(7);for(let y=rect.y0;y<rect.y1;y++)for(let x=rect.x0;x<rect.x1;x++)expect(f.ink.has(y*f.width+x)).toBe(true);}
+    });
+    it('已有同帧检测覆盖遗漏墨迹时直接修补，不准备分割；竖排仍按原对齐绘制',async()=>{
+        const f=clipped();f.line.vertical=true;setRegions([f.line]);evidenceMode='valid';
+        detectorCore=[...MODEL_CORE,[25,41,.94],[29,41,.94],[25,45,.94],[29,45,.94],[31,45,.94],[31,41,.94]];
+        expect((await translate()).image).toBeTruthy();expect(mocks.prepareSeg).not.toHaveBeenCalled();completeGlyphs();checkFrame(f);
+    });
+    it('整页另一行不能证明完整墨迹时，不启用局部扩大擦除或准备分割',async()=>{
+        const f=clipped();setRegions([f.line,{text:'SECOND',bbox:{x0:20,y0:60,x1:100,y1:70}}]);translations=['FULL TEXT','SECOND TEXT'];
+        expect((await translate()).image).toBeTruthy();expect(mocks.prepareSeg).not.toHaveBeenCalled();
+    });
+    it('另一行的彩色图案进入绘字框时保留整图，不能凭第一行纯色观察覆盖它',async()=>{
+        const first=clipped(),second=fixture(255),width=256,height=176,pixels=new Pixels(width*height*4);
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},first.matte);
+        for(const r of second.art)fill(second.pixels,second.width,r,[230,60,20,255]);
+        for(const[f,dx,dy]of [[first,0,0],[second,128,80]]as const)for(let y=0;y<f.height;y++)for(let x=0;x<f.width;x++)pixels.set(f.pixels.subarray((y*f.width+x)*4,(y*f.width+x+1)*4),((y+dy)*width+x+dx)*4);
+        const move=(b:Rect)=>({x0:b.x0+128,x1:b.x1+128,y0:b.y0+80,y1:b.y1+80});
+        source={width,height,pixels};setRegions([first.line,{...second.line,text:'SECOND',bbox:move(second.line.bbox),sourceBoxes:[move(second.line.bbox)]}]);translations=['FULL TEXT','SECOND TEXT'];
+        const result=await translate();expect(result.imageUnchanged).toBe(true);expect(mocks.prepareSeg).not.toHaveBeenCalled();preserved();
+    });
+    it('缺少可选资源时仍生成常规译图，保留框外笔画并明确可在导入分割后重试',async()=>{
+        const f=clipped();const result=await translate();
+        expect(result.image).toBeTruthy();expect(result.imageUnchanged).toBeUndefined();expect(result.retryWhenSegmentationReady).toBe(true);
+        expect(result.lines[0]).toMatchObject({text:'FULL TEXT',sourceText:'SOURCE'});completeGlyphs();
+        expect(at(encoded[0],f.width,24,47)).toEqual(at(f.pixels,f.width,24,47));
+        expect(mocks.prepareSeg).toHaveBeenCalledOnce();expect(mocks.segment).not.toHaveBeenCalled();released();
+    });
+    it('无保护孔的半透明段落也不能进入不透明整页修补',async()=>{
+        const first=clipped(),second=fixture(224),width=256,height=176,pixels=new Pixels(width*height*4);
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},first.matte);
+        for(const art of second.art)fill(second.pixels,second.width,art,second.matte);
+        for(let y=0;y<first.height;y++)for(let x=0;x<first.width;x++){
+            pixels.set(at(first.pixels,first.width,x,y),(y*width+x)*4);
+            pixels.set(at(second.pixels,second.width,x,y),((y+80)*width+128+x)*4);
+        }
+        const move=(b:Rect)=>({x0:b.x0+128,x1:b.x1+128,y0:b.y0+80,y1:b.y1+80});
+        const secondBox=move(second.line.bbox);
+        source={width,height,pixels};setRegions([first.line,{...second.line,text:'SECOND',bbox:secondBox,sourceBoxes:[secondBox]}]);
+        translations=['FULL TEXT','SECOND TEXT'];mocks.prepareSeg.mockResolvedValue(true);
+        expect((await translate()).image).toBeTruthy();
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();released();
+    });
+    it('分割拒绝原字时不得退回旧边缘扩散，也不误报资源缺失',async()=>{
+        clipped();mocks.prepareSeg.mockResolvedValue(true);mocks.segment.mockResolvedValue(new Uint8Array(1024*1024));
+        const result=await translate();expect(result.imageUnchanged).toBe(true);expect(result.retryWhenSegmentationReady).toBeUndefined();preserved();
+    });
+    it.each(['prepare','input','result']as const)('%s阶段取消时不回写、不编码',async stage=>{
+        clipped();const controller=new AbortController();
+        mocks.prepareSeg.mockImplementation(async()=>{if(stage==='prepare')controller.abort();return true;});
+        mocks.segment.mockImplementation(async(factory:()=>ImageTextSegmentationSource)=>{
+            if(stage==='input')controller.abort();factory();if(stage==='result')controller.abort();return new Uint8Array(1024*1024).fill(255);
+        });
+        await expect(translate(controller.signal)).rejects.toMatchObject({name:'AbortError'});preserved();
+    });
+    it.each(['already-aborted','queued']as const)('预检失败撤回前处理%s取消，不发布原图保留响应',async stage=>{
+        clipped();metrics='missing';const controller=new AbortController();let triggered=false;
+        action=event=>{if(event==='measure'&&!triggered){triggered=true;if(stage==='queued')setTimeout(()=>controller.abort(),0);else controller.abort();}};
+        await expect(translate(controller.signal)).rejects.toMatchObject({name:'AbortError'});
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();preserved();
+    });
+    it.each(['before','after']as const)('完整字形指标在%s模型等待时失效，原图与全文仍保留',async stage=>{
+        clipped();if(stage==='before')metrics='missing';
+        mocks.prepareSeg.mockResolvedValue(true);mocks.segment.mockImplementation(async()=>{metrics='missing';return new Uint8Array(1024*1024).fill(255);});
+        const result=await translate();expect(result.imageUnchanged).toBe(true);expect(result.retryWhenSegmentationReady).toBeUndefined();preserved();
+        expect(mocks.prepareSeg).toHaveBeenCalledTimes(stage==='before'?0:1);
+    });
+});
 
 describe('完整RGBA matte救援只在已证源墨上写入，整页通过才发布',()=>{
     it('独立pure负控：白moat不能授权吞掉灰牌并遗漏灰牌上的完整白字',async()=>{

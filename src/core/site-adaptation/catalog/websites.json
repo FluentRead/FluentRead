@@ -1,5 +1,22 @@
 [
   {
+    "id": "inco-blog",
+    "name": "Inco 博客文章摘要",
+    "match": {
+      "hosts": ["inco.ai"],
+      "paths": ["/blog/*"],
+      "excludePaths": ["/blog/"]
+    },
+    "mode": "augment",
+    "content": [
+      {
+        "css": ["main#content > .post-page > header.post-head > p.post-dek"],
+        "resolve": "closest"
+      }
+    ],
+    "protect": ["code", "pre", "input", "textarea"]
+  },
+  {
     "id": "llamaperf-mac",
     "name": "Llamaperf Mac 基准测试",
     "match": {
@@ -5400,10 +5417,17 @@
     "match": {
       "hosts": [
         "www.google.com",
+        "google.com",
         "www.google.co.uk",
         "www.google.co.jp",
         "www.google.de",
-        "www.google.com.hk"
+        "www.google.com.hk",
+        "www.google.com.tw",
+        "www.google.com.sg",
+        "www.google.ca",
+        "www.google.com.au",
+        "www.google.fr",
+        "www.google.co.kr"
       ],
       "paths": [
         "/search"
@@ -5429,10 +5453,25 @@
       {
         "css": [
           "#search h3",
-          "#search .VwiC3b"
+          "#search .VwiC3b",
+          "#m-x-content :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)",
+          "[data-attrid=\"VisualDigestGeneratedDescription\"]",
+          "[data-attrid=\"VisualDigestGeneratedDescription\"] :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)",
+          "[data-attrid=\"AIOverview\"]",
+          "[data-attrid=\"AIOverview\"] :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)",
+          "[data-mcpr] :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)",
+          "[data-tr-rsts] :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)",
+          "[data-subtree=\"aimp\"]",
+          ":is([data-subtree=\"aimc\"], [data-subtree=\"aimp\"], [data-subtree=\"aimfl\"]) :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)"
         ],
         "atomic": false
       }
+    ],
+    "exclude": [
+      "[role=\"button\"]",
+      "[data-container-id=\"rhs-col\"]",
+      "[data-attrid=\"VisualDigestWebResult\"]",
+      "[data-attrid=\"VisualDigestVideoResult\"]"
     ]
   },
   {
@@ -6322,6 +6361,41 @@
     "watchIgnore": [
       "[role=\"article\"][aria-posinset=\"1\"] [data-ad-rendering-role=\"profile_name\"]:not([data-ad-preview=\"message\"] *)",
       "[role=\"article\"][aria-label] span:has(+ div > span[dir=\"auto\"][lang]):not(span[dir=\"auto\"][lang] *):not([data-ad-preview=\"message\"] *)"
+    ]
+  },
+  {
+    "id": "paulgraham-essays",
+    "name": "Paul Graham 文章",
+    "match": {
+      "hosts": [
+        "paulgraham.com",
+        "www.paulgraham.com"
+      ]
+    },
+    "mode": "augment",
+    "content": [
+      {
+        "css": [
+          "td > font:has(> br)"
+        ],
+        "key": "paulgraham-essay-lines",
+        "resolve": "closest",
+        "atomic": true,
+        "splitOnBr": true
+      }
+    ],
+    "protect": [
+      "pre",
+      "code",
+      "kbd",
+      "samp",
+      "input",
+      "textarea",
+      "button",
+      "select"
+    ],
+    "exclude": [
+      "nav"
     ]
   }
 ]

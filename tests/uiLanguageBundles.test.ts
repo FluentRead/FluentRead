@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {createExtensionSiteActionText} from '@/src/core/i18n/messages/siteRules';
 
 type I18nModule = typeof import('@/src/core/i18n');
 type BundlesModule = typeof import('./helpers/uiLanguageBundles');
@@ -66,7 +67,13 @@ describe('界面语言注册表', () => {
         for (const {relativeDest, contents} of files) {
             const language = relativeDest.slice('i18n/'.length, -'.json'.length) as keyof typeof bundles.UI_LANGUAGE_BUNDLES;
             expect(contents).not.toContain('\n');
-            expect(JSON.parse(contents)).toEqual(bundles.UI_LANGUAGE_BUNDLES[language]);
+            const shared = bundles.UI_LANGUAGE_BUNDLES[language];
+            const siteActions = createExtensionSiteActionText(language);
+            const extensionBundle = JSON.parse(contents);
+            expect(extensionBundle).toEqual({...shared, legacyText: {...shared.legacyText, ...siteActions}});
+            expect(shared.legacyText).not.toHaveProperty('查看原网页');
+            i18n.registerUiLanguageBundle(language, extensionBundle);
+            expect(i18n.translateLegacyText('查看原网页', language)).toBe(siteActions['查看原网页']);
         }
 
         bundles.registerAllUiLanguageBundles();
@@ -76,7 +83,7 @@ describe('界面语言注册表', () => {
         expect(i18n.translate('common.brand', 'en-US')).toBe(bundles.UI_LANGUAGE_BUNDLES['en-US'].messages['common.brand']);
     });
 
-    it('扩展安装 metadata 复用七语品牌和功能说明，不复制界面目录', () => {
+    it('扩展 metadata 生成七语名称、功能说明和工具栏提示', () => {
         const files = bundles.createExtensionMetadataLocaleFiles();
         expect(files.map(({relativeDest}) => relativeDest).sort()).toEqual([
             '_locales/en/messages.json', '_locales/es/messages.json', '_locales/fr/messages.json',
@@ -91,9 +98,12 @@ describe('界面语言注册表', () => {
         for (const {relativeDest, contents} of files) {
             const locale = relativeDest.split('/')[1] as keyof typeof languageByLocale;
             const message = JSON.parse(contents);
-            expect(Object.keys(message).sort()).toEqual(['extensionDescription', 'extensionName']);
+            expect(Object.keys(message).sort()).toEqual(['extensionDescription', 'extensionName', 'extensionToolbarTitle']);
             expect(message.extensionName).toEqual({message: i18n.translate('common.brand', languageByLocale[locale])});
             expect(message.extensionName.message).toBe(locale === 'zh_CN' ? '流畅阅读' : 'FluentRead');
+            expect(message.extensionToolbarTitle.message).toContain(`${message.extensionName.message} · `);
+            if (locale === 'zh_CN') expect(message.extensionToolbarTitle.message).toBe('流畅阅读 · 网页翻译、划词翻译');
+            if (locale === 'en') expect(message.extensionToolbarTitle.message).toBe('FluentRead · Translate pages and selected text');
             expect(contents).not.toContain('\n');
         }
         expect(files.filter(({relativeDest}) => relativeDest.startsWith('i18n/'))).toEqual([]);

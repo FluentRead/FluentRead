@@ -6,14 +6,26 @@
  */
 import defaultWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 
-export interface PdfRuntimeResources {assetRoot: string; workerUrl: string}
+export interface PdfRuntimeResources {
+    assetRoot: string;
+    workerUrl: string;
+}
 let installed: Readonly<PdfRuntimeResources> | undefined;
 
 /** 在独立应用启动时设置；不传参数时恢复浏览器扩展默认资源。 */
 export function configurePdfResources(resources?: PdfRuntimeResources): void {
-    installed = resources ? Object.freeze({assetRoot: resources.assetRoot.replace(/\/+$/u, ''), workerUrl: resources.workerUrl}) : undefined;
+    installed = resources
+        ? Object.freeze({assetRoot: resources.assetRoot.replace(/\/+$/u, ''), workerUrl: resources.workerUrl})
+        : undefined;
+}
+
+export function hasCustomPdfAssetRoot(): boolean {
+    return installed !== undefined;
 }
 
 export function getPdfResources(): PdfRuntimeResources {
-    return installed ?? {assetRoot: typeof window === 'undefined' ? '' : `${window.location.origin}/pdfjs`, workerUrl: defaultWorkerUrl};
+    return installed ?? {
+        assetRoot: typeof window === 'undefined' ? '' : `${window.location.origin}/pdfjs`,
+        workerUrl: defaultWorkerUrl,
+    };
 }

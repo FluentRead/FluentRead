@@ -398,4 +398,98 @@ describe('video subtitle logic', () => {
       expect(getVideoTranslationConfigFingerprint(config)).toContain(entry.service);
     }
   });
+
+  it('有序长字幕时间轴通过二分索引保持 O(log n) 语义、同起点保序、无序回退与长度变更感知', () => {
+    const cues = Array.from({length: 200}, (_, i) => ({
+      startMs: i * 1000,
+      durationMs: 800,
+      text: `Line ${i}`,
+    }));
+    // 重叠同起点与长跨度短句验证二分回扫语义。
+    const overlapping = [
+      {startMs: 0, durationMs: 5000, text: 'Long span'},
+      {startMs: 1000, durationMs: 200, text: 'Short overlap'},
+      {startMs: 2000, durationMs: 1000, text: 'Tie first'},
+      {startMs: 2000, durationMs: 1000, text: 'Tie second'},
+      {startMs: 3000, durationMs: 0, text: 'Zero duration'},
+    ];
+    expect(findActiveVideoCaptionCue(overlapping, 1100)).toBe(overlapping[1]);
+    expect(findActiveVideoCaptionCue(overlapping, 1600)).toBe(overlapping[0]);
+    expect(findActiveVideoCaptionCue(overlapping, 2200)).toBe(overlapping[2]);
+    expect(findActiveVideoCaptionCue(overlapping, 6000)).toBeNull();
+
+    expect(selectVideoSubtitleCueAtOffset(overlapping, 1100, 0)).toBe(overlapping[1]);
+    expect(selectVideoSubtitleCueAtOffset(overlapping, 1500, 0)).toBe(overlapping[0]);
+    expect(selectVideoSubtitleCueAtOffset(overlapping, 2200, 0)).toBe(overlapping[2]);
+    expect(selectVideoSubtitleCueAtOffset(overlapping, 3000, 0)).toBe(overlapping[0]);
+    expect(selectVideoSubtitleCueAtOffset(cues, 150_200, 0)).toBe(cues[150]);
+
+    // 渐进匹配有序活跃区快速命中且每个候选只读取文本一次；单词反查走有序邻近窗口。
+    let textReads = 0;
+    const tracked = Array.from({length: 100}, (_, i) => ({
+      startMs: i * 2000,
+      durationMs: 1500,
+      get text() { textReads += 1; return `Sentence number ${i} here`; },
+    }));
+    textReads = 0;
+    expect(findProgressiveVideoCaptionCue(tracked, 'Sentence number 50', 100_500)).toBe(tracked[50]);
+    expect(textReads).toBe(1);
+    textReads = 0;
+    expect(findProgressiveVideoCaptionCue(tracked, 'number 50', 100_500)).toBe(tracked[50]);
+    // 前缀回退扫描 100 条后，单词反查仅走有序邻近窗口而非二次全量扫描。
+    expect(textReads).toBeLessThan(110);
+
+    // YouTube 长轨过期句检测：向外扩散优先命中邻近句，无匹配时仍保持 >32 条数组上的原位文本修改立即生效。
+    let staleReads = 0;
+    const ytLongTexts = Array.from({length: 100}, (_, i) => `Caption ${i}`);
+    const ytLong = Array.from({length: 100}, (_, i) => ({
+      startMs: i * 1000,
+      durationMs: 900,
+      get text() { staleReads += 1; return ytLongTexts[i]!; },
+    }));
+    // 命中左侧邻近过期句（index 49 在 t=50950 之后）。
+    staleReads = 0;
+    expect(selectYoutubeCaptionCue(ytLong, 'Caption 49', 50_950)).toEqual({cue: null, stale: true});
+    expect(staleReads).toBeLessThanOrEqual(4);
+    // 命中右侧邻近句（index 51 在 t=50950 之前）。
+    staleReads = 0;
+    expect(selectYoutubeCaptionCue(ytLong, 'Caption 51', 50_950)).toEqual({cue: null, stale: true});
+    expect(staleReads).toBeLessThanOrEqual(4);
+    // 不同语言轨无匹配，随后原位改写某条 cue 文本，下一次查询必须立即可见而非返回陈旧缓存。
+    expect(selectYoutubeCaptionCue(ytLong, 'Unrelated track text', 50_950)).toEqual({cue: null, stale: false});
+    ytLongTexts[48] = 'Unrelated track text';
+    expect(selectYoutubeCaptionCue(ytLong, 'Unrelated track text', 50_960)).toEqual({cue: null, stale: true});
+
+    // 预翻译窗口在有序时间轴上跳过零时长与重叠旧句并正确在 clear 后重算。
+    const preWin = new VideoSubtitlePretranslationWindow();
+    expect(preWin.select(overlapping, 2200, 5000)).toEqual([overlapping[2]]);
+    expect(preWin.select(overlapping, 1600, 5000)).toEqual([overlapping[0], overlapping[2], overlapping[3]]);
+    expect(preWin.select(overlapping, 3000, 5000)).toEqual([overlapping[0]]);
+    expect(preWin.select(overlapping, 1100, 5000)).toEqual([overlapping[1], overlapping[2], overlapping[3]]);
+    // 数组长度变化自动失效旧索引。
+    const growing = [{startMs: 0, durationMs: 1000, text: 'A'}];
+    expect(findActiveVideoCaptionCue(growing, 1500)).toBeNull();
+    growing.push({startMs: 1000, durationMs: 1000, text: 'B'});
+    expect(findActiveVideoCaptionCue(growing, 1500)).toBe(growing[1]);
+    // 包含非有限时长时回退线性扫描。
+    const nonFinite = [{startMs: 0, durationMs: Infinity, text: 'Inf'}];
+    expect(findActiveVideoCaptionCue(nonFinite, 100)).toBe(nonFinite[0]);
+    // 无序时间轴上 selectYoutubeCaptionCue 走线性路径并覆盖空文本与 stale。
+    const unsortedYt = [
+      {startMs: 2000, durationMs: 1000, text: 'Second'},
+      {startMs: 1000, durationMs: 1000, text: ''},
+      {startMs: 1000, durationMs: 1000, text: 'First'},
+    ];
+    expect(selectYoutubeCaptionCue(unsortedYt, 'First', 1500)).toEqual({cue: unsortedYt[2], stale: false});
+    expect(selectYoutubeCaptionCue(unsortedYt, 'First', 2500)).toEqual({cue: null, stale: true});
+    expect(selectYoutubeCaptionCue(unsortedYt, 'Other', 2500)).toEqual({cue: null, stale: false});
+    // 有序同起点重叠排名消歧。
+    const sortedTie = [
+      {startMs: 1000, durationMs: 1000, text: 'Hello'},
+      {startMs: 1000, durationMs: 1000, text: 'Hello'},
+      {startMs: 1000, durationMs: 0, text: 'Hello'},
+    ];
+    expect(selectYoutubeCaptionCue(sortedTie, 'Hello', 1200)).toEqual({cue: sortedTie[0], stale: false});
+    preWin.clear();
+  });
 });

@@ -2,7 +2,7 @@
  * @file src/platform/offscreen/client.ts
  *
  * 文件职责：统一管理扩展自有 DOM 的创建、复用与消息发送，为 OCR、内置翻译和音频等后台能力提供基础设施客户端。
- * 主要内容：为 requests.ts 的已知消息端口及其它能力提供同一底层传输，定义 runtime/document 依赖端口和 OffscreenClient，串行创建文档、等待接收端 ready 握手，并在接收端丢失时受控重建一次，恢复请求的取消信号贯穿排队和文档变更边界；准备超时后继续持有未结束的原生创建或关闭操作，避免迟到文档与后续重建重叠。默认 chromeOffscreenClient 连接浏览器 API。
+ * 主要内容：为 requests.ts 的已知消息端口及其它能力提供同一底层传输，定义 runtime/document 依赖端口和 OffscreenClient，串行创建文档、以有上限指数退避等待接收端 ready 握手，并在接收端丢失或消息端口异常关闭时受控重建一次，恢复请求的取消信号贯穿排队和文档变更边界；准备超时后继续持有未结束的原生创建或关闭操作，避免迟到文档与后续重建重叠。默认 chromeOffscreenClient 连接浏览器 API。
  * 模块边界：只封装文档生命周期与消息可靠性；默认连接 Chrome Offscreen，Firefox 注入文档容器与查询端口，不复制任务调度或业务逻辑。
  */
 
@@ -77,6 +77,8 @@ export interface OffscreenClient {
 }
 
 const DEFAULT_PREPARATION_TIMEOUT_MS = 10_000;
+const DEFAULT_READY_RETRY_BASE_MS = 25;
+const DEFAULT_READY_RETRY_MAX_MS = 400;
 // 大模型下载可以显式申请十分钟加三十秒收尾；默认准备及其他请求的较短预算保持独立。
 const MAX_OFFSCREEN_TIMEOUT_MS = 630_000;
 
@@ -87,7 +89,8 @@ function errorMessage(error: unknown): string {
 function isMissingReceiverError(error: unknown): boolean {
     const message = errorMessage(error);
     return message.includes('Receiving end does not exist')
-        || message.includes('Could not establish connection');
+        || message.includes('Could not establish connection')
+        || message.includes('message port closed before a response was received');
 }
 
 function normalizeTimeoutMs(value: number | undefined, fallback: number): number {
@@ -119,8 +122,7 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
     } | null = null;
     let documentMutation: Promise<void> | null = null;
     const readyRetryAttempts = Math.max(1, Math.floor(dependencies.readyRetryAttempts ?? 40));
-    const readyRetryDelay = dependencies.readyRetryDelay
-        ?? (() => new Promise<void>((resolve) => setTimeout(resolve, 25)));
+    const customReadyRetryDelay = dependencies.readyRetryDelay;
     const preparationTimeoutMs = normalizeTimeoutMs(
         dependencies.preparationTimeoutMs,
         DEFAULT_PREPARATION_TIMEOUT_MS,
@@ -231,6 +233,32 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
         onCancel,
     );
 
+    const waitForReadyBackoff = (attempt: number, deadlineAt: number, signal: AbortSignal): Promise<void> => {
+        if (customReadyRetryDelay) {
+            return runWithinDeadline(customReadyRetryDelay, deadlineAt, 'Offscreen 文档准备超时', signal);
+        }
+        const backoffMs = Math.min(
+            DEFAULT_READY_RETRY_MAX_MS,
+            DEFAULT_READY_RETRY_BASE_MS * (2 ** Math.min(attempt, 4)),
+        );
+        let delayTimer: ReturnType<typeof setTimeout> | undefined;
+        return runWithinDeadline(
+            () => new Promise<void>((resolve) => {
+                delayTimer = setTimeout(() => {
+                    delayTimer = undefined;
+                    resolve();
+                }, backoffMs);
+            }),
+            deadlineAt,
+            'Offscreen 文档准备超时',
+            signal,
+            () => {
+                clearTimeout(delayTimer);
+                delayTimer = undefined;
+            },
+        );
+    };
+
     const waitForReceiver = async (signal: AbortSignal, deadlineAt: number): Promise<void> => {
         let lastError: unknown = new Error('Offscreen 文档尚未就绪');
         for (let attempt = 0; attempt < readyRetryAttempts; attempt += 1) {
@@ -246,7 +274,7 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
                 lastError = error;
             }
             if (attempt + 1 < readyRetryAttempts) {
-                await runWithinDeadline(readyRetryDelay, deadlineAt, 'Offscreen 文档准备超时', signal);
+                await waitForReadyBackoff(attempt, deadlineAt, signal);
             }
         }
         throw lastError;

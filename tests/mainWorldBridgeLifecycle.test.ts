@@ -31,6 +31,11 @@ describe('MAIN world bridge lifecycle publisher', () => {
             const original = postMessage.mock.calls[0][0]; postMessage.mockClear();
             dom.dispatchEvent(new Event(YOUTUBE_BRIDGE_REPLAY_EVENT));
             expect(postMessage).toHaveBeenCalledWith({...original, pageHref: location.href}, location.origin);
+            postMessage.mockClear();
+            // 播放期追加 &t= / &list= / #hash 仍属同一视频，不丢弃回放缓存。
+            location.href = 'https://www.youtube.com/watch?v=early&t=42s&list=PL1#comments';
+            dom.dispatchEvent(new Event(YOUTUBE_BRIDGE_REPLAY_EVENT));
+            expect(postMessage).toHaveBeenCalledWith({...original, pageHref: 'https://www.youtube.com/watch?v=early'}, location.origin);
             expect(fetch).toHaveBeenCalledTimes(2); expect(response.bodyUsed).toBe(false);
             postMessage.mockClear(); location.href = 'https://www.youtube.com/watch?v=another';
             dom.dispatchEvent(new Event(YOUTUBE_BRIDGE_REPLAY_EVENT)); expect(postMessage).not.toHaveBeenCalled();

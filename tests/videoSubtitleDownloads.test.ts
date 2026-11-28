@@ -488,11 +488,16 @@ describe('字幕下载与人工轨优先', () => {
         finish('旧任务结果'); await vi.advanceTimersByTimeAsync(2200);
         expect(f.button.disabled).toBe(false); expect(secondButton.disabled).toBe(false); expect(f.save).toHaveBeenCalledOnce(); f.downloads.destroy();
     });
-    it('原文下载成功或失败的反馈与等待计时器由下载协调器管理', async () => {
-        const ready = fixture(); const errorMessage = vi.fn(() => '原文读取失败');
+    it('原文下载成功或失败的反馈与等待计时器由下载协调器管理，并上报规范化后的条数', async () => {
+        const ui = vi.fn((key: string, params?: Record<string, string | number>) => `${key}:${params?.count ?? ''}`);
+        const ready = fixture({
+            captured: () => [{url: 'https://www.youtube.com/api/timedtext?v=abc&lang=en', cues: [cue, {...cue, text: '   '}]}],
+            ui,
+        }); const errorMessage = vi.fn(() => '原文读取失败');
         await ready.downloads.original(ready.menu, ready.button, errorMessage);
         expect(ready.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\nOriginal caption.\n', 'en', expect.any(Array)); expect(errorMessage).not.toHaveBeenCalled();
-        expect(ready.status).toHaveBeenLastCalledWith(ready.menu, 'video.downloaded', 2400);
+        expect(ui).toHaveBeenCalledWith('video.downloaded', {count: 1});
+        expect(ready.status).toHaveBeenLastCalledWith(ready.menu, 'video.downloaded:1', 2400);
         await vi.advanceTimersByTimeAsync(2400); expect(ready.button.disabled).toBe(false); ready.downloads.destroy();
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         const missing = fixture({captured: () => []});
@@ -523,4 +528,19 @@ describe('字幕下载与人工轨优先', () => {
         f.downloads.destroy(); warn.mockRestore();
     });
 
+    it('支持直连完整轨道端口，并在无可用字幕时提示准备中', async () => {
+        let track: {languageCode: string; cues: typeof cue[]} | null = {languageCode: 'en', cues: [cue]};
+        const base = fixture();
+        const direct = createVideoSubtitleDownloads({
+            config: base.config, location: base.ports.location, isDisposed: () => false,
+            human: base.ports.human, translate: base.translate, peek: () => undefined,
+            confirm: base.ports.confirm, ui: key => key, status: base.status, save: base.save,
+            readCompleteTrack: () => track,
+        });
+        await expect(direct.resolve()).resolves.toEqual(track);
+        track = null;
+        await expect(direct.resolve()).rejects.toThrow('video.sourcePreparing');
+        direct.destroy();
+        base.downloads.destroy();
+    });
 });

@@ -253,6 +253,14 @@ describe('视频 AI Worker timestamp parser', () => {
             await waitForWorkerMessages(scope, 1);
             expect(scope.postMessage).toHaveBeenLastCalledWith({requestId: 1, success: false, error: 'CPU initialization failed', retryWithCpu: true});
         } finally {vi.unstubAllGlobals();}
+
+        const singleScope = await loadProtocolWorker(vi.fn());
+        workerMocks.pipeline.mockRejectedValue('Single-thread raw error');
+        try {
+            singleScope.onmessage({data: {requestId: 1, type: 'prepare'}});
+            await waitForWorkerMessages(singleScope, 1);
+            expect(singleScope.postMessage).toHaveBeenLastCalledWith({requestId: 1, success: false, error: 'Single-thread raw error'});
+        } finally {vi.unstubAllGlobals();}
     });
 
     it.each(['absent', 'success', 'failure'])('GPU初始化诊断抛错时恢复owner边界，清理行为明确：%s', async cleanup => {
@@ -616,11 +624,11 @@ describe('视频 AI Worker timestamp parser', () => {
             const processed = await transcriber.processor(_audio);
             expect(processed.input_features.disposed).toBe(false);
             if (outcome === 'decoder-failure') throw new Error('decoder failure');
-            await new Promise(resolve => setTimeout(resolve, 3));
+            await new Promise(resolve => setTimeout(resolve, 5));
             return {text: 'A new sentence.', chunks: [{timestamp: [0, 1], text: 'A new sentence.'}]};
         });
         transcriber.processor = vi.fn(async () => {
-            await new Promise(resolve => setTimeout(resolve, 3));
+            await new Promise(resolve => setTimeout(resolve, 5));
             const feature = new workerMocks.Tensor('float32', new Float32Array([0]), [1, 80, 3000]);
             const disposal = vi.spyOn(feature, 'dispose');
             if (outcome === 'feature-cleanup-failure') disposal.mockImplementation(() => {
@@ -684,7 +692,7 @@ describe('视频 AI Worker timestamp parser', () => {
         }
     });
 
-    it('auto 异常重复重试建立新的特征租约，首窗张量已释放且第二窗不跨用', async () => {
+    it('auto 异常重复重试复用已检出语种而不重复检测语言，首窗张量在重试前已释放', async () => {
         vi.resetModules();
         const scope = createWorkerScope();
         vi.stubGlobal('self', scope);
@@ -692,13 +700,17 @@ describe('视频 AI Worker timestamp parser', () => {
         webGpuMocks.probeWebGpu.mockResolvedValue({available: false, info: ''});
         const features: any[] = [], encoders: any[] = [];
         const transcriber: any = vi.fn(async (audio, options) => {
-            const processed = await transcriber.processor(audio);
-            expect(processed.input_features).toBe(features.at(-1));
-            expect(processed.input_features.disposed).toBe(false);
-            expect(options.encoder_outputs).toBe(encoders.at(-1));
-            if (features.length === 1) return {text: 'Repeated phrase. '.repeat(10), chunks: []};
+            if (transcriber.mock.calls.length === 1) {
+                const processed = await transcriber.processor(audio);
+                expect(processed.input_features).toBe(features[0]);
+                expect(processed.input_features.disposed).toBe(false);
+                expect(options.encoder_outputs).toBe(encoders[0]);
+                return {text: 'Repeated phrase. '.repeat(10), chunks: []};
+            }
             expect(features[0].disposed).toBe(true);
             expect(encoders[0].disposed).toBe(true);
+            expect(options).toMatchObject({language: 'en', no_repeat_ngram_size: 4, repetition_penalty: 1.15});
+            expect(options.encoder_outputs).toBeUndefined();
             return {text: 'A recovered original sentence.', chunks: []};
         });
         transcriber.processor = vi.fn(async () => {
@@ -725,13 +737,41 @@ describe('视频 AI Worker timestamp parser', () => {
             (await import('@/src/features/video-subtitle/offscreen/transcription.worker')).startVideoTranscriptionWorker();
             scope.onmessage({data: {requestId: 1, type: 'transcribe', model: 'base', sourceLanguage: 'auto', audio: new Float32Array(16_000).fill(.04)}});
             await waitForWorkerMessages(scope, 1);
-            expect(scope.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({success: true, text: 'A recovered original sentence.'}));
-            expect(originalProcessor).toHaveBeenCalledTimes(2);
+            expect(scope.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({
+                success: true,
+                text: 'A recovered original sentence.',
+                detectedLanguage: 'en',
+                encoderReuse: true,
+            }));
+            expect(originalProcessor).toHaveBeenCalledTimes(1);
+            expect(transcriber.model).toHaveBeenCalledTimes(1);
+            expect(transcriber.model._prepare_encoder_decoder_kwargs_for_generation).toHaveBeenCalledTimes(1);
             expect(transcriber).toHaveBeenCalledTimes(2);
             expect(transcriber.processor).toBe(originalProcessor);
-            expect(features).toHaveLength(2);
-            expect(features.every(tensor => tensor.disposed && tensor.dispose.mock.calls.length === 1)).toBe(true);
-            expect(encoders.every(tensor => tensor.disposed)).toBe(true);
+            expect(features).toHaveLength(1);
+            expect(features[0].disposed).toBe(true);
+            expect(features[0].dispose).toHaveBeenCalledOnce();
+            expect(encoders).toHaveLength(1);
+            expect(encoders[0].disposed).toBe(true);
+        } finally {vi.unstubAllGlobals();}
+    });
+
+    it('多线程 WASM 下异常重复和配置错误不触发 retryWithCpu，真实推理故障才请求单线程重试', async () => {
+        const repeated = '全套 不' + '吻'.repeat(50);
+        const transcriber: any = vi.fn(async () => ({text: repeated, chunks: []}));
+        const scope = await loadProtocolWorker(transcriber);
+        vi.stubGlobal('navigator', {hardwareConcurrency: 4});
+        vi.stubGlobal('crossOriginIsolated', true);
+        try {
+            scope.onmessage({data: {requestId: 1, type: 'transcribe', model: 'tiny', sourceLanguage: 'zh', audio: new Float32Array(64_000).fill(0.04)}});
+            await waitForWorkerMessages(scope, 1);
+            expect(scope.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({success: false, error: expect.stringContaining('异常重复')}));
+            expect(scope.postMessage.mock.calls.at(-1)?.[0]).not.toHaveProperty('retryWithCpu');
+
+            transcriber.mockRejectedValueOnce(new Error('WASM pthread runtime failed'));
+            scope.onmessage({data: {requestId: 2, type: 'transcribe', model: 'tiny', sourceLanguage: 'zh', audio: new Float32Array(64_000).fill(0.04)}});
+            await waitForWorkerMessages(scope, 2);
+            expect(scope.postMessage).toHaveBeenLastCalledWith({requestId: 2, success: false, error: 'WASM pthread runtime failed', retryWithCpu: true});
         } finally {vi.unstubAllGlobals();}
     });
 

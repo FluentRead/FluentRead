@@ -30,11 +30,23 @@ it('keeps an unsplit sentence identity across whitespace normalization', () => {
   expect(a.id).not.toBe(buildSemanticLearningTimeline([cue('one two.', 1)])[0].id);
 });
 
-it.each(['R&D.', 'AT&T.'])('does not emit an empty fragment when the next cue contributes only boundary whitespace after %s', source => {
-  const timeline=buildSemanticLearningTimeline([cue(source+'  '),cue('   Next full sentence.',800)]);
-  expect(timeline.map(unit=>unit.text)).toEqual([source,'Next full sentence.']);
-  expect(timeline[0]).toMatchObject({cueIndices:[0,1],startMs:0,endMs:1800});
-  expect(timeline[1]).toMatchObject({cueIndices:[1],startMs:800,endMs:1800});
+it.each(['R&D.', 'AT&T.'])('terminates connected-letter abbreviations cleanly at cue boundary without emitting an empty fragment after %s', source => {
+  const timeline = buildSemanticLearningTimeline([cue(source + '  '), cue('   Next full sentence.', 800)]);
+  expect(timeline.map(unit => unit.text)).toEqual([source, 'Next full sentence.']);
+  expect(timeline[0]).toMatchObject({cueIndices: [0], startMs: 0, endMs: 1000, complete: true});
+  expect(timeline[1]).toMatchObject({cueIndices: [1], startMs: 800, endMs: 1800, complete: true});
+});
+
+it('does not emit an empty fragment when a split unit spans only boundary whitespace in the next cue', () => {
+  const first = 'a'.repeat(230);
+  const second = 'b'.repeat(180);
+  const timeline = buildSemanticLearningTimeline([
+    cue(first + '  ', 0),
+    cue('   ' + second, 800),
+  ]);
+  expect(timeline.map(unit => unit.text)).toEqual([first, second]);
+  expect(timeline[0]).toMatchObject({cueIndices: [0, 1], startMs: 0, endMs: 1800});
+  expect(timeline[1]).toMatchObject({cueIndices: [1], startMs: 800, endMs: 1800});
 });
 
 it('formats split sentences across cue boundaries without changing raw semantic offsets', () => {
@@ -50,7 +62,7 @@ it.each([
   'Sea otters have strong teeth.', ' \tA  sentence!\r\n ', '“Wait!”\t', 'e\u0301 and 👩🏽‍💻 belong here.',
   '中'.repeat(127) + '。',
 ])('matches the full solver for a short cue with one final mark: %s', text => {
-  const source = [cue('because we'), cue(text, 3000)];
+  const source = [{text: 'because we', startMs: 0, durationMs: 25_000}, cue(text, 25_000)];
   const legacy = buildVideoSentenceTimeline(source)[1];
   const solved = segmentSemanticDocument(createSemanticDocument([source[1]]));
   expect(canUseWholeCueSemanticUnit(text)).toBe(true);
@@ -81,20 +93,58 @@ it('loads the timeline without Intl.Segmenter and preserves the original learnin
   }
 });
 
-it.each(['gap', 'limit'])('does not turn a continuation after a %s group into a complete sentence', boundary => {
-  const first = boundary === 'gap' ? cue('because we') : cue('word '.repeat(90));
-  const timeline = buildSemanticLearningTimeline([first, cue('needed more time.', 5000), cue('Next full sentence.', 6500)]);
-  expect(timeline.find(unit => unit.text === 'needed more time.')!.complete).toBe(false);
-  expect(timeline.find(unit => unit.text === 'Next full sentence.')!.complete).toBe(true);
+it('keeps start uncertainty after a limit split but resets start confirmation after a silence gap', () => {
+  const afterLimit = buildSemanticLearningTimeline([cue('word '.repeat(90)), cue('needed more time.', 1000), cue('Next full sentence.', 2500)]);
+  expect(afterLimit.find(unit => unit.text === 'needed more time.')!.complete).toBe(false);
+  expect(afterLimit.find(unit => unit.text === 'Next full sentence.')!.complete).toBe(true);
+
+  const afterGap = buildSemanticLearningTimeline([cue('title card'), cue('Post silence sentence.', 5000)]);
+  expect(afterGap.find(unit => unit.text === 'Post silence sentence.')!.complete).toBe(true);
 });
 it('uses actual source punctuation rather than a preceding length-limit flag for the next start', () => {
   const timeline = buildSemanticLearningTimeline([cue('word '.repeat(90) + 'finished.'), cue('Next full sentence.', 2000)]);
   expect(timeline.find(unit => unit.text === 'Next full sentence.')!.complete).toBe(true);
 });
 it('keeps start uncertainty on over-budget whitespace fallback and resolves later punctuation', () => {
-  const long = cue(' '.repeat(17000) + 'Ends here.', 5000);
+  const long = cue(' '.repeat(17000) + 'Ends here.', 1000);
   expect(buildSemanticLearningTimeline([long])[0].complete).toBe(true);
-  const timeline = buildSemanticLearningTimeline([cue('because'), long, cue('Next full sentence.', 6500)]);
+  const timeline = buildSemanticLearningTimeline([cue('word '.repeat(90)), long, cue('Next full sentence.', 2500)]);
   expect(timeline.find(unit => unit.text === 'Ends here.')!.complete).toBe(false);
   expect(timeline.find(unit => unit.text === 'Next full sentence.')!.complete).toBe(true);
+});
+it('memoizes per-group segmentation safely across progressive appends, validates cue timings, clones cueIndices and evicts beyond cache capacity', () => {
+  const first = buildSemanticLearningTimeline([cue('First sentence. Second sentence!', 0)]);
+  const appended = buildSemanticLearningTimeline([cue('First sentence. Second sentence!', 0), cue('Third sentence.', 2000)]);
+  expect(first[1].nextText).toBe('');
+  expect(appended[1].nextText).toBe('Third sentence.');
+  expect(appended[0].id).toBe(first[0].id);
+  // 修改返回对象的 cueIndices 不应污染缓存中的分组记录。
+  appended[0].cueIndices.push(999);
+  const reread = buildSemanticLearningTimeline([cue('First sentence. Second sentence!', 0), cue('Third sentence.', 2000)]);
+  expect(reread[0].cueIndices).toEqual([0]);
+  // 同 group.id 但组内 cue 的原始文本/起始/时长变化时必须失效重算。
+  const basePair = buildSemanticLearningTimeline([
+    {text: 'First. Second', startMs: 0, durationMs: 1000},
+    {text: 'third.', startMs: 1000, durationMs: 1000},
+  ]);
+  const changedDuration = buildSemanticLearningTimeline([
+    {text: 'First. Second', startMs: 0, durationMs: 1200},
+    {text: 'third.', startMs: 1000, durationMs: 1000},
+  ]);
+  const changedStart = buildSemanticLearningTimeline([
+    {text: 'First. Second', startMs: 0, durationMs: 1000},
+    {text: 'third.', startMs: 800, durationMs: 1200},
+  ]);
+  const changedRawText = buildSemanticLearningTimeline([
+    {text: 'First.  Second', startMs: 0, durationMs: 1000},
+    {text: 'third.', startMs: 1000, durationMs: 1000},
+  ]);
+  expect(changedDuration[0].endMs).toBe(1200);
+  expect(changedDuration[0].id).not.toBe(basePair[0].id);
+  expect(changedStart[1].startMs).toBe(0);
+  expect(changedStart[0].id).not.toBe(basePair[0].id);
+  expect(changedRawText[0].id).not.toBe(basePair[0].id);
+  const many = Array.from({length: 520}, (_, index) => cue(`Part A ${index}. Part B ${index}!`, index * 2000));
+  const result = buildSemanticLearningTimeline(many);
+  expect(result).toHaveLength(1040);
 });

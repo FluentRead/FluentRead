@@ -216,4 +216,54 @@ describe('播放器读音与原轨上下文所有权', () => {
     expect(signal.aborted).toBe(true); expect(f.reading.state.status).toBe('idle');
     expect(mocks.config.videoSubtitleAppearance.readingAnnotation).toBe(true);
   });
+
+  it('页面重新可见时恢复暂停画面的读音，状态未变时不重复刷新菜单，自动与显式预取后续字幕', async () => {
+    const f = fixture();
+    mocks.config.videoSubtitleAppearance.readingAnnotation = true;
+    f.context.cues = [
+      {startMs: 0, durationMs: 1000, text: 'こんにちは'},
+      {startMs: 1000, durationMs: 1000, text: 'おはよう'},
+      {startMs: 2000, durationMs: 1000, text: 'ありがとう'},
+      {startMs: 3000, durationMs: 1000, text: 'こんばんは'},
+      {startMs: 4000, durationMs: 1000, text: 'おやすみ'},
+    ];
+    mocks.annotate.mockImplementation(async (text: string, language: string) => ({text: `R:${text}`, language, scheme: 'fixture'}));
+    expect(f.reading.session).toBeTruthy();
+
+    // 渲染首句时自动预取后续 3 条字幕。
+    f.render('こんにちは');
+    await flush();
+    expect(mocks.annotate.mock.calls.map(call => call[0])).toEqual(['こんにちは', 'おはよう', 'ありがとう', 'こんばんは']);
+
+    // 切到已预取的下一句时状态仍为 ready，不重复调用 updateMenu。
+    const menuCalls = f.ports.updateMenu.mock.calls.length;
+    f.render('おはよう');
+    await flush();
+    expect(f.reading.state.result?.text).toBe('R:おはよう');
+    expect(f.ports.updateMenu).toHaveBeenCalledTimes(menuCalls);
+
+    // 显式 prefetchUpcoming 预取后续最多 3 条字幕，末尾空窗口及边界与关闭状态下安全跳过。
+    f.reading.prefetchUpcoming(f.context.cues, 0);
+    await flush();
+    f.reading.prefetchUpcoming(f.context.cues, 2500);
+    await flush();
+    expect(f.reading.session.peek('おやすみ', 'ja')?.text).toBe('R:おやすみ');
+    f.reading.prefetchUpcoming(f.context.cues, 99_999);
+    f.reading.prefetchUpcoming([], 0);
+    f.reading.prefetchUpcoming(f.context.cues, Number.NaN);
+    // 渲染不在 cues 列表中的文本时不报错。
+    f.render('さようなら');
+    await flush();
+
+    // 标签页切走清除读音，切回 visible 时触发 updateCaption 恢复暂停画面读音。
+    f.ports.updateCaption.mockClear();
+    f.visibility('hidden');
+    expect(f.reading.state.status).toBe('idle');
+    f.visibility('visible');
+    expect(f.ports.updateCaption).toHaveBeenCalledOnce();
+    // 禁用读音后切回 visible 不触发 updateCaption。
+    mocks.config.videoSubtitleAppearance.readingAnnotation = false;
+    f.visibility('visible');
+    expect(f.ports.updateCaption).toHaveBeenCalledOnce();
+  });
 });

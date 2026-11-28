@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {annotateVideoReading} from '@/src/features/video-subtitle/content/readingAnnotationClient';
 import {createVideoReadingController} from '@/src/features/video-subtitle/content/readingAnnotationController';
+import {VideoReadingAnnotationSession} from '@/src/features/video-subtitle/content/readingAnnotationSession';
 import {startReadingAnnotationWorkerApp as startReadingAnnotationWorker} from '@/src/app/offscreen/readingAnnotationWorker';
 import type {VideoReadingAnnotation} from '@/src/core/messaging/readingAnnotation';
 
@@ -141,6 +142,47 @@ describe('当前原句读音控制器', () => {
     controller.sync('さようなら', 'ja', true); await flush(); controller.destroy();
     pending.resolve(reading); await flush(); controller.sync('こんにちは', 'ja', true);
     expect(controller.state).toEqual({status: 'idle', result: null, source: '', language: ''}); expect(annotate).toHaveBeenCalledTimes(3);
+  });
+
+  it('支持共享 session、peek 文本规范化、预取与窗口裁剪，销毁外部 session 不释放缓存', async () => {
+    const sharedAnnotate = vi.fn(async (text: string, language: string): Promise<VideoReadingAnnotation | null> => ({text: `R:${text}`, language, scheme: 'shared'}));
+    const shared = new VideoReadingAnnotationSession(sharedAnnotate);
+    const controller = createVideoReadingController(vi.fn(), vi.fn(), {session: shared});
+    expect(controller.session).toBe(shared);
+    expect(controller.peek('   ', 'ja')).toBeNull();
+
+    // 预取跳过空文本、无适用语言文本和已缓存文本，并支持窗口裁剪与默认语言参数。
+    controller.prefetch(['', 'Hello', 'こんにちは', 'さようなら']);
+    controller.retainPrefetches(['', 'Hello', 'こんにちは']);
+    await flush();
+    expect(sharedAnnotate).toHaveBeenCalledOnce();
+    expect(controller.peek(' こんにちは\n ', 'ja')).toEqual({text: 'R:こんにちは', language: 'ja', scheme: 'shared'});
+
+    // 缓存命中时 sync 直接发布 ready 且不重复调用 session.request。
+    const requestSpy = vi.spyOn(shared, 'request');
+    controller.sync('こんにちは', 'ja', true);
+    expect(controller.state).toMatchObject({status: 'ready', result: {text: 'R:こんにちは'}});
+    expect(requestSpy).not.toHaveBeenCalled();
+
+    // 预取已缓存项跳过；销毁控制器后预取/裁剪无副作用，同轮已 resolve 的迟到结果在 clear 后不覆写状态。
+    controller.prefetch(['こんにちは'], 'ja');
+    controller.retainPrefetches(['こんにちは'], 'ja');
+    expect(requestSpy).not.toHaveBeenCalled();
+    const late = deferred();
+    sharedAnnotate.mockReturnValueOnce(late.promise);
+    controller.sync('ありがとう', 'ja', true);
+    await flush();
+    late.resolve({text: 'arigatou', language: 'ja', scheme: 'shared'});
+    await Promise.resolve();
+    await Promise.resolve();
+    controller.clear();
+    await flush();
+    expect(controller.state.status).toBe('idle');
+    controller.destroy();
+    controller.prefetch(['ありがとう'], 'ja');
+    controller.retainPrefetches(['ありがとう'], 'ja');
+    expect(shared.peek('こんにちは', 'ja')).toEqual({text: 'R:こんにちは', language: 'ja', scheme: 'shared'});
+    shared.destroy();
   });
 });
 

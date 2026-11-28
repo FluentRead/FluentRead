@@ -38,6 +38,7 @@ registerAllUiLanguageBundles();
 const locale = Vue.ref<UiLanguage>('zh-CN');
 const capabilities = {extensionDom: true};
 const i18nPort = {useUiI18n: () => ({
+    language: locale,
     t: (key: string) => translate(key, locale.value),
     translateLegacy: (value: string) => translateLegacyText(value, locale.value),
 })};
@@ -117,11 +118,12 @@ async function check(selector: string, checked: boolean): Promise<void> {
 async function click(selector: string): Promise<void> {event(control(selector), 'click'); await settle();}
 const autoSelector = '.subtitle-auto-bottom-toggle input[type="checkbox"]';
 const offsetSelector = 'input[aria-label="字幕底部偏移"]';
+const topOffsetSelector = 'input[aria-label="字幕顶部偏移"]';
 const previewSelector = '[data-video-subtitle-preview]';
 const readingSelector = '[data-video-subtitle-reading-annotation]';
 const readingPreviewSelector = '[data-video-subtitle-reading-preview]';
 const sceneSelector = '[data-video-subtitle-preview-scene]';
-const offsetText = () => control(offsetSelector).closest('label')!.querySelector('b')!.textContent;
+const offsetText = (selector = offsetSelector) => control(selector).closest('label')!.querySelector('b')!.textContent;
 
 beforeEach(() => {locale.value = 'zh-CN'; capabilities.extensionDom = true; dom.document.body.replaceChildren();});
 afterEach(() => {app?.unmount(); app = undefined; dom.document.body.replaceChildren();});
@@ -228,17 +230,28 @@ describe('视频字幕外观设置实际客户端模板', () => {
         expect(control<HTMLInputElement>(offsetSelector).value).toBe('17');
     });
 
-    it('通过实际位置控件切换顶部和中部时隐藏自动贴底，回到底部恢复保存状态', async () => {
+    it('通过实际位置控件切换顶部和中部时隐藏自动贴底并更新偏移标签与可用状态，回到底部恢复保存状态', async () => {
         await mount();
-        for (const position of ['top', 'center']) {
-            await change('select[aria-label="字幕位置"]', position);
-            expect(props.config.videoSubtitleAppearance.position).toBe(position);
-            expect(control<HTMLElement>(sceneSelector).dataset.position).toBe(position);
-            expect(root.querySelector(autoSelector)).toBeNull();
-            expect(offsetText()).toBe('10%');
-            expect(props.config.videoSubtitleAppearance.autoBottom).toBe(true);
-        }
+        await change('select[aria-label="字幕位置"]', 'top');
+        expect(props.config.videoSubtitleAppearance.position).toBe('top');
+        expect(control<HTMLElement>(sceneSelector).dataset.position).toBe('top');
+        expect(root.querySelector(autoSelector)).toBeNull();
+        expect(control<HTMLInputElement>(topOffsetSelector).disabled).toBe(false);
+        expect(control(topOffsetSelector).closest('label')!.querySelector('span')!.textContent).toContain('顶部偏移');
+        expect(offsetText(topOffsetSelector)).toBe('10%');
+        expect(props.config.videoSubtitleAppearance.autoBottom).toBe(true);
+        locale.value = 'en-US'; await settle();
+        expect(control<HTMLInputElement>('input[aria-label="Subtitle top offset"]').closest('label')!.querySelector('span')!.textContent).toContain('Top offset');
+        locale.value = 'zh-CN'; await settle();
+        await change('select[aria-label="字幕位置"]', 'center');
+        expect(props.config.videoSubtitleAppearance.position).toBe('center');
+        expect(control<HTMLElement>(sceneSelector).dataset.position).toBe('center');
+        expect(root.querySelector(autoSelector)).toBeNull();
+        expect(control<HTMLInputElement>(offsetSelector).disabled).toBe(true);
+        expect(offsetText()).toBe('10%');
+        expect(props.config.videoSubtitleAppearance.autoBottom).toBe(true);
         await change('select[aria-label="字幕位置"]', 'bottom');
+        expect(control<HTMLInputElement>(offsetSelector).disabled).toBe(false);
         expect(control<HTMLInputElement>(autoSelector).checked).toBe(true);
         expect(offsetText()).toBe('自动');
     });
@@ -265,10 +278,12 @@ describe('视频字幕外观设置实际客户端模板', () => {
         }
     });
 
-    it('自定义字号提交归一化范围和整数，字号滑块也通过实际事件更新输入框与预览', async () => {
+    it('自定义字号提交归一化范围和整数，字号滑块与数值框拥有独立无障碍标签并同步预览', async () => {
         await mount();
+        expect(control('input[type="range"][aria-label="字幕字号"]').getAttribute('aria-label'))
+            .not.toBe(control('input[type="number"][aria-label="字幕字号数值"]').getAttribute('aria-label'));
         for (const [input, expected] of [['900', 500], ['39', 80], ['153.6', 154], ['', 100]] as const) {
-            await change('input[type="number"][aria-label="字幕字号"]', input);
+            await change('input[type="number"][aria-label="字幕字号数值"]', input);
             expect(props.config.videoSubtitleAppearance.fontScale).toBe(expected);
             expect(control<HTMLInputElement>('input[type="number"]').value).toBe(String(expected));
             expect(control<HTMLElement>(previewSelector).style.getPropertyValue('--fluent-read-video-subtitle-font-scale')).toBe(`${expected}%`);

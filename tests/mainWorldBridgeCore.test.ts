@@ -483,9 +483,83 @@ describe('YouTube timedtext MAIN world bridge core', () => {
         const base = 'https://www.youtube.com/watch?v=1';
         expect(isYoutubeTimedTextUrl('/api/timedtext?x=1', base)).toBe(true);
         expect(isYoutubeTimedTextUrl('https://youtube.com/api/timedtext', base)).toBe(true);
+        expect(isYoutubeTimedTextUrl('https://youtube-nocookie.com/api/timedtext', base)).toBe(true);
+        expect(isYoutubeTimedTextUrl('https://www.youtube-nocookie.com/api/timedtext?v=abcdefghijk', base)).toBe(true);
         expect(isYoutubeTimedTextUrl('https://notyoutube.com/api/timedtext', base)).toBe(false);
+        expect(isYoutubeTimedTextUrl('https://notyoutube-nocookie.com/api/timedtext', base)).toBe(false);
         expect(isYoutubeTimedTextUrl('https://www.youtube.com/watch', base)).toBe(false);
         expect(isYoutubeTimedTextUrl('http://[bad', base)).toBe(false);
+    });
+
+    it('YouTube 播放期参数漂移保持同页匹配，支持 /shorts /embed /live /nocookie 与自定义 isSamePage', async () => {
+        const cases: Array<[string, string, boolean]> = [
+            ['https://www.youtube.com/watch?v=abc', 'https://www.youtube.com/watch?v=abc&t=42s&list=PL1#hash', true],
+            ['http://www.youtube.com/watch?v=abc', 'http://www.youtube.com/watch?v=abc&t=10s', true],
+            ['https://www.youtube.com/shorts/short123', 'https://www.youtube.com/shorts/short123?feature=share', true],
+            ['https://www.youtube.com/embed/abcdefghijk', 'https://www.youtube.com/embed/abcdefghijk?autoplay=1', true],
+            ['https://www.youtube.com/live/abcdefghijk', 'https://www.youtube.com/live/abcdefghijk?si=1', true],
+            ['https://www.youtube-nocookie.com/embed/abcdefghijk', 'https://www.youtube-nocookie.com/embed/abcdefghijk?rel=0', true],
+            ['https://www.youtube.com/watch?v=abc', 'https://m.youtube.com/watch?v=abc', false],
+            ['https://www.youtube.com/embed/abcdefghijk', 'https://www.youtube-nocookie.com/embed/abcdefghijk', false],
+            ['http://www.youtube.com/watch?v=abc', 'https://www.youtube.com/watch?v=abc', false],
+            ['ftp://www.youtube.com/watch?v=abc', 'ftp://www.youtube.com/watch?v=abc&t=1', false],
+            ['https://www.youtube.com/watch', 'https://www.youtube.com/watch?v=abc', false],
+            ['https://www.youtube.com/shorts/', 'https://www.youtube.com/shorts/short123', false],
+            ['https://www.youtube.com/embed/short', 'https://www.youtube.com/embed/abcdefghijk', false],
+            ['https://www.youtube.com/live/short', 'https://www.youtube.com/live/abcdefghijk', false],
+            ['https://www.youtube-nocookie.com/embed/short', 'https://www.youtube-nocookie.com/embed/abcdefghijk', false],
+            ['https://www.youtube.com/results?search_query=1', 'https://www.youtube.com/results?search_query=2', false],
+            ['not-a-url', 'https://www.youtube.com/watch?v=abc', false],
+        ];
+        for (const [startHref, endHref, same] of cases) {
+            const f = youtubeFixture();
+            f.setHref(startHref);
+            let resolveText!: (value: string) => void;
+            (f.originalFetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+                clone: () => ({text: () => new Promise<string>(resolve => { resolveText = resolve; })}),
+            });
+            const dispose = installYoutubeTimedTextBridgeCore({
+                ...f.environment,
+                resourcePolicy: {
+                    matches: (url, href) => url.includes('/api/timedtext') && Boolean(href),
+                    payload: (url, text) => typeof text === 'string' && text ? {
+                        source: 'fluent-read' as const,
+                        type: 'fluent-read-youtube-timedtext',
+                        url,
+                        responseText: text,
+                    } : null,
+                    replayLatest: true,
+                },
+            });
+            await f.fetch.value.call({}, 'https://www.youtube.com/api/timedtext?lang=en');
+            f.setHref(endHref);
+            resolveText('<timedtext />');
+            await flush();
+            expect(f.posts.length, `${startHref} -> ${endHref}`).toBe(same ? 1 : 0);
+            if (same) {
+                f.posts.length = 0;
+                f.documentEvents.dispatchEvent({type: YOUTUBE_BRIDGE_REPLAY_EVENT});
+                expect(f.posts).toHaveLength(1);
+            }
+            dispose();
+        }
+
+        const custom = youtubeFixture();
+        custom.setHref('https://x.com/status/1?s=20');
+        const dispose = installYoutubeTimedTextBridgeCore({
+            ...custom.environment,
+            resourcePolicy: {
+                ...xReplayPolicy(),
+                isSamePage: (a, b) => new URL(a).pathname === new URL(b).pathname,
+            },
+        });
+        await custom.fetch.value.call({}, 'https://video.twimg.com/captions/en.vtt');
+        await flush();
+        custom.posts.length = 0;
+        custom.setHref('https://x.com/status/1?s=46#reply');
+        custom.documentEvents.dispatchEvent({type: YOUTUBE_BRIDGE_REPLAY_EVENT});
+        expect(custom.posts).toHaveLength(1);
+        dispose();
     });
 
     it('只为非空 timedtext 文本创建跨 world payload', () => {

@@ -44,6 +44,9 @@ const CAPTION_BUTTON_SELECTORS: Partial<Record<CaptionPlatform, string>> = {
     zoom: '.footer__cc-button, button[aria-label], [role="button"][aria-label]',
 };
 
+const CAPTION_ENABLE_LABEL = /^(?:(?:turn on|show|enable)\s+(?:closed\s+|live\s+)?(?:captions|subtitles)|(?:开启|打开|显示|開啟|打開|顯示)(?:实时|即時|隐藏式|隱藏式)?字幕|(?:ライブ)?字幕を(?:オンにする|オン|有効にする|表示する|表示)|(?:실시간\s*)?자막\s*(?:켜기|표시|사용)|(?:activer|afficher)\s+les\s+sous-titres(?:\s+en\s+direct)?|(?:live[- ]?)?untertitel\s+(?:aktivieren|einschalten|einblenden)|(?:activar|mostrar)\s+(?:los\s+)?subt[ií]tulos(?:\s+en\s+(?:directo|vivo))?|(?:ativar|mostrar)\s+(?:as\s+)?legendas(?:\s+ao\s+vivo)?)(?:\s*\([^)]*\))?$/i;
+const TEAMS_LANGUAGE_MENU_LABEL = /^(?:language and speech|语言[和与]语音|語言[和與]語音|言語と音声|언어 및 음성|langue et voix|sprache und sprach(?:aus|ein)gabe|idioma y voz|idioma e fala)$/i;
+
 /** 只接受明确的“开启/显示字幕”；不点击录制、转录、更多菜单或已开启的开关。 */
 export function findCaptionEnableButton(root: ParentNode, platform: CaptionPlatform): HTMLElement | null {
     const selector = CAPTION_BUTTON_SELECTORS[platform];
@@ -53,14 +56,14 @@ export function findCaptionEnableButton(root: ParentNode, platform: CaptionPlatf
             || button.getAttribute('aria-pressed') === 'true' || button.getAttribute('aria-checked') === 'true'
             || button.closest('[hidden], [aria-hidden="true"]')) return false;
         const label = button.getAttribute('aria-label') || button.textContent || '';
-        return /^(?:turn on (?:live )?captions|show (?:closed |live )?(?:captions|subtitles)|开启(?:实时)?字幕|打开(?:实时)?字幕|显示(?:实时)?字幕)(?:\s*\([^)]*\))?$/i.test(label.trim());
+        return CAPTION_ENABLE_LABEL.test(label.trim());
     }) || null;
 }
 
 /** Teams 把字幕开关放在会议的更多操作菜单中，只沿明确的会议控件与语言菜单导航。 */
 export function findTeamsCaptionMenuStep(root: ParentNode): HTMLElement | null {
     const language = Array.from(root.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(node =>
-        /^(?:language and speech|语言和语音|语言与语音)$/i.test((node.getAttribute('aria-label') || node.textContent || '').trim())
+        TEAMS_LANGUAGE_MENU_LABEL.test((node.getAttribute('aria-label') || node.textContent || '').trim())
         && !node.closest('[hidden], [aria-hidden="true"]') && node.getAttribute('aria-disabled') !== 'true');
     if (language) return language;
     const more = root.querySelector<HTMLElement>('#callingButtons-showMoreBtn, [data-tid="callingButtons-showMoreBtn"], [data-tid="call-more-options"]');

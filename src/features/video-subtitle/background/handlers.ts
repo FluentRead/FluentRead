@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/background/handlers.ts
  * 文件职责：承载视频字幕本地 Whisper 的后台所有权、代际取消和 Offscreen 调度。
- * 主要内容：按共享消息 DTO 校验外部输入与离屏回复，校验 tab/stream/generation 与预下载来源偏好，串行转发识别、预热与取消请求，在等待旧代取消后、向 Offscreen 派发前及响应返回后复验当前所有者，阻止已取消或被接管的旧代工作重新启动；用真实缓存键核对模型下载登记后的可用状态。
+ * 主要内容：按共享消息 DTO 校验外部输入与离屏回复，校验 tab/stream/generation 与预下载来源偏好，串行转发识别、预热与取消请求，在等待旧代取消时忽略离屏文档已消失的接收端错误以免阻塞新代启动，并在向 Offscreen 派发前及响应返回后复验当前所有者，阻止已取消或被接管的旧代工作重新启动；用真实缓存键核对模型下载登记后的可用状态。
  * 模块边界：只编排视频字幕与平台 Offscreen client，不实现 Whisper 推理，也不关闭共享 Offscreen 文档。
  */
 import {parseMessage} from '@/src/core/messaging/validation';
@@ -38,6 +38,13 @@ function ownerFrom(message: {streamId?: string; generation?: number}, context: C
     const result = {tabId: tabId(context), streamId: stream(message.streamId), generation: validGeneration(message.generation)};
     if (!result.streamId || result.generation <= 0) throw new Error('本地视频 AI 字幕缺少流标识');
     return result;
+}
+
+function isMissingOffscreenReceiverError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes('Receiving end does not exist')
+        || message.includes('Could not establish connection')
+        || message.includes('message port closed before a response was received');
 }
 
 function parseVideoBackgroundMessage(value: unknown): VideoBackgroundInput {
@@ -88,7 +95,11 @@ export function createVideoSubtitleBackgroundHandlers(dependencies: VideoSubtitl
             if (nativeWork?.owner === next) await nativeWork.work.catch(() => undefined);
             return;
         }
-        await sendOffscreenRequestIfPresent(offscreen, {type: 'VIDEO_AI_CANCEL', streamId: workerStream(next)}, {timeoutMs: 5_000});
+        try {
+            await sendOffscreenRequestIfPresent(offscreen, {type: 'VIDEO_AI_CANCEL', streamId: workerStream(next)}, {timeoutMs: 5_000});
+        } catch (error) {
+            if (!isMissingOffscreenReceiverError(error)) throw error;
+        }
     };
     const claimOwner = (next: Owner, message: VideoBackgroundInput): ActiveOwner => {
         const provider = message.provider || 'browser';

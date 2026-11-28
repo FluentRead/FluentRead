@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/video-ai/fullCapture.ts
  * 文件职责：执行完整视频 AI 字幕的独立音频读取、分窗识别和最终 cue 整理。
- * 主要内容：普通 HTML 流媒体可只读采集原播放音轨，由 AudioWorklet 在渲染线程采集 PCM，以原始时间轴发布字幕，跳转或倍速变化作废请求、积压超过一分钟时停止，结束的片段不冒充整片缓存；支持 HLS PCM 注入、限额流式媒体读取与可取消的 16 kHz 原生解码、可取消元数据等待的隐藏扫描副本、有界串行 Whisper 窗口、完整模式字幕整理和取消清理；解码返回先复核会话再读取 PCM，解码上下文的关闭握手不阻塞识别完成或扫描回退。
+ * 主要内容：普通 HTML 流媒体可只读采集原播放音轨，优先由 AudioWorklet 在渲染线程采集 PCM（不可用或加载受阻时自动回退到 ScriptProcessorNode），在 playback 模式下以更短首窗（4.5 秒）与 8 秒稳态窗降低首条字幕延迟并在 Firefox mozCaptureStream 路径并行直通音频输出防止静音，以原始时间轴发布字幕，跳转或倍速变化作废请求、积压超过一分钟时停止，结束的片段不冒充整片缓存；支持 HLS PCM 注入、限额流式媒体读取、独立 30 秒分块存储以逐步释放已消费缓冲与可取消的 16 kHz 原生解码（兼容采样率回退及 subarray 安全切片）、可取消元数据等待的隐藏扫描副本、有界串行 Whisper 窗口、完整模式字幕整理和取消清理；解码返回先复核会话再读取 PCM，解码上下文的关闭握手不阻塞识别完成或扫描回退。
  * 模块边界：不得接管用户可见 video 的播放状态；页面源隔离由调用方通过选项注入。
  */
 import {
@@ -123,12 +123,15 @@ interface FullAudioWindow {
 const AUDIO_PROCESSOR_BUFFER_SIZE = 4_096;
 const FULL_TINY_WINDOW_MS = 10_000;
 const FULL_BASE_WINDOW_MS = 14_000;
+const PLAYBACK_FIRST_WINDOW_MS = 4_500;
+const PLAYBACK_STEADY_WINDOW_MS = 8_000;
 const FULL_WINDOW_OVERLAP_MS = 1_200;
 const FULL_MIN_WINDOW_MS = 900;
 const FULL_MAX_DURATION_MS = 20 * 60 * 1_000;
+const FAST_AUDIO_BLOCK_SAMPLES = 30 * VIDEO_AI_SAMPLE_RATE;
 const FULL_CAPTURE_FINALIZE_DELAY_MS = 420;
 const FULL_FAST_DECODE_MAX_BYTES = 48 * 1024 * 1024;
-const FULL_FAST_DECODE_FETCH_TIMEOUT_MS = 1_500;
+const FULL_FAST_DECODE_FETCH_TIMEOUT_MS = 8_000;
 const FULL_FAST_DECODE_TIMEOUT_MS = 8_000;
 const FULL_FAST_DECODE_DURATION_TOLERANCE_MS = 750;
 // X 的 MediaSource/blob URL 通常只能绑定可见播放器；完整模式不接管可见
@@ -145,6 +148,26 @@ function toError(value: unknown, fallback: string): Error {
 function getAudioContextConstructor(): AudioContextConstructor | undefined {
   return window.AudioContext
     || (window as typeof window & { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext;
+}
+
+function createAudioContext(
+  AudioContextClass: AudioContextConstructor,
+  options?: AudioContextOptions,
+): AudioContext {
+  try {
+    return new AudioContextClass(options);
+  } catch {
+    return new AudioContextClass();
+  }
+}
+
+function splitAudioIntoBlocks(audio: Float32Array): Float32Array[] {
+  if (audio.length <= FAST_AUDIO_BLOCK_SAMPLES) return [audio];
+  const blocks: Float32Array[] = [];
+  for (let offset = 0; offset < audio.length; offset += FAST_AUDIO_BLOCK_SAMPLES) {
+    blocks.push(audio.slice(offset, Math.min(audio.length, offset + FAST_AUDIO_BLOCK_SAMPLES)));
+  }
+  return blocks;
 }
 
 function getWindowLengthMs(model: unknown): number {
@@ -246,8 +269,6 @@ export class VideoAiFullCaptureController {
   private fullNextWindowStartMs = 0;
   private fullNextWindowOverlapMs = 0;
   private fullAttributedSpeechEndMs = 0;
-  private fullWindowLengthMs = 0;
-  private fullWindowStepMs = 0;
   private fullWindowSequence = 0;
   private fullWindowCount = 0;
   private lastProgressNotifyAt = 0;
@@ -343,7 +364,8 @@ export class VideoAiFullCaptureController {
       windowCount: 0,
     });
 
-    void this.startAudioGraph(video, captureStream || legacyCaptureStream, AudioContextClass, session, audioAbortController.signal)
+    const isMozCaptureStream = !captureStream && Boolean(legacyCaptureStream);
+    void this.startAudioGraph(video, captureStream || legacyCaptureStream, isMozCaptureStream, AudioContextClass, session, audioAbortController.signal)
       .catch((error) => {
         if (session === this.session) this.fail(toError(error, '本地视频完整 AI 字幕启动失败'));
       });
@@ -428,6 +450,7 @@ export class VideoAiFullCaptureController {
   private async startAudioGraph(
     video: CaptureStreamVideo,
     captureStreamFactory: (() => MediaStream) | undefined,
+    isMozCaptureStream: boolean,
     AudioContextClass: AudioContextConstructor | undefined,
     session: number,
     signal: AbortSignal,
@@ -454,7 +477,7 @@ export class VideoAiFullCaptureController {
         : playback ? null : await this.tryFastDecodeAudio(video, session, signal);
       if (!this.isCurrentSession(session)) return;
       if (fastAudio) {
-        this.audioBlocks = [fastAudio];
+        this.audioBlocks = splitAudioIntoBlocks(fastAudio);
         this.audioBlocksStartSample = 0;
         this.bufferedSamples = fastAudio.length;
         this.captureStartOffsetMs = 0;
@@ -482,15 +505,12 @@ export class VideoAiFullCaptureController {
       if (!this.isCurrentSession(session) || signal.aborted) throw new Error(FULL_CANCELLED_ERROR);
       this.scanVideo = playback ? null : audioVideo;
 
-      const context = new AudioContextClass!({
-        sampleRate: VIDEO_AI_SAMPLE_RATE,
-        latencyHint: 'playback',
-      });
-      createdContext = context;
+      let context: AudioContext;
       let source: MediaStreamAudioSourceNode | MediaElementAudioSourceNode;
       let audioTracks: MediaStreamTrack[] = [];
       let sourceStream: MediaStream | null = null;
       let audioStream: MediaStream | null = null;
+      let usedMozCaptureStream = false;
       if (playback) {
         const provided = video.srcObject as MediaStream | null;
         // srcObject 的捕获 API 可能返回原轨；优先克隆，停止自有采集时不结束网页音轨。
@@ -499,52 +519,75 @@ export class VideoAiFullCaptureController {
           sourceStream = captureStreamFactory?.call(video) || null;
           createdSourceStream = sourceStream;
           audioTracks = sourceStream?.getAudioTracks() || [];
+          usedMozCaptureStream = isMozCaptureStream && audioTracks.length > 0;
         }
         if (!audioTracks.length) throw new Error('当前媒体没有可读取的音轨，请先播放后重试；受保护媒体无法生成本地字幕');
         audioStream = new MediaStream(audioTracks); createdStream = audioStream;
+        // Firefox mozCaptureStream 需直通到扬声器；保持设备默认采样率避免外放降质，由重采样器下采样到 16 kHz。
+        context = createAudioContext(
+          AudioContextClass!,
+          usedMozCaptureStream ? {latencyHint: 'playback'} : {sampleRate: VIDEO_AI_SAMPLE_RATE, latencyHint: 'playback'},
+        );
+        createdContext = context;
         source = context.createMediaStreamSource(audioStream);
-      } else try {
-        // MediaElementAudioSourceNode 会接管该 video 的默认音频输出；这里只
-        // 把它接到 0 增益 sink，因此扫描期间不会把原声播放给用户。
-        source = context.createMediaElementSource(audioVideo);
-        audioVideo.muted = false;
-        audioVideo.volume = 1;
-      } catch {
-        // 某些 X 跨域包装播放器禁止 MediaElementAudioSourceNode，退回
-        // captureStream；这是兼容路径，若页面把 volume 传播为静音，后续
-        // 的能量检查会给出明确提示而不是产出空字幕。
-        if (!captureStreamFactory) throw new Error('当前视频没有可用的独立音频源');
-        sourceStream = captureStreamFactory.call(audioVideo);
-        // 即使兼容路径的 captureStream 不受 volume 影响，也不要让隐藏扫描
-        // 副本把原声直接送到用户扬声器；PCM 能量检查会决定该路径是否可用。
-        audioVideo.volume = 0;
-        createdSourceStream = sourceStream;
-        audioTracks = sourceStream.getAudioTracks();
-        const providedStream = video.srcObject as (MediaStream & {
-          getAudioTracks?: () => MediaStreamTrack[];
-        }) | null;
-        if (audioTracks.length === 0 && providedStream && typeof providedStream.getAudioTracks === 'function') {
-          audioTracks = providedStream.getAudioTracks().map((track) => track.clone());
+      } else {
+        context = createAudioContext(AudioContextClass!, {
+          sampleRate: VIDEO_AI_SAMPLE_RATE,
+          latencyHint: 'playback',
+        });
+        createdContext = context;
+        try {
+          // MediaElementAudioSourceNode 会接管该 video 的默认音频输出；这里只
+          // 把它接到 0 增益 sink，因此扫描期间不会把原声播放给用户。
+          source = context.createMediaElementSource(audioVideo);
+          audioVideo.muted = false;
+          audioVideo.volume = 1;
+        } catch {
+          // 某些 X 跨域包装播放器禁止 MediaElementAudioSourceNode，退回
+          // captureStream；这是兼容路径，若页面把 volume 传播为静音，后续
+          // 的能量检查会给出明确提示而不是产出空字幕。
+          if (!captureStreamFactory) throw new Error('当前视频没有可用的独立音频源');
+          sourceStream = captureStreamFactory.call(audioVideo);
+          // 即使兼容路径的 captureStream 不受 volume 影响，也不要让隐藏扫描
+          // 副本把原声直接送到用户扬声器；PCM 能量检查会决定该路径是否可用。
+          audioVideo.volume = 0;
+          createdSourceStream = sourceStream;
+          audioTracks = sourceStream.getAudioTracks();
+          const providedStream = video.srcObject as (MediaStream & {
+            getAudioTracks?: () => MediaStreamTrack[];
+          }) | null;
+          if (audioTracks.length === 0 && providedStream && typeof providedStream.getAudioTracks === 'function') {
+            audioTracks = providedStream.getAudioTracks().map((track) => track.clone());
+          }
+          if (audioTracks.length === 0) throw new Error('当前媒体没有可捕获的音轨');
+          audioStream = new MediaStream(audioTracks);
+          createdStream = audioStream;
+          source = context.createMediaStreamSource(audioStream);
         }
-        if (audioTracks.length === 0) throw new Error('当前媒体没有可捕获的音轨');
-        audioStream = new MediaStream(audioTracks);
-        createdStream = audioStream;
-        source = context.createMediaStreamSource(audioStream);
       }
-      let processor: ScriptProcessorNode | AudioWorkletNode;
-      if (this.options.pcmWorkletUrl) {
-        if (!context.audioWorklet || typeof AudioWorkletNode !== 'function') {
+      let processor: ScriptProcessorNode | AudioWorkletNode | undefined;
+      if (this.options.pcmWorkletUrl && context.audioWorklet && typeof AudioWorkletNode === 'function') {
+        try {
+          await context.audioWorklet.addModule(this.options.pcmWorkletUrl);
+          if (signal.aborted || !this.isCurrentSession(session)) throw new Error(FULL_CANCELLED_ERROR);
+          processor = new AudioWorkletNode(context, 'fluent-read-video-pcm', {numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1]});
+        } catch (error) {
+          if (signal.aborted || !this.isCurrentSession(session)) throw new Error(FULL_CANCELLED_ERROR);
+          if (typeof context.createScriptProcessor !== 'function') throw error;
+        }
+      }
+      if (!processor) {
+        if (typeof context.createScriptProcessor !== 'function') {
           throw new Error('播放采集需要 HTTPS 或本地页面及支持 AudioWorklet 的浏览器');
         }
-        await context.audioWorklet.addModule(this.options.pcmWorkletUrl);
-        if (signal.aborted || !this.isCurrentSession(session)) throw new Error(FULL_CANCELLED_ERROR);
-        processor = new AudioWorkletNode(context, 'fluent-read-video-pcm', {numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1]});
-      } else {
         processor = context.createScriptProcessor(AUDIO_PROCESSOR_BUFFER_SIZE, 1, 1);
       }
       const silentSink = context.createGain();
       silentSink.gain.value = 0;
       source.connect(processor);
+      // Firefox mozCaptureStream 会断开媒体默认扬声器输出；在 playback 模式下
+      // 并行直通到 destination，避免用户播放视频被静音。
+      if (usedMozCaptureStream) source.connect(context.destination);
       processor.connect(silentSink);
       silentSink.connect(context.destination);
 
@@ -603,7 +646,7 @@ export class VideoAiFullCaptureController {
         processor.onprocessorerror = () => {if (this.isCurrentSession(epoch)) this.fail(new Error('当前浏览器无法完整采集媒体音频，请使用桌面版 Edge 或 Chrome'));};
       } else {
         processor.onaudioprocess = event => receiveAudio(Array.from({length: event.inputBuffer.numberOfChannels},
-          (_, channel) => event.inputBuffer.getChannelData(channel)), event.inputBuffer.sampleRate);
+          (_, channel) => event.inputBuffer.getChannelData(channel).slice()), event.inputBuffer.sampleRate);
       }
 
       const handleTrackEnded = () => {
@@ -699,10 +742,13 @@ export class VideoAiFullCaptureController {
           FULL_FAST_DECODE_TIMEOUT_MS,
         );
       });
-      // 原生解码按 context 的采样率重采样，避免先以设备采样率解码再线性降采样。
-      decodeContext = new AudioContextClass({sampleRate: VIDEO_AI_SAMPLE_RATE});
+      // 原生解码按 context 的采样率重采样，避免先以设备采样率解码再线性降采样；
+      // 浏览器不支持 16 kHz 时自动回退默认采样率并由下方重采样统一转换。
+      decodeContext = createAudioContext(AudioContextClass, {sampleRate: VIDEO_AI_SAMPLE_RATE});
       const decoded = await Promise.race([
-        decodeContext.decodeAudioData(encoded.buffer as ArrayBuffer),
+        decodeContext.decodeAudioData(
+          encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength),
+        ),
         interrupted,
       ]);
       // decode 与取消可在同一 turn 竞争；成功分支已赢得 race 也不代表会话仍有效。
@@ -963,17 +1009,21 @@ export class VideoAiFullCaptureController {
     this.bufferedSamples = Math.max(0, this.bufferedSamples - removedSamples);
   }
 
+  private getCurrentWindowLengthMs(): number {
+    if (this.progress.captureMode === 'playback') {
+      return this.fullWindowSequence === 0 ? PLAYBACK_FIRST_WINDOW_MS : PLAYBACK_STEADY_WINDOW_MS;
+    }
+    return getWindowLengthMs(this.options.getModel());
+  }
+
   /** 音频继续扫描时也只启动一个 producer，不按整片时长扩张 Promise 链。 */
   private queueAvailableFullTranscriptionWindows(session: number, forceTail = false): void {
     if (!this.isCurrentSession(session) || this.phase !== 'capturing') return;
     this.fullCaptureFinished ||= forceTail;
-    if (this.fullWindowLengthMs <= 0) {
-      this.fullWindowLengthMs = getWindowLengthMs(this.options.getModel());
-      this.fullWindowStepMs = Math.max(FULL_MIN_WINDOW_MS, this.fullWindowLengthMs - FULL_WINDOW_OVERLAP_MS);
-    }
     if (this.fullTranscriptionChain) return;
     const capturedMs = (this.audioBlocksStartSample + this.bufferedSamples) * 1_000 / VIDEO_AI_SAMPLE_RATE;
-    if (!this.fullCaptureFinished && capturedMs + 1 < this.fullNextWindowStartMs + this.fullWindowLengthMs) return;
+    const windowLengthMs = this.getCurrentWindowLengthMs();
+    if (!this.fullCaptureFinished && capturedMs + 1 < this.fullNextWindowStartMs + windowLengthMs) return;
 
     const signal = this.audioAbortController!.signal;
     this.fullTranscriptionChain = Promise.resolve().then(async () => {
@@ -1025,15 +1075,17 @@ export class VideoAiFullCaptureController {
     const capturedMs = (this.audioBlocksStartSample + this.bufferedSamples) * 1_000 / VIDEO_AI_SAMPLE_RATE;
     const startMs = this.fullNextWindowStartMs;
     const overlapMs = this.fullNextWindowOverlapMs;
+    const windowLengthMs = this.getCurrentWindowLengthMs();
+    const windowStepMs = Math.max(FULL_MIN_WINDOW_MS, windowLengthMs - FULL_WINDOW_OVERLAP_MS);
     let window: FullAudioWindow;
-    if (capturedMs + 1 >= startMs + this.fullWindowLengthMs) {
-      window = this.createFullAudioWindowFromBlocks(startMs, startMs + this.fullWindowLengthMs);
+    if (capturedMs + 1 >= startMs + windowLengthMs) {
+      window = this.createFullAudioWindowFromBlocks(startMs, startMs + windowLengthMs);
       const pauseMs = findVideoAiPauseBoundary(window.pcm);
-      window.endMs = startMs + (pauseMs || this.fullWindowLengthMs);
+      window.endMs = startMs + (pauseMs || windowLengthMs);
       if (pauseMs) {
         window.pcm = window.pcm.subarray(0, Math.round(pauseMs * VIDEO_AI_SAMPLE_RATE / 1_000));
       }
-      this.fullNextWindowStartMs = startMs + (pauseMs || this.fullWindowStepMs);
+      this.fullNextWindowStartMs = startMs + (pauseMs || windowStepMs);
       this.fullNextWindowOverlapMs = pauseMs ? 0 : FULL_WINDOW_OVERLAP_MS;
     } else {
       if (!this.fullCaptureFinished || capturedMs <= startMs + 1) return null;
@@ -1128,8 +1180,6 @@ export class VideoAiFullCaptureController {
     this.fullNextWindowStartMs = 0;
     this.fullNextWindowOverlapMs = 0;
     this.fullAttributedSpeechEndMs = 0;
-    this.fullWindowLengthMs = 0;
-    this.fullWindowStepMs = 0;
     this.fullWindowSequence = 0;
     this.fullWindowCount = 0;
   }

@@ -1110,6 +1110,10 @@ export default defineConfig({
                 'src/core/site-rules/subframeDomain.ts',
                 'src/features/document-translation/services/pdfBinaryDataFactory.ts',
                 'src/platform/assets/verifiedAssetCache.ts',
+                'src/features/video-subtitle/content/retryBackoff.ts',
+                'src/features/video-subtitle/content/captionClock.ts',
+                'src/platform/dom/fullscreen.ts',
+                'src/shared/dom/shadowQuery.ts',
             ],
             exclude: ['**/*.d.ts'],
             thresholds: {

@@ -17,6 +17,7 @@ import {
 } from './ui';
 import type {VideoPlayerLocator, VideoPlayerTarget} from './videoPlayerLocator';
 import {getYoutubeSubtitleControlsScope} from './youtubeControlsScope';
+import {getFullscreenElement, onFullscreenChange} from '@/src/platform/dom/fullscreen';
 import {getSafeVisualViewportRect, getVisualViewportRect, type VisualViewportRect} from '@/src/platform/dom/visualViewport';
 
 export interface VideoPlayerBindingState {
@@ -143,16 +144,17 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
   const invalidateViewport = () => {safeViewport = undefined;};
   const readSafeViewport = (): VisualViewportRect => {
     const viewport = getVisualViewportRect(view);
+    const fullscreen = getFullscreenElement(document);
     const key = [viewport.left, viewport.top, viewport.width, viewport.height].join(':');
-    if (!safeViewport || key !== viewportKey || viewportFullscreen !== document.fullscreenElement) {
+    if (!safeViewport || key !== viewportKey || viewportFullscreen !== fullscreen) {
       safeViewport = getSafeVisualViewportRect(view);
       viewportKey = key;
-      viewportFullscreen = document.fullscreenElement;
+      viewportFullscreen = fullscreen;
     }
     return safeViewport;
   };
   const viewportPresentation = () => Boolean(coarsePointer?.matches) || readSafeViewport().width <= 600;
-  const viewportRoot = (): Element => document.fullscreenElement || document.documentElement || document.body;
+  const viewportRoot = (): Element => getFullscreenElement(document) || document.documentElement || document.body;
   const menuHostParent = (scope: HTMLElement): Element => viewportPresentation() ? viewportRoot() : scope;
   // 属性随 DOM 深复制而保留；只识别本实例入口的副本，不按公共 id 删除其他实例或页面节点。
   const buttonOwner = `${Date.now()}-${Math.random()}`;
@@ -251,7 +253,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
   const controlsScope = (next: VideoPlayerTarget): HTMLElement => {
     try {
       const scope = getYoutubeSubtitleControlsScope(next.player, next.video);
-      const fullscreen = document.fullscreenElement;
+      const fullscreen = getFullscreenElement(document);
       // HTML 全屏可能只带入 movie_player；兄弟控制层不在全屏子树时不得继续持有外部入口。
       return fullscreen && !fullscreen.contains(scope) ? next.player : scope;
     } catch {
@@ -282,7 +284,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
     let rect: {left: number; top: number; width: number; height: number} = playerRect;
     let width = next.player.clientWidth || playerRect.width, height = next.player.clientHeight || playerRect.height;
     if (viewport) {
-      const safe = readSafeViewport(), fullscreen = document.fullscreenElement?.getBoundingClientRect();
+      const safe = readSafeViewport(), fullscreen = getFullscreenElement(document)?.getBoundingClientRect();
       const left = fullscreen ? Math.max(safe.left, fullscreen.left) : safe.left;
       const top = fullscreen ? Math.max(safe.top, fullscreen.top) : safe.top;
       const right = fullscreen ? Math.min(safe.right, fullscreen.right) : safe.right;
@@ -469,7 +471,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
   view.addEventListener?.('pageshow', invalidateViewport);
   subscribedViewport?.addEventListener('resize', invalidateViewport);
   subscribedViewport?.addEventListener('scroll', invalidateViewport);
-  document.addEventListener('fullscreenchange', invalidateViewport);
+  const stopFullscreen = onFullscreenChange(document, invalidateViewport);
   const unsubscribe = options.locator.subscribe((next) => {
     if (destroyed) return;
     if (next?.interacting) activePlayers.add(next.player);
@@ -538,7 +540,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
       view.removeEventListener?.('pageshow', invalidateViewport);
       subscribedViewport?.removeEventListener('resize', invalidateViewport);
       subscribedViewport?.removeEventListener('scroll', invalidateViewport);
-      document.removeEventListener('fullscreenchange', invalidateViewport);
+      stopFullscreen();
       removePlayerMark(target?.player || null);
       cleanNodes();
       target = null;

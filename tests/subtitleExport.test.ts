@@ -6,10 +6,12 @@ describe('portable subtitle exports', () => {
     it('preserves bilingual lines and millisecond timestamps in SRT', () => {
         expect(serializeSubtitleFile(cues, 'srt')).toEqual({text: '1\n01:00:00,123 --> 01:00:01,690\nOriginal <text> & [link]\n原文译文\n', extension: 'srt', mime: 'application/x-subrip;charset=utf-8'});
     });
-    it('escapes cue markup and uses WebVTT timestamps', () => {
+    it('escapes cue markup, collapses blank lines inside cues and uses WebVTT timestamps', () => {
         const result = serializeSubtitleFile(cues, 'vtt');
         expect(result).toMatchObject({extension: 'vtt', mime: 'text/vtt;charset=utf-8'});
         expect(result.text).toBe('WEBVTT\n\n01:00:00.123 --> 01:00:01.690\nOriginal &lt;text&gt; &amp; [link]\n原文译文\n');
+        const multiBlank = serializeSubtitleFile([{startMs: 0, durationMs: 1000, text: '\n\nLine 1\n  \t \n\nLine 2\r\n\r\nLine 3\n\n'}], 'vtt');
+        expect(multiBlank.text).toBe('WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nLine 1\nLine 2\nLine 3\n');
     });
     it('makes readable Markdown without interpreting recognized text as markup', () => {
         expect(serializeSubtitleFile(cues, 'md')).toEqual({text: '### 01:00:00.123 – 01:00:01.690\n\nOriginal \\<text\\> & \\[link\\]  \n原文译文\n', extension: 'md', mime: 'text/markdown;charset=utf-8'});

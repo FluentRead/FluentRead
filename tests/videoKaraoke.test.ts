@@ -59,9 +59,13 @@ describe('逐字高亮切分与时间换算', () => {
     expect(splitVideoKaraokeParts('好')[0].weight).toBe(1);
   });
 
-  it('估算时长限制在合理范围内', () => {
+  it('估算媒体时间轴时长限制在合理范围内且不随播放倍速失真', () => {
     expect(estimateVideoKaraokeDurationMs('好')).toBe(1200);
     expect(estimateVideoKaraokeDurationMs('今天天气不错我们出去走走')).toBe(12 * 230);
+    expect(estimateVideoKaraokeDurationMs('今天天气不错我们出去走走', 2)).toBe(12 * 230);
+    expect(estimateVideoKaraokeDurationMs('今天天气不错我们出去走走', 0.5)).toBe(12 * 230);
+    expect(estimateVideoKaraokeDurationMs('今天天气不错我们出去走走', 0)).toBe(12 * 230);
+    expect(estimateVideoKaraokeDurationMs('今天天气不错我们出去走走', Number.NaN)).toBe(12 * 230);
     expect(estimateVideoKaraokeDurationMs('字'.repeat(80))).toBe(7000);
   });
 
@@ -74,12 +78,13 @@ describe('逐字高亮切分与时间换算', () => {
     expect(getVideoKaraokeProgress({startMs: 0, durationMs: 0}, 10)).toBe(0);
   });
 
-  it('把进度定位到单元与单元内比例', () => {
+  it('把进度定位到单元与单元内比例，并在浮点舍入边界防越界', () => {
     expect(locateVideoKaraokePosition([1, 2, 4], 0)).toEqual({index: 0, fraction: 0});
     expect(locateVideoKaraokePosition([1, 2, 4], .25)).toEqual({index: 1, fraction: 0});
     expect(locateVideoKaraokePosition([1, 2, 4], .75)).toEqual({index: 2, fraction: .5});
     expect(locateVideoKaraokePosition([1, 2, 4], 1)).toEqual({index: 3, fraction: 0});
     expect(locateVideoKaraokePosition([], .5)).toEqual({index: 0, fraction: 0});
+    expect(locateVideoKaraokePosition([Number.MIN_VALUE], 0.9999)).toEqual({index: 1, fraction: 0});
   });
 });
 
@@ -110,6 +115,8 @@ describe('字幕行写入与上色', () => {
     setVideoCaptionText(line, '', true);
     expect(line.childNodes.length).toBe(0);
     setVideoCaptionText(line, '   ', true);
+    setVideoCaptionText(line, '   ', true);
+    setVideoCaptionText(line, '   ', false);
     expect(units(line)).toHaveLength(0);
     expect(line.textContent).toBe('   ');
   });
@@ -136,10 +143,14 @@ describe('字幕行写入与上色', () => {
     expect(fills(line)).toEqual(['', '', '50.0%', '']);
     const active = units(line)[2];
     const writeState = vi.spyOn(active, 'setAttribute');
+    const writeStyle = vi.spyOn(active.style, 'setProperty');
+    paintVideoKaraokeLine(line, .625 + .0002);
+    expect(writeStyle).not.toHaveBeenCalled();
     for (let frame = 1; frame <= 20; frame++) paintVideoKaraokeLine(line, .625 + frame * .001);
     expect(writeState.mock.calls.filter(([name]) => name === VIDEO_KARAOKE_STATE_ATTRIBUTE)).toHaveLength(0);
     expect(fills(line)).toEqual(['', '', '58.0%', '']);
     writeState.mockRestore();
+    writeStyle.mockRestore();
 
     paintVideoKaraokeLine(line, .3);
     expect(states(line)).toEqual(['sung', 'active', null, null]);
@@ -164,11 +175,14 @@ describe('逐字高亮控制器', () => {
   function setup(options: {timing?: {startMs: number; durationMs: number} | null} = {}) {
     const original = createLine();
     const translation = original.ownerDocument.createElement('div') as unknown as HTMLElement;
+    const video = original.ownerDocument.createElement('video') as unknown as HTMLVideoElement;
+    Object.assign(video, {currentTime: 0, paused: false, ended: false, playbackRate: 1});
+    original.ownerDocument.body.appendChild(video);
     const frames = new Map<number, () => void>();
     let frameId = 0;
     const state = {
       enabled: true,
-      video: {currentTime: 0, paused: false, ended: false} as HTMLVideoElement | null,
+      video: video as HTMLVideoElement | null,
       timing: options.timing === undefined ? {startMs: 0, durationMs: 4000} : options.timing,
       timingCalls: 0,
     };
@@ -271,18 +285,25 @@ describe('逐字高亮控制器', () => {
     expect(states(original)).toEqual(['sung', 'sung', 'sung', 'sung']);
   });
 
-  it('相同文本的下一句从头再扫，新句子重新取时间', () => {
-    const {original, state, runFrame} = setup({timing: {startMs: 0, durationMs: 1000}});
+  it('相同文本的下一句在句末暂停帧循环并由 timeupdate 唤醒从头再扫，新句子重新取时间', () => {
+    const {original, frames, state, runFrame} = setup({timing: {startMs: 0, durationMs: 1000}});
+    const {Event} = original.ownerDocument.defaultView!;
     setVideoCaptionText(original, '好的', true);
     state.video!.currentTime = 2;
     runFrame();
     expect(states(original)).toEqual(['sung', 'sung']);
-    runFrame();
+    expect(frames.size).toBe(0);
+    state.video!.dispatchEvent(new Event('timeupdate', {bubbles: true}));
     expect(states(original)).toEqual(['sung', 'sung']);
+    expect(frames.size).toBe(0);
 
     state.timing = {startMs: 2000, durationMs: 1000};
-    runFrame();
+    state.video!.dispatchEvent(new Event('timeupdate', {bubbles: true}));
     expect(states(original)).toEqual(['active', null]);
+    expect(frames.size).toBe(1);
+    // 已有待执行帧时 timeupdate 不重复同步。
+    state.video!.dispatchEvent(new Event('timeupdate', {bubbles: true}));
+    expect(frames.size).toBe(1);
 
     state.timing = {startMs: 5000, durationMs: 1000};
     state.video!.currentTime = 5.5;
@@ -298,23 +319,78 @@ describe('逐字高亮控制器', () => {
     expect(states(original)).toEqual(['active', null]);
   });
 
-  it('拖动进度条后在暂停画面上重画，销毁后不再响应播放事件', () => {
+  it('拖动进度条后在暂停画面上重画，忽略其他视频事件，销毁后不再响应播放事件', () => {
     const {original, frames, state, runFrame, controller} = setup();
     const {Event} = original.ownerDocument.defaultView!;
+    const otherVideo = original.ownerDocument.createElement('video');
+    original.ownerDocument.body.appendChild(otherVideo);
     Object.assign(state.video!, {paused: true});
     setVideoCaptionText(original, '一二', true);
     runFrame();
     expect(states(original)).toEqual(['active', null]);
 
     state.video!.currentTime = 2.5;
-    original.dispatchEvent(new Event('seeked', {bubbles: true}));
+    otherVideo.dispatchEvent(new Event('seeked', {bubbles: true}));
+    expect(states(original)).toEqual(['active', null]);
+
+    state.video!.dispatchEvent(new Event('seeked', {bubbles: true}));
     expect(states(original)).toEqual(['sung', 'active']);
     expect(frames.size).toBe(0);
 
     controller.destroy();
     state.video!.currentTime = 0;
-    original.dispatchEvent(new Event('seeked', {bubbles: true}));
+    state.video!.dispatchEvent(new Event('seeked', {bubbles: true}));
     expect(states(original)).toEqual(['sung', 'active']);
+  });
+
+  it('多控制器共存互不覆盖，sync 即时应用字幕偏移，估算模式向后回跳重置起点', () => {
+    const first = setup({timing: null});
+    const secondLine = createLine();
+    const secondFrames = new Map<number, () => void>();
+    let secondId = 0;
+    const secondVideo = secondLine.ownerDocument.createElement('video') as unknown as HTMLVideoElement;
+    Object.assign(secondVideo, {currentTime: 1, paused: false, ended: false, playbackRate: undefined});
+    secondLine.ownerDocument.body.appendChild(secondVideo);
+    let secondTiming: {startMs: number; durationMs: number} | null = {startMs: 0, durationMs: 4000};
+    const secondController = createVideoKaraokeController({
+      window: {
+        requestAnimationFrame: (cb: FrameRequestCallback) => { secondId += 1; secondFrames.set(secondId, () => cb(0)); return secondId; },
+        cancelAnimationFrame: (id: number) => { secondFrames.delete(id); },
+      },
+      document: secondLine.ownerDocument,
+      isEnabled: () => true,
+      getVideo: () => secondVideo,
+      getLines: () => [secondLine],
+      getTiming: () => secondTiming,
+    });
+    try {
+      // 销毁第一个控制器不会注销第二个控制器的行变更通知。
+      first.state.video!.currentTime = 10;
+      setVideoCaptionText(first.original, '一二三四', true);
+      first.runFrame();
+      expect(states(first.original)).toEqual(['active', null, null, null]);
+      // 估算模式下播放头回到 startMs 之前（无论通过 frame 还是 seeked）都重置起点。
+      first.state.video!.currentTime = 4;
+      first.runFrame();
+      expect(states(first.original)).toEqual(['active', null, null, null]);
+      first.state.video!.currentTime = 2;
+      first.controller.sync();
+      expect(states(first.original)).toEqual(['active', null, null, null]);
+      first.controller.destroy();
+
+      setVideoCaptionText(secondLine, '一二三四', true);
+      expect(secondFrames.size).toBe(1);
+      Array.from(secondFrames.values()).forEach(run => run());
+      secondFrames.clear();
+      expect(states(secondLine)).toEqual(['sung', 'active', null, null]);
+
+      // 字幕偏移改变后，sync() 立即刷新 timingStale 并应用新时间轴。
+      secondTiming = {startMs: 500, durationMs: 4000};
+      secondController.sync();
+      expect(states(secondLine)).toEqual(['active', null, null, null]);
+    } finally {
+      secondController.destroy();
+    }
   });
 
   it('销毁后取消帧循环并忽略后续调用', () => {

@@ -1,13 +1,43 @@
 /**
  * @file src/features/video-subtitle/content/hlsAudio.ts
  * 文件职责：从 X 播放器已请求的 HLS 清单读取完整音轨，避免按视频时长实时扫描。
- * 主要内容：优先音频 rendition、保留同清单内的备用变体，先校验 fMP4 初始化段中的音频轨，再按原顺序并发读取媒体段；响应头拒绝即释放未读流，读取取消不依赖底层清理完成，并严格限制大小与取消范围。
+ * 主要内容：优先音频 rendition、保留同清单内的备用变体，先校验 fMP4 初始化段中的音频轨，再按原顺序并发读取媒体段（单段 8 秒超时并对 429/5xx 及网络瞬时故障在剩余总预算内有界抖动重试，失败自动归还已计字节）；响应头拒绝即释放未读流，读取取消不依赖底层清理完成，并严格限制大小与取消范围。
  * 模块边界：不解密媒体、不访问页面凭据、不操作播放器；fetch 由调用方注入，解码由独立浏览器音频适配器执行。
  */
 import {cancelUnreadResponseBody} from '@/src/platform/http/runtime';
 
 export interface HlsAudioManifest {next?: string; alternatives?: string[]; segments?: string[]; durationMs: number}
 const MAX_AUDIO_BYTES = 64 * 1024 * 1024;
+const HLS_SEGMENT_TIMEOUT_MS = 8_000;
+const HLS_SEGMENT_MAX_RETRIES = 2;
+const HLS_SEGMENT_RETRY_BACKOFF_MS = [200, 600] as const;
+
+function linkAbortSignal(parent: AbortSignal, child: AbortController): () => void {
+    const abort = () => child.abort();
+    if (parent.aborted) {
+        abort();
+        return () => undefined;
+    }
+    parent.addEventListener('abort', abort, {once: true});
+    return () => parent.removeEventListener('abort', abort);
+}
+
+function waitForSegmentRetry(attempt: number, signal: AbortSignal): Promise<void> {
+    if (signal.aborted) return Promise.resolve();
+    const base = HLS_SEGMENT_RETRY_BACKOFF_MS[attempt];
+    const delayMs = Math.round(base * (0.8 + Math.random() * 0.4));
+    return new Promise<void>((resolve) => {
+        const onAbort = () => {
+            clearTimeout(timer);
+            resolve();
+        };
+        const timer = setTimeout(() => {
+            signal.removeEventListener('abort', onAbort);
+            resolve();
+        }, delayMs);
+        signal.addEventListener('abort', onAbort, {once: true});
+    });
+}
 
 /** 沿 moov/trak/mdia/hdlr 检查真实音频轨，避免下载只有画面的高清分片。 */
 export function hasMp4AudioTrack(bytes: Uint8Array): boolean {
@@ -131,30 +161,28 @@ export async function readXHlsAudio(
     fetchResource: (url: string, options: {signal: AbortSignal; credentials: 'omit'}) => Promise<Response>,
 ): Promise<{bytes: Uint8Array; durationMs: number} | null> {
     const scope = new AbortController();
-    const abort = () => scope.abort();
-    if (signal.aborted) abort();
-    signal.addEventListener('abort', abort, {once: true});
-    const timer = setTimeout(abort, 30_000);
+    const abortScope = () => scope.abort();
+    const unlinkScope = linkAbortSignal(signal, scope);
+    const timer = setTimeout(abortScope, 30_000);
     const cleanup = () => {
         clearTimeout(timer);
-        signal.removeEventListener('abort', abort);
-        scope.abort();
+        unlinkScope();
+        abortScope();
     };
     const visited = new Set<string>();
     let attempts = 0;
     const readHeaderResource = async (resourceUrl: string, parent: AbortSignal, options: ReadBoundedMediaResponseOptions = {}) => {
         const requestScope = new AbortController();
-        const cancelRequest = () => requestScope.abort();
-        parent.addEventListener('abort', cancelRequest, {once: true});
+        const unlinkRequest = linkAbortSignal(parent, requestScope);
         // 清单/初始化段应很小；某个地址卡住不应占满整段音轨的预算。
         // 媒体分片仍共用完整 30 秒读取预算，不因这个阶段上限被缩短。
-        const requestTimer = setTimeout(cancelRequest, 5000);
+        const requestTimer = setTimeout(() => requestScope.abort(), 5000);
         try {
             const response = await fetchResource(resourceUrl, {signal: requestScope.signal, credentials: 'omit'});
             return await readBoundedMediaResponse(response, 1_000_000, requestScope.signal, options);
         } finally {
             clearTimeout(requestTimer);
-            parent.removeEventListener('abort', cancelRequest);
+            unlinkRequest();
             requestScope.abort();
         }
     };
@@ -182,8 +210,7 @@ export async function readXHlsAudio(
         }
         if (!manifest?.segments || scope.signal.aborted) return null;
         const mediaScope = new AbortController();
-        const cancelMedia = () => mediaScope.abort();
-        scope.signal.addEventListener('abort', cancelMedia, {once: true});
+        const unlinkMedia = linkAbortSignal(scope.signal, mediaScope);
         try {
             const segments = manifest.segments;
             const results: Uint8Array[] = [];
@@ -198,12 +225,51 @@ export async function readXHlsAudio(
             // 先读取小型初始化段；纯视频清单直接交回上层尝试其他候选。
             results[0] = await readHeaderResource(segments[0], mediaScope.signal, {consumeBytes});
             if (!hasMp4AudioTrack(results[0]) || mediaScope.signal.aborted) return null;
+            const readSegment = async (segmentUrl: string): Promise<Uint8Array> => {
+                for (let attempt = 0; ; attempt += 1) {
+                    if (attempt > 0) await waitForSegmentRetry(attempt - 1, mediaScope.signal);
+                    if (mediaScope.signal.aborted) throw new Error('视频音轨读取已取消');
+                    let attemptBytes = 0;
+                    const attemptScope = new AbortController();
+                    const unlinkAttempt = linkAbortSignal(mediaScope.signal, attemptScope);
+                    const attemptTimer = setTimeout(() => attemptScope.abort(), HLS_SEGMENT_TIMEOUT_MS);
+                    try {
+                        const response = await fetchResource(segmentUrl, {signal: attemptScope.signal, credentials: 'omit'});
+                        if (!response.ok) {
+                            const transient = response.status === 429 || response.status >= 500;
+                            cancelUnreadResponseBody(response);
+                            if (!transient || attempt >= HLS_SEGMENT_MAX_RETRIES || mediaScope.signal.aborted) {
+                                throw new Error('视频音轨响应无效或过大');
+                            }
+                        } else {
+                            return await readBoundedMediaResponse(response, MAX_AUDIO_BYTES, attemptScope.signal, {
+                                consumeBytes(count) {
+                                    if (!consumeBytes(count)) return false;
+                                    attemptBytes += count;
+                                    return true;
+                                },
+                            });
+                        }
+                    } catch (error) {
+                        total -= attemptBytes;
+                        const nonRetryable = error instanceof Error
+                            && (error.message === '视频音轨超过读取上限'
+                                || error.message === '视频音轨响应无效或过大'
+                                || error.message === '视频音轨响应为空');
+                        if (mediaScope.signal.aborted || nonRetryable || attempt >= HLS_SEGMENT_MAX_RETRIES) {
+                            throw error;
+                        }
+                    } finally {
+                        clearTimeout(attemptTimer);
+                        unlinkAttempt();
+                        attemptScope.abort();
+                    }
+                }
+            };
             const worker = async () => {
                 while (index < segments.length && !mediaScope.signal.aborted) {
                     const next = index++;
-                    const response = await fetchResource(segments[next], {signal: mediaScope.signal, credentials: 'omit'});
-                    const bytes = await readBoundedMediaResponse(response, MAX_AUDIO_BYTES, mediaScope.signal, {consumeBytes});
-                    results[next] = bytes;
+                    results[next] = await readSegment(segments[next]);
                 }
             };
             try { await Promise.all([worker(), worker(), worker()]); }
@@ -214,7 +280,7 @@ export async function readXHlsAudio(
             for (const segment of results) { bytes.set(segment, offset); offset += segment.length; }
             return {bytes, durationMs: manifest.durationMs};
         } finally {
-            scope.signal.removeEventListener('abort', cancelMedia);
+            unlinkMedia();
             mediaScope.abort();
         }
     };

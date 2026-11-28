@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/VideoSubtitleAppearanceSettings.vue
  * 文件职责：提供视频字幕外观设置，并用同一套 CSS 变量展示隔离的实时预览。
- * 主要内容：左侧在等高预览区内用正常视频比例呈现字幕样式，滚动调整时保持预览可见；右侧选择显示内容、双语上下顺序、默认关闭的逐字高亮与读音标注、皮肤并按字号、位置、字体轮廓、背景、颜色与布局分组调整字幕。单语模式禁用顺序并保留选择，仅译文时可显式切回双语查看读音；读音预览只使用明确标记的固定日语示例，DOM 与视觉顺序同步且读音紧随原文；字号允许 80–500% 与整数自定义输入，支持恢复默认。
+ * 主要内容：左侧在等高预览区内用正常视频比例呈现字幕样式，滚动调整时保持预览可见并尊重减少动态偏好；右侧选择显示内容、双语上下顺序、默认关闭的逐字高亮与读音标注、皮肤并按字号、位置、字体轮廓、背景、颜色与布局分组调整字幕。单语模式禁用顺序并保留选择，仅译文时可显式切回双语查看读音；读音预览只使用明确标记的固定日语示例，DOM 与视觉顺序同步且读音紧随原文；字号滑块与数值输入提供独立无障碍标签，允许 80–500% 与整数自定义输入，顶部/底部位置自动切换对应偏移标签并在中部位置禁用偏移，支持恢复默认。
  * 模块边界：只编辑传入 Config 草稿；保存由 SettingsSections 统一处理，播放器实际应用由 content 层负责。
  -->
 <template>
@@ -72,9 +72,9 @@
         <div class="subtitle-appearance-controls">
           <div class="subtitle-appearance-control-group">
             <strong>字号与位置</strong>
-            <label><span>字号 <b>{{ config.videoSubtitleAppearance.fontScale }}%</b></span><input v-model.number="config.videoSubtitleAppearance.fontScale" type="range" :min="VIDEO_SUBTITLE_FONT_SCALE_RANGE.min" :max="VIDEO_SUBTITLE_FONT_SCALE_RANGE.max" step="10" aria-label="字幕字号" /><input :value="config.videoSubtitleAppearance.fontScale" type="number" :min="VIDEO_SUBTITLE_FONT_SCALE_RANGE.min" :max="VIDEO_SUBTITLE_FONT_SCALE_RANGE.max" step="1" :aria-label="translateControlLabel('字幕字号')" @change="updateFontScale" /></label>
+            <label><span>字号 <b>{{ config.videoSubtitleAppearance.fontScale }}%</b></span><input v-model.number="config.videoSubtitleAppearance.fontScale" type="range" :min="VIDEO_SUBTITLE_FONT_SCALE_RANGE.min" :max="VIDEO_SUBTITLE_FONT_SCALE_RANGE.max" step="10" :aria-label="translateControlLabel('字幕字号')" /><input :value="config.videoSubtitleAppearance.fontScale" type="number" :min="VIDEO_SUBTITLE_FONT_SCALE_RANGE.min" :max="VIDEO_SUBTITLE_FONT_SCALE_RANGE.max" step="1" :aria-label="fontScaleNumberAriaLabel" @change="updateFontScale" /></label>
             <label><span>位置</span><UiSelect v-model="config.videoSubtitleAppearance.position" aria-label="字幕位置"><ElOption value="bottom" :label="translateControlLabel('底部')" /><ElOption value="center" :label="translateControlLabel('中部')" /><ElOption value="top" :label="translateControlLabel('顶部')" /></UiSelect></label>
-            <label><span>底部偏移 <b>{{ config.videoSubtitleAppearance.position === 'bottom' && config.videoSubtitleAppearance.autoBottom ? translateControlLabel('自动') : `${config.videoSubtitleAppearance.bottomOffset}%` }}</b></span><input v-model.number="config.videoSubtitleAppearance.bottomOffset" type="range" min="0" max="25" step="1" aria-label="字幕底部偏移" @input="config.videoSubtitleAppearance.autoBottom = false" /></label>
+            <label><span>{{ offsetLabel }} <b>{{ config.videoSubtitleAppearance.position === 'bottom' && config.videoSubtitleAppearance.autoBottom ? translateControlLabel('自动') : `${config.videoSubtitleAppearance.bottomOffset}%` }}</b></span><input v-model.number="config.videoSubtitleAppearance.bottomOffset" type="range" min="0" max="25" step="1" :aria-label="offsetAriaLabel" :disabled="config.videoSubtitleAppearance.position === 'center'" @input="config.videoSubtitleAppearance.autoBottom = false" /></label>
             <label v-if="config.videoSubtitleAppearance.position === 'bottom'" class="subtitle-auto-bottom-toggle"><span>{{ translateControlLabel('移动端 / X 自动贴底') }}</span><input v-model="config.videoSubtitleAppearance.autoBottom" type="checkbox" :aria-label="translateControlLabel('移动端 / X 自动贴底')" /></label>
           </div>
           <div class="subtitle-appearance-control-group">
@@ -105,7 +105,36 @@ import UiSelect from '@/src/ui/components/UiSelect.vue';
 import {ElOption, ElColorPicker} from 'element-plus';
 import 'element-plus/es/components/color-picker/style/css';
 import {useUiI18n as useControlI18n} from '@/src/ui/i18n';
-const {t, translateLegacy: translateControlLabel} = useControlI18n();
+import type {UiLanguage} from '@/src/core/i18n';
+const controlI18n = useControlI18n();
+const {t, translateLegacy: translateControlLabel} = controlI18n;
+const topOffsetLabels: Readonly<Record<UiLanguage, string>> = {
+  'zh-CN': '顶部偏移',
+  'en-US': 'Top offset',
+  'ja-JP': '上端オフセット',
+  'ko-KR': '상단 간격',
+  'fr-FR': 'Décalage supérieur',
+  'ru-RU': 'Отступ сверху',
+  'es-ES': 'Desplazamiento superior',
+};
+const topOffsetAriaLabels: Readonly<Record<UiLanguage, string>> = {
+  'zh-CN': '字幕顶部偏移',
+  'en-US': 'Subtitle top offset',
+  'ja-JP': '字幕の上端オフセット',
+  'ko-KR': '자막 상단 간격',
+  'fr-FR': 'Décalage supérieur des sous-titres',
+  'ru-RU': 'Отступ субтитров сверху',
+  'es-ES': 'Desplazamiento superior de subtítulos',
+};
+const fontScaleNumberAriaLabels: Readonly<Record<UiLanguage, string>> = {
+  'zh-CN': '字幕字号数值',
+  'en-US': 'Subtitle font size value',
+  'ja-JP': '字幕サイズ数値',
+  'ko-KR': '자막 크기 수치',
+  'fr-FR': 'Valeur de taille des sous-titres',
+  'ru-RU': 'Значение размера субтитров',
+  'es-ES': 'Valor del tamaño de subtítulos',
+};
 
 import {computed, nextTick} from 'vue';
 import type {CSSProperties} from 'vue';
@@ -127,6 +156,14 @@ import SettingsPreviewLayout from './components/SettingsPreviewLayout.vue';
 const props = defineProps<{config: Config}>();
 // 设置页会整体替换草稿；始终读取最新 prop，避免卡片继续编辑旧配置。
 const config = computed(() => props.config);
+const currentLanguage = computed<UiLanguage>(() => controlI18n.language?.value ?? 'zh-CN');
+const fontScaleNumberAriaLabel = computed(() => fontScaleNumberAriaLabels[currentLanguage.value]);
+const offsetLabel = computed(() => config.value.videoSubtitleAppearance.position === 'top'
+  ? topOffsetLabels[currentLanguage.value]
+  : translateControlLabel('底部偏移'));
+const offsetAriaLabel = computed(() => config.value.videoSubtitleAppearance.position === 'top'
+  ? topOffsetAriaLabels[currentLanguage.value]
+  : translateControlLabel('字幕底部偏移'));
 const displayModeOptions = [{value: 'bilingual', label: '双语'}, {value: 'translation-only', label: '仅译文'}, {value: 'original-only', label: '仅原文'}];
 const bilingualOrderOptions = computed(() => [{value: 'original-first', label: t('video.originalFirst')}, {value: 'translation-first', label: t('video.translationFirst')}]);
 const customOutlineAvailable = computed(() => config.value.videoSubtitleAppearance.outlineStyle === 'stroke' || config.value.videoSubtitleAppearance.outlineStyle === 'shadow');
@@ -258,6 +295,9 @@ b.subtitle-preview-karaoke { --subtitle-preview-karaoke-color:var(--fluent-read-
 @keyframes subtitle-preview-karaoke {
   0% { clip-path:inset(-.3em 100% -.3em -.3em); }
   78%, 100% { clip-path:inset(-.3em -.3em -.3em -.3em); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .subtitle-preview-karaoke::after { animation:none; clip-path:inset(-.3em 35% -.3em -.3em); }
 }
 .subtitle-preview-hidden { position:absolute; inset:0; display:grid; place-items:center; color:#d1d5db; font-size:13px; }
 .appearance-reset-button:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }

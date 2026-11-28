@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {chooseBilibiliAudio, readBilibiliAudio} from '@/src/features/video-subtitle/content/bilibiliAudio';
+import {chooseBilibiliAudio, chooseBilibiliAudioCandidates, readBilibiliAudio} from '@/src/features/video-subtitle/content/bilibiliAudio';
 
 const part = 'BV193s56tEx2:1';
 const url = 'https://audio.bilivideo.com/test.m4s';
@@ -11,7 +11,7 @@ function fixture(duration = 1) {
     const decode = vi.fn(async (_audio: ArrayBuffer) => decoded);
     const fetch = vi.fn<typeof globalThis.fetch>(async input => String(input).includes('api.bilibili.com')
         ? new Response(JSON.stringify({code: 0, data: data()})) : new Response(new Uint8Array([1, 2])));
-    const ports = {fetch, manifest: vi.fn(async () => 123), decode: decode as unknown as (audio: ArrayBuffer) => Promise<AudioBuffer>};
+    const ports = {fetch, manifest: vi.fn<(part: string, signal: AbortSignal) => Promise<number>>(async () => 123), decode: decode as unknown as (audio: ArrayBuffer) => Promise<AudioBuffer>};
     const abort = new AbortController();
     const run = (id = part, length = 1) => readBilibiliAudio(id, {duration: length} as HTMLVideoElement, abort.signal, ports);
     return {ports, abort, run, decode, decoded, fetch};
@@ -98,5 +98,49 @@ describe('B 站独立音轨读取', () => {
         await expect(g.run()).rejects.toThrow('changed'); expect(g.fetch).not.toHaveBeenCalled();
         const h = fixture(); h.decode.mockRejectedValueOnce(new Error('decode failed'));
         await expect(h.run()).rejects.toThrow('decode failed');
+    });
+    it('提取并去重 backupUrl / backup_url 及次优流地址，在主 CDN 瞬时失败时自动故障转移', async () => {
+        const backup1 = 'https://backup1.bilivideo.cn/test.m4s';
+        const backup2 = 'https://backup2.hdslb.com/test.m4s';
+        const fallbackStream = 'https://fallback.bilivideo.com/hq.m4s';
+        const payload = data([
+            track({baseUrl: url, backupUrl: [url, backup1, 'https://evil.example/a'], bandwidth: 64000}),
+            track({baseUrl: fallbackStream, backup_url: backup2, bandwidth: 128000}),
+        ]);
+        expect(chooseBilibiliAudioCandidates(payload)).toEqual([url, backup1, fallbackStream, backup2]);
+
+        const f = fixture();
+        f.fetch.mockImplementation(async input => {
+            const target = String(input);
+            if (target.includes('api.bilibili.com')) return new Response(JSON.stringify({code: 0, data: payload}));
+            if (target === url) return new Response('unavailable', {status: 503});
+            if (target === backup1) throw new Error('cdn reset');
+            return new Response(new Uint8Array([3, 4]));
+        });
+        await expect(f.run()).resolves.toEqual(new Float32Array([.1, .2]));
+        expect(f.fetch.mock.calls.map(([input]) => String(input))).toEqual([
+            expect.stringContaining('api.bilibili.com'),
+            url,
+            backup1,
+            fallbackStream,
+        ]);
+    });
+    it('解码阶段受 30 秒独立超时保护，外层读取受 90 秒总超时保护', async () => {
+        vi.useFakeTimers();
+        const f = fixture();
+        f.decode.mockImplementation(() => new Promise(() => undefined));
+        const pending = f.run().catch(error => error);
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect((await pending).message).toContain('解码超时');
+        expect(vi.getTimerCount()).toBe(0);
+
+        const stalled = fixture();
+        stalled.ports.manifest.mockImplementation((_part: string, sig: AbortSignal) => new Promise<number>((_resolve, reject) => {
+            sig.addEventListener('abort', () => reject(sig.reason), {once: true});
+        }));
+        const stalledPending = stalled.run().catch(error => error);
+        await vi.advanceTimersByTimeAsync(90_000);
+        expect((await stalledPending).message).toContain('读取超时');
+        expect(vi.getTimerCount()).toBe(0);
     });
 });

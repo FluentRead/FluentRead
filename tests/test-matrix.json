@@ -580,7 +580,10 @@
       "tests/bilibiliAudio.test.ts",
       "tests/bilibiliAiSource.test.ts",
       "tests/deepSlimLayer1Layer2.test.ts",
-      "tests/dependencyGraph.test.ts"
+      "tests/dependencyGraph.test.ts",
+      "tests/videoRetryBackoff.test.ts",
+      "tests/videoCaptionClock.test.ts",
+      "tests/fullscreenDomHelper.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",

@@ -32,8 +32,8 @@ describe('native ASR failure cleanup and transmission', () => {
     it('preserves HTTP error without awaiting a stalled cancellation handshake', async () => {
         const cancel = vi.fn(() => new Promise<void>(() => {}));
         const body = new ReadableStream<Uint8Array>({cancel});
-        vi.stubGlobal('fetch', vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(body, {status: 503})));
-        await expect(transcribeNativeQwenPcm16(pcm, options())).rejects.toThrow('HTTP 503');
+        vi.stubGlobal('fetch', vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(body, {status: 500})));
+        await expect(transcribeNativeQwenPcm16(pcm, options())).rejects.toThrow('HTTP 500');
         expect(cancel).toHaveBeenCalledTimes(1);
         expect(vi.getTimerCount()).toBe(0);
     });
@@ -107,10 +107,21 @@ describe('native ASR remaining transport boundaries', () => {
         expect(view.getUint32(40, true)).toBe(2);
         expect([...bytes.subarray(44)]).toEqual([0, 0]);
     });
-    it.each(['A', 'AAB=', 'A'.repeat(1280004)])('rejects noncanonical or oversized PCM (%#)', async encoded => {
+    it.each(['A', 'AAB=', 'AAAAAB==', 'AAAAéAAA', 'AAAAéA==', 'AAé=', 'éA==', 'A'.repeat(1280004)])('rejects noncanonical or oversized PCM (%#)', async encoded => {
         const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
         await expect(transcribeNativeQwenPcm16(encoded, options())).rejects.toThrow();
         expect(fetch).not.toHaveBeenCalled();
+    });
+    it('decodes double-padded canonical PCM16 base64 directly into WAV bytes', async () => {
+        const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('{"text":"padded"}'));
+        vi.stubGlobal('fetch', fetch);
+        const encoded = Buffer.from([1, 2, 3, 4]).toString('base64');
+        expect(encoded.endsWith('==')).toBe(true);
+        const result = await transcribeNativeQwenPcm16(encoded, options());
+        expect(result.audioDurationMs).toBeCloseTo(0.125, 6);
+        const file = (fetch.mock.calls[0][1]!.body as FormData).get('file') as File;
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        expect([...bytes.subarray(44)]).toEqual([1, 2, 3, 4]);
     });
     it('accepts the exact thirty-second PCM limit', async () => {
         const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('{"text":"bounded"}'));
@@ -145,10 +156,88 @@ describe('native ASR remaining transport boundaries', () => {
         await expect(transcribeNativeQwenPcm16(pcm, options())).rejects.toThrow();
         expect(body.locked).toBe(false);
     });
-    it('preserves ordinary transport errors and clears its timer', async () => {
+    it('preserves ordinary transport errors after bounded retries and clears its timer', async () => {
         const error = new Error('controlled network failure');
-        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(error));
-        await expect(transcribeNativeQwenPcm16(pcm, options())).rejects.toBe(error);
+        const fetch = vi.fn().mockRejectedValue(error);
+        vi.stubGlobal('fetch', fetch);
+        const pending = expect(transcribeNativeQwenPcm16(pcm, options())).rejects.toBe(error);
+        await vi.advanceTimersByTimeAsync(3_000);
+        await pending;
+        expect(fetch).toHaveBeenCalledTimes(3);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+    it('retries transient HTTP statuses with Retry-After and backoff, and respects abort during retry', async () => {
+        const fetch = vi.fn<typeof globalThis.fetch>()
+            .mockResolvedValueOnce(new Response('busy', {status: 429, headers: {'retry-after': '1'}}))
+            .mockResolvedValueOnce(new Response('bad gateway', {status: 502, headers: {'retry-after': new Date(Date.now() + 500).toUTCString()}}))
+            .mockResolvedValueOnce(new Response('{"text":"recovered"}'));
+        vi.stubGlobal('fetch', fetch);
+        const pending = transcribeNativeQwenPcm16(pcm, options());
+        await vi.advanceTimersByTimeAsync(2_000);
+        await expect(pending).resolves.toMatchObject({text: 'recovered'});
+        expect(fetch).toHaveBeenCalledTimes(3);
+
+        const zeroRetryFetch = vi.fn<typeof globalThis.fetch>()
+            .mockResolvedValueOnce(new Response('unavailable', {status: 503, headers: {'retry-after': '0'}}))
+            .mockResolvedValueOnce(new Response('timeout', {status: 504, headers: {'retry-after': 'invalid-header'}}))
+            .mockResolvedValueOnce(new Response('{"text":"ok"}'));
+        vi.stubGlobal('fetch', zeroRetryFetch);
+        const second = transcribeNativeQwenPcm16(pcm, options());
+        await vi.advanceTimersByTimeAsync(2_000);
+        await expect(second).resolves.toMatchObject({text: 'ok'});
+        expect(zeroRetryFetch).toHaveBeenCalledTimes(3);
+
+        // Non-HTTP-date numeric/ISO Retry-After without 3 ASCII letters must not be parsed by Date.parse.
+        const malformedRetryFetch = vi.fn<typeof globalThis.fetch>()
+            .mockResolvedValueOnce(new Response('busy', {status: 429, headers: {'retry-after': '2026-11-28'}}))
+            .mockResolvedValueOnce(new Response('{"text":"fallback-ok"}'));
+        vi.stubGlobal('fetch', malformedRetryFetch);
+        const third = transcribeNativeQwenPcm16(pcm, options());
+        await vi.advanceTimersByTimeAsync(2_000);
+        await expect(third).resolves.toMatchObject({text: 'fallback-ok'});
+        expect(malformedRetryFetch).toHaveBeenCalledTimes(2);
+
+        // If caller aborts before waitForRetry runs on a transient 503, reject immediately with zero timers and no retry.
+        const preAbortedRetryController = new AbortController();
+        const late503Fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => {
+            preAbortedRetryController.abort(new Error('aborted before retry wait'));
+            return new Response('busy', {status: 503, headers: {'retry-after': '0'}});
+        });
+        vi.stubGlobal('fetch', late503Fetch);
+        await expect(transcribeNativeQwenPcm16(pcm, {...options(), signal: preAbortedRetryController.signal}))
+            .rejects.toThrow('aborted before retry wait');
+        expect(late503Fetch).toHaveBeenCalledTimes(1);
+        expect(vi.getTimerCount()).toBe(0);
+
+        const controller = new AbortController();
+        vi.stubGlobal('fetch', vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('busy', {status: 503})));
+        const aborted = expect(transcribeNativeQwenPcm16(pcm, {...options(), signal: controller.signal}))
+            .rejects.toThrow('stopped during backoff');
+        await Promise.resolve();
+        await Promise.resolve();
+        controller.abort(new Error('stopped during backoff'));
+        await aborted;
+        expect(vi.getTimerCount()).toBe(0);
+    });
+    it('scales timeout dynamically by audio duration between 20s and 90s', async () => {
+        vi.stubGlobal('fetch', vi.fn((_url, init: RequestInit) => new Promise((_resolve, reject) => {
+            init.signal!.addEventListener('abort', () => reject(init.signal!.reason), {once: true});
+        })));
+        const shortPending = expect(transcribeNativeQwenPcm16(pcm, options())).rejects.toThrow('原生转写超时');
+        await vi.advanceTimersByTimeAsync(20_000);
+        await shortPending;
+
+        // 10s of 16kHz PCM16 = 320,000 bytes -> 426,668 base64 chars -> timeout = 40s.
+        const tenSeconds = Buffer.alloc(10 * 16_000 * 2).toString('base64');
+        let settled = false;
+        const midPending = transcribeNativeQwenPcm16(tenSeconds, options()).catch(error => {
+            settled = true;
+            return error;
+        });
+        await vi.advanceTimersByTimeAsync(39_999);
+        expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        expect((await midPending).message).toBe('原生转写超时');
         expect(vi.getTimerCount()).toBe(0);
     });
     it('reports the deadline when cooperative fetch aborts', async () => {

@@ -101,3 +101,69 @@ it('rejects stale discovery and layout callbacks after disposal, including a hos
     owner.getPlayer(node); f.resize(); const late = [...f.frames.values()][0]!;
     owner.destroy(); late(0); expect(layout).not.toHaveBeenCalled();
 });
+
+it('discovers open Shadow DOM media, handles webkit fullscreen and guards ResizeObserver availability', () => {
+    const f = fixture();
+    const mount = vi.fn(() => vi.fn());
+    const dispose = mountWhenHtmlMediaPresent(mount, f.document);
+    expect(mount).not.toHaveBeenCalled();
+    const shadowHost = f.document.createElement('div');
+    const shadow = shadowHost.attachShadow({mode: 'open'});
+    const shadowVideo = f.document.createElement('video') as unknown as HTMLMediaElement;
+    Object.defineProperty(shadowVideo, 'getBoundingClientRect', {value: () => ({left: 10, top: 20, right: 310, bottom: 200, width: 300, height: 180})});
+    shadow.appendChild(shadowVideo);
+    f.document.body.appendChild(shadowHost);
+    f.notify([shadowHost]); f.flush();
+    expect(mount).toHaveBeenCalledOnce();
+    dispose();
+
+    // 1) view.ResizeObserver 存在时优先使用并响应 webkitfullscreenchange
+    const observe = vi.fn(), roDisconnect = vi.fn();
+    let viewResize!: () => void;
+    Object.defineProperty(f.window, 'ResizeObserver', {
+        configurable: true,
+        value: class {
+            constructor(cb: () => void) { viewResize = cb; }
+            observe = observe;
+            disconnect = roDisconnect;
+        },
+    });
+    const layout = vi.fn();
+    const video = f.media('video');
+    const fsWrap = f.document.createElement('section');
+    f.document.body.appendChild(fsWrap);
+    fsWrap.appendChild(video.node);
+    const owner = createHtmlMediaHost(layout, f.document);
+    const host = owner.getPlayer(video.node);
+    expect(observe).toHaveBeenCalledWith(video.node);
+    Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: fsWrap});
+    f.document.dispatchEvent(new f.window.Event('webkitfullscreenchange'));
+    f.flush();
+    expect(host.parentElement).toBe(fsWrap);
+    viewResize(); f.flush();
+    expect(layout).toHaveBeenCalledTimes(2);
+    owner.destroy();
+    expect(roDisconnect).toHaveBeenCalled();
+
+    // 2) 容器全屏包裹开放 Shadow DOM 媒体时通过 containsDeep 挂载浮层并判定归属
+    const shadowFsWrap = f.document.createElement('section');
+    const shadowFsHost = f.document.createElement('div');
+    const shadowFsRoot = shadowFsHost.attachShadow({mode: 'open'});
+    const shadowFsVideo = f.document.createElement('video') as unknown as HTMLMediaElement;
+    Object.defineProperty(shadowFsVideo, 'getBoundingClientRect', {value: () => ({left: 10, top: 20, right: 310, bottom: 200, width: 300, height: 180})});
+    shadowFsRoot.appendChild(shadowFsVideo);
+    shadowFsWrap.appendChild(shadowFsHost);
+    f.document.body.appendChild(shadowFsWrap);
+    expect(playerOwnsMedia(shadowFsWrap, shadowFsVideo)).toBe(true);
+    Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: shadowFsWrap});
+    const shadowOwner = createHtmlMediaHost(vi.fn(), f.document);
+    expect(shadowOwner.getPlayer(shadowFsVideo).parentElement).toBe(shadowFsWrap);
+    shadowOwner.destroy();
+
+    // 3) view 与 globalThis 均缺少 ResizeObserver 时安全降级不抛错
+    Object.defineProperty(f.window, 'ResizeObserver', {configurable: true, value: undefined});
+    vi.stubGlobal('ResizeObserver', undefined);
+    const fallbackOwner = createHtmlMediaHost(vi.fn(), f.document);
+    expect(fallbackOwner.getPlayer(video.node).dataset.mediaKind).toBe('video');
+    fallbackOwner.destroy();
+});

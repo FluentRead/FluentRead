@@ -10,18 +10,49 @@ import {
   parseYoutubeTimedTextResponse,
   sanitizeSubtitleFilename,
 } from '@/src/features/video-subtitle/content/youtubeSubtitleData';
+import {validateYoutubeTimedTextMessage} from '@/src/features/video-subtitle/content/youtubeTimedTextMessage';
 
 describe('YouTube 字幕轨道数据', () => {
-  it('内嵌播放器严格绑定路径ID，原watch和shorts解析保持既有行为', () => {
-    const location = (pathname: string, search = '') => ({hostname: 'www.youtube.com', pathname, search});
+  it('内嵌播放器与 /live/ 严格绑定路径ID，兼容 youtube-nocookie 内嵌并保持原 watch/shorts 行为', () => {
+    const location = (pathname: string, search = '', hostname = 'www.youtube.com') => ({hostname, pathname, search});
     expect(getYoutubeVideoId(location('/embed/abcdefghijk', '?v=other-video'))).toBe('abcdefghijk');
     expect(getYoutubeVideoId(location('/embed/aB_cD-eF123/'))).toBe('aB_cD-eF123');
-    for (const path of ['/embed/', '/embed/short-id', '/embed/abcdefghijkl', '/embed/abcdefghijk/extra', '/embed/abc%20efghijk']) {
+    expect(getYoutubeVideoId(location('/embed/abcdefghijk', '?v=other-video', 'www.youtube-nocookie.com'))).toBe('abcdefghijk');
+    expect(getYoutubeVideoId(location('/live/abcdefghijk', '?v=other-video'))).toBe('abcdefghijk');
+    expect(getYoutubeVideoId(location('/live/aB_cD-eF123/'))).toBe('aB_cD-eF123');
+    for (const path of [
+      '/embed/', '/embed/short-id', '/embed/abcdefghijkl', '/embed/abcdefghijk/extra', '/embed/abc%20efghijk',
+      '/live/', '/live/short-id', '/live/abcdefghijkl', '/live/abcdefghijk/extra', '/live/abc%20efghijk',
+    ]) {
       expect(getYoutubeVideoId(location(path))).toBe('');
     }
     expect(getYoutubeVideoId(location('/shorts/short-id'))).toBe('short-id');
     expect(getYoutubeVideoId(location('/shorts/short-id/', '?v=preferred-id'))).toBe('preferred-id');
     expect(getYoutubeVideoId(location('/watch', '?v=watch-id'))).toBe('watch-id');
+
+    const responseText = JSON.stringify({events: [{tStartMs: 0, dDurationMs: 1000, segs: [{utf8: 'Hello live'}]}]});
+    const basePayload = {source: 'fluent-read', type: 'fluent-read-youtube-timedtext', responseText};
+    expect(validateYoutubeTimedTextMessage(
+      {...basePayload, url: 'https://www.youtube-nocookie.com/api/timedtext?v=abcdefghijk&lang=en'},
+      'https://www.youtube-nocookie.com/embed/abcdefghijk',
+    )?.cues).toHaveLength(1);
+    expect(validateYoutubeTimedTextMessage(
+      {...basePayload, url: 'https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en'},
+      'https://www.youtube-nocookie.com/embed/abcdefghijk?v=spoofed',
+    )?.cues).toHaveLength(1);
+    expect(validateYoutubeTimedTextMessage(
+      {...basePayload, url: 'https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en'},
+      'https://www.youtube.com/live/abcdefghijk?v=spoofed',
+    )?.cues).toHaveLength(1);
+    for (const [url, href] of [
+      ['https://www.youtube.com/api/timedtext?v=spoofed&lang=en', 'https://www.youtube.com/live/abcdefghijk?v=spoofed'],
+      ['https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en', 'https://www.youtube-nocookie.com/watch?v=abcdefghijk'],
+      ['https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en', 'https://www.youtube-nocookie.com.evil.test/embed/abcdefghijk'],
+      ['https://www.youtube.com/api/timedtext?v=short-id&lang=en', 'https://www.youtube-nocookie.com/embed/short-id'],
+      ['https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en', 'https://www.youtube.com/live/abcdefghijk/extra'],
+    ]) {
+      expect(validateYoutubeTimedTextMessage({...basePayload, url}, href), href).toBeNull();
+    }
   });
   it('跳过响应中的空轨道、空事件和空片段，保留相邻有效字幕', () => {
     const validTrack = {baseUrl: 'https://www.youtube.com/api/timedtext?v=current&lang=en', languageCode: 'en'};

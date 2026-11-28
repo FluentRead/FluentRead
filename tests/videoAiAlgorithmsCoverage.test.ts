@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   VideoAiStreamingResampler,
+  encodeVideoAiPcm16Base64,
+  isVideoAiAmbientSilence,
   measureVideoAiSpeechActivity,
 } from '@/src/features/video-subtitle/content/video-ai/audioWindow';
 import {
@@ -69,6 +71,37 @@ describe('Video AI algorithm boundary coverage', () => {
     const resampler = new VideoAiStreamingResampler();
     expect(Array.from(resampler.process([new Float32Array([1])], 8_000, 16_000))).toEqual([1]);
     expect(Array.from(resampler.process([new Float32Array([0])], 8_000, 16_000))).toEqual([0.5, 0]);
+
+    // Mono zero-copy fast path at matching sample rate.
+    const monoInput = new Float32Array([0.2, -0.2]);
+    expect(new VideoAiStreamingResampler().process([monoInput], 16_000, 16_000)).toBe(monoInput);
+
+    // Multi-channel mixing and 48kHz -> 16kHz causal anti-aliasing decimation across tiny chunks.
+    const stereoMixed = new VideoAiStreamingResampler().process(
+      [new Float32Array([1, 0, 1]), new Float32Array([0, 1])],
+      16_000,
+      16_000,
+    );
+    expect(Array.from(stereoMixed)).toEqual([0.5, 0.5, 0.5]);
+
+    const source48k = new Float32Array([0.3, 0.6, 0.9, 0.3, 0.6, 0.9]);
+    const streamed48k = new VideoAiStreamingResampler();
+    const parts = [
+      streamed48k.process([source48k.subarray(0, 1)], 48_000, 16_000),
+      streamed48k.process([source48k.subarray(1, 2)], 48_000, 16_000),
+      streamed48k.process([source48k.subarray(2, 6)], 48_000, 16_000),
+    ];
+    const oneShot48k = new VideoAiStreamingResampler().process([source48k], 48_000, 16_000);
+    expect(parts.flatMap(part => Array.from(part))).toEqual(Array.from(oneShot48k));
+
+    // Ambient silence detection stays conservative on quiet speech.
+    expect(isVideoAiAmbientSilence({active: false, peak: 0, rms: 0, activeFrameRatio: 0})).toBe(true);
+    expect(isVideoAiAmbientSilence({active: true, peak: 0.002, rms: 0.0005, activeFrameRatio: 0.01})).toBe(true);
+    expect(isVideoAiAmbientSilence({active: true, peak: 0.02, rms: 0.005, activeFrameRatio: 0.2})).toBe(false);
+
+    // Sub-chunked PCM16 encoding handles buffers larger than 4096 bytes cleanly.
+    const largePcm = new Float32Array(3_000).fill(0.5);
+    expect(encodeVideoAiPcm16Base64(largePcm).length).toBe(Math.ceil((largePcm.length * 2) / 3) * 4);
   });
 
   it('uses all timeline metadata fallbacks and chooses the newest available cue', () => {

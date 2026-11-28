@@ -16,6 +16,9 @@ import {
 } from './youtubeTimedTextBridgeCore';
 
 const YOUTUBE_HOST_PATTERN = /(^|\.)youtube\.com$/i;
+const YOUTUBE_NOCOOKIE_HOST_PATTERN = /(^|\.)youtube-nocookie\.com$/i;
+const YOUTUBE_EMBED_PATH_PATTERN = /^\/embed\/[\w-]{11}\/?$/u;
+const YOUTUBE_LIVE_PATH_PATTERN = /^\/live\/[\w-]{11}\/?$/u;
 
 export interface YoutubeTimedTextMessageLimits {
     maxPayloadChars: number;
@@ -35,8 +38,14 @@ export interface ValidatedYoutubeTimedTextMessage {
 }
 
 function isYoutubeVideoUrl(url: URL): boolean {
+    if (YOUTUBE_NOCOOKIE_HOST_PATTERN.test(url.hostname)) {
+        return YOUTUBE_EMBED_PATH_PATTERN.test(url.pathname);
+    }
     return YOUTUBE_HOST_PATTERN.test(url.hostname)
-        && (url.pathname === '/watch' || url.pathname.startsWith('/shorts/') || /^\/embed\/[\w-]{11}\/?$/u.test(url.pathname));
+        && (url.pathname === '/watch'
+            || url.pathname.startsWith('/shorts/')
+            || YOUTUBE_EMBED_PATH_PATTERN.test(url.pathname)
+            || YOUTUBE_LIVE_PATH_PATTERN.test(url.pathname));
 }
 
 /**

@@ -756,3 +756,53 @@ it('adopts a playing HTML audio element before the first scan', () => {
   media.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('play', {bubbles: true}));
   expect(locator.getTarget()!.video).toBe(media); locator.destroy();
 });
+
+it('discovers open Shadow DOM videos, honors webkit fullscreen, prefers playing media, and ignores non-media play events', () => {
+  const f = setup('<div id="host"></div><div class="plain"><video id="paused"></video></div><div class="plain"><video id="playing"></video></div>', 'https://example.test/');
+  const host = f.document.getElementById('host')!;
+  const shadow = host.attachShadow({mode: 'open'});
+  const shadowVideo = f.document.createElement('video') as unknown as HTMLVideoElement;
+  shadowVideo.id = 'shadow-video';
+  Object.defineProperty(shadowVideo, 'getBoundingClientRect', {configurable: true, value: () => ({width: 640, height: 360, top: 0, left: 0, right: 640, bottom: 360})});
+  shadow.appendChild(shadowVideo);
+  const paused = f.document.getElementById('paused') as unknown as HTMLVideoElement;
+  const playing = f.document.getElementById('playing') as unknown as HTMLVideoElement;
+  Object.defineProperty(paused, 'paused', {configurable: true, value: true});
+  Object.defineProperty(playing, 'paused', {configurable: true, value: false});
+  Object.defineProperty(playing, 'ended', {configurable: true, value: false});
+  Object.defineProperty(shadowVideo, 'paused', {configurable: true, value: true});
+
+  const locator = createVideoPlayerLocator({document: f.document, window: f.window, includeAudio: true});
+  expect(locator.sync()?.video).toBe(playing);
+
+  // 非媒体节点派发 play 不应切换选中项
+  f.document.body.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('play', {bubbles: true}));
+  expect(locator.getTarget()?.video).toBe(playing);
+
+  // webkitFullscreenElement 与 webkitfullscreenchange 切到全屏容器（直指 Shadow DOM video）
+  Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: shadowVideo});
+  f.document.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('webkitfullscreenchange'));
+  expect(locator.getTarget()?.video).toBe(shadowVideo);
+  expect(locator.getTarget()?.fullscreen).toBe(true);
+
+  // 容器级全屏包裹 Shadow DOM video：通过 containsDeep 与受限子树深查命中，且忽略不可见的额外全屏视频
+  const hiddenShadowVideo = f.document.createElement('video') as unknown as HTMLVideoElement;
+  Object.defineProperty(hiddenShadowVideo, 'getBoundingClientRect', {configurable: true, value: () => ({width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0})});
+  shadow.appendChild(hiddenShadowVideo);
+  Object.defineProperty(f.document, 'webkitFullscreenElement', {configurable: true, value: host});
+  f.document.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('webkitfullscreenchange'));
+  expect(locator.getTarget()?.video).toBe(shadowVideo);
+  expect(locator.getTarget()?.fullscreen).toBe(true);
+  hiddenShadowVideo.remove();
+  expect(locator.sync()?.player).toBe(host);
+  locator.destroy();
+
+  // 纯 Shadow DOM 页面（无轻 DOM video）回退全页深查命中
+  const shadowOnly = setup('<div id="only-host"></div>', 'https://example.test/');
+  const onlyHost = shadowOnly.document.getElementById('only-host')!;
+  const onlyShadow = onlyHost.attachShadow({mode: 'open'});
+  const onlyVideo = shadowOnly.document.createElement('video') as unknown as HTMLVideoElement;
+  Object.defineProperty(onlyVideo, 'getBoundingClientRect', {configurable: true, value: () => ({width: 640, height: 360, top: 0, left: 0, right: 640, bottom: 360})});
+  onlyShadow.appendChild(onlyVideo);
+  expect(selectVideoPlayerTarget(shadowOnly.document, {window: shadowOnly.window})?.video).toBe(onlyVideo);
+});

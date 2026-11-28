@@ -9,6 +9,7 @@ import {
 } from '@/src/features/video-subtitle/transcription';
 import {
   cancelLocalVideoTranscription,
+  disposeLocalVideoTranscriber,
   prepareLocalVideoTranscriptionModel,
   transcribeLocalVideoAudio,
 } from '@/src/features/video-subtitle/offscreen/transcription';
@@ -101,6 +102,7 @@ afterEach(async () => {
   await cancelLocalVideoTranscription('warm-stream');
   await cancelLocalVideoTranscription('recovered-stream');
   await cancelLocalVideoTranscription('handoff-stream');
+  disposeLocalVideoTranscriber();
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.clearAllTimers();
@@ -213,6 +215,13 @@ describe('video transcription offscreen transport branches', () => {
     await tick();
     await expect(second).rejects.toThrow('音频解码失败：decode string');
 
+    const syncThrow = vi.spyOn(CoverageAudioContext.prototype, 'decodeAudioData').mockImplementationOnce(() => {
+      throw new Error('sync decode error');
+    });
+    await expect(transcribeLocalVideoAudio({streamId: 'coverage-stream', audioBase64: 'AAAAAA=='}))
+      .rejects.toThrow('音频解码失败：sync decode error');
+    syncThrow.mockRestore();
+
     vi.stubGlobal('window', {location: {href: 'chrome-extension://test/offscreen.html'}, setTimeout, clearTimeout});
     const noDecoder = transcribeLocalVideoAudio({streamId: 'coverage-stream', audioBase64: 'AAAAAA=='});
     await expect(noDecoder).rejects.toThrow('没有可用的 Web Audio 解码器');
@@ -238,15 +247,15 @@ describe('video transcription offscreen transport branches', () => {
     vi.useFakeTimers();
     installWorker({audio: CoverageAudioContext});
     const pending = transcribeLocalVideoAudio({streamId: 'coverage-stream', audioPcm16Base64: 'AAAAAA==', model: 'tiny'});
-    const pendingResult = expect(pending).rejects.toThrow('超过 16 秒');
+    const pendingResult = expect(pending).rejects.toThrow('超过 11.2 秒');
     await tick();
     const firstWorker = CoverageWorker.instances.at(-1)!;
-    await vi.advanceTimersByTimeAsync(16_000);
+    await vi.advanceTimersByTimeAsync(20_800);
     const fallback = CoverageWorker.instances.at(-1)!;
     expect(firstWorker.terminated).toBe(true);
     expect(fallback).not.toBe(firstWorker);
     expect(fallback.lastMessage?.device).toBe('wasm');
-    await vi.advanceTimersByTimeAsync(15_999);
+    await vi.advanceTimersByTimeAsync(11_199);
     expect(fallback.terminated).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     await pendingResult;

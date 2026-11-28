@@ -337,6 +337,28 @@ it('rechecks missing Small tokenizer on return and offers the existing repair do
     expect(h.backend.videoOffscreen.send).toHaveBeenCalledOnce();
 });
 
+it('coalesces simultaneous visibilitychange and focus return events into a single refresh batch', async () => {
+    const h = await mount('video');
+    const nowSpy = vi.spyOn(Date, 'now');
+    try {
+        let now = 0;
+        nowSpy.mockImplementation(() => now);
+        const before = ports.send.mock.calls.length;
+        dom.document.dispatchEvent(new dom.window.Event('visibilitychange'));
+        dom.window.dispatchEvent(new dom.window.Event('focus'));
+        await settle();
+        const firstBatch = ports.send.mock.calls.length - before;
+        expect(firstBatch).toBe(2); // model state + cache stats (not duplicated to 4, works even at timestamp 0)
+        now += 350;
+        dom.window.dispatchEvent(new dom.window.Event('focus'));
+        await settle();
+        expect(ports.send.mock.calls.length - before).toBe(4);
+    } finally {
+        nowSpy.mockRestore();
+        h.stop();
+    }
+});
+
 describe('video model settings pure public contract', () => {
     it('loads the existing model and cache protocol without evaluating the player runtime', async () => {
         vi.resetModules();

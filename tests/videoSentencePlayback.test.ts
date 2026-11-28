@@ -8,7 +8,8 @@ class MediaFixture extends EventTarget {
   seeking = false;
   ended = false;
   isConnected = true;
-  playbackRate = 1.75;
+  playbackRate: number | undefined = 1.75;
+  duration: number | undefined = undefined;
   failSeek = false;
   synchronousSeek = false;
   get currentTime(): number { return this.time; }
@@ -96,12 +97,15 @@ describe('视频单句播放器控制器', () => {
     h.controller.destroy();
   });
 
-  it('跳转待完成时允许同一时间范围切换辅助模式', () => {
+  it('跳转待完成时允许同一时间范围切换或保持辅助模式', () => {
     const h = harness();
     let time = 5;
     const seek = vi.fn((value: number) => {time = value; h.media.seeking = true;});
     Object.defineProperty(h.media, 'currentTime', {get: () => time, set: seek});
     h.controller.select(h.sentence, 'loop');
+    const sameModeSentence = {...h.sentence, id: 'same-mode-semantic-sentence'};
+    h.controller.select(sameModeSentence, 'loop', false);
+    expect(h.controller.getState()).toMatchObject({sentence: sameModeSentence, mode: 'loop'});
     const nextSentence = {...h.sentence, id: 'next-semantic-sentence'};
     h.controller.select(nextSentence, 'pause', false);
     h.media.dispatchEvent(new Event('seeking'));
@@ -201,13 +205,13 @@ describe('视频单句播放器控制器', () => {
     h.controller.destroy();
   });
 
-  it('句末暂停停在真实终点，主动恢复播放后解除句末暂停', async () => {
+  it('句末暂停停在句尾前避开下句起跳，主动恢复播放后解除句末暂停', async () => {
     const h = harness();
     h.controller.select(h.sentence, 'pause');
     h.media.currentTime = 3.1;
     h.frame();
     expect(h.media.pause).toHaveBeenCalledOnce();
-    expect(h.media.currentTime).toBe(3);
+    expect(h.media.currentTime).toBe(2.99);
     expect(h.controller.getState().pausedAtEnd).toBe(true);
     expect(h.callbacks.size).toBe(0);
     h.media.paused = false;
@@ -383,5 +387,61 @@ describe('视频单句播放器控制器', () => {
     expect(request).toHaveBeenCalledOnce();
     controller.destroy();
     expect(cancel).toHaveBeenCalledWith(19);
+  });
+
+  it('高倍速与关键帧对齐容差避免误解除，非正或缺失倍速回退 150ms', () => {
+    const h = harness();
+    h.media.playbackRate = 3;
+    let time = 5;
+    Object.defineProperty(h.media, 'currentTime', {
+      get: () => time,
+      set: (value: number) => { time = value + 0.2; h.media.seeking = true; },
+    });
+    h.controller.select(h.sentence, 'loop');
+    h.media.dispatchEvent(new Event('seeking'));
+    h.media.seeking = false;
+    h.media.dispatchEvent(new Event('seeked'));
+    expect(h.controller.getState().mode).toBe('loop');
+    time = 0.85;
+    h.frame();
+    expect(h.controller.getState().mode).toBe('loop');
+    h.media.playbackRate = undefined;
+    time = 0.8;
+    h.frame();
+    expect(h.controller.getState().mode).toBe('off');
+    h.media.playbackRate = 0;
+    h.controller.select(h.sentence, 'loop');
+    h.media.dispatchEvent(new Event('seeking'));
+    expect(h.controller.getState().mode).toBe('off');
+    h.controller.destroy();
+  });
+
+  it('句末略超媒体总时长或距句末 250ms 内自然结束仍继续循环，极短句暂停不越过起点', async () => {
+    const h = harness();
+    h.controller.select(h.sentence, 'loop');
+    h.media.currentTime = 2.8;
+    h.media.dispatchEvent(new Event('ended'));
+    await Promise.resolve();
+    expect(h.media.currentTime).toBe(1);
+    expect(h.controller.getState().mode).toBe('loop');
+
+    h.media.duration = 2.5;
+    h.media.currentTime = 2.5;
+    h.media.dispatchEvent(new Event('ended'));
+    await Promise.resolve();
+    expect(h.media.currentTime).toBe(1);
+    expect(h.controller.getState().mode).toBe('loop');
+
+    h.media.duration = 10;
+    h.media.currentTime = 2.0;
+    h.media.dispatchEvent(new Event('ended'));
+    expect(h.controller.getState().mode).toBe('off');
+
+    const tiny = {...h.sentence, startMs: 1000, endMs: 1005};
+    h.controller.select(tiny, 'pause');
+    h.media.currentTime = 1.01;
+    h.frame();
+    expect(h.media.currentTime).toBe(1);
+    h.controller.destroy();
   });
 });

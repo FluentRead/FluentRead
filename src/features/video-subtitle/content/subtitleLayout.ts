@@ -1,10 +1,16 @@
 /**
  * @file src/features/video-subtitle/content/subtitleLayout.ts
  * 文件职责：在有限画面内计算字幕可用区域，并适配用户选择的大字号。
- * 主要内容：移动控件避让只按已知控件矩形切分和合并候选，保留最多八个可读宽度的空区；字号适配保持最多八轮二分，支持读音字幕的可读下限且不因取整跌破下限，不修改已保存偏好。
+ * 主要内容：移动控件避让只按已知控件矩形切分和合并候选，保留最多八个可读宽度的空区；字号适配保持最多八轮二分并支持按目标对象与几何签名记忆化复用结果，支持读音字幕的可读下限且不因取整跌破下限，不修改已保存偏好。
  * 模块边界：只处理几何或调用注入的字体测量函数，不读取配置、播放器或浏览器全局对象。
  */
 export type VideoSubtitleRect = {left: number; top: number; width: number; height: number};
+export interface VideoSubtitleFontFitCache {
+    target: object;
+    key: string;
+}
+
+const fittedFontSizes = new WeakMap<object, {key: string; size: number}>();
 
 export function videoSubtitleRectsOverlap(a: VideoSubtitleRect, b: VideoSubtitleRect): boolean {
     return a.left < b.left + b.width && a.left + a.width > b.left && a.top < b.top + b.height && a.top + a.height > b.top;
@@ -35,19 +41,31 @@ export function getVideoSubtitleFreeRegions(viewport: VideoSubtitleRect, obstacl
 }
 
 export function fitVideoSubtitleFontSize(requested: number, maximumHeight: number,
-    apply: (fontSize: number) => void, measure: () => number, minimum = 8): number {
+    apply: (fontSize: number) => void, measure: () => number, minimum = 8, cache?: VideoSubtitleFontFitCache): number {
+    if (cache) {
+        const cached = fittedFontSizes.get(cache.target);
+        if (cached && cached.key === cache.key) {
+            apply(cached.size);
+            return cached.size;
+        }
+    }
+    const remember = (result: number) => {
+        if (cache) fittedFontSizes.set(cache.target, {key: cache.key, size: result});
+        return result;
+    };
     let size = Number.isFinite(requested) && requested > 0 ? requested : 16;
     const floor = Number.isFinite(minimum) && minimum > 0 ? Math.min(size, minimum) : 8;
     apply(size);
     if (!Number.isFinite(maximumHeight) || maximumHeight <= 0) return size;
     const initialHeight = measure();
-    if (!Number.isFinite(initialHeight) || initialHeight <= maximumHeight || size <= floor) return size;
+    if (!Number.isFinite(initialHeight) || initialHeight <= 0) return size;
+    if (initialHeight <= maximumHeight || size <= floor) return remember(size);
     let lower = floor, upper = size;
     apply(lower);
     const minimumHeight = measure();
     // 测量失效时还原偏好；下界仍溢出时保留最低字号，不伪造可容纳结果。
     if (!Number.isFinite(minimumHeight)) { apply(size); return size; }
-    if (minimumHeight > maximumHeight) return lower;
+    if (minimumHeight > maximumHeight) return remember(lower);
     for (let attempt = 0; attempt < 8; attempt += 1) {
         size = (lower + upper) / 2;
         apply(size);
@@ -58,5 +76,5 @@ export function fitVideoSubtitleFontSize(requested: number, maximumHeight: numbe
     }
     size = Math.max(floor, Math.floor(lower * 100) / 100);
     apply(size);
-    return size;
+    return remember(size);
 }

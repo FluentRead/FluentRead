@@ -2,16 +2,24 @@ import {resolveLocalTranslationLanguageCode} from '@/src/core/language/localTran
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import * as detection from '@/src/core/language/detect';
 import {
+  DEFAULT_LOCAL_TRANSLATION_MIRROR_URL,
   DEFAULT_LOCAL_TRANSLATION_MODEL,
   HUNYUAN2_SUPPORTED_LANGUAGES,
   HUNYUAN_LANGUAGE_NAMES,
   LOCAL_TRANSLATION_MODEL_IDS,
   LOCAL_TRANSLATION_MODELS,
+  buildLocalTranslationMirrorPageUrl,
+  buildLocalTranslationModelScopePageUrl,
+  isValidLocalTranslationMirrorUrl,
   localTranslationErrorKey,
   normalizeLocalTranslationDownloadSnapshot,
+  normalizeLocalTranslationMirrorUrl,
   normalizeLocalTranslationModel,
+  normalizeLocalTranslationSourcePreference,
   resolveOpusTranslationRepository,
 } from '@/src/core/config/localTranslation';
+import {parseOffscreenRequest} from '@/src/core/messaging/offscreen';
+import {createLocalTranslationOffscreenAdapter} from '@/src/platform/offscreen/localTranslation';
 import {
   LOCAL_TRANSLATION_MODEL_FILES,
   getLocalTranslationModelFileUrl,
@@ -203,5 +211,56 @@ describe('local translation model cache', () => {
     await removeLocalTranslationModelFiles(LOCAL_TRANSLATION_MODEL_IDS.m2m100);
     await expect(isLocalTranslationModelCached(LOCAL_TRANSLATION_MODEL_IDS.m2m100)).resolves.toBe(false);
     await expect(isLocalTranslationModelCached(LOCAL_TRANSLATION_MODEL_IDS.nllb)).resolves.toBe(true);
+  });
+
+  it('validates download source preferences, acceleration mirror URLs, page links, and offscreen prepare forwarding', async () => {
+    expect(normalizeLocalTranslationSourcePreference('mirror')).toBe('mirror');
+    expect(normalizeLocalTranslationSourcePreference('official')).toBe('official');
+    expect(normalizeLocalTranslationSourcePreference('auto')).toBe('auto');
+    expect(normalizeLocalTranslationSourcePreference('invalid')).toBe('auto');
+
+    expect(normalizeLocalTranslationMirrorUrl(undefined)).toBeUndefined();
+    expect(normalizeLocalTranslationMirrorUrl('   ')).toBeUndefined();
+    expect(normalizeLocalTranslationMirrorUrl('not-a-url')).toBeUndefined();
+    expect(normalizeLocalTranslationMirrorUrl('http://hf-mirror.com')).toBeUndefined();
+    expect(normalizeLocalTranslationMirrorUrl('https://user:pass@hf-mirror.com')).toBeUndefined();
+    expect(normalizeLocalTranslationMirrorUrl('https://hf-mirror.com?token=1')).toBeUndefined();
+    expect(normalizeLocalTranslationMirrorUrl('https://hf-mirror.com#frag')).toBeUndefined();
+    expect(normalizeLocalTranslationMirrorUrl('https://hf-mirror.com/')).toBe('https://hf-mirror.com');
+    expect(normalizeLocalTranslationMirrorUrl(' https://proxy.example.com/hf/// ')).toBe('https://proxy.example.com/hf');
+
+    expect(isValidLocalTranslationMirrorUrl('')).toBe(true);
+    expect(isValidLocalTranslationMirrorUrl('https://proxy.example.com/hf')).toBe(true);
+    expect(isValidLocalTranslationMirrorUrl('http://insecure.example.com')).toBe(false);
+
+    expect(buildLocalTranslationMirrorPageUrl('tencent/Hy-MT3-1.8B-GGUF')).toBe(`${DEFAULT_LOCAL_TRANSLATION_MIRROR_URL}/tencent/Hy-MT3-1.8B-GGUF`);
+    expect(buildLocalTranslationMirrorPageUrl('tencent/Hy-MT3-1.8B-GGUF', 'https://proxy.example.com/hf/')).toBe('https://proxy.example.com/hf/tencent/Hy-MT3-1.8B-GGUF');
+    expect(buildLocalTranslationModelScopePageUrl('tencent/Hy-MT3-1.8B-GGUF')).toBe('https://modelscope.cn/models/Tencent-Hunyuan/Hy-MT3-1.8B-GGUF');
+    expect(buildLocalTranslationModelScopePageUrl('Xenova/opus-mt-en-zh')).toBeUndefined();
+
+    expect(parseOffscreenRequest('LOCAL_TRANSLATION_PREPARE', {
+      model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan3,
+      preference: 'mirror',
+      mirrorUrl: 'https://proxy.example.com/hf',
+    })).toEqual({
+      model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan3,
+      preference: 'mirror',
+      mirrorUrl: 'https://proxy.example.com/hf',
+    });
+    expect(() => parseOffscreenRequest('LOCAL_TRANSLATION_PREPARE', {
+      model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan3,
+      mirrorUrl: 'http://bad.example.com',
+    })).toThrow();
+
+    const send = vi.fn(async () => ({success: true, version: 2, tasks: []}));
+    const adapter = createLocalTranslationOffscreenAdapter({send} as never);
+    await adapter.prepare(LOCAL_TRANSLATION_MODEL_IDS.hunyuan3, false, {preference: 'mirror', mirrorUrl: 'https://proxy.example.com/hf'});
+    expect(send).toHaveBeenCalledWith({
+      type: 'LOCAL_TRANSLATION_PREPARE',
+      model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan3,
+      keepWarm: false,
+      preference: 'mirror',
+      mirrorUrl: 'https://proxy.example.com/hf',
+    }, {timeoutMs: 30_000});
   });
 });

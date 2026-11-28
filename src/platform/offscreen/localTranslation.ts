@@ -5,7 +5,11 @@
  * 主要内容：通过已知 type 关联的 DTO 校验真实序列化消息，转发文本翻译、模型准备、状态查询和清除请求，并把取消信号绑定到对应 requestId。
  * 模块边界：只连接平台 Offscreen client，不读取配置、不初始化模型，也不访问宿主网页 DOM。
  */
-import {type LocalTranslationModelId, type LocalTranslationDownloadSnapshot} from '@/src/core/config/localTranslation';
+import {
+    type LocalTranslationDownloadOptions,
+    type LocalTranslationDownloadSnapshot,
+    type LocalTranslationModelId,
+} from '@/src/core/config/localTranslation';
 import type {LocalTranslationStatus, InferenceSuccess, InferenceFailure} from '@/src/core/messaging/offscreen';
 import {sendOffscreenRequest} from './requests';
 import {OFFSCREEN_CANCEL_LOCAL_TRANSLATION_MESSAGE_TYPE, type OffscreenClient} from './client';
@@ -56,11 +60,17 @@ export function createLocalTranslationOffscreenAdapter(client: OffscreenClient =
             }
             return response.result;
         },
-        async prepare(model: LocalTranslationModelId, keepWarm = false): Promise<InferenceSuccess<LocalTranslationDownloadSnapshot>> {
+        async prepare(
+            model: LocalTranslationModelId,
+            keepWarm = false,
+            options?: LocalTranslationDownloadOptions,
+        ): Promise<InferenceSuccess<LocalTranslationDownloadSnapshot>> {
             const response = await sendOffscreenRequest(client, {
                 type: 'LOCAL_TRANSLATION_PREPARE',
                 model,
                 keepWarm,
+                ...(options?.preference ? {preference: options.preference} : {}),
+                ...(options?.mirrorUrl ? {mirrorUrl: options.mirrorUrl} : {}),
             }, {timeoutMs: 30_000});
             if (!response.success) throw new Error(errorMessage(response, '本地翻译模型下载失败'));
             return response;

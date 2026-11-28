@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaEntry.ts
  * 文件职责：将安静的独立漫画按钮、按住对照原图桥接和按需资源确认挂载到隔离 Shadow UI，并桥接真实会话、资源检查与持久偏好。
- * 主要内容：用地址识别阅读页，在已有 Shadow UI 中持有唯一按需文字面板；主入口和悬浮球共享打开状态与可信触发目标，不自动读取；暴露可选 onPeekOriginal 端口并在暂停、禁用或卸载时安全复位对照态；注册实际宿主并按实例释放，订阅会话和配置，卸载即时退订，挂载所有权防止迟到实例影响新入口。
+ * 主要内容：用地址识别阅读页，在已有 Shadow UI 中持有唯一按需文字面板并同步独立悬浮坞左右/垂直停靠位置；主入口和悬浮球共享打开状态与可信触发目标，不自动读取；暴露可选 onPeekOriginal 端口并在暂停、禁用或卸载时安全复位对照态；注册实际宿主并按实例释放，订阅会话和配置，卸载即时退订，挂载所有权防止迟到实例影响新入口。
  * 模块边界：仅编排 feature 内部 UI 与公共配置、浏览器消息端口，不下载模型、不实现翻译，宿主脚本不能通过合成 DOM 事件发起动作。
  */
 import {reactive} from 'vue';
@@ -61,9 +61,15 @@ export function mountMangaEntry(ctx: ContentScriptContext, ports: MangaEntryPort
     const sourceLanguage = () => resolveMangaSourceLanguage(location.href, config.from, config.imageTranslationMangaSites);
     const settings = reactive({sourceLanguage: sourceLanguage(), promptEnabled: config.imageTranslationMangaPromptEnabled, floatingBallVisible: !config.disableFloatingBall && !isFloatingBallDisabledOnSite(location.href, config.floatingBallDisabledDomains), to: config.to,
         service: config.imageTranslationService, downloadConfirmed: config.imageTranslationMangaDownloadConfirmed, animations: config.animations, toolsDisplay: config.floatingBallToolsDisplay ?? 'always', prefetchPages: config.imageTranslationMangaPrefetchPages});
+    const dockPosition = reactive<{side: 'left' | 'right'; verticalPosition: number | null}>({
+        side: config.floatingBallPosition === 'left' ? 'left' : 'right',
+        verticalPosition: typeof config.floatingBallVerticalPosition === 'number' ? config.floatingBallVerticalPosition : null,
+    });
     const page = reactive({site: resolveMangaSite(location.href, config.imageTranslationMangaSites)?.name ?? '', route: location.href});
     const sync = () => {Object.assign(settings, {sourceLanguage: sourceLanguage(), promptEnabled: config.imageTranslationMangaPromptEnabled, floatingBallVisible: !config.disableFloatingBall && !isFloatingBallDisabledOnSite(location.href, config.floatingBallDisabledDomains), to: config.to,
         service: config.imageTranslationService, downloadConfirmed: config.imageTranslationMangaDownloadConfirmed, animations: config.animations, toolsDisplay: config.floatingBallToolsDisplay ?? 'always', prefetchPages: config.imageTranslationMangaPrefetchPages});
+        dockPosition.side = config.floatingBallPosition === 'left' ? 'left' : 'right';
+        dockPosition.verticalPosition = typeof config.floatingBallVerticalPosition === 'number' ? config.floatingBallVerticalPosition : null;
         reading.theme = theme();Object.assign(page, {site: resolveMangaSite(location.href, config.imageTranslationMangaSites)?.name ?? '', route: location.href});
         if (!allowed()) setPeeking(false);};
     const stopOpener = registerMangaReadingOpener(event => openMangaReading(event, false));
@@ -84,7 +90,7 @@ export function mountMangaEntry(ctx: ContentScriptContext, ports: MangaEntryPort
         ? (next: boolean) => {if (request === owner && !removed && (!next || allowed())) setPeeking(next);}
         : undefined;
     pending = createVueShadowUi(ctx, {name: 'fluent-read-manga-entry', hostId: 'fluent-read-manga-entry-container', component: MangaEntry, mode: 'closed', css:mangaEntryStyles,
-        props: {status, settings, page,reading,readingState,readManga:openMangaReading,onPeekOriginal,
+        props: {status, settings, dockPosition, page,reading,readingState,readManga:openMangaReading,onPeekOriginal,
             readingChanged:(open:boolean)=>{if(request===owner && !removed){readingState.open=open;publishReading(open);}},
             startAreaTranslation: async () => config.on && config.imageTranslationMangaEnabled && status.available && status.areaFallback === true
                 && await (ports.startAreaTranslation?.() ?? false),

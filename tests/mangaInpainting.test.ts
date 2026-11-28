@@ -738,4 +738,30 @@ describe('漫画局部神经修补',()=>{
         await expect(createBrowserMangaInpainter(initAbort.signal)).rejects.toMatchObject({name:'AbortError'});
         expect(releaseFail).toHaveBeenCalledOnce();
     });
+    it('并发等待修补模型准备的页面共享实时进度，排队取消立即停止接收进度',async()=>{
+        let progressCallback:((percent?:number,initializing?:boolean)=>void)|undefined;
+        const ready=deferred<{run:(patch:{image:Float32Array;mask:Float32Array;width:number;height:number})=>Promise<Float32Array>;release:()=>Promise<void>}>();
+        const runtime=createMangaInpaintingRuntime((_signal,progress)=>{progressCallback=progress;return ready.promise;});
+        try{
+            const firstProgress=vi.fn(),secondProgress=vi.fn(),abortedProgress=vi.fn();
+            const abort=new AbortController();
+            const first=runtime.repair(pixels(),128,128,[region],undefined,firstProgress,undefined,[{uniform:false,color:'#eee'}]);
+            await tick();
+            progressCallback?.(35,false);
+            const second=runtime.repair(pixels(),128,128,[region],undefined,secondProgress,undefined,[{uniform:false,color:'#eee'}]);
+            const third=runtime.repair(pixels(),128,128,[region],abort.signal,abortedProgress,undefined,[{uniform:false,color:'#eee'}]);
+            expect(secondProgress).toHaveBeenCalledWith(35,false);
+            expect(abortedProgress).toHaveBeenCalledWith(35,false);
+            abort.abort();
+            progressCallback?.(80,false);
+            expect(firstProgress).toHaveBeenCalledWith(80,false);
+            expect(secondProgress).toHaveBeenCalledWith(80,false);
+            expect(abortedProgress).toHaveBeenCalledTimes(1);
+            const run=vi.fn(async(patch:{width:number;height:number})=>zero(patch));
+            ready.resolve({run,release:vi.fn(async()=>{})});
+            await expect(third).rejects.toMatchObject({name:'AbortError'});
+            await Promise.all([first,second]);
+            expect(run).toHaveBeenCalledTimes(2);
+        }finally{await runtime.dispose();}
+    });
 });

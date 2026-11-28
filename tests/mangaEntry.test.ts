@@ -325,4 +325,15 @@ describe('独立漫画入口所有权和配置端口', () => {
         props().openSettings();expect(mocks.send).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-image-translation'});
         mocks.send.mockRejectedValueOnce(new Error('closed'));props().openSettings();await Promise.resolve();
     });
+    it('同步独立操作坞的左右侧停靠和垂直位置偏好', async () => {
+        Object.assign(mocks.config, {floatingBallPosition: 'left', floatingBallVerticalPosition: 0.35});
+        await mountMangaEntry({} as never);
+        expect(props().dockPosition).toEqual({side: 'left', verticalPosition: 0.35});
+        Object.assign(mocks.config, {floatingBallPosition: 'right', floatingBallVerticalPosition: undefined});
+        mocks.subscribe.mock.calls[0][0]();
+        expect(props().dockPosition).toEqual({side: 'right', verticalPosition: null});
+        Object.assign(mocks.config, {floatingBallPosition: 'left', floatingBallVerticalPosition: 0.72});
+        mocks.subscribe.mock.calls[0][0]();
+        expect(props().dockPosition).toEqual({side: 'left', verticalPosition: 0.72});
+    });
 });

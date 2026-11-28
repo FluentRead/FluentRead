@@ -37,7 +37,7 @@ import type {ImageViewport} from '@/src/shared/image/types';
 import {fetchPageImageForOcr} from '@/src/features/image-translation/services/remoteImage';
 import {encodeImageCanvas} from '@/src/features/image-translation/services/imageEncoding';
 import {withImageSourceAuthorization} from './sourceAuthorization';
-import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSource, isImagePresentationOccluded, canShareImageOverflowClipping, type ImagePresentation} from './presentation';
+import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSource, isImagePresentationOccluded, resolveMangaPresentationBounds, canShareImageOverflowClipping, type ImagePresentation} from './presentation';
 import {isNativeModal, isOpenImageViewer, samePreviewImage, samePreviewResource, visibleImageViewers, type PreviewImageSource} from './imagePreview';
 import {createImageControls, IMAGE_CONTROLS_CSS, type ImageControlPhase, type ImageSettingsSection} from './controls';
 import {isImageHoverEligible} from './hoverEligibility';
@@ -1075,8 +1075,21 @@ function updateOverlayPosition(state: ImageTranslationState, scrollOnly = false)
         && style.visibility !== 'collapse' && style.display !== 'none' && opacity > 0;
     const visible = usable && right > left && bottom > top;
     const ignoreForeground = imagePreview?.state === state ? ignorePreviewInputLayer(imagePreview.viewer) : undefined;
-    const occluded = visible && isImagePresentationOccluded(surface, {left, top, right, bottom}, imageOverlayHost, state.image, null, ignoreForeground,
-        transformed && style.pointerEvents !== 'none');
+    let occluded = false;
+    let mangaEdgeClipped = false;
+    if (visible) {
+        if (state.manga) {
+            const adjusted = resolveMangaPresentationBounds(surface, {left, top, right, bottom}, imageOverlayHost, state.image);
+            if (adjusted) {
+                mangaEdgeClipped = adjusted.top !== top || adjusted.bottom !== bottom;
+                left = adjusted.left; top = adjusted.top; right = adjusted.right; bottom = adjusted.bottom;
+            }
+            else occluded = true;
+        } else {
+            occluded = isImagePresentationOccluded(surface, {left, top, right, bottom}, imageOverlayHost, state.image, null, ignoreForeground,
+                transformed && style.pointerEvents !== 'none');
+        }
+    }
     const bitmap = state.phase === 'translated' ? state.translatedImage : null;
     if (!visible || occluded) {
         // 非滚动帧仍复核离屏局部译图的盒子和样式。真正遮挡或失配时归还原图。
@@ -1149,7 +1162,8 @@ function updateOverlayPosition(state: ImageTranslationState, scrollOnly = false)
             return;
         }
     }
-    if (bitmap.isConnected && state.overlay.isConnected) hideOriginalImage(state);
+    if (!localBitmap && mangaEdgeClipped) restoreOriginalImage(state);
+    else if (bitmap.isConnected && state.overlay.isConnected) hideOriginalImage(state);
 }
 
 async function openImageTranslationSettings(section: ImageSettingsSection): Promise<void> {
@@ -2333,7 +2347,7 @@ export function mountImageTranslator(): void {
                     if(item!==surface){const x=/^(hidden|clip|auto|scroll)$/.test(style.overflowX),y=/^(hidden|clip|auto|scroll)$/.test(style.overflowY);
                         if(x||y){const clip=item.getBoundingClientRect();if(x){left=Math.max(left,clip.left);right=Math.min(right,clip.right);}if(y){top=Math.max(top,clip.top);bottom=Math.min(bottom,clip.bottom);}}}
                 }
-                return right>left&&bottom>top&&!isImagePresentationOccluded(surface,{left,top,right,bottom},imageOverlayHost,image,mangaReadingOverlay?.host);
+                return right>left&&bottom>top&&resolveMangaPresentationBounds(surface,{left,top,right,bottom},imageOverlayHost,image,mangaReadingOverlay?.host)!==null;
             },
             load: async (source,signal) => {
                 if(signal.aborted)return {status:'cancelled'};

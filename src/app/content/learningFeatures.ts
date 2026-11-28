@@ -26,7 +26,7 @@ export function createLearningContentFeatures(ctx: ContentScriptContext, config:
             {id: 'personal-corrections', isEnabled: () => capabilities.browser !== 'userscript' && config.on && config.personalCorrectionsEnabled === true,
                 mount: ({signal}) => mountPersonalCorrectionContent(ctx, signal), unmount: unmountPersonalCorrectionContent} satisfies ContentFeatureDefinition,
         ]),
-        {id: 'writing-assistant', isEnabled: () => capabilities.browser !== 'userscript' && config.on && config.writing.enabled && isWritingPage(window.location.href),
+        {id: 'writing-assistant', isEnabled: () => capabilities.browser !== 'userscript' && config.on && config.writing.enabled && (isWritingPage(window.location.href) || isWritingAssistantMounted()),
             mount: () => mountWritingAssistant(ctx), unmount: unmountWritingAssistant, isMounted: isWritingAssistantMounted},
         {id: 'share-card', isEnabled: () => config.on, mount: () => mountShareCard(ctx), unmount: unmountShareCard, isMounted: isShareCardMounted},
     ];

@@ -407,6 +407,8 @@ export default defineConfig({
                 'src/features/writing-assistant/entrySession.ts',
                 'src/features/writing-assistant/background.ts',
                 'src/features/writing-assistant/editors.ts',
+                'src/features/writing-assistant/siteProfiles.ts',
+                'src/features/writing-assistant/shortcutRuntime.ts',
                 'src/features/writing-assistant/markdown.ts',
                 'src/features/writing-assistant/reference.ts',
                 'src/services/writing/runtime.ts',

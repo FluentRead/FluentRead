@@ -163,6 +163,7 @@ import { resolveParagraphCopyHotkey } from '@/src/core/config/paragraphCopy'
 import { findEnabledQuickTranslationHotkeyConflict, quickTranslationActionKey } from '@/src/core/config/quickTranslation'
 import { resolveSectionTranslationHotkey } from '@/src/core/config/sectionTranslation'
 import { canonicalizeHotkey, resolveConfiguredHotkey } from '@/src/core/hotkey'
+import { resolveWritingHotkey } from '@/src/core/config/writing'
 import {
   DEFAULT_INPUT_BOX_TRANSLATION_INTERVAL,
   DEFAULT_INPUT_BOX_TRANSLATION_PROMPT,
@@ -333,6 +334,7 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
         : '',
       feature: translateLegacy('智能高亮'),
     },
+    {hotkey: resolveWritingHotkey(props.config.writing), feature: translateLegacy('写作助手')},
   ]
 }
 

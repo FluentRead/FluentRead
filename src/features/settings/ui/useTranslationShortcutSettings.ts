@@ -9,6 +9,7 @@ import {ElMessage} from 'element-plus';
 import type {Config} from '@/src/core/config/model';
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
 import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
+import {resolveWritingHotkey} from '@/src/core/config/writing';
 import {findEnabledQuickTranslationHotkeyConflict, quickTranslationActionKey, inputBoxTranslationTriggerHotkey} from '@/src/core/config/quickTranslation';
 import {canonicalizeHotkey, parseHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
 import {useUiI18n} from '@/src/ui/i18n';
@@ -60,6 +61,10 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
             : '';
         if (reservedVideoSubtitle && canonical === canonicalizeHotkey(reservedVideoSubtitle).toLowerCase()) {
             return t('quickTranslation.legacyConflictEdit', {feature: t('video.modeShortcut.title')});
+        }
+        const reservedWriting = resolveWritingHotkey(config.value.writing);
+        if (reservedWriting && canonical === canonicalizeHotkey(reservedWriting).toLowerCase()) {
+            return t('quickTranslation.legacyConflictEdit', {feature: translateLegacy('写作助手')});
         }
         return '';
     }

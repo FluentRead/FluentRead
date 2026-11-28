@@ -1,15 +1,25 @@
 /**
  * @file src/core/config/writing.ts
- * 文件职责：定义写作助手的持久化偏好、动作目录与配置规范化。
- * 主要内容：默认跟随翻译目标语言并使用简短自然回复，独立选择阅读对照语言，限定风格、身份和自定义语气边界，迁移旧偏好并规范化写作专用网站禁用名单，以 HTTPS 和路径白名单限定 GitHub 新建 Issue 与回复入口。
- * 模块边界：仅处理纯数据；不读取编辑框、不调用模型、不保存配置。
+ * 文件职责：定义写作助手的持久化偏好、动作目录、呼出快捷键与配置规范化。
+ * 主要内容：默认跟随翻译目标语言并使用简短自然回复，独立选择阅读对照语言，限定风格、身份、自定义语气与呼出组合键边界，迁移旧偏好并规范化写作专用网站禁用名单，以 HTTPS 与域名路径白名单识别一等协作平台并校验通用网页地址。
+ * 模块边界：仅处理纯数据与快捷键匹配；不读取编辑框、不调用模型、不保存配置。
  */
 import {isHarnessService} from './harness';
 import type {CustomOpenAIProvider} from './customOpenAI';
 import {options} from './catalog';
+import {canonicalizeHotkey, matchesHotkey, parseHotkey} from '../hotkey';
 import {normalizeChineseLanguageCode} from '../language/chinese';
 import type {UiLanguage} from '../i18n/types';
 import {normalizeSiteDomains} from '../site-rules/domain';
+
+export const FIRST_CLASS_WRITING_SITES = [
+    'gmail', 'github', 'outlook', 'x', 'reddit', 'linkedin', 'slack', 'discord', 'notion',
+] as const;
+export type FirstClassWritingSite = typeof FIRST_CLASS_WRITING_SITES[number];
+export const WRITING_SITES = [...FIRST_CLASS_WRITING_SITES, 'generic'] as const;
+export type WritingSiteId = typeof WRITING_SITES[number];
+
+export const DEFAULT_WRITING_HOTKEY = 'Alt+Shift+W';
 
 export const WRITING_ACTIONS = [
     {id: 'draft', label: '起草'}, {id: 'reply', label: '帮我回复'},
@@ -40,6 +50,27 @@ export type WritingStyle = typeof WRITING_STYLES[number]['value'];
 export interface WritingPreferences {
     enabled: boolean; disabledDomains: string[]; service: string; model: string;
     language: string; referenceLanguage: string; tone: string; length: WritingLength; style: WritingStyle; role: string;
+    writingHotkey: string;
+}
+/** 呼出快捷键必须带修饰键且不含 Meta，显式空值或 none 表示关闭快捷键呼出。 */
+export function normalizeWritingHotkey(value: unknown): string {
+    if (value === '' || value === 'none') return '';
+    if (typeof value !== 'string') return DEFAULT_WRITING_HOTKEY;
+    const parsed = parseHotkey(value);
+    return parsed.isValid && parsed.modifiers.length > 0 && !parsed.modifiers.includes('meta')
+        ? canonicalizeHotkey(value) : DEFAULT_WRITING_HOTKEY;
+}
+export function resolveWritingHotkey(writing: Partial<Pick<WritingPreferences, 'enabled' | 'writingHotkey'>> | undefined): string {
+    if (!writing || writing.enabled === false) return '';
+    return normalizeWritingHotkey(writing.writingHotkey);
+}
+export function writingHotkeyDisplayName(value: unknown): string {
+    const hotkey = normalizeWritingHotkey(value);
+    return hotkey ? parseHotkey(hotkey).displayName : '';
+}
+export function matchesWritingHotkey(event: KeyboardEvent, writing: Pick<WritingPreferences, 'enabled' | 'writingHotkey'> | undefined): boolean {
+    const hotkey = resolveWritingHotkey(writing);
+    return Boolean(hotkey) && matchesHotkey(event, parseHotkey(hotkey));
 }
 /** 旧自动语言随新默认迁移，中文地区别名统一为书写体系。 */
 export function normalizeWritingLanguage(value: unknown): string {
@@ -89,15 +120,35 @@ export function normalizeWritingPreferences(value: unknown, providers: readonly 
         length: normalizeWritingLength(source.length),
         style: WRITING_STYLES.some(item => item.value === source.style) ? source.style! : 'auto',
         role: normalizeDescription(source.role, WRITING_ROLE_MAX_LENGTH, 'auto'),
+        writingHotkey: normalizeWritingHotkey(source.writingHotkey),
     };
 }
 
-/** 网页写作仅在 Gmail 邮件与 GitHub Issue 新建、Issue/PR 回复场景提供。 */
+const FIRST_CLASS_HOSTS = new Set([
+    'outlook.live.com', 'outlook.office.com', 'outlook.office365.com',
+    'x.com', 'twitter.com',
+    'reddit.com', 'www.reddit.com', 'old.reddit.com', 'sh.reddit.com',
+    'linkedin.com', 'www.linkedin.com',
+    'app.slack.com',
+    'discord.com', 'ptb.discord.com', 'canary.discord.com',
+    'notion.so', 'www.notion.so',
+]);
+
+/** 一等支持站点自动呈现原生操作行入口；Gmail 与 GitHub 保留精确路径白名单。 */
 export function isWritingPage(url: string): boolean {
     try {
         const location = new URL(url);
         if (location.protocol !== 'https:') return false;
         if (location.hostname === 'mail.google.com') return /^\/mail(?:\/|$)/u.test(location.pathname);
-        return location.hostname === 'github.com' && /^\/[^/]+\/[^/]+\/(?:issues\/new\/?$|(?:issues|pull)\/\d+(?:\/|$))/u.test(location.pathname);
+        if (location.hostname === 'github.com') return /^\/[^/]+\/[^/]+\/(?:issues\/new\/?$|(?:issues|pull)\/\d+(?:\/|$))/u.test(location.pathname);
+        return FIRST_CLASS_HOSTS.has(location.hostname);
+    } catch { return false; }
+}
+
+/** 通用快捷键写作允许任何常规 HTTP/HTTPS 网页，拒绝扩展页、本地文件与无效地址。 */
+export function isWritingEligibleUrl(url: string): boolean {
+    try {
+        const location = new URL(url);
+        return (location.protocol === 'https:' || location.protocol === 'http:') && Boolean(location.hostname);
     } catch { return false; }
 }

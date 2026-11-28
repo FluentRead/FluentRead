@@ -5,7 +5,7 @@
  * 模块边界：只负责组合，不读取网页，不实现提示词和编辑器写回。
  */
 import {normalizeConfig, type Config} from '@/src/core/config/model';
-import {isWritingPage} from '@/src/core/config/writing';
+import {isWritingEligibleUrl} from '@/src/core/config/writing';
 import browser from 'webextension-polyfill';
 import {config, configReady, subscribeConfig} from '@/src/services/config/store';
 import {isExtensionDisabledOnSite} from '@/src/core/site-rules/domain';
@@ -34,7 +34,8 @@ export function installWritingBackgroundRuntime(): () => void {
     const handler = createWritingHandler({
         extensionId: browser.runtime.id, optionsUrl: browser.runtime.getURL('options.html'), ready: configReady,
         eligibility: sender => {
-            if (!isWritingPage(resolveWritingSenderUrl(sender))) return '写作助手仅支持 Gmail 邮件与 GitHub 新建 Issue、Issue/PR 回复页面';
+            const resolvedUrl = resolveWritingSenderUrl(sender);
+            if (!isWritingEligibleUrl(resolvedUrl)) return '写作助手仅支持常规网页（HTTP/HTTPS）';
             if (!config.on || !config.writing.enabled) return '写作助手已停用';
             const domains = [...config.disabledExtensionDomains, ...config.writing.disabledDomains];
             if (isExtensionDisabledOnSite(sender.url!, domains) || isExtensionDisabledOnSite(sender.tab?.url || '', domains)) return '当前网站已禁用写作助手';
@@ -53,7 +54,7 @@ export function installWritingBackgroundRuntime(): () => void {
         const modelKey = getHarnessModelInputKey(next, service, model);
         return {
             general: JSON.stringify([next.on, next.to, next.harness.memoryEnabled,
-                {...next.writing, service: undefined, model: undefined, referenceLanguage: undefined}, next.disabledExtensionDomains, modelKey]),
+                {...next.writing, service: undefined, model: undefined, referenceLanguage: undefined, writingHotkey: undefined}, next.disabledExtensionDomains, modelKey]),
             // 忠实翻译使用请求内冻结的语言和草稿，不读取风格、记忆或全局目标等无关偏好。
             translation: JSON.stringify([next.on, next.writing.enabled, next.writing.disabledDomains, next.disabledExtensionDomains, modelKey]),
             // 面板会观察全部代理和自定义服务；摘要只用于本地检测，不能传给内容页。

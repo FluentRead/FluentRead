@@ -6,6 +6,7 @@
  */
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
 import {createVueShadowUi} from '@/src/platform/shadow-ui/vue';
+import {clearPendingWritingOpenTarget} from './shortcutRuntime';
 import WritingSurface from './ui/WritingSurface.vue';
 let mounted: Awaited<ReturnType<typeof createVueShadowUi>> | undefined;
 let generation = 0;
@@ -15,5 +16,5 @@ export async function mountWritingAssistant(ctx: ContentScriptContext): Promise<
     if (owner !== generation) { ui.remove(); return; }
     mounted?.remove(); mounted = ui;
 }
-export function unmountWritingAssistant(): void { generation++; mounted?.remove(); mounted = undefined; }
+export function unmountWritingAssistant(): void { generation++; clearPendingWritingOpenTarget(); mounted?.remove(); mounted = undefined; }
 export function isWritingAssistantMounted(): boolean { return Boolean(mounted); }

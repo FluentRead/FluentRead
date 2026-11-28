@@ -35,6 +35,7 @@ vi.mock('@/src/features/writing-assistant/ui/WritingEntrySettings.vue', () => ({
 import {createApp, nextTick, type App} from 'vue';
 import WritingSurface from '@/src/features/writing-assistant/ui/WritingSurface.vue';
 import {writingEntrySaveFailure} from '@/src/features/writing-assistant/entrySession';
+import {requestOpenWritingForEditor} from '@/src/features/writing-assistant/shortcutRuntime';
 let app: App | undefined;
 const markup = '<main><form><textarea name="comment[body]">Draft</textarea><button type="submit">Comment</button></form></main>';
 function entries() {return dom.document.querySelectorAll('[data-fluent-read-ui="writing-entry"]');}
@@ -50,7 +51,7 @@ beforeEach(() => {
     vi.useFakeTimers();
     ports.patch.mockReset().mockResolvedValue(undefined); ports.send.mockReset().mockResolvedValue(undefined);
     Object.assign(location, {href: 'https://github.com/fluent/read/issues/1'});
-    Object.assign(ports.config, {on: true, theme: 'light', disabledExtensionDomains: [], writing: {enabled: true, disabledDomains: []}});
+    Object.assign(ports.config, {on: true, theme: 'light', disabledExtensionDomains: [], writing: {enabled: true, disabledDomains: [], writingHotkey: 'Alt+Shift+W'}});
     Object.defineProperty(globalThis, 'getComputedStyle', {configurable: true, value: () => ({display: 'block', visibility: 'visible'})});
     dom.document.body.innerHTML = markup;
     writingEntrySaveFailure.value = false;
@@ -65,7 +66,7 @@ describe('写作入口真实组件生命周期', () => {
     it('saves the site exclusion through the shared configuration message transport', async () => {
         ports.patch.mockImplementationOnce(async (_patch,send)=>{await send({type:'persistConfig',fixture:'site-exclusion'});});
         const state=mount();await state.saveEntrySetting('site');
-        expect(ports.patch).toHaveBeenCalledWith({writing:{enabled:true,disabledDomains:['github.com']}},expect.any(Function));
+        expect(ports.patch).toHaveBeenCalledWith({writing:{enabled:true,disabledDomains:['github.com'],writingHotkey:'Alt+Shift+W'}},expect.any(Function));
         expect(ports.send).toHaveBeenCalledWith({type:'persistConfig',fixture:'site-exclusion'});expect(state.menuError).toBe('');
     });
     it('整 body 替换后自动恢复原生操作行入口，后续编辑器变化仍被观察且不重复创建', async () => {
@@ -288,6 +289,69 @@ describe('写作入口真实组件生命周期', () => {
         expect(state.canInsert).toBe(false);
         expect(state.fillDraft('New text')).toContain('复杂格式');
         expect(editor.querySelector('a')).not.toBeNull();
+    });
+
+    it('opens on demand via shortcut on generic websites without injecting inline entries, and closes when editor disconnects', async () => {
+        location.href = 'https://example.com/article';
+        dom.document.title = 'Example article';
+        dom.document.body.innerHTML = '<article><h1>Article heading</h1><p>Helpful surrounding paragraph.</p><textarea aria-label="Reply box">Draft text</textarea></article>';
+        const state = mount();
+        expect(entries()).toHaveLength(0);
+        const editor = dom.document.querySelector<HTMLTextAreaElement>('textarea')!;
+        requestOpenWritingForEditor(editor); await settle();
+        expect(state.opened).toBe(true);
+        expect(state.anchor).toBe(editor);
+        expect(state.draft).toBe('Draft text');
+        expect(state.intent).toBe('polish');
+        expect(state.context).toContain('页面标题：Example article');
+        expect(state.context).toContain('输入提示：Reply box');
+        expect(state.context).toContain('Helpful surrounding paragraph.');
+        expect(state.plainTextOutput).toBe(true);
+        expect(state.canInsert).toBe(true);
+        expect(state.fillDraft('Updated generic draft')).toBeUndefined();
+        expect(editor.value).toBe('Updated generic draft');
+        // Connected editor that becomes disabled closes generic session on scan.
+        requestOpenWritingForEditor(editor); await settle();
+        expect(state.opened).toBe(true);
+        editor.disabled = true;
+        state.scan(); await settle();
+        expect(state.opened).toBe(false);
+        editor.disabled = false;
+        // Managed rich editor (Slate) opens cleanly with copy fallback.
+        const slate = dom.document.createElement('div');
+        slate.setAttribute('contenteditable', 'true');
+        slate.setAttribute('data-slate-editor', 'true');
+        slate.textContent = 'Slate draft';
+        dom.document.body.append(slate);
+        requestOpenWritingForEditor(slate); await settle();
+        expect(state.opened).toBe(true);
+        expect(state.canInsert).toBe(false);
+        expect(state.fillDraft('Should copy')).toContain('页面框架托管');
+        slate.remove();
+        state.scan(); await settle();
+        expect(state.opened).toBe(false);
+        // Hidden/invalid editor shortcut trigger is ignored.
+        const hiddenInput = dom.document.createElement('textarea');
+        hiddenInput.setAttribute('hidden', '');
+        dom.document.body.append(hiddenInput);
+        requestOpenWritingForEditor(hiddenInput); await settle();
+        expect(state.opened).toBe(false);
+    });
+
+    it('shortcut trigger on a first-class page anchors to inline entry when present and editor when standalone', async () => {
+        const state = mount();
+        const editor = dom.document.querySelector<HTMLTextAreaElement>('textarea')!;
+        requestOpenWritingForEditor(editor); await settle();
+        expect(state.opened).toBe(true);
+        expect(state.anchor).toBe(entries()[0]);
+        state.close(false);
+        const standalone = dom.document.createElement('textarea');
+        dom.document.body.append(standalone);
+        requestOpenWritingForEditor(standalone); await settle();
+        expect(state.opened).toBe(true);
+        expect(state.anchor).toBe(standalone);
+        state.scan(); await settle();
+        expect(state.opened).toBe(true);
     });
 
     it('dismisses writing for this visit without a config write, including after remount', async () => {

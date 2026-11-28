@@ -9,6 +9,7 @@ import {resolveAreaTranslationHotkey} from './areaTranslation';
 import {resolveParagraphCopyHotkey} from './paragraphCopy';
 import {resolveSectionTranslationHotkey} from './sectionTranslation';
 import {resolveVideoSubtitleModeHotkey} from './videoSubtitleShortcut';
+import {resolveWritingHotkey} from './writing';
 import {findEnabledQuickTranslationHotkeyConflict, inputBoxTranslationTriggerHotkey, type QuickTranslationProfile} from './quickTranslation';
 
 export const DEFAULT_CLICK_SELECTION_HOTKEY = 'Alt+Shift+S';
@@ -41,6 +42,7 @@ interface ClickSelectionConfig {
     customInputBoxTranslationHotkey?: string;
     quickTranslationProfiles?: readonly QuickTranslationProfile[];
     informationHighlight?: {hotkeyEnabled?: boolean; hotkey?: string};
+    writing?: {enabled?: boolean; writingHotkey?: string};
 }
 
 /** 不接受单键或仅修饰键，避免正常输入或临时按住 Control 时进入点选模式。 */
@@ -76,6 +78,7 @@ export function findClickSelectionHotkeyConflict(config: ClickSelectionConfig, h
         {hotkey: config.videoSubtitleModeHotkeyEnabled ? resolveVideoSubtitleModeHotkey(config.videoSubtitleModeHotkey, config.customVideoSubtitleModeHotkey) : '', feature: '视频字幕显示模式切换'},
         {hotkey: inputBoxTranslationTriggerHotkey(config.inputBoxTranslationTrigger, config.customInputBoxTranslationHotkey), feature: '输入框翻译'},
         {hotkey: config.informationHighlight?.hotkeyEnabled === true ? config.informationHighlight.hotkey ?? '' : '', feature: '智能高亮'},
+        {hotkey: resolveWritingHotkey(config.writing), feature: '写作助手'},
     ];
     const owner = owners.find(item => canonicalizeHotkey(item.hotkey).toLowerCase() === identity);
     if (owner) return owner.feature;

@@ -252,6 +252,7 @@ import {useQuickProfileDraft} from '../model/useQuickProfileDraft'
 import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation'
 import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation'
 import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut'
+import {resolveWritingHotkey} from '@/src/core/config/writing'
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection'
 import {
   createQuickTranslationProfile,
@@ -416,6 +417,8 @@ function legacyHotkeyEntries(): Array<{hotkey: string; label: string}> {
   if (props.config.videoSubtitleModeHotkeyEnabled) entries.push({hotkey: resolveVideoSubtitleModeHotkey(props.config.videoSubtitleModeHotkey, props.config.customVideoSubtitleModeHotkey), label: t('video.modeShortcut.title')})
   const input = inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger, props.config.customInputBoxTranslationHotkey)
   if (input) entries.push({hotkey: input, label: translateLegacy('输入框翻译')})
+  const writing = resolveWritingHotkey(props.config.writing)
+  if (writing) entries.push({hotkey: writing, label: translateLegacy('写作助手')})
   return entries.filter(entry => Boolean(canonicalizeHotkey(entry.hotkey)))
 }
 function selectionHotkey(): string {

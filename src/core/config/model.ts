@@ -208,7 +208,7 @@ import {
     normalizeExcludedTags,
     normalizeMinTranslationTextLength,
 } from './pageTranslation';
-import {normalizeWritingPreferences, type WritingPreferences} from './writing';
+import {normalizeWritingPreferences, resolveWritingHotkey, type WritingPreferences} from './writing';
 import {normalizeVideoCourseAutoStart, type VideoCourseAutoStart} from './videoCourse';
 import {DEFAULT_HARNESS_PREFERENCES, normalizeHarnessPreferences, type HarnessPreferences} from './harness';
 import {
@@ -1795,6 +1795,9 @@ export function normalizeConfig(value: unknown): Config {
                     : []),
                 ...(normalized.videoSubtitleModeHotkeyEnabled
                     ? [resolveVideoSubtitleModeHotkey(normalized.videoSubtitleModeHotkey, normalized.customVideoSubtitleModeHotkey)]
+                    : []),
+                ...(resolveWritingHotkey(normalized.writing)
+                    ? [resolveWritingHotkey(normalized.writing)]
                     : []),
                 inputBoxTranslationTriggerHotkey(
                     normalized.inputBoxTranslationTrigger,

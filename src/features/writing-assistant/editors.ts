@@ -1,77 +1,133 @@
 /**
  * @file src/features/writing-assistant/editors.ts
- * 文件职责：识别 Gmail/GitHub 回复编辑器与普通文本框，捕获可审阅上下文并安全填入草稿。
- * 主要内容：按评论容器识别新旧 GitHub 回复及新建 Issue 编辑器与原生操作区，按剩余字符预算直接读取项目、标题、原帖和最近回复的参考信息，避免克隆长评论的整个子树；限定当前会话并排除重复译文，快照编辑器和页面身份后安全写回。
- * 模块边界：只处理显式传入的 DOM，不监听页面、不联网、不发送表单；复杂富文本提供复制回退。
+ * 文件职责：识别一等写作平台与通用网页的可编辑区域，按预算捕获可审阅上下文并安全写回草稿。
+ * 主要内容：复用站点配置支持 Gmail、GitHub、Outlook、X、Reddit、LinkedIn、Slack、Discord、Notion 及通用网页编辑框；解析穿透 Shadow DOM 的当前焦点编辑目标，按剩余字符预算读取主题、原帖、最近讨论或周边段落而不克隆长子树，检测富媒体与框架托管富文本编辑器并提供复制回退。
+ * 模块边界：只处理显式传入的 DOM，不监听页面、不联网、不发送表单；复杂富文本和 Slate/ProseMirror/Lexical 编辑器统一回退复制粘贴。
  */
-export type WritingSite = 'gmail' | 'github' | null;
+import {isWritingEligibleUrl, type WritingIntent} from '@/src/core/config/writing';
+import {getWritingSiteProfile, matchFirstClassWritingSite, type WritingSite, type WritingSiteProfile} from './siteProfiles';
+
+export type {WritingSite} from './siteProfiles';
+export {isPlainTextWritingSite} from './siteProfiles';
+
 const excludedUi = '[data-fluent-read-ui], .read-frog-react-shadow-host, .immersive-translate-ai-writing-container, template';
 const hiddenContent = '[hidden], [inert], [aria-hidden="true"], [style*="display:none" i], [style*="display: none" i], [style*="visibility:hidden" i], [style*="visibility: hidden" i]';
-const githubComposer = '[data-testid="comment-composer"], [data-testid="comment-box"], .js-inline-comment-form, form';
+const richMediaSelector = 'a, img, video, audio, table, [contenteditable="false"]';
+const managedRichEditorSelector = '[data-slate-editor="true"], .ProseMirror, [data-lexical-editor="true"], .public-DraftEditor-content';
 const githubReviewThread = '[data-testid="review-thread"], .js-resolvable-timeline-thread-container, .js-inline-comments-container';
 const githubOriginalPost = '[data-testid="issue-body"], [data-testid="issue-body-viewer"], .js-issue';
 const contextExcluded = `input, textarea, button, [role="button"], select, script, style, noscript, svg, [contenteditable], ${hiddenContent}, ${excludedUi}, .immersive-translate-target-wrapper, .fluent-read-bilingual-content, [data-fr-translation-owned="true"]:not(.fluent-read-single-slot)`;
+
 export function writingSite(url: string): WritingSite {
-    try { const host = new URL(url).hostname; return host === 'mail.google.com' ? 'gmail' : host === 'github.com' ? 'github' : null; } catch { return null; }
+    return matchFirstClassWritingSite(url);
 }
+
+/** 优先匹配一等支持网站；其余常规 HTTP/HTTPS 页面回落为通用编辑模式。 */
+export function resolveWritingSite(url: string): WritingSite {
+    return matchFirstClassWritingSite(url) ?? (isWritingEligibleUrl(url) ? 'generic' : null);
+}
+
 export function isWritingEditor(element: Element | null, site: WritingSite): element is HTMLElement {
     if (!element || element.closest(`${excludedUi}, ${hiddenContent}, fieldset[disabled], fieldset[aria-disabled="true"]`)) return false;
     if (element.matches('textarea, input[type="text"], input:not([type])')) {
         const input = element as HTMLInputElement;
         return !input.disabled && !input.readOnly;
     }
-    return element.getAttribute('contenteditable') === 'plaintext-only'
-        || (site === 'gmail' && element.matches('[contenteditable="true"][role="textbox"]'));
+    if (element.getAttribute('contenteditable') === 'plaintext-only') return true;
+    if (site === 'generic') return element.getAttribute('contenteditable') === 'true';
+    const profile = getWritingSiteProfile(site);
+    if (!profile || !profile.richEditorSelector) return false;
+    return (element.getAttribute('contenteditable') === 'true' || element.matches('[role="textbox"][data-slate-editor="true"]'))
+        && element.matches(profile.richEditorSelector);
 }
+
+/** 从焦点节点向上解析实际可编辑宿主，兼容富文本内部子节点与开放 Shadow DOM。 */
+export function deepActiveElement(doc: Document): Element | null {
+    let active: Element | null = doc.activeElement;
+    while (active?.shadowRoot?.activeElement) {
+        if (active.matches(excludedUi)) return null;
+        active = active.shadowRoot.activeElement;
+    }
+    return active;
+}
+
+export function resolveEditableTarget(element: Element | null, site: WritingSite): HTMLElement | null {
+    if (!element) return null;
+    if (isWritingEditor(element, site)) return element;
+    const host = element.closest('[contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"][data-slate-editor="true"]');
+    return host && isWritingEditor(host, site) ? host : null;
+}
+
+export function hasManagedRichEditor(element: HTMLElement): boolean {
+    return Boolean(element.closest(managedRichEditorSelector));
+}
+
+export function hasComplexRichEditorStructure(element: HTMLElement): boolean {
+    return Boolean(element.querySelector(richMediaSelector)) || hasManagedRichEditor(element);
+}
+
 export function findReplyEditors(doc: Document, site: WritingSite, url: string = doc.URL): HTMLElement[] {
-    const selector = site === 'gmail' ? '[contenteditable="true"][role="textbox"]'
-        : site === 'github' ? `textarea[name="comment[body]"], textarea#new_comment_field, textarea[name="discussion[body]"], textarea[name="discussion_comment[body]"], [data-testid="comment-composer"] textarea, [data-testid="comment-box"] textarea, textarea[aria-labelledby="comment-composer-heading"]${githubNewIssueIdentity(url) ? ', textarea[name="issue[body]"], textarea#issue_body' : ''}` : '';
-    return selector ? Array.from(doc.querySelectorAll<HTMLElement>(selector)).filter(element => isWritingEditor(element, site)).slice(0, 12) : [];
+    const profile = getWritingSiteProfile(site);
+    if (!profile) return [];
+    const selector = site === 'github' && githubNewIssueIdentity(url)
+        ? `${profile.editorSelector}, textarea[name="issue[body]"], textarea#issue_body`
+        : profile.editorSelector;
+    return Array.from(doc.querySelectorAll<HTMLElement>(selector)).filter(element => isWritingEditor(element, site)).slice(0, 12);
 }
+
 function actionIsVisible(element: HTMLElement): boolean {
     if (element.closest(`${excludedUi}, ${hiddenContent}`)) return false;
     const style = element.ownerDocument.defaultView?.getComputedStyle?.(element);
     if (style && (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse')) return false;
     return typeof element.getClientRects !== 'function' || element.getClientRects().length > 0;
 }
+
 /** 返回当前编辑框所属操作区的原生发送/评论按钮；空稿禁用状态仍可定位。 */
 export function findReplyActionAnchor(editor: HTMLElement, site: WritingSite): HTMLElement | null {
-    if (!isWritingEditor(editor, site)) return null;
-    const scope = site === 'github' ? editor.closest(githubComposer) ?? editor.closest('fieldset')
-        : site === 'gmail' ? editor.closest('form, [role="dialog"], .M9') : null;
+    const profile = getWritingSiteProfile(site);
+    if (!profile || !isWritingEditor(editor, site)) return null;
+    const scope = editor.closest(profile.composerScopeSelector)
+        ?? (site === 'github' ? editor.closest('fieldset') : null);
     if (!scope) return null;
-    const selector = site === 'github'
-        ? '[data-testid="markdown-editor-footer"] button[data-variant="primary"], [data-testid="comment-button"], .js-comment-button, button[type="submit"]:not([name="comment_and_close"]), input[type="submit"]:not([name="comment_and_close"])'
-        : '[role="button"][data-tooltip*="Enter"], [role="button"][aria-label*="Enter"], button[type="submit"]';
-    const ownerSelector = site === 'github' ? githubComposer : 'form, [role="dialog"], .M9';
-    const candidates = Array.from(scope.querySelectorAll<HTMLElement>(selector)).filter(candidate => {
+    const candidates = Array.from(scope.querySelectorAll<HTMLElement>(profile.actionSelector)).filter(candidate => {
         if (!actionIsVisible(candidate)) return false;
-        if ((site === 'github' && scope.matches('fieldset') ? candidate.closest('fieldset') : candidate.closest(ownerSelector)) !== scope) return false;
-        return true;
+        const owner = site === 'github' && scope.matches('fieldset')
+            ? candidate.closest('fieldset')
+            : candidate.closest(profile.composerScopeSelector);
+        return owner === scope;
     });
     return candidates[0] ?? null;
 }
+
 export function editorText(element: HTMLElement): string {
     return element.matches('input, textarea') ? (element as HTMLInputElement).value : element.innerText ?? element.textContent ?? '';
 }
+
 const signature = (element: HTMLElement) => element.matches('input, textarea') ? editorText(element) : element.innerHTML;
 export interface EditorSnapshot {element: HTMLElement; signature: string; url: string; site: WritingSite}
-export function captureEditor(element: HTMLElement, url: string): EditorSnapshot {
-    return {element, signature: signature(element), url, site: writingSite(url)};
+
+export function captureEditor(element: HTMLElement, url: string, site: WritingSite = resolveWritingSite(url)): EditorSnapshot {
+    return {element, signature: signature(element), url, site};
 }
-function replyContextRoot(doc: Document, site: WritingSite, editor?: HTMLElement): ParentNode | null {
+
+function replyContextRoot(doc: Document, site: WritingSite, profile: WritingSiteProfile, editor?: HTMLElement): ParentNode | null {
     if (!editor) return doc;
     if (editor.ownerDocument !== doc || !editor.isConnected || !isWritingEditor(editor, site)) return null;
-    if (site === 'gmail') return editor.closest('[role="dialog"], .M9, [role="main"]');
-    return editor.closest(githubReviewThread)
-        ?? editor.closest('.js-inline-comment-form') ?? editor.closest('main');
+    if (site === 'github') {
+        return editor.closest(githubReviewThread)
+            ?? editor.closest('.js-inline-comment-form') ?? editor.closest('main');
+    }
+    return editor.closest(profile.contextRootSelector);
 }
+
 function isCssHidden(element: Element): boolean {
     const style = element.ownerDocument.defaultView?.getComputedStyle?.(element);
     return style?.display === 'none' || style?.visibility === 'hidden' || style?.visibility === 'collapse';
 }
+
 function visibleContextElements(root: ParentNode, selector: string): HTMLElement[] {
-    const candidates = Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(element => !element.closest(`${hiddenContent}, [contenteditable], ${excludedUi}`) && element.getClientRects().length > 0 && !isCssHidden(element));
+    const candidates = Array.from(root.querySelectorAll<HTMLElement>(selector))
+        .filter(element => !element.closest(`${hiddenContent}, [contenteditable], ${excludedUi}`) && element.getClientRects().length > 0 && !isCssHidden(element));
     const candidateSet = new Set(candidates);
     // 嵌套的匹配节点只保留外层；沿祖先链查询避免评论数增长时逐对比较。
     return candidates.filter(element => {
@@ -81,6 +137,7 @@ function visibleContextElements(root: ParentNode, selector: string): HTMLElement
         return true;
     });
 }
+
 function contextText(element: HTMLElement, limit: number): string {
     const fragments: string[] = [];
     let length = 0;
@@ -104,14 +161,19 @@ function contextText(element: HTMLElement, limit: number): string {
     }
     return fragments.join('').trim();
 }
-function firstContextText(root: ParentNode, selector: string, limit: number): string {
+
+function firstContextText(root: ParentNode, selector: string, limit: number, subjectInputSelector = ''): string {
+    if (!selector) return '';
     for (const element of visibleContextElements(root, selector)) {
-        // 仅显式命名的当前撰写窗口主题字段可以读取 value，其余上下文只读取可见正文。
-        const text = element.matches('input[name="subjectbox"]') ? (element as HTMLInputElement).value.trim() : contextText(element, limit);
+        // 仅显式命名的当前撰写窗口主题/标题字段可以读取 value，其余上下文只读取可见正文。
+        const text = subjectInputSelector && element.matches(subjectInputSelector)
+            ? (element as HTMLInputElement).value.trim()
+            : contextText(element, limit);
         if (text) return text.slice(0, limit);
     }
     return '';
 }
+
 function githubPageIdentity(url: string): string {
     try {
         const parsed = new URL(url);
@@ -121,6 +183,7 @@ function githubPageIdentity(url: string): string {
         return `当前项目：${owner}/${repo}\n帖子类型：${kind === 'issues' ? 'Issue' : 'Pull Request'} #${number}\n页面地址：https://github.com/${owner}/${repo}/${kind}/${number}`;
     } catch { return ''; }
 }
+
 function githubNewIssueIdentity(url: string): string {
     try {
         const parsed = new URL(url);
@@ -128,7 +191,8 @@ function githubNewIssueIdentity(url: string): string {
         return parsed.origin === 'https://github.com' && match ? `当前项目：${match[1]}/${match[2]}\n帖子类型：新建 Issue` : '';
     } catch { return ''; }
 }
-function recentContextText(snippets: HTMLElement[], budget: number, site: WritingSite): string {
+
+function recentContextText(snippets: HTMLElement[], budget: number, authorContainerSelector: string, authorSelector: string): string {
     let remaining = budget;
     const texts: string[] = [];
     for (const element of snippets.slice(-12).reverse()) {
@@ -136,33 +200,67 @@ function recentContextText(snippets: HTMLElement[], budget: number, site: Writin
         if (remaining <= separatorLength) break;
         const body = contextText(element, remaining - separatorLength);
         if (!body) continue;
-        const comment = site === 'github' ? element.closest('[data-testid="issue-comment"], .js-comment, .timeline-comment') : null;
-        const author = comment ? firstContextText(comment, '[data-testid="issue-comment-header-author"], [data-testid="comment-author"], .timeline-comment-header .author', 100) : '';
+        const container = authorContainerSelector ? element.closest(authorContainerSelector) : null;
+        const author = container && authorSelector ? firstContextText(container, authorSelector, 100) : '';
         const text = `${author ? `回复作者：${author}\n` : ''}${body}`.slice(0, remaining - separatorLength);
         remaining -= text.length + separatorLength;
         texts.unshift(text);
     }
     return texts.join('\n\n');
 }
+
+function genericEditorLabel(doc: Document, editor: HTMLElement): string {
+    const aria = editor.getAttribute('aria-label')?.trim();
+    if (aria) return aria.slice(0, 200);
+    const id = editor.getAttribute('id')?.trim();
+    const explicitLabel = id ? Array.from(doc.querySelectorAll<HTMLLabelElement>('label[for]')).find(label => label.getAttribute('for') === id) : undefined;
+    const label = explicitLabel ?? editor.closest('label');
+    if (label && !label.closest(`${hiddenContent}, ${excludedUi}`) && !isCssHidden(label)) {
+        const labelText = contextText(label, 200);
+        if (labelText) return labelText;
+    }
+    return (editor.getAttribute('placeholder') ?? '').trim().slice(0, 200);
+}
+
+function collectGenericContext(doc: Document, editor?: HTMLElement): string {
+    if (editor && (editor.ownerDocument !== doc || !editor.isConnected || !isWritingEditor(editor, 'generic'))) return '';
+    const title = (doc.title || '').trim().slice(0, 300);
+    const label = editor ? genericEditorLabel(doc, editor) : '';
+    const header = [
+        title ? `页面标题：${title}` : '',
+        label ? `输入提示：${label}` : '',
+    ].filter(Boolean).join('\n');
+    const scope = editor?.closest('article, main, section, [role="main"], [role="dialog"], form') ?? doc.body;
+    const snippets = scope ? visibleContextElements(scope, 'h1, h2, h3, p, blockquote, li') : [];
+    const sections = header ? [header] : [];
+    const remaining = Math.min(4000, 12000 - header.length - (sections.length ? 2 : 0) - '页面参考：'.length);
+    if (snippets.length && remaining > 0) {
+        const text = recentContextText(snippets, remaining, '', '');
+        if (text) sections.push(`页面参考：${text}`);
+    }
+    return sections.join('\n\n');
+}
+
 export function collectReplyContext(doc: Document, site: WritingSite, editor?: HTMLElement, url: string = doc.URL): string {
-    const selector = site === 'gmail' ? '[role="main"] .a3s, [role="dialog"] .a3s, .M9 .a3s' : site === 'github' ? 'main .js-comment-body, main .CommentBody, main [data-testid="markdown-body"]' : '';
-    if (!selector) return '';
-    const root = replyContextRoot(doc, site, editor);
+    if (site === 'generic') return collectGenericContext(doc, editor);
+    const profile = getWritingSiteProfile(site);
+    if (!profile) return '';
+    const root = replyContextRoot(doc, site, profile, editor);
     if (!root) return '';
-    const snippets = visibleContextElements(root, selector);
+    const snippets = visibleContextElements(root, profile.snippetSelector);
     const inline = site === 'github' && Boolean(editor?.closest(`${githubReviewThread}, .js-inline-comment-form`));
-    const titleRoot = site === 'github' && editor ? editor.closest('main') ?? root : root;
+    const titleRoot = (site === 'github' || site === 'reddit') && editor ? editor.closest('main') ?? root : root;
     const newIssue = site === 'github' && editor ? githubNewIssueIdentity(url) : '';
     const titleInput = newIssue ? editor!.closest('form')?.querySelector<HTMLInputElement>('input[name="issue[title]"], input#issue_title') : null;
     const title = newIssue
         ? titleInput && !titleInput.closest(`${hiddenContent}, ${excludedUi}`) && titleInput.getClientRects().length && !isCssHidden(titleInput) ? titleInput.value.trim().slice(0, 1000) : ''
-        : firstContextText(titleRoot, site === 'github' ? 'main [data-testid="issue-title"], main bdi.js-issue-title, main .gh-header-title .js-issue-title' : 'h2.hP, input[name="subjectbox"]', 1000);
+        : firstContextText(titleRoot, profile.titleSelector, 1000, profile.subjectInputSelector);
     const original = site === 'github' && !inline ? snippets.find(element => element.closest(githubOriginalPost)) ?? snippets[0] : undefined;
     const starter = site === 'github' ? firstContextText(titleRoot, 'main [data-testid="issue-body"] [data-testid="issue-body-header-author"], main .js-issue .timeline-comment-header .author', 100) : '';
     const state = site === 'github' ? firstContextText(titleRoot, 'main [data-testid="header-state"], main .gh-header-meta .State', 100) : '';
     const header = [
         site === 'github' ? githubPageIdentity(url) || newIssue : '',
-        title ? `${site === 'github' ? '帖子标题' : '邮件主题'}：${title}` : '',
+        title && profile.titleLabel ? `${profile.titleLabel}：${title}` : '',
         state ? `帖子状态：${state}` : '',
         starter ? `发起人：${starter}` : '',
     ].filter(Boolean).join('\n');
@@ -178,17 +276,31 @@ export function collectReplyContext(doc: Document, site: WritingSite, editor?: H
         sections.push(`原帖：${body}`); remaining -= prefixLength + body.length;
     }
     if (comments.length) {
-        const label = site === 'github' ? '当前讨论' : '当前邮件';
-        const text = recentContextText(comments, remaining - (sections.length ? 2 : 0) - label.length - 1, site);
-        if (text) sections.push(`${label}：${text}`);
+        const text = recentContextText(
+            comments,
+            remaining - (sections.length ? 2 : 0) - profile.sectionLabel.length - 1,
+            profile.authorContainerSelector,
+            profile.authorSelector,
+        );
+        if (text) sections.push(`${profile.sectionLabel}：${text}`);
     }
     return sections.join('\n\n');
 }
+
+export function resolveInitialWritingIntent(site: WritingSite, url: string, draft: string, context: string): WritingIntent {
+    if (draft.trim()) return 'polish';
+    if (!site || site === 'generic' || site === 'notion') return 'draft';
+    if (site === 'gmail' || site === 'outlook') return /(?:^|\n\n)当前邮件：/.test(context) ? 'reply' : 'draft';
+    if (site === 'github') return !githubNewIssueIdentity(url) && Boolean(context.trim()) ? 'reply' : 'draft';
+    return Boolean(context.trim()) ? 'reply' : 'draft';
+}
+
 export function applyWritingDraft(snapshot: EditorSnapshot, text: string, url: string): string | undefined {
     const element = snapshot.element;
     if (url !== snapshot.url || !element.isConnected || !isWritingEditor(element, snapshot.site)) return '原编辑框已关闭或页面已变化，请复制正文后自行粘贴。';
     if (signature(element) !== snapshot.signature) return '原草稿已被修改。为保留你的新内容，请复制正文后自行粘贴。';
-    if (element.querySelector('a, img, video, audio, table, [contenteditable="false"]')) return '原草稿包含链接、附件或复杂格式，请复制正文后自行粘贴。';
+    if (hasManagedRichEditor(element)) return '当前富文本编辑器由页面框架托管，请复制正文后自行粘贴。';
+    if (element.querySelector(richMediaSelector)) return '原草稿包含链接、附件或复杂格式，请复制正文后自行粘贴。';
     const win = element.ownerDocument.defaultView!;
     if (element.matches('input, textarea')) {
         const prototype = element.tagName.toLowerCase() === 'textarea' ? win.HTMLTextAreaElement.prototype : win.HTMLInputElement.prototype;

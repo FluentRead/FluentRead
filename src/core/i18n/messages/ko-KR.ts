@@ -33,6 +33,7 @@ import {localTranslationKoreanMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
 import {task7Messages, task7LegacyText} from './task7Features';
+import {toolbarActionMessages} from './toolbarAction';
 
 import countForms from './count-forms.json';
 
@@ -42,6 +43,7 @@ export const koKRMessages = {
     "toolbar.click.popup": "빠른 패널 열기",
     "toolbar.click.translate": "번역 / 원문 보기",
     "toolbar.openPopup": "빠른 패널 열기",
+    ...toolbarActionMessages['ko-KR'],
     "settings.backup.includeContext": "단어 문맥 포함",
     "feedback.serviceHint": "선택한 서비스의 연결 또는 모델 설정을 확인한 후 다시 시도하세요.",
     "feedback.retryHint": "잠시 후 다시 시도하세요. 원문과 현재 선택 영역은 유지됩니다.",

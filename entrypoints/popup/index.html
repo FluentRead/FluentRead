@@ -2,7 +2,7 @@
 <!--
   @file entrypoints/popup/index.html
   文件职责：提供浏览器工具栏 popup 的最小 HTML 外壳。
-  主要内容：声明中文、browser_action 和本地化工具栏提示，在外部样式和脚本到达前固定首屏尺寸与图形等待状态；用独立无框架脚本提前唤醒后台，与应用模块加载并行。
+  主要内容：声明中文、browser_action 和本地化工具栏提示，在外部样式和脚本到达前固定首屏尺寸并延迟渐显图形等待状态，避免快速打开时闪现空白加载页；用独立无框架脚本同步恢复非敏感皮肤画布提示并提前唤醒后台，与应用模块加载并行。
   模块边界：预唤醒只返回引导状态提示，不读取配置快照或当前标签页，渲染与所有交互由 popup Vue 应用完成。
 -->
 <html lang="zh-CN" data-popup-root>
@@ -14,13 +14,19 @@
     <meta name="manifest.title" content="__MSG_extensionToolbarTitle__" />
     <style>
       /* 工具栏先按文档内容定尺寸；关键样式必须早于后台唤醒及外部 CSS。 */
-      html { width: var(--interface-popup-width, 320px); min-height: 460px; background: #fff; }
+      html { width: var(--interface-popup-width, 320px); min-height: 460px; background: var(--popup-startup-bg, #fff); }
       body, #app { width: var(--fluentread-localized-popup-width, var(--interface-popup-width, 320px)); margin: 0; }
-      .popup-startup { box-sizing: border-box; min-height: 460px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 20px; }
-      .popup-startup i { width: 12px; height: 12px; border: 1.5px solid #d4d8e1; border-top-color: #737c8f; border-radius: 50%; }
+      .popup-startup { box-sizing: border-box; min-height: 460px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 20px; opacity: 0; animation: popup-startup-reveal 120ms ease 200ms forwards; }
+      .popup-startup i { width: 12px; height: 12px; border: 1.5px solid #d4d8e1; border-top-color: #737c8f; border-radius: 50%; animation: popup-startup-spin .75s linear infinite; }
+      @keyframes popup-startup-reveal { to { opacity: 1; } }
+      @keyframes popup-startup-spin { to { transform: rotate(360deg); } }
       @media (prefers-color-scheme: dark) {
-        html:not([data-interface-skin]) { background: #14171c; }
+        html:not([data-interface-skin]) { background: var(--popup-startup-bg, #14171c); }
         .popup-startup i { border-color: #2f3542; border-top-color: #a5aebf; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .popup-startup { animation-duration: 0ms; }
+        .popup-startup i { animation: none; }
       }
     </style>
     <script src="/popup-startup.js"></script>

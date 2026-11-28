@@ -39,7 +39,7 @@ function configureOptionsPorts(data: Record<string, any>) {
     ({t: (key: string) => key === 'informationHighlight.title' ? 'Smart Highlighting' : key, translateLegacy: (text: string) => text})}));
   vi.doMock('@/src/services/config/store', () => data);
   vi.doMock('@/src/ui/interfaceAppearance', () => ({applyInterfaceTheme: data.theme, applyInterfaceSkin: data.skin,
-    applyInterfaceFont: data.font, registerInterfaceAppearanceRoot: data.registerAppearance}));
+    applyInterfaceFont: data.font, persistPopupStartupAppearance: data.persistPopupStartupAppearance ?? (() => {}), registerInterfaceAppearanceRoot: data.registerAppearance}));
   vi.doMock('@/src/platform/browser/capabilities', () => ({browserCapabilities: data.browserCapabilities}));
   vi.doMock('@/src/app/options/assets/wechat-contact.jpg', () => ({default: 'synthetic-contact-image'}));
   vi.doUnmock('@/src/app/options/aboutImages');

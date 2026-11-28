@@ -6,7 +6,8 @@ const ports = vi.hoisted(() => ({
     ready: Promise.resolve() as Promise<void>, hydration: 'ready' as 'loading' | 'ready' | 'blocked',
     mainGate: undefined as Promise<void> | undefined, onboardingGate: undefined as Promise<void> | undefined,
     mainLoaded: vi.fn(), onboardingLoaded: vi.fn(), ensureBundle: vi.fn(async (_language: unknown) => {}), font: vi.fn(async (_font: unknown) => {}),
-    skin: vi.fn((_skin: unknown) => 'default'), theme: vi.fn((_dark: unknown) => {}),
+    skin: vi.fn((_skin: unknown) => 'default'), theme: vi.fn((_dark: unknown) => {}), persistStartupAppearance: vi.fn((_skin: unknown, _theme: unknown) => {}),
+    subscribe: vi.fn((listener: (next: typeof ports.config) => void) => {listener(ports.config); return () => {};}),
     browser: 'chrome', platform: vi.fn(), currentTab: vi.fn(), tabViews: vi.fn(), tabApi: 'present' as 'present' | 'missing-tabs' | 'missing-method', unmountCallbacks: [] as Array<()=>void>,
     createApp: vi.fn(), plugin: vi.fn(() => ({kind: 'i18n'})), use: vi.fn(), component: vi.fn(), mount: vi.fn(), anonymousElement: false,
 }));
@@ -28,10 +29,10 @@ vi.mock('element-plus', () => Object.fromEntries(
 ));
 vi.mock('../src/app/options/OptionsApp.vue', () => ({default: {kind: 'options'}}));
 vi.mock('../src/ui/components/UiSelect.vue', () => ({default: {kind: 'ui-select'}}));
-vi.mock('../src/services/config/store', () => ({config: ports.config, get configReady() {return ports.ready;}, getConfigHydrationStatus: () => ports.hydration}));
+vi.mock('../src/services/config/store', () => ({config: ports.config, get configReady() {return ports.ready;}, getConfigHydrationStatus: () => ports.hydration, subscribeConfig: ports.subscribe}));
 vi.mock('../src/ui/i18n', () => ({createUiI18nPlugin: ports.plugin}));
 vi.mock('../src/platform/i18n/uiLanguageBundles', () => ({ensureUiLanguageBundle: ports.ensureBundle}));
-vi.mock('../src/ui/interfaceAppearance', () => ({prepareInterfaceFont: ports.font, applyInterfaceSkin: ports.skin, applyInterfaceTheme: ports.theme}));
+vi.mock('../src/ui/interfaceAppearance', () => ({prepareInterfaceFont: ports.font, applyInterfaceSkin: ports.skin, applyInterfaceTheme: ports.theme, persistPopupStartupAppearance: ports.persistStartupAppearance}));
 function deferred() {let resolve!: () => void, reject!: (error: Error) => void; const promise = new Promise<void>((yes, no) => {resolve = yes;reject = no;}); return {promise, resolve, reject};}
 function pageTransition(type: 'pagehide' | 'pageshow', persisted: boolean) {
     const event = new Event(type); Object.defineProperty(event, 'persisted', {value: persisted}); window.dispatchEvent(event);
@@ -42,7 +43,8 @@ beforeEach(async () => {
     vi.resetModules(); vi.clearAllMocks(); ports.ready = Promise.resolve(); ports.hydration = 'ready'; ports.mainGate = undefined; ports.onboardingGate = undefined;
     Object.assign(ports.config, {uiLanguageSetupCompleted: false, uiLanguage: 'en-US', interfaceFont: 'system', interfaceSkin: 'default', theme: 'auto'});
     ports.font.mockReset().mockResolvedValue(undefined); ports.ensureBundle.mockReset().mockResolvedValue(undefined);
-    ports.skin.mockReset(); ports.theme.mockReset();
+    ports.skin.mockReset(); ports.theme.mockReset(); ports.persistStartupAppearance.mockReset();
+    ports.subscribe.mockReset().mockImplementation((listener: (next: typeof ports.config) => void) => {listener(ports.config); return () => {};});
     ports.browser='chrome';ports.platform.mockReset().mockResolvedValue({os:'mac'});ports.unmountCallbacks=[];ports.anonymousElement=false;
     ports.tabApi='present';ports.currentTab.mockReset().mockResolvedValue(undefined);ports.tabViews.mockReset().mockReturnValue([]);
     ports.mount.mockReset();ports.createApp.mockReturnValue({use: ports.use, component: ports.component, mount: ports.mount,onUnmount: (fn:()=>void)=>ports.unmountCallbacks.push(fn)});
@@ -253,14 +255,36 @@ describe('Popup fresh configuration bootstrap', () => {
         ports.config.uiLanguageSetupCompleted = true;
         ports.config.interfaceSkin = 'raycast';
         ports.config.theme = themeMode;
+        document.documentElement.style.setProperty('--popup-startup-bg', '#dfd9ce');
         await bootstrap.mountPreparedPopupApp('#owned');
         expect(ports.skin).toHaveBeenCalledWith('raycast');
         expect(ports.skin.mock.invocationCallOrder[0]).toBeLessThan(ports.mount.mock.invocationCallOrder[0]);
+        expect(ports.persistStartupAppearance).toHaveBeenCalledWith('raycast', themeMode);
+        expect(document.documentElement.style.getPropertyValue('--popup-startup-bg') || '').toBe('');
         if (expectedDark === undefined) expect(ports.theme).not.toHaveBeenCalled();
         else {
             expect(ports.theme).toHaveBeenCalledWith(expectedDark);
             expect(ports.theme.mock.invocationCallOrder[0]).toBeLessThan(ports.mount.mock.invocationCallOrder[0]);
         }
+    });
+    it.each([
+        ['light', false, false],
+        ['dark', true, true],
+        ['throws', 'throw', false],
+    ] as const)('auto 主题下启动外观提示曾写过 dark 标记时按 %s 媒体查询清理旧状态且不额外调用主题端口', async (_label, mediaMode, expectedDark) => {
+        ports.config.uiLanguageSetupCompleted = true;
+        ports.config.theme = 'auto';
+        document.documentElement.classList.add('dark');
+        document.documentElement.dataset.fluentreadStartupTheme = '1';
+        const matchMedia = vi.fn(() => {
+            if (mediaMode === 'throw') throw new Error('matchMedia unavailable');
+            return {matches: mediaMode};
+        });
+        vi.stubGlobal('window', Object.assign(new EventTarget(), {matchMedia}));
+        await bootstrap.mountPreparedPopupApp('#owned');
+        expect(ports.theme).not.toHaveBeenCalled();
+        expect(document.documentElement.dataset.fluentreadStartupTheme).toBeUndefined();
+        expect(document.documentElement.classList.contains('dark')).toBe(expectedDark);
     });
     it.each([false,true])('Safari coarse 对首次完成=%s 的根启用自有填宽且卸载释放',async completed=>{
         ports.browser='safari';ports.config.uiLanguageSetupCompleted=completed;

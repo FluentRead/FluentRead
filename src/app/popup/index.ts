@@ -45,7 +45,7 @@ function wakePopupWorker(): void {
 }
 
 export async function mountPopupApp(selector: string): Promise<void> {
-  if (!await preparePopupSurface() || !isPopupSurfaceActive()) return;
+  if (isEmbeddedPopup() && (!await preparePopupSurface() || !isPopupSurfaceActive())) return;
   wakePopupWorker();
   const feedback = createPopupStartupFeedback(selector);
   try {

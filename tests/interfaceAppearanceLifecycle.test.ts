@@ -126,6 +126,40 @@ describe('界面根节点和字体异步归属', () => {
     expect(a.style.getPropertyValue('--interface-font-family')).toContain('system-ui');expect(a.classList.contains('dark')).toBe(false)
     expect(doc.documentElement.dataset.interfaceFont).toBeUndefined()
   })
+
+  it('持久化非敏感 Popup 启动外观提示并在存储不可用或受限时安全跳过', () => {
+    const store = new Map<string, string>()
+    const localStorageStub = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: vi.fn((key: string, value: string) => {store.set(key, value)}),
+    }
+    vi.stubGlobal('localStorage', localStorageStub)
+    appearance.persistPopupStartupAppearance('tactile', 'light')
+    expect(JSON.parse(store.get(appearance.POPUP_STARTUP_APPEARANCE_KEY)!)).toMatchObject({
+      skin: 'tactile',
+      skinKind: 'craft',
+      theme: 'light',
+      darkOnly: false,
+    })
+    appearance.persistPopupStartupAppearance('cyber', 'dark')
+    expect(JSON.parse(store.get(appearance.POPUP_STARTUP_APPEARANCE_KEY)!)).toMatchObject({
+      skin: 'cyber',
+      skinKind: 'craft',
+      theme: 'dark',
+      darkOnly: true,
+    })
+    appearance.persistPopupStartupAppearance('unknown', 'unexpected')
+    expect(JSON.parse(store.get(appearance.POPUP_STARTUP_APPEARANCE_KEY)!)).toMatchObject({
+      skin: 'default',
+      skinKind: 'default',
+      theme: 'auto',
+      darkOnly: false,
+    })
+    localStorageStub.setItem.mockImplementationOnce(() => {throw new Error('quota')})
+    expect(() => appearance.persistPopupStartupAppearance('tactile', 'auto')).not.toThrow()
+    vi.stubGlobal('localStorage', undefined)
+    expect(() => appearance.persistPopupStartupAppearance('tactile', 'auto')).not.toThrow()
+  })
 })
 
 describe('字体可用性和共享资源状态', () => {

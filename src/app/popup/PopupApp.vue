@@ -506,7 +506,7 @@ import {getEmbeddedPopupTabId, closePopupSurface} from './embedded';
 import {useSettingsActionContext} from '@/src/features/settings/model/useSettingsActionContext';
 import {waitForSettingsTask} from '@/src/features/settings/model/taskWait';
 import {useConfigEditor} from '@/src/features/settings/model/useConfigEditor';
-import {applyInterfaceFont, applyInterfaceSkin} from '@/src/ui/interfaceAppearance';
+import {applyInterfaceFont, applyInterfaceSkin, persistPopupStartupAppearance} from '@/src/ui/interfaceAppearance';
 import { requestTranslationCacheClear } from './cache';
 import {TranslationCacheRequestTimeoutError} from '@/src/services/translation/cacheRequest';
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue';
@@ -1182,8 +1182,8 @@ const configEditor = useConfigEditor({
 async function persistSiteRulePatch(patch: PopupSiteRulePatch): Promise<void> {
   await persistConfigPatch({...config.value, ...patch});
 }
-watch(() => config.value.theme, theme => applyTheme(theme || 'auto'));
-watch(() => config.value.interfaceSkin, skin => applyInterfaceSkin(skin));
+watch(() => config.value.theme, theme => { applyTheme(theme || 'auto'); persistPopupStartupAppearance(config.value.interfaceSkin, theme); });
+watch(() => config.value.interfaceSkin, skin => { applyInterfaceSkin(skin); persistPopupStartupAppearance(skin, config.value.theme); });
 watch(() => config.value.interfaceFont, font => applyInterfaceFont(font));
 watch(popupUsesContentHeight, applyPopupHeightMode, {immediate: true});
 darkMode.onchange = () => { if (config.value.theme === 'auto') applyTheme('auto'); };

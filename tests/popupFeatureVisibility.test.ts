@@ -561,4 +561,55 @@ describe('popup HTML pre-wakeup', () => {
         }
         expect(lastError).toHaveBeenCalledOnce();
     });
+
+    it('delays the startup placeholder graphic and restores validated non-sensitive skin appearance before first paint', () => {
+        const html = source('entrypoints/popup/index.html');
+        const criticalStyles = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+        expect(criticalStyles).toContain('opacity: 0;');
+        expect(criticalStyles).toContain('popup-startup-reveal');
+        expect(criticalStyles).toContain('popup-startup-spin');
+        expect(criticalStyles).toContain('prefers-reduced-motion: reduce');
+        expect(criticalStyles).toContain('var(--popup-startup-bg, #fff)');
+
+        const createRoot = () => {
+            const props = new Map<string, string>();
+            const classes = new Set<string>();
+            return {
+                dataset: {} as Record<string, string>,
+                style: {setProperty: (k: string, v: string) => props.set(k, v), get: (k: string) => props.get(k)},
+                classList: {
+                    toggle: (name: string, force?: boolean) => { if (force) classes.add(name); else classes.delete(name); },
+                    has: (name: string) => classes.has(name),
+                },
+            };
+        };
+
+        const tactileRoot = createRoot();
+        runInNewContext(source('public/popup-startup.js'), {
+            document: {documentElement: tactileRoot},
+            localStorage: {getItem: () => JSON.stringify({skin: 'tactile', skinKind: 'craft', width: 320, theme: 'light', bgLight: '#dfd9ce', bgDark: '#1c1a17', darkOnly: false})},
+            matchMedia: () => ({matches: true}),
+        });
+        expect(tactileRoot.dataset).toEqual({interfaceSkin: 'tactile', interfaceSkinKind: 'craft', fluentreadStartupTheme: '1'});
+        expect(tactileRoot.style.get('--interface-popup-width')).toBe('320px');
+        expect(tactileRoot.style.get('--popup-startup-bg')).toBe('#dfd9ce');
+        expect(tactileRoot.classList.has('dark')).toBe(false);
+
+        const autoDarkRoot = createRoot();
+        runInNewContext(source('public/popup-startup.js'), {
+            document: {documentElement: autoDarkRoot},
+            localStorage: {getItem: () => JSON.stringify({skin: 'default', skinKind: 'default', width: 320, theme: 'auto', bgLight: '#ffffff', bgDark: '#14171c', darkOnly: false})},
+            matchMedia: () => ({matches: true}),
+        });
+        expect(autoDarkRoot.style.get('--popup-startup-bg')).toBe('#14171c');
+        expect(autoDarkRoot.classList.has('dark')).toBe(true);
+
+        const invalidRoot = createRoot();
+        runInNewContext(source('public/popup-startup.js'), {
+            document: {documentElement: invalidRoot},
+            localStorage: {getItem: () => JSON.stringify({skin: 'bad;url(x)', skinKind: 'craft', width: 999, theme: 'light', bgLight: 'red;position:fixed'})},
+        });
+        expect(invalidRoot.dataset).toEqual({});
+        expect(invalidRoot.style.get('--popup-startup-bg')).toBeUndefined();
+    });
 });

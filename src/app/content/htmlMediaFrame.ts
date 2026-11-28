@@ -10,21 +10,26 @@ import {ensureUiLanguageBundle} from '@/src/platform/i18n/uiLanguageBundles';
 import {isExtensionDisabledOnSite} from '@/src/features/site-rules/domain';
 import {isExcludedHtmlMediaHost, isExcludedHtmlMediaUrl, mountWhenHtmlMediaPresent} from '@/src/features/video-subtitle/content/htmlMedia';
 import {getCaptionPlatform} from '@/src/features/video-subtitle/content/platforms';
+import {YOUTUBE_HOST_PATTERN} from '@/src/features/video-subtitle/content/youtubeEmbedUrl';
+import {VIDEO_SUBTITLE_FRAME_STARTED_KEY} from '@/src/features/video-subtitle/frameProtocol';
 import {installContentPageLifecycle, waitForContentDocument} from './pageLifecycle';
 
 export async function startHtmlMediaFrameApp(ctx: ContentScriptContext): Promise<void> {
     const platform = getCaptionPlatform(window.location);
-    if (window.top === window || ctx.isInvalid || !/^https?:$/.test(window.location.protocol)
-        || /(^|\.)(youtube\.com|x\.com|twitter\.com)$/i.test(window.location.hostname)
+    const frameState = window as unknown as Record<string, unknown>;
+    if (window.top === window || ctx.isInvalid || frameState[VIDEO_SUBTITLE_FRAME_STARTED_KEY] === true || !/^https?:$/.test(window.location.protocol)
+        || YOUTUBE_HOST_PATTERN.test(window.location.hostname)
+        || /(^|\.)(x\.com|twitter\.com)$/i.test(window.location.hostname)
         || isExcludedHtmlMediaHost(window.location.hostname)
         || isExcludedHtmlMediaUrl(document.referrer)
         || (platform && platform !== 'coursera' && platform !== 'vimeo')) return;
+    frameState[VIDEO_SUBTITLE_FRAME_STARTED_KEY] = true;
     const lifetime = new AbortController();
     let disposed = false;
     let stop: (() => void) | undefined;
     let unsubscribe: (() => void) | undefined;
     const unmount = () => {const previous = stop; stop = undefined; previous?.();};
-    const cleanup = () => {disposed = true; unmount(); unsubscribe?.(); unsubscribe = undefined; lifetime.abort();};
+    const cleanup = () => {disposed = true; delete frameState[VIDEO_SUBTITLE_FRAME_STARTED_KEY]; unmount(); unsubscribe?.(); unsubscribe = undefined; lifetime.abort();};
     const lifecycle = installContentPageLifecycle(window, lifetime.signal, {suspend: unmount, resume: () => reconcile(), dispose: cleanup}, ctx, document);
     const reconcile = () => {
         if (disposed || ctx.isInvalid || lifecycle.isSuspended() || !config.on || !config.videoTranslationEnabled
@@ -40,12 +45,17 @@ export async function startHtmlMediaFrameApp(ctx: ContentScriptContext): Promise
             return () => {current = false; dispose?.();};
         });
     };
-    await configReady;
-    if (disposed || ctx.isInvalid) {cleanup(); return;}
-    await ensureUiLanguageBundle(config.uiLanguage);
-    if (disposed || ctx.isInvalid) {cleanup(); return;}
-    if (document.readyState === 'loading' && !await waitForContentDocument(document, lifetime.signal)) {cleanup(); return;}
-    if (disposed || ctx.isInvalid) {cleanup(); return;}
-    unsubscribe = subscribeConfig(reconcile);
-    reconcile();
+    try {
+        await configReady;
+        if (disposed || ctx.isInvalid) {cleanup(); return;}
+        await ensureUiLanguageBundle(config.uiLanguage);
+        if (disposed || ctx.isInvalid) {cleanup(); return;}
+        if (document.readyState === 'loading' && !await waitForContentDocument(document, lifetime.signal)) {cleanup(); return;}
+        if (disposed || ctx.isInvalid) {cleanup(); return;}
+        unsubscribe = subscribeConfig(reconcile);
+        reconcile();
+    } catch (error) {
+        cleanup();
+        throw error;
+    }
 }

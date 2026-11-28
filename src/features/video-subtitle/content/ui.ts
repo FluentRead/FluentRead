@@ -37,8 +37,10 @@ import {
 import {createVideoKaraokeController, setVideoCaptionText, type VideoKaraokeController, VIDEO_KARAOKE_FILL_PROPERTY, VIDEO_KARAOKE_STATE_ATTRIBUTE, VIDEO_KARAOKE_TEXT_ATTRIBUTE, VIDEO_KARAOKE_UNIT_CLASS} from './karaoke';
 import {VIDEO_NATIVE_CAPTION_HIDDEN_CLASS} from './youtubeNativeCaptionVisibility';
 import {buildVideoSubtitleStyleText} from './videoSubtitleStyles';
+import {isYouTubeEmbedPage, YOUTUBE_HOST_PATTERN} from './youtubeEmbedUrl';
 
 export {VIDEO_NATIVE_CAPTION_HIDDEN_CLASS} from './youtubeNativeCaptionVisibility';
+export {isYouTubeEmbedPage, YOUTUBE_HOST_PATTERN} from './youtubeEmbedUrl';
 export {setStyleIfChanged, removeStyleIfPresent, setAttrIfChanged, setDataIfChanged} from './subtitleControlLayout';
 
 import {
@@ -159,9 +161,7 @@ export const VIDEO_NORMALIZED_CAPTION_CLASS = 'fluent-read-video-normalized-capt
 export const VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS = 'fluent-read-video-normalized-caption-active';
 export const VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS = 'fluent-read-video-subtitle-panel-active';
 
-export const YOUTUBE_HOST_PATTERN = /(^|\.)youtube(?:-nocookie)?\.com$/i;
 const YOUTUBE_MAIN_HOST_PATTERN = /(^|\.)youtube\.com$/i;
-const YOUTUBE_EMBED_PATH_PATTERN = /^\/embed\/[\w-]{11}\/?$/u;
 const YOUTUBE_LIVE_PATH_PATTERN = /^\/live\/[\w-]{11}\/?$/u;
 export const X_SUBTITLE_RESOURCE_MESSAGE = 'fluent-read-x-video-subtitle-resource';
 
@@ -278,12 +278,6 @@ export function isYouTubeVideoPage(locationLike: Pick<Location, 'hostname' | 'pa
       && (locationLike.pathname === '/watch'
         || locationLike.pathname.startsWith('/shorts/')
         || YOUTUBE_LIVE_PATH_PATTERN.test(locationLike.pathname)));
-}
-
-/** YouTube iframe 播放器使用独立 /embed/{videoId} 文档（含 youtube-nocookie.com）；只接受真实视频 ID。 */
-export function isYouTubeEmbedPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {
-  return YOUTUBE_HOST_PATTERN.test(locationLike.hostname)
-    && YOUTUBE_EMBED_PATH_PATTERN.test(locationLike.pathname);
 }
 
 export function isXVideoPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {

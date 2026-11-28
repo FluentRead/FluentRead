@@ -372,9 +372,10 @@ describe('audit 49 E real Vue client model settings', () => {
         }
         ports.message.mockResolvedValue({success:true,ready:true,inpaintingReady:true,bytes:1});await vi.advanceTimersByTimeAsync(1500);await settle();
         expect(container.querySelector('[role="alert"]')).toBeNull();
-        const remove=[...container.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent==='清除已下载资源')!;
         for(const response of [undefined,{success:false}]){
-            ports.message.mockResolvedValueOnce(response);remove.click();await settle();
+            [...container.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent==='清除已下载资源')!.click();await settle();
+            ports.message.mockResolvedValueOnce(response);
+            [...container.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent==='确认清除')!.click();await settle();
             expect(container.querySelector('[role="alert"]')!.textContent).toBe('漫画识别模型清除失败');
         }
     });
@@ -415,10 +416,13 @@ describe('audit 49 E real Vue client model settings', () => {
         expect(container.querySelector('[role="alert"]')!.textContent).toContain('状态读取失败');
         ports.message.mockResolvedValue({success: true, ready: true, inpaintingReady: true, bytes: 1024, source: 'official'});
         await vi.advanceTimersByTimeAsync(1500); await settle(); expect(container.querySelector('[role="alert"]')).toBeNull();
-        const remove = [...container.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '清除已下载资源')!;
-        remove.click(); await settle(); expect(ports.message).toHaveBeenCalledWith({type: 'fluentReadMangaModelRemove'});
+        const clickRemoveAndConfirm = async () => {
+            [...container.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '清除已下载资源')!.click(); await settle();
+            [...container.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '确认清除')!.click(); await settle();
+        };
+        await clickRemoveAndConfirm(); expect(ports.message).toHaveBeenCalledWith({type: 'fluentReadMangaModelRemove'});
         ports.message.mockResolvedValueOnce({success:false,error:'Failed to load https://hf-mirror.com/controlled-model.onnx'});
-        remove.click();await settle();expect(container.querySelector('[role="alert"]')!.textContent).toBe('漫画识别模型清除失败');
+        await clickRemoveAndConfirm(); expect(container.querySelector('[role="alert"]')!.textContent).toBe('漫画识别模型清除失败');
         expect(container.textContent).not.toContain('hf-mirror');
     });
     it('keeps offline import usable and renders the actionable file validation failure', async () => {

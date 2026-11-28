@@ -1,8 +1,8 @@
 <!--
 @file src/features/settings/ui/RemoteConfigSync.vue
 文件职责：用清晰的保存、恢复、端到端口令保护、学习资产合并与可选自动同步流程完成 Google Drive 与 WebDAV 共用的配置云备份。
-主要内容：以同级选项展示始终同步且不可关闭的基础配置、默认关闭的敏感配置及三类默认关闭的学习资产（单词本与独立上下文、个人校订、阅读材料元数据）；敏感配置须明确同意，选择在本机持续保存直到手动关闭。
-提供端到端加密口令模式切换（兼容模式与自定义零知识口令）、12 字符强度校验与遗忘警示、会话或本机加密留存及一键清除；WebDAV 侧额外展示默认关闭的定时自动同步周期、状态与立即安全合并入口。
+主要内容：以同级选项依次展示始终同步且不可关闭的基础配置、默认关闭的学习数据（合并单词本、个人校订与阅读材料元数据，开启后提供独立的单词上下文隐私子开关）以及默认关闭的敏感配置；敏感配置须明确同意且风险文案按加密模式自适应，选择在本机持续保存直到手动关闭。
+以统一开关卡呈现自定义端到端加密：默认兼容态仅占一行；首次启用通过聚焦弹窗完成口令双输、强度条评估、三档留存分段选择与遗忘风险确认；已解锁态支持一键切换会话/本机留存与锁定；未解锁态（含云端要求口令或口令错误时）内联展示单输入框解锁条并支持回车或直接同步一步完成；关闭加密经确认弹窗原子切回兼容模式，消除半悬空状态。WebDAV 侧额外展示默认关闭的定时自动同步、分段周期与立即安全合并入口。
 预览说明旧备份范围、端到端升级提示、学习数据逐类增改数量和恢复保护，不在选项区重复展示范围摘要与恢复提示。
 风险确认集中展示存储方式、泄露风险与持续生效的选择；删除确认将云端删除范围、本机保留说明与加粗的确认词合入同一个提示块，输入框紧接其后；次要说明在独立浮层展示，避免展开时改变弹窗与按钮位置。
 删除前须输入本次界面语言的确认文本，再点击确认；只删除已核验版本的备份文件，并保留本机配置。
@@ -21,79 +21,81 @@ Drive 已上传但未完成核验时单独显示警示，不误报未上传，�
         <el-switch :id="`${kind}-include-settings`" :model-value="true" disabled :aria-label="t('settings.cloud.basicSettings')" :aria-describedby="`${kind}-settings-description`" data-testid="cloud-include-settings" />
       </div>
       <div class="cloud-scope-option">
+        <label :for="`${kind}-include-learning`"><strong>{{ t('settings.cloud.learning.title') }}</strong><span :id="`${kind}-learning-description`">{{ t('settings.cloud.learning.description') }}</span></label>
+        <el-switch :id="`${kind}-include-learning`" :model-value="learningEnabled" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.learning.title')" :aria-describedby="`${kind}-learning-description`" data-testid="cloud-include-learning" @change="toggleLearningAll" />
+      </div>
+      <div v-if="learningEnabled" class="cloud-scope-option cloud-scope-suboption">
+        <label :for="`${kind}-include-vocabulary-context`"><strong>{{ t('settings.cloud.learning.vocabularyContext') }}</strong><span :id="`${kind}-vocabulary-context-description`">{{ t('settings.cloud.learning.vocabularyContextDescription') }}</span></label>
+        <el-switch :id="`${kind}-include-vocabulary-context`" :model-value="learningScope.includeVocabularyContext" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.learning.vocabularyContext')" :aria-describedby="`${kind}-vocabulary-context-description`" data-testid="cloud-include-vocabulary-context" @change="toggleVocabularyContext" />
+      </div>
+      <div class="cloud-scope-option">
         <label :for="`${kind}-include-sensitive`"><strong>{{ t('settings.cloud.includeSensitive') }}</strong><span :id="`${kind}-sensitive-description`">{{ t('settings.cloud.sensitiveDescription') }}</span></label>
         <el-switch :id="`${kind}-include-sensitive`" :model-value="includeSensitive" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.includeSensitive')" :aria-describedby="`${kind}-sensitive-description`" data-testid="cloud-include-sensitive" @change="toggleSensitive" />
       </div>
-      <div class="cloud-scope-option">
-        <label :for="`${kind}-include-vocabulary`"><strong>{{ t('settings.cloud.learning.vocabulary') }}</strong><span :id="`${kind}-vocabulary-description`">{{ t('settings.cloud.learning.vocabularyDescription') }}</span></label>
-        <el-switch :id="`${kind}-include-vocabulary`" :model-value="learningScope.includeVocabulary" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.learning.vocabulary')" :aria-describedby="`${kind}-vocabulary-description`" data-testid="cloud-include-vocabulary" @change="toggleLearning('includeVocabulary', $event)" />
+    </div>
+    <div v-if="hasPassphraseSupport" class="e2ee" data-testid="cloud-e2ee-section">
+      <div class="cloud-scope-option e2ee-row">
+        <label :for="`${kind}-e2ee-enabled`">
+          <strong class="e2ee-title">
+            <span>{{ t('settings.cloud.e2ee.switchTitle') }}</span>
+            <span class="e2ee-badge" :class="`is-${e2eeStatusTone}`" role="status" data-testid="cloud-e2ee-status">{{ e2eeStatusText }}</span>
+          </strong>
+          <span :id="`${kind}-e2ee-description`">{{ t('settings.cloud.e2ee.switchDescription') }}</span>
+        </label>
+        <el-switch :id="`${kind}-e2ee-enabled`" :model-value="e2eeEnabled" :disabled="busy || previewVisible || e2eeSetupVisible || e2eeDisableVisible" :aria-label="t('settings.cloud.e2ee.switchTitle')" :aria-describedby="`${kind}-e2ee-description`" data-testid="cloud-e2ee-toggle" @change="toggleE2ee" />
       </div>
-      <div v-if="learningScope.includeVocabulary" class="cloud-scope-option cloud-scope-suboption">
-        <label :for="`${kind}-include-vocabulary-context`"><strong>{{ t('settings.cloud.learning.vocabularyContext') }}</strong><span :id="`${kind}-vocabulary-context-description`">{{ t('settings.cloud.learning.vocabularyContextDescription') }}</span></label>
-        <el-switch :id="`${kind}-include-vocabulary-context`" :model-value="learningScope.includeVocabularyContext" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.learning.vocabularyContext')" :aria-describedby="`${kind}-vocabulary-context-description`" data-testid="cloud-include-vocabulary-context" @change="toggleLearning('includeVocabularyContext', $event)" />
+      <div v-if="showUnlockedBar" class="e2ee-sub" data-testid="cloud-e2ee-unlocked">
+        <div class="e2ee-bar">
+          <div class="e2ee-ret">
+            <span class="e2ee-lbl">{{ t('settings.cloud.e2ee.rememberLabel') }}</span>
+            <div class="seg" role="group" :aria-label="t('settings.cloud.e2ee.rememberLabel')">
+              <button v-for="scope in (['session', 'device'] as const)" :key="scope" type="button" class="seg-btn" :class="{'is-active': passphraseState?.storageScope === scope}" :aria-pressed="passphraseState?.storageScope === scope" :disabled="busy || previewVisible" :data-testid="`cloud-e2ee-switch-${scope}`" @click="switchStoredRetention(scope)">{{ t(scope === 'session' ? 'settings.cloud.e2ee.rememberSessionTitle' : 'settings.cloud.e2ee.rememberDeviceTitle') }}</button>
+            </div>
+          </div>
+          <el-button size="small" link type="danger" :disabled="busy || previewVisible" data-testid="cloud-e2ee-forget" @click="forgetStoredPassphrase">{{ t('settings.cloud.e2ee.lockAction') }}</el-button>
+        </div>
+        <p v-if="showAutoSyncRetentionNudge" class="e2ee-nudge" data-testid="cloud-e2ee-autosync-nudge">
+          <span>{{ t('settings.cloud.e2ee.autoSyncDeviceHint') }}</span>
+          <el-button size="small" link type="primary" :disabled="busy || previewVisible" data-testid="cloud-e2ee-autosync-fix" @click="switchStoredRetention('device')">{{ t('settings.cloud.e2ee.rememberDeviceTitle') }}</el-button>
+        </p>
+        <p v-if="justEnabledE2ee" class="e2ee-muted" data-testid="cloud-e2ee-upgrade-hint">{{ t('settings.cloud.e2ee.pendingUpgradeHint') }}</p>
       </div>
-      <div class="cloud-scope-option">
-        <label :for="`${kind}-include-corrections`"><strong>{{ t('settings.cloud.learning.corrections') }}</strong><span :id="`${kind}-corrections-description`">{{ t('settings.cloud.learning.correctionsDescription') }}</span></label>
-        <el-switch :id="`${kind}-include-corrections`" :model-value="learningScope.includePersonalCorrections" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.learning.corrections')" :aria-describedby="`${kind}-corrections-description`" data-testid="cloud-include-corrections" @change="toggleLearning('includePersonalCorrections', $event)" />
+      <div v-else-if="showEphemeralReadyBar" class="e2ee-sub" data-testid="cloud-e2ee-ephemeral-ready">
+        <div class="e2ee-bar">
+          <p class="e2ee-ready"><el-icon><CircleCheck /></el-icon><span>{{ t(justEnabledE2ee ? 'settings.cloud.e2ee.pendingUpgradeHint' : 'settings.cloud.e2ee.rememberNoneHint') }}</span></p>
+          <el-button size="small" link :disabled="busy || previewVisible" data-testid="cloud-e2ee-clear-ephemeral" @click="clearEphemeralPassphrase">{{ t('settings.cloud.e2ee.lockAction') }}</el-button>
+        </div>
       </div>
-      <div class="cloud-scope-option">
-        <label :for="`${kind}-include-materials`"><strong>{{ t('settings.cloud.learning.materials') }}</strong><span :id="`${kind}-materials-description`">{{ t('settings.cloud.learning.materialsDescription') }}</span></label>
-        <el-switch :id="`${kind}-include-materials`" :model-value="learningScope.includeReadingMaterials" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.learning.materials')" :aria-describedby="`${kind}-materials-description`" data-testid="cloud-include-materials" @change="toggleLearning('includeReadingMaterials', $event)" />
+      <div v-else-if="showUnlockBar" class="e2ee-sub" data-testid="cloud-e2ee-unlock-bar">
+        <p class="e2ee-hint" data-testid="cloud-e2ee-unlock-hint">{{ t('settings.cloud.e2ee.passphraseRequired') }}</p>
+        <div class="e2ee-unlock">
+          <el-input ref="unlockInputRef" :id="`${kind}-e2ee-unlock`" v-model="unlockDraft" type="password" show-password :placeholder="t('settings.cloud.e2ee.passphrasePlaceholder')" :aria-label="t('settings.cloud.e2ee.passphraseLabel')" :disabled="busy || previewVisible" :maxlength="1024" autocomplete="current-password" data-testid="cloud-e2ee-passphrase" @keydown.enter.prevent="submitUnlockOnEnter" />
+          <el-button v-if="unlockRemember !== 'none'" :disabled="busy || previewVisible || !unlockLengthValid" data-testid="cloud-e2ee-unlock-btn" @click="applyUnlock">{{ t('settings.cloud.e2ee.unlockButton') }}</el-button>
+        </div>
+        <div v-if="unlockDraft && !unlockLengthValid" class="e2ee-fb">
+          <span class="e2ee-str is-too-short" data-testid="cloud-e2ee-strength">{{ t('settings.cloud.e2ee.strength.too-short') }}</span>
+          <span class="e2ee-muted">{{ unlockDraft.trim().length }}/12</span>
+        </div>
+        <p v-if="e2eeValidationError" class="e2ee-err" role="alert" data-testid="cloud-e2ee-validation-error">{{ e2eeValidationError }}</p>
+        <div class="e2ee-ret">
+          <span class="e2ee-lbl">{{ t('settings.cloud.e2ee.rememberLabel') }}</span>
+          <div class="seg" role="radiogroup" :aria-label="t('settings.cloud.e2ee.rememberLabel')">
+            <button v-for="option in retentionOptions" :key="option.value" type="button" role="radio" :aria-checked="unlockRemember === option.value" class="seg-btn" :class="{'is-active': unlockRemember === option.value}" :disabled="busy || previewVisible" @click="unlockRemember = option.value">{{ option.title }}</button>
+          </div>
+        </div>
+        <p class="e2ee-muted">{{ activeUnlockRetentionHint }}</p>
       </div>
     </div>
-    <div v-if="hasPassphraseSupport" class="cloud-e2ee" data-testid="cloud-e2ee-section">
-      <div class="cloud-e2ee-header">
-        <strong>{{ t('settings.cloud.e2ee.title') }}</strong>
-        <span class="cloud-e2ee-badge" role="status" data-testid="cloud-e2ee-status">{{ e2eeStatusText }}</span>
-      </div>
-      <div class="cloud-e2ee-modes" role="radiogroup" :aria-label="t('settings.cloud.e2ee.title')">
-        <label :class="{'is-selected': e2eeMode === 'app'}">
-          <input v-model="e2eeMode" type="radio" :name="`${kind}-e2ee-mode`" value="app" :disabled="busy || previewVisible" data-testid="cloud-e2ee-mode-app" />
-          <span>{{ t('settings.cloud.e2ee.modeLegacy') }}</span>
-        </label>
-        <label :class="{'is-selected': e2eeMode === 'custom'}">
-          <input v-model="e2eeMode" type="radio" :name="`${kind}-e2ee-mode`" value="custom" :disabled="busy || previewVisible" data-testid="cloud-e2ee-mode-custom" />
-          <span>{{ t('settings.cloud.e2ee.modeCustom') }}</span>
-        </label>
-      </div>
-      <template v-if="e2eeMode === 'custom'">
-        <el-alert :title="t('settings.cloud.e2ee.warning')" type="warning" :closable="false" show-icon class="cloud-e2ee-warning" />
-        <div class="cloud-e2ee-fields">
-          <label :for="`${kind}-e2ee-passphrase`">{{ t('settings.cloud.e2ee.passphraseLabel') }}</label>
-          <el-input :id="`${kind}-e2ee-passphrase`" v-model="passphraseDraft" type="password" show-password :placeholder="t('settings.cloud.e2ee.passphrasePlaceholder')" :disabled="busy || previewVisible" :maxlength="1024" autocomplete="new-password" data-testid="cloud-e2ee-passphrase" />
-          <p v-if="passphraseDraft" class="cloud-e2ee-strength" :class="`is-${passphraseStrength}`" data-testid="cloud-e2ee-strength">{{ passphraseStrengthLabel }}</p>
-          <label :for="`${kind}-e2ee-confirm`">{{ t('settings.cloud.e2ee.confirmLabel') }}</label>
-          <el-input :id="`${kind}-e2ee-confirm`" v-model="passphraseConfirm" type="password" show-password :placeholder="t('settings.cloud.e2ee.confirmPlaceholder')" :disabled="busy || previewVisible" :maxlength="1024" autocomplete="new-password" data-testid="cloud-e2ee-confirm" />
-          <p v-if="passphraseMismatch" class="cloud-e2ee-mismatch" role="alert" data-testid="cloud-e2ee-mismatch">{{ t('settings.cloud.e2ee.mismatch') }}</p>
-          <label :for="`${kind}-e2ee-remember`">{{ t('settings.cloud.e2ee.rememberLabel') }}</label>
-          <select :id="`${kind}-e2ee-remember`" class="cloud-native-select" :disabled="busy || previewVisible" data-testid="cloud-e2ee-remember" @change="changeE2eeRemember">
-            <option value="none" :selected="e2eeRemember === 'none'">{{ t('settings.cloud.e2ee.rememberNone') }}</option>
-            <option value="session" :selected="e2eeRemember === 'session'">{{ t('settings.cloud.e2ee.rememberSession') }}</option>
-            <option value="device" :selected="e2eeRemember === 'device'">{{ t(hasAutoSyncSupport ? 'settings.cloud.e2ee.rememberDevice' : 'settings.cloud.e2ee.rememberDeviceNoAutoSync') }}</option>
-          </select>
-        </div>
-        <div class="cloud-e2ee-actions">
-          <el-button size="small" type="primary" :disabled="busy || previewVisible || !canApplyPassphrase" data-testid="cloud-e2ee-apply" @click="applyPassphraseSettings">{{ t('settings.cloud.e2ee.apply') }}</el-button>
-          <el-button v-if="passphraseState?.hasStoredPassphrase" size="small" link type="danger" :disabled="busy || previewVisible" data-testid="cloud-e2ee-forget" @click="forgetStoredPassphrase">{{ t('settings.cloud.e2ee.forget') }}</el-button>
-        </div>
-      </template>
-      <div v-else-if="passphraseState?.mode === 'custom'" class="cloud-e2ee-actions">
-        <el-button size="small" :disabled="busy || previewVisible" data-testid="cloud-e2ee-apply" @click="applyPassphraseSettings">{{ t('settings.cloud.e2ee.apply') }}</el-button>
-      </div>
-    </div>
-    <div v-if="hasAutoSyncSupport && status?.available" class="cloud-autosync" data-testid="cloud-auto-sync-section">
+    <div v-if="hasAutoSyncSupport && status?.available" class="cloud-autosync">
       <div class="cloud-scope-option">
         <label :for="`${kind}-auto-sync-enabled`"><strong>{{ t('settings.cloud.autoSync.title') }}</strong><span :id="`${kind}-auto-sync-description`">{{ t('settings.cloud.autoSync.description') }}</span></label>
         <el-switch :id="`${kind}-auto-sync-enabled`" :model-value="autoSyncState?.enabled === true" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.autoSync.title')" :aria-describedby="`${kind}-auto-sync-description`" data-testid="cloud-auto-sync-enabled" @change="toggleAutoSync" />
       </div>
       <div v-if="autoSyncState" class="cloud-autosync-controls">
-        <label :for="`${kind}-auto-sync-interval`">{{ t('settings.cloud.autoSync.interval') }}</label>
-        <select :id="`${kind}-auto-sync-interval`" class="cloud-native-select" :disabled="busy || previewVisible" data-testid="cloud-auto-sync-interval" @change="changeAutoSyncInterval">
-          <option value="30" :selected="autoSyncState.intervalMinutes === 30">{{ t('settings.cloud.autoSync.interval30m') }}</option>
-          <option value="60" :selected="autoSyncState.intervalMinutes === 60">{{ t('settings.cloud.autoSync.interval60m') }}</option>
-          <option value="360" :selected="autoSyncState.intervalMinutes === 360">{{ t('settings.cloud.autoSync.interval6h') }}</option>
-          <option value="1440" :selected="autoSyncState.intervalMinutes === 1440">{{ t('settings.cloud.autoSync.interval24h') }}</option>
-        </select>
+        <span class="e2ee-lbl">{{ t('settings.cloud.autoSync.interval') }}</span>
+        <div class="seg" role="radiogroup" :aria-label="t('settings.cloud.autoSync.interval')">
+          <button v-for="([minutes, suffix]) in autoSyncIntervals" :key="minutes" type="button" role="radio" :aria-checked="autoSyncState.intervalMinutes === minutes" class="seg-btn" :class="{'is-active': autoSyncState.intervalMinutes === minutes}" :disabled="busy || previewVisible" :data-testid="`cloud-auto-sync-interval-${minutes}`" @click="selectAutoSyncInterval(minutes)">{{ t(`settings.cloud.autoSync.interval${suffix}`) }}</button>
+        </div>
         <el-button v-if="autoSyncState.enabled" size="small" :disabled="busy || previewVisible" data-testid="cloud-auto-sync-run-now" @click="runAutoSyncNow">{{ t('settings.cloud.autoSync.runNow') }}</el-button>
       </div>
       <p v-if="autoSyncState && autoSyncState.enabled" class="cloud-autosync-status" role="status" data-testid="cloud-auto-sync-status">{{ autoSyncStatusText }}</p>
@@ -139,9 +141,45 @@ Drive 已上传但未完成核验时单独显示警示，不误报未上传，�
         <div class="cloud-consent-actions"><el-button :disabled="busy" data-testid="cloud-delete-cancel" @click="cancelDeletion">{{ t('settings.drive.cancelSync') }}</el-button><el-button type="primary" :loading="busy" :disabled="busy || !canConfirmDeletion" data-testid="cloud-delete-confirm" @click="confirmDeletion">{{ t(deletion?.hasRemote ? 'settings.cloud.deleteConfirm' : 'settings.cloud.deleteFinish') }}</el-button></div>
       </div></template>
     </el-dialog>
+    <el-dialog v-model="e2eeSetupVisible" class="cloud-compact-dialog fluentread-cloud-sync-dialog" :title="t('settings.cloud.e2ee.switchTitle')" width="min(500px, calc(100vw - 24px))" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" destroy-on-close @closed="resetSetupDialog">
+      <div class="cloud-consent-risk"><el-icon><Warning /></el-icon><p>{{ t('settings.cloud.e2ee.warning') }}</p></div>
+      <div class="e2ee-form">
+        <div class="e2ee-field">
+          <label :for="`${kind}-e2ee-setup-passphrase`">{{ t('settings.cloud.e2ee.passphraseLabel') }}</label>
+          <el-input :id="`${kind}-e2ee-setup-passphrase`" v-model="setupPassphrase" type="password" show-password :placeholder="t('settings.cloud.e2ee.passphrasePlaceholder')" :disabled="busy" :maxlength="1024" autocomplete="new-password" data-testid="cloud-e2ee-setup-passphrase" @keydown.enter.prevent="submitSetupOnEnter" />
+          <div v-if="setupPassphrase" class="e2ee-fb">
+            <div class="e2ee-meter">
+              <span class="e2ee-bars" :class="`is-${setupStrength}`" aria-hidden="true"><span /><span /><span /></span>
+              <span class="e2ee-str" :class="`is-${setupStrength}`" data-testid="cloud-e2ee-setup-strength">{{ setupStrengthLabel }}</span>
+            </div>
+            <span v-if="setupStrength === 'too-short'" class="e2ee-muted">{{ setupPassphrase.trim().length }}/12</span>
+          </div>
+        </div>
+        <div class="e2ee-field">
+          <label :for="`${kind}-e2ee-setup-confirm`">{{ t('settings.cloud.e2ee.confirmLabel') }}</label>
+          <el-input :id="`${kind}-e2ee-setup-confirm`" v-model="setupConfirm" type="password" show-password :placeholder="t('settings.cloud.e2ee.confirmPlaceholder')" :disabled="busy" :maxlength="1024" autocomplete="new-password" data-testid="cloud-e2ee-setup-confirm" @keydown.enter.prevent="submitSetupOnEnter" />
+          <p v-if="setupMismatch" class="e2ee-err" role="alert" data-testid="cloud-e2ee-setup-mismatch">{{ t('settings.cloud.e2ee.mismatch') }}</p>
+          <p v-else-if="setupLengthValid && !setupConfirm" class="e2ee-muted" data-testid="cloud-e2ee-setup-confirm-hint">{{ t('settings.cloud.e2ee.confirmPlaceholder') }}</p>
+        </div>
+        <div class="e2ee-field">
+          <span class="e2ee-lbl">{{ t('settings.cloud.e2ee.rememberLabel') }}</span>
+          <div class="seg seg-3" role="radiogroup" :aria-label="t('settings.cloud.e2ee.rememberLabel')" data-testid="cloud-e2ee-setup-remember">
+            <button v-for="option in retentionOptions" :key="option.value" type="button" role="radio" :aria-checked="setupRemember === option.value" class="seg-btn" :class="{'is-active': setupRemember === option.value}" :disabled="busy" :data-testid="`cloud-e2ee-setup-remember-${option.value}`" @click="setupRemember = option.value">{{ option.title }}</button>
+          </div>
+          <p class="e2ee-muted" data-testid="cloud-e2ee-setup-remember-hint">{{ activeSetupRetentionHint }}</p>
+        </div>
+        <label class="cloud-consent-checkbox"><input v-model="setupAcknowledged" type="checkbox" :disabled="busy" data-testid="cloud-e2ee-setup-ack" /><span>{{ t('settings.cloud.e2ee.setupAcknowledge') }}</span></label>
+        <p class="e2ee-muted">{{ t('settings.cloud.e2ee.pendingUpgradeHint') }}</p>
+      </div>
+      <template #footer><div class="cloud-consent-actions"><el-button :disabled="busy" data-testid="cloud-e2ee-setup-cancel" @click="e2eeSetupVisible = false">{{ t('settings.drive.cancelSync') }}</el-button><el-button type="primary" :loading="busy" :disabled="busy || !canSubmitSetup" data-testid="cloud-e2ee-setup-confirm-btn" @click="confirmSetupE2ee">{{ t('settings.cloud.consentConfirm') }}</el-button></div></template>
+    </el-dialog>
+    <el-dialog v-model="e2eeDisableVisible" class="cloud-compact-dialog fluentread-cloud-sync-dialog" :title="t('settings.cloud.e2ee.switchToLegacyAction')" width="min(460px, calc(100vw - 24px))" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" destroy-on-close>
+      <div class="cloud-consent-risk"><el-icon><Warning /></el-icon><p>{{ t('settings.cloud.e2ee.switchToLegacyNotice') }}</p></div>
+      <template #footer><div class="cloud-consent-actions"><el-button :disabled="busy" data-testid="cloud-e2ee-disable-cancel" @click="e2eeDisableVisible = false">{{ t('settings.drive.cancelSync') }}</el-button><el-button type="primary" :loading="busy" :disabled="busy" data-testid="cloud-e2ee-disable-confirm" @click="confirmDisableE2ee">{{ t('settings.cloud.e2ee.switchToLegacyAction') }}</el-button></div></template>
+    </el-dialog>
     <el-dialog v-model="consentVisible" class="cloud-consent-dialog cloud-compact-dialog fluentread-cloud-sync-dialog" :title="t('settings.cloud.consentTitle')" width="min(480px, calc(100vw - 24px))" destroy-on-close @closed="riskAcknowledged = false">
       <p class="cloud-consent-intro">{{ t('settings.cloud.consentStorage', {provider}) }}</p>
-      <div class="cloud-consent-risk"><el-icon><Warning /></el-icon><p>{{ t('settings.cloud.consentRisk') }}</p></div>
+      <div class="cloud-consent-risk"><el-icon><Warning /></el-icon><p data-testid="cloud-consent-risk-text">{{ t(e2eeEnabled ? 'settings.cloud.e2ee.consentRisk' : 'settings.cloud.consentRisk', {provider}) }}</p></div>
       <label class="cloud-consent-checkbox"><input v-model="riskAcknowledged" type="checkbox" data-testid="cloud-risk-acknowledgement" /><span>{{ t('settings.cloud.consentAcknowledgement') }}</span></label>
       <template #footer><div class="cloud-consent-actions"><el-button data-testid="cloud-consent-cancel" @click="consentVisible = false">{{ t('settings.drive.cancelSync') }}</el-button><el-button type="primary" :disabled="!riskAcknowledged" data-testid="cloud-consent-confirm" @click="confirmSensitive">{{ t('settings.cloud.consentConfirm') }}</el-button></div></template>
     </el-dialog>
@@ -254,7 +292,7 @@ Drive 已上传但未完成核验时单独显示警示，不误报未上传，�
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, onUnmounted, reactive, ref, watch} from 'vue';
+import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch} from 'vue';
 import {ElAlert, ElIcon, ElInput, ElMessage, ElPagination, ElPopover, ElSwitch} from 'element-plus';
 import {ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CircleCheck, Delete, Download, Switch, Upload, User, Warning} from '@element-plus/icons-vue';
 import 'element-plus/es/components/alert/style/css';
@@ -264,7 +302,7 @@ import 'element-plus/es/components/popover/style/css';
 import 'element-plus/es/components/switch/style/css';
 import {useUiI18n} from '@/src/ui/i18n';
 import {CloudBackupRequestError, type CloudBackupCommitOptions, type CloudBackupPrepareOptions, type createCloudBackupClient} from '@/src/services/config/cloudBackupClient';
-import {evaluatePassphraseStrength, type DriveEncryptionKeyMode} from '@/src/platform/google-drive/encryption';
+import {evaluatePassphraseStrength} from '@/src/platform/google-drive/encryption';
 import {DEFAULT_LEARNING_SYNC_SCOPE, hasAnyLearningSyncScope, type LearningSyncScope} from '@/src/core/config/learningSync';
 import type {CloudPassphraseConfigInput, CloudPassphraseRememberScope, CloudPassphraseStatus} from '@/src/services/config/cloudPassphraseStore';
 import type {CloudAutoSyncConfigPatch, CloudAutoSyncIntervalMinutes, CloudAutoSyncStatus} from '@/src/services/config/cloudAutoSync';
@@ -300,52 +338,84 @@ const sensitivePreferenceKey = 'fluentread-cloud-backup-include-sensitive';
 const learningPreferenceKey = 'fluentread-cloud-backup-learning-scope';
 try {includeSensitive.value = localStorage.getItem(sensitivePreferenceKey) === 'true';} catch { /* 无法读取已保存选择时保持默认关闭。 */ }
 const learningScope = reactive<LearningSyncScope>({...DEFAULT_LEARNING_SYNC_SCOPE});
+const learningEnabled = computed(() => learningScope.includeVocabulary || learningScope.includePersonalCorrections || learningScope.includeReadingMaterials);
 function loadLearningPreference() {
   try {
     const raw = localStorage.getItem(learningPreferenceKey);
     if (!raw) return;
     const parsed = JSON.parse(raw) as Partial<LearningSyncScope>;
-    learningScope.includeVocabulary = parsed.includeVocabulary === true;
-    learningScope.includeVocabularyContext = learningScope.includeVocabulary && parsed.includeVocabularyContext === true;
-    learningScope.includePersonalCorrections = parsed.includePersonalCorrections === true;
-    learningScope.includeReadingMaterials = parsed.includeReadingMaterials === true;
+    const enabled = parsed.includeVocabulary === true || parsed.includePersonalCorrections === true || parsed.includeReadingMaterials === true;
+    learningScope.includeVocabulary = enabled;
+    learningScope.includePersonalCorrections = enabled;
+    learningScope.includeReadingMaterials = enabled;
+    learningScope.includeVocabularyContext = enabled && parsed.includeVocabularyContext === true;
   } catch { /* 无法读取学习同步偏好时保持默认全部关闭。 */ }
 }
 loadLearningPreference();
 
 const passphraseState = ref<CloudPassphraseStatus | null>(null);
-const e2eeMode = ref<DriveEncryptionKeyMode>('app');
-const passphraseDraft = ref('');
-const passphraseConfirm = ref('');
-const e2eeRemember = ref<CloudPassphraseRememberScope>('session');
+const e2eeSetupVisible = ref(false);
+const e2eeDisableVisible = ref(false);
+const setupPassphrase = ref('');
+const setupConfirm = ref('');
+const setupRemember = ref<CloudPassphraseRememberScope>('session');
+const setupAcknowledged = ref(false);
+const unlockDraft = ref('');
+const unlockRemember = ref<CloudPassphraseRememberScope>('session');
+const unlockInputRef = ref<{focus?: () => void} | null>(null);
+const ephemeralReadyPassphrase = ref<string | undefined>(undefined);
+const remoteRequiresUnlock = ref(false);
+const forceUnlockPrompt = ref(false);
+const justEnabledE2ee = ref(false);
+const e2eeValidationError = ref('');
 const activeEphemeralPassphrase = ref<string | undefined>(undefined);
-const passphraseStrength = computed(() => evaluatePassphraseStrength(passphraseDraft.value));
-const passphraseStrengthLabel = computed(() => {
-  if (passphraseStrength.value === 'strong') return t('settings.cloud.e2ee.strength.strong');
-  if (passphraseStrength.value === 'fair') return t('settings.cloud.e2ee.strength.fair');
-  if (passphraseStrength.value === 'weak') return t('settings.cloud.e2ee.strength.weak');
-  return t('settings.cloud.e2ee.strength.too-short');
+const pendingPassphrasePersist = ref<{rememberScope: CloudPassphraseRememberScope; passphrase: string} | null>(null);
+
+const e2eeEnabled = computed(() => passphraseState.value?.mode === 'custom' || remoteRequiresUnlock.value);
+const showUnlockedBar = computed(() => passphraseState.value?.mode === 'custom' && passphraseState.value.hasStoredPassphrase && !forceUnlockPrompt.value);
+const showEphemeralReadyBar = computed(() => !showUnlockedBar.value && e2eeEnabled.value && Boolean(ephemeralReadyPassphrase.value));
+const showUnlockBar = computed(() => e2eeEnabled.value && !showUnlockedBar.value && !showEphemeralReadyBar.value);
+
+const setupStrength = computed(() => evaluatePassphraseStrength(setupPassphrase.value));
+const setupStrengthLabel = computed(() => t(`settings.cloud.e2ee.strength.${setupStrength.value}`));
+const setupLengthValid = computed(() => setupPassphrase.value.trim().length >= 12 && setupPassphrase.value.length <= 1024);
+const setupMismatch = computed(() => Boolean(setupConfirm.value && setupPassphrase.value !== setupConfirm.value));
+const canSubmitSetup = computed(() => setupLengthValid.value && setupPassphrase.value === setupConfirm.value && setupAcknowledged.value);
+
+const unlockLengthValid = computed(() => unlockDraft.value.trim().length >= 12 && unlockDraft.value.length <= 1024);
+const canSyncWithCustomPassphrase = computed(() => showUnlockedBar.value || showEphemeralReadyBar.value || unlockLengthValid.value);
+
+const retentionOptions = computed(() => [
+  {value: 'none' as const, title: t('settings.cloud.e2ee.rememberNoneTitle'), hint: t('settings.cloud.e2ee.rememberNoneHint')},
+  {value: 'session' as const, title: t('settings.cloud.e2ee.rememberSessionTitle'), hint: t('settings.cloud.e2ee.rememberSessionHint')},
+  {value: 'device' as const, title: t('settings.cloud.e2ee.rememberDeviceTitle'), hint: t('settings.cloud.e2ee.rememberDeviceHint')},
+]);
+const activeSetupRetentionHint = computed(() => retentionOptions.value.find(item => item.value === setupRemember.value)?.hint ?? '');
+const activeUnlockRetentionHint = computed(() => retentionOptions.value.find(item => item.value === unlockRemember.value)?.hint ?? '');
+const showAutoSyncRetentionNudge = computed(() => hasAutoSyncSupport.value && autoSyncState.value?.enabled === true && passphraseState.value?.storageScope !== 'device');
+const autoSyncIntervals = [[30, '30m'], [60, '60m'], [360, '6h'], [1440, '24h']] as const;
+
+const e2eeStatusTone = computed<'legacy' | 'unlocked' | 'ready' | 'locked'>(() => {
+  if (!e2eeEnabled.value) return 'legacy';
+  if (showUnlockedBar.value) return 'unlocked';
+  if (showEphemeralReadyBar.value || (unlockRemember.value === 'none' && unlockLengthValid.value)) return 'ready';
+  return 'locked';
 });
-const passphraseMismatch = computed(() => Boolean(passphraseConfirm.value && passphraseDraft.value !== passphraseConfirm.value));
-const passphraseValid = computed(() => passphraseDraft.value.trim().length >= 12 && passphraseDraft.value.length <= 1024 && passphraseDraft.value === passphraseConfirm.value);
-const canApplyPassphrase = computed(() => e2eeMode.value === 'app' || e2eeRemember.value === 'none' || passphraseValid.value);
 const e2eeStatusText = computed(() => {
-  if (!passphraseState.value || passphraseState.value.mode === 'app') return t('settings.cloud.e2ee.statusLegacy');
-  if (passphraseState.value.storageScope === 'device') return t('settings.cloud.e2ee.statusDevice');
-  if (passphraseState.value.storageScope === 'session') return t('settings.cloud.e2ee.statusSession');
-  return t('settings.cloud.e2ee.statusLocked');
+  if (!e2eeEnabled.value) return t('settings.cloud.e2ee.badgeLegacy');
+  if (showUnlockedBar.value) {
+    return t(passphraseState.value?.storageScope === 'device' ? 'settings.cloud.e2ee.rememberDeviceTitle' : 'settings.cloud.e2ee.rememberSessionTitle');
+  }
+  if (showEphemeralReadyBar.value || (unlockRemember.value === 'none' && unlockLengthValid.value)) return t('settings.cloud.e2ee.rememberNoneTitle');
+  return t('settings.cloud.e2ee.badgeLocked');
 });
+watch([unlockDraft, unlockRemember], () => {e2eeValidationError.value = '';});
 
 const autoSyncState = ref<CloudAutoSyncStatus | null>(null);
+const autoSyncStatusKey: Record<CloudAutoSyncStatus['state'], string> = {synced: 'Synced', conflict: 'Conflict', 'passphrase-locked': 'Locked', offline: 'Offline', error: 'Error', idle: 'Idle'};
 const autoSyncStatusText = computed(() => {
-  const current = autoSyncState.value;
-  if (!current) return '';
-  if (current.state === 'synced') return t('settings.cloud.autoSync.statusSynced');
-  if (current.state === 'conflict') return t('settings.cloud.autoSync.statusConflict', {count: current.conflictCount || 1});
-  if (current.state === 'passphrase-locked') return t('settings.cloud.autoSync.statusLocked');
-  if (current.state === 'offline') return t('settings.cloud.autoSync.statusOffline');
-  if (current.state === 'error') return t('settings.cloud.autoSync.statusError');
-  return t('settings.cloud.autoSync.statusIdle');
+  const c = autoSyncState.value;
+  return c ? t(`settings.cloud.autoSync.status${autoSyncStatusKey[c.state]}`, {count: c.conflictCount || 1}) : '';
 });
 
 const consentVisible = ref(false);
@@ -361,7 +431,7 @@ const deleteDetailsVisible = ref(false);
 const deleteConfirmation = ref('');
 const deleteInstruction = computed(() => t('settings.cloud.deleteVerificationPrompt', {phrase: '{phrase}'}).split('{phrase}'));
 const canConfirmDeletion = computed(() => Boolean(deleteVisible.value && deletion.value?.canDelete && (!deletion.value.hasRemote || deleteConfirmation.value === t('settings.cloud.deletePhrase'))));
-watch(() => busy.value || consentVisible.value || previewVisible.value || deleteVisible.value, value => emit('busy', value));
+watch(() => busy.value || consentVisible.value || previewVisible.value || deleteVisible.value || e2eeSetupVisible.value || e2eeDisableVisible.value, value => emit('busy', value));
 watch(deleteVisible, value => {if (!value) deleteDetailsVisible.value = false;});
 const direction = ref<DriveSyncDirection | ''>('');
 const step = ref<'choose' | 'review'>('review');
@@ -428,41 +498,69 @@ async function perform(operation: () => Promise<void>, deletionOperation = false
   try {await operation();} catch (failure) {if (alive) {
     uploadUnverified.value = failure instanceof CloudBackupRequestError && failure.errorKey === 'settings.cloud.uploadUnverified';
     if (failure instanceof CloudBackupRequestError && (failure.errorKey === 'settings.cloud.e2ee.passphraseRequired' || failure.errorKey === 'settings.cloud.e2ee.wrongPassphrase')) {
-      e2eeMode.value = 'custom';
+      remoteRequiresUnlock.value = true;
+      if (failure.errorKey === 'settings.cloud.e2ee.wrongPassphrase') {
+        forceUnlockPrompt.value = true;
+        unlockDraft.value = '';
+        ephemeralReadyPassphrase.value = undefined;
+      }
+      void nextTick(() => unlockInputRef.value?.focus?.());
     }
     error.value = failure instanceof CloudBackupRequestError && failure.errorKey ? t(failure.errorKey, failure.params) : failure instanceof Error ? translateLegacy(failure.message) : translateLegacy('同步未完成，请重试');
   }}
   finally {if (alive) {busy.value = false; deleting.value = false;}}
 }
-function toggleLearning(field: keyof LearningSyncScope, value: boolean | string | number) {
-  if (busy.value || previewVisible.value) return;
-  const enabled = value === true;
-  learningScope[field] = enabled;
-  if (field === 'includeVocabulary' && !enabled) learningScope.includeVocabularyContext = false;
+function persistLearningPreference() {
   try {localStorage.setItem(learningPreferenceKey, JSON.stringify({...learningScope}));} catch { /* 本地偏好写入受限时仅保持当前页面有效。 */ }
   if (hasAutoSyncSupport.value && autoSyncState.value?.enabled) {
     void client.configureAutoSync!({learningScope: {...learningScope}}).then(next => {if (alive) autoSyncState.value = next;}).catch(() => undefined);
   }
 }
+function toggleLearningAll(value: boolean | string | number) {
+  if (busy.value || previewVisible.value) return;
+  const enabled = value === true;
+  learningScope.includeVocabulary = enabled;
+  learningScope.includePersonalCorrections = enabled;
+  learningScope.includeReadingMaterials = enabled;
+  if (!enabled) learningScope.includeVocabularyContext = false;
+  persistLearningPreference();
+}
+function toggleVocabularyContext(value: boolean | string | number) {
+  if (busy.value || previewVisible.value || !learningEnabled.value) return;
+  learningScope.includeVocabularyContext = value === true;
+  persistLearningPreference();
+}
 function buildPrepareOptions(): CloudBackupPrepareOptions | undefined {
   const options: CloudBackupPrepareOptions = {};
   if (hasAnyLearningSyncScope(learningScope)) options.learningScope = {...learningScope};
   if (hasPassphraseSupport.value) {
-    options.keyMode = e2eeMode.value;
-    if (e2eeMode.value === 'custom' && passphraseValid.value) {
-      activeEphemeralPassphrase.value = passphraseDraft.value;
-      options.passphrase = passphraseDraft.value;
+    options.keyMode = e2eeEnabled.value ? 'custom' : 'app';
+    if (e2eeEnabled.value) {
+      if (showEphemeralReadyBar.value && ephemeralReadyPassphrase.value) {
+        activeEphemeralPassphrase.value = ephemeralReadyPassphrase.value;
+        pendingPassphrasePersist.value = null;
+        options.passphrase = ephemeralReadyPassphrase.value;
+      } else if (showUnlockBar.value && unlockLengthValid.value) {
+        activeEphemeralPassphrase.value = unlockDraft.value;
+        pendingPassphrasePersist.value = {rememberScope: unlockRemember.value, passphrase: unlockDraft.value};
+        options.passphrase = unlockDraft.value;
+      } else {
+        activeEphemeralPassphrase.value = undefined;
+        pendingPassphrasePersist.value = null;
+      }
     } else {
       activeEphemeralPassphrase.value = undefined;
+      pendingPassphrasePersist.value = null;
     }
   } else {
     activeEphemeralPassphrase.value = undefined;
+    pendingPassphrasePersist.value = null;
   }
   return Object.keys(options).length > 0 ? options : undefined;
 }
 function buildCommitOptions(): CloudBackupCommitOptions | undefined {
   if (!hasPassphraseSupport.value) return undefined;
-  if (e2eeMode.value === 'custom') {
+  if (e2eeEnabled.value) {
     return {
       keyMode: 'custom',
       ...(activeEphemeralPassphrase.value ? {passphrase: activeEphemeralPassphrase.value} : {}),
@@ -483,30 +581,71 @@ async function requestPreview() {
   step.value = direction.value ? 'review' : 'choose';
   page.value = 1; detailsVisible.value = true; automaticVisible.value = true; previewVisible.value = true;
 }
-async function prepare() {await perform(requestPreview);}
-function changeE2eeRemember(event: Event) {
-  const value = (event.target as HTMLSelectElement).value;
-  if (value === 'none' || value === 'session' || value === 'device') e2eeRemember.value = value;
+async function prepare() {
+  if (hasPassphraseSupport.value && e2eeEnabled.value && !canSyncWithCustomPassphrase.value) {
+    e2eeValidationError.value = unlockDraft.value.length > 0
+      ? t('settings.cloud.e2ee.invalidPassphrase')
+      : t('settings.cloud.e2ee.passphraseRequired');
+    void nextTick(() => unlockInputRef.value?.focus?.());
+    return;
+  }
+  e2eeValidationError.value = '';
+  await perform(requestPreview);
 }
-async function applyPassphraseSettings() {
-  if (!hasPassphraseSupport.value || !canApplyPassphrase.value) return;
+function resetSetupDialog() {setupPassphrase.value = ''; setupConfirm.value = ''; setupAcknowledged.value = false; setupRemember.value = 'session';}
+function clearE2eeTransient(resetUpgrade = false) {
+  unlockDraft.value = ''; ephemeralReadyPassphrase.value = undefined; activeEphemeralPassphrase.value = undefined;
+  pendingPassphrasePersist.value = null; remoteRequiresUnlock.value = false; forceUnlockPrompt.value = false; e2eeValidationError.value = '';
+  if (resetUpgrade) justEnabledE2ee.value = false;
+}
+function toggleE2ee(value: boolean | string | number) {
+  if (busy.value || previewVisible.value || e2eeSetupVisible.value || e2eeDisableVisible.value) return;
+  if (value === true) {resetSetupDialog(); e2eeSetupVisible.value = true; return;}
+  if (passphraseState.value?.mode !== 'custom') {clearE2eeTransient(); return;}
+  e2eeDisableVisible.value = true;
+}
+function submitSetupOnEnter() {if (!busy.value && canSubmitSetup.value) void confirmSetupE2ee();}
+async function confirmSetupE2ee() {
+  if (!hasPassphraseSupport.value || !canSubmitSetup.value) return;
+  const remember = setupRemember.value, pass = setupPassphrase.value;
   await perform(async () => {
-    const next = await client.configurePassphrase!(
-      e2eeMode.value === 'app'
-        ? {mode: 'app'}
-        : {
-          mode: 'custom',
-          rememberScope: e2eeRemember.value,
-          ...(passphraseValid.value ? {passphrase: passphraseDraft.value} : {}),
-        },
-    );
+    const next = await client.configurePassphrase!(remember === 'none' ? {mode: 'custom', rememberScope: 'none'} : {mode: 'custom', rememberScope: remember, passphrase: pass});
     if (!alive) return;
-    passphraseState.value = next;
-    e2eeMode.value = next.mode;
-    if (e2eeRemember.value !== 'none') {
-      passphraseDraft.value = '';
-      passphraseConfirm.value = '';
-    }
+    passphraseState.value = next; clearE2eeTransient();
+    ephemeralReadyPassphrase.value = remember === 'none' ? pass : undefined;
+    justEnabledE2ee.value = true; e2eeSetupVisible.value = false; resetSetupDialog();
+    ElMessage.success(t('settings.cloud.e2ee.saved'));
+  });
+}
+async function confirmDisableE2ee() {
+  if (!hasPassphraseSupport.value) return;
+  await perform(async () => {
+    const next = await client.configurePassphrase!({mode: 'app'});
+    if (!alive) return;
+    passphraseState.value = next; clearE2eeTransient(true); e2eeDisableVisible.value = false;
+    ElMessage.success(t('settings.cloud.e2ee.saved'));
+  });
+}
+function submitUnlockOnEnter() {
+  if (busy.value || previewVisible.value || !unlockLengthValid.value) return;
+  void (unlockRemember.value === 'none' ? prepare() : applyUnlock());
+}
+async function applyUnlock() {
+  if (!hasPassphraseSupport.value || !unlockLengthValid.value || unlockRemember.value === 'none') return;
+  await perform(async () => {
+    const next = await client.configurePassphrase!({mode: 'custom', rememberScope: unlockRemember.value, passphrase: unlockDraft.value});
+    if (!alive) return;
+    passphraseState.value = next; clearE2eeTransient();
+    ElMessage.success(t('settings.cloud.e2ee.saved'));
+  });
+}
+function clearEphemeralPassphrase() {ephemeralReadyPassphrase.value = undefined; activeEphemeralPassphrase.value = undefined; justEnabledE2ee.value = false;}
+async function switchStoredRetention(scope: 'session' | 'device') {
+  if (!hasPassphraseSupport.value || !passphraseState.value?.hasStoredPassphrase || passphraseState.value.storageScope === scope) return;
+  await perform(async () => {
+    const next = await client.configurePassphrase!({mode: 'custom', rememberScope: scope});
+    if (!alive) return;
+    passphraseState.value = next; unlockRemember.value = next.storageScope === 'none' ? 'session' : next.storageScope;
     ElMessage.success(t('settings.cloud.e2ee.saved'));
   });
 }
@@ -515,10 +654,7 @@ async function forgetStoredPassphrase() {
   await perform(async () => {
     const next = await client.clearPassphrase!();
     if (!alive) return;
-    passphraseState.value = next;
-    passphraseDraft.value = '';
-    passphraseConfirm.value = '';
-    activeEphemeralPassphrase.value = undefined;
+    passphraseState.value = next; clearE2eeTransient(true);
     ElMessage.success(t('settings.cloud.e2ee.cleared'));
   });
 }
@@ -533,9 +669,8 @@ async function toggleAutoSync(value: boolean | string | number) {
     if (alive) autoSyncState.value = next;
   });
 }
-async function changeAutoSyncInterval(event: Event) {
-  if (!hasAutoSyncSupport.value) return;
-  const minutes = Number((event.target as HTMLSelectElement).value) as CloudAutoSyncIntervalMinutes;
+async function selectAutoSyncInterval(minutes: CloudAutoSyncIntervalMinutes) {
+  if (!hasAutoSyncSupport.value || autoSyncState.value?.intervalMinutes === minutes) return;
   await perform(async () => {
     const next = await client.configureAutoSync!({intervalMinutes: minutes});
     if (alive) autoSyncState.value = next;
@@ -640,10 +775,23 @@ async function commit() {
         : await client.commit(selected.id, selected.direction, selected.choices);
       if (alive) {
         status.value = result;
+        const persist = pendingPassphrasePersist.value;
         activeEphemeralPassphrase.value = undefined;
-        if (!passphraseState.value?.hasStoredPassphrase || passphraseState.value.storageScope === 'none') {
-          passphraseDraft.value = '';
-          passphraseConfirm.value = '';
+        pendingPassphrasePersist.value = null;
+        if (hasPassphraseSupport.value && persist && (persist.rememberScope !== 'none' || passphraseState.value?.mode !== 'custom' || passphraseState.value.hasStoredPassphrase)) {
+          const nextPassphrase = await client.configurePassphrase!(
+            persist.rememberScope === 'none'
+              ? {mode: 'custom', rememberScope: 'none'}
+              : {mode: 'custom', rememberScope: persist.rememberScope, passphrase: persist.passphrase},
+          );
+          if (alive) passphraseState.value = nextPassphrase;
+        }
+        if (alive) {
+          ephemeralReadyPassphrase.value = undefined;
+          unlockDraft.value = '';
+          remoteRequiresUnlock.value = false;
+          forceUnlockPrompt.value = false;
+          justEnabledE2ee.value = false;
         }
         ElMessage.success(t('settings.cloud.syncComplete', {provider: props.provider}));
       }
@@ -656,7 +804,7 @@ async function cancelPreview() {
     finally {if (alive) previewVisible.value = false;}
   });
 }
-function clearPreview() {preview.value = null; choices.value = {}; direction.value = ''; activeEphemeralPassphrase.value = undefined;}
+function clearPreview() {preview.value = null; choices.value = {}; direction.value = ''; activeEphemeralPassphrase.value = undefined; pendingPassphrasePersist.value = null;}
 function endSession() {if (preview.value || deletion.value || busy.value) void client.cancel(preview.value?.id ?? deletion.value?.id).catch(() => undefined);}
 async function refreshStatus() {await perform(async () => {
   try {
@@ -669,12 +817,17 @@ async function refreshStatus() {await perform(async () => {
     status.value = nextStatus;
     if (nextPassphrase) {
       passphraseState.value = nextPassphrase;
-      e2eeMode.value = nextPassphrase.mode;
-      e2eeRemember.value = nextPassphrase.storageScope === 'none' ? 'session' : nextPassphrase.storageScope;
-      if (!nextPassphrase.hasStoredPassphrase) {
-        passphraseDraft.value = '';
-        passphraseConfirm.value = '';
+      remoteRequiresUnlock.value = false;
+      forceUnlockPrompt.value = false;
+      if (nextPassphrase.mode === 'custom' && nextPassphrase.hasStoredPassphrase) {
+        unlockRemember.value = nextPassphrase.storageScope;
+        ephemeralReadyPassphrase.value = undefined;
+      } else if (nextPassphrase.mode === 'app') {
+        unlockRemember.value = 'session';
+        ephemeralReadyPassphrase.value = undefined;
+        justEnabledE2ee.value = false;
       }
+      if (!nextPassphrase.hasStoredPassphrase) unlockDraft.value = '';
     }
     if (nextAutoSync) autoSyncState.value = nextAutoSync;
   }
@@ -682,7 +835,7 @@ async function refreshStatus() {await perform(async () => {
 });}
 defineExpose({refreshStatus});
 onMounted(() => {window.addEventListener('storage', handleSensitivePreferenceChange); void refreshStatus();});
-onUnmounted(() => {window.removeEventListener('storage', handleSensitivePreferenceChange); alive = false; passphraseDraft.value = ''; passphraseConfirm.value = ''; endSession(); clearPreview();});
+onUnmounted(() => {window.removeEventListener('storage', handleSensitivePreferenceChange); alive = false; setupPassphrase.value = ''; setupConfirm.value = ''; unlockDraft.value = ''; ephemeralReadyPassphrase.value = undefined; endSession(); clearPreview();});
 </script>
 
 <style scoped>
@@ -702,23 +855,45 @@ onUnmounted(() => {window.removeEventListener('storage', handleSensitivePreferen
 .cloud-scope-option strong {font-size:13px; font-weight:500;}
 .cloud-scope-option label>span {font-size:12px; line-height:1.7; color:var(--el-text-color-secondary); overflow-wrap:anywhere;}
 .cloud-scope-option>.el-switch {flex-shrink:0;}
-.cloud-e2ee,.cloud-autosync {margin-top:16px; border:1px solid var(--el-border-color-lighter); border-radius:10px; padding:16px; background:var(--el-fill-color-blank);}
-.cloud-e2ee-header {display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;}
-.cloud-e2ee-header strong {font-size:13px; font-weight:600;}
-.cloud-e2ee-badge {font-size:12px; padding:2px 8px; border-radius:999px; background:var(--el-fill-color-light); color:var(--el-text-color-secondary);}
-.cloud-e2ee-modes {display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
-.cloud-e2ee-modes label {display:flex; align-items:center; gap:6px; padding:8px 12px; border:1px solid var(--el-border-color); border-radius:8px; font-size:12px; cursor:pointer;}
-.cloud-e2ee-modes label.is-selected {border-color:var(--el-color-primary); background:var(--el-color-primary-light-9);}
-.cloud-e2ee-modes input {accent-color:var(--el-color-primary); margin:0;}
-.cloud-e2ee-warning {margin-bottom:12px;}
-.cloud-e2ee-fields {display:grid; gap:8px; margin-bottom:12px;}
-.cloud-e2ee-fields>label {font-size:12px; color:var(--el-text-color-regular);}
-.cloud-e2ee-strength {margin:0; font-size:12px;}
-.cloud-e2ee-strength.is-too-short,.cloud-e2ee-strength.is-weak,.cloud-e2ee-mismatch {margin:0; font-size:12px; color:var(--el-color-danger);}
-.cloud-e2ee-strength.is-fair {color:var(--el-color-warning);}
-.cloud-e2ee-strength.is-strong {color:var(--el-color-success);}
-.cloud-e2ee-actions {display:flex; flex-wrap:wrap; align-items:center; gap:10px;}
-.cloud-native-select {height:32px; padding:0 10px; border:1px solid var(--el-border-color); border-radius:6px; background:var(--el-bg-color); color:var(--el-text-color-primary); font:inherit; font-size:12px;}
+.e2ee,.cloud-autosync {margin-top:16px; border:1px solid var(--el-border-color-lighter); border-radius:10px; padding:16px; background:var(--el-fill-color-blank);}
+.e2ee-row>label {cursor:pointer;}
+.e2ee-title {display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px;}
+.e2ee-badge {font-size:11px; font-weight:500; padding:1px 8px; border-radius:999px; background:var(--el-fill-color-light); color:var(--el-text-color-secondary); line-height:1.6;}
+.e2ee-badge.is-unlocked {background:var(--el-color-success-light-9); color:var(--el-color-success);}
+.e2ee-badge.is-ready {background:var(--el-color-primary-light-9); color:var(--el-color-primary);}
+.e2ee-badge.is-locked {background:var(--el-color-warning-light-9); color:var(--el-color-warning);}
+.e2ee-sub {display:grid; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid var(--el-border-color-lighter);}
+.e2ee-bar,.e2ee-fb {display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px;}
+.e2ee-ret,.e2ee-meter {display:flex; flex-wrap:wrap; align-items:center; gap:8px;}
+.e2ee-lbl {font-size:12px; font-weight:500; color:var(--el-text-color-regular); white-space:nowrap;}
+.seg {display:inline-flex; flex-wrap:wrap; padding:2px; gap:2px; border:1px solid var(--el-border-color-lighter); border-radius:8px; background:var(--el-fill-color-light);}
+.seg-3 {display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); width:100%;}
+.seg-btn {padding:5px 10px; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--el-text-color-regular); font:inherit; font-size:12px; line-height:1.4; cursor:pointer;}
+.seg-btn.is-active {border-color:var(--el-border-color-lighter); background:var(--el-bg-color); color:var(--el-color-primary); font-weight:500; box-shadow:0 1px 2px rgb(0 0 0 / 5%);}
+.seg-btn:disabled {opacity:.6; cursor:not-allowed;}
+.seg-btn:focus-visible {outline:2px solid var(--el-color-primary); outline-offset:1px;}
+.e2ee-nudge {display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin:0; padding:8px 10px; border-radius:8px; background:var(--el-color-warning-light-9); font-size:12px; color:var(--el-text-color-regular);}
+.e2ee-nudge .el-button {padding:0; min-height:auto; font-size:12px;}
+.e2ee-muted,.e2ee-hint {margin:0; font-size:12px; line-height:1.6; color:var(--el-text-color-secondary);}
+.e2ee-hint,.e2ee-ready {color:var(--el-text-color-regular);}
+.e2ee-ready {display:flex; align-items:center; gap:6px; margin:0; font-size:12px; line-height:1.6;}
+.e2ee-ready .el-icon {color:var(--el-color-success); font-size:15px; flex-shrink:0;}
+.e2ee-unlock {display:flex; align-items:center; gap:8px;}
+.e2ee-unlock :deep(.el-input),.e2ee-field :deep(.el-input) {flex:1; min-width:0; width:100%; max-width:none;}
+.e2ee-unlock>.el-button,.cloud-autosync-controls>.el-button {flex-shrink:0; margin:0;}
+.e2ee-form {display:grid; gap:14px;}
+.e2ee-field {display:grid; gap:6px; min-width:0;}
+.e2ee-field>label {font-size:13px; font-weight:500; color:var(--el-text-color-primary);}
+.e2ee-bars {display:inline-flex; gap:3px; width:54px;}
+.e2ee-bars>span {height:4px; flex:1; border-radius:999px; background:var(--el-border-color-lighter);}
+.e2ee-bars.is-too-short>span:nth-child(1) {background:var(--el-color-danger); opacity:.5;}
+.e2ee-bars.is-weak>span:nth-child(1) {background:var(--el-color-danger);}
+.e2ee-bars.is-fair>span:nth-child(1),.e2ee-bars.is-fair>span:nth-child(2) {background:var(--el-color-warning);}
+.e2ee-bars.is-strong>span {background:var(--el-color-success);}
+.e2ee-str,.e2ee-err {margin:0; font-size:12px;}
+.e2ee-str.is-too-short,.e2ee-str.is-weak,.e2ee-err {color:var(--el-color-danger);}
+.e2ee-str.is-fair {color:var(--el-color-warning);}
+.e2ee-str.is-strong {color:var(--el-color-success);}
 .cloud-autosync-controls {display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid var(--el-border-color-lighter); font-size:12px;}
 .cloud-autosync-status {margin:10px 0 0; font-size:12px; color:var(--el-text-color-secondary);}
 .cloud-learning-preview {margin:0 0 20px; padding:12px 14px; border:1px solid var(--el-border-color-lighter); border-radius:8px; background:var(--el-fill-color-light);}
@@ -858,6 +1033,8 @@ label.drive-value {cursor:pointer;}
 .drive-footer-actions .el-button {margin:0; min-height:38px;}
 .is-disabled {cursor:wait; opacity:.65;}
 @media (max-width:600px) {
+  .seg-3 {grid-template-columns:1fr;}
+  .e2ee-unlock {flex-direction:column; align-items:stretch;}
   .drive-heading {flex-wrap:wrap;}.drive-values {grid-template-columns:1fr;}.drive-change.is-compact {grid-template-columns:minmax(0, 1fr);}
   .drive-actions {flex-direction:column; align-items:flex-start;}.drive-record {flex:none; width:100%; margin-inline-start:0; text-align:left;}
   .drive-operation {padding:16px;}.drive-review-heading {align-items:flex-start; flex-direction:column;}

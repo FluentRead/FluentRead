@@ -142,88 +142,170 @@ async function applySelectedPresets(): Promise<void> {
 .scenario-presets-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-top: 8px;
+  gap: 14px;
+  padding: 16px var(--fr-card-padding-inline, 20px) 18px;
+  border-top: 1px solid var(--fr-card-border, var(--line));
 }
 
 .scenario-presets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: 12px;
 }
 
 .scenario-preset-card {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--line, #e2e8f0);
-  border-radius: 10px;
-  background: var(--surface-soft, #f8fafc);
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--fr-card-border, var(--line));
+  border-radius: var(--fr-radius-md, 10px);
+  background: var(--surface-soft, #f7f8fb);
   color: var(--ink, #172033);
+  font: inherit;
   text-align: left;
   cursor: pointer;
+  transition:
+    border-color var(--fr-duration-fast, 160ms) var(--fr-ease-out, ease),
+    background-color var(--fr-duration-fast, 160ms) var(--fr-ease-out, ease),
+    box-shadow var(--fr-duration-fast, 160ms) var(--fr-ease-out, ease);
+}
+
+.scenario-preset-card:hover {
+  border-color: var(--fr-color-line-strong, var(--line));
+  background: var(--fr-color-surface-hover, var(--surface-soft));
+}
+
+.scenario-preset-card:focus-visible {
+  outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand-strong));
+  outline-offset: 2px;
 }
 
 .scenario-preset-card.is-selected {
-  border-color: var(--brand, #2563eb);
-  background: var(--brand-soft, #eff6ff);
+  border-color: var(--brand, #ef4776);
+  background: var(--brand-soft, #fff0f5);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand, #ef4776) 22%, transparent);
+}
+
+.scenario-preset-card.is-selected:hover {
+  border-color: var(--brand-strong, #d4235a);
+  background: var(--brand-soft, #fff0f5);
 }
 
 .scenario-preset-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
+  gap: 10px;
+  min-width: 0;
+  font-size: var(--fr-text-base, 13px);
+  line-height: 1.4;
+}
+
+.scenario-preset-card-head strong {
+  min-width: 0;
+  color: var(--ink, #172033);
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .scenario-preset-check {
-  color: var(--brand, #2563eb);
-  visibility: hidden;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--fr-color-line-strong, var(--line));
+  border-radius: var(--fr-radius-full, 9999px);
+  background: var(--surface, #ffffff);
+  color: transparent;
+  font-size: 11px;
   font-weight: 700;
+  line-height: 1;
+  transition:
+    border-color var(--fr-duration-fast, 160ms) var(--fr-ease-out, ease),
+    background-color var(--fr-duration-fast, 160ms) var(--fr-ease-out, ease),
+    color var(--fr-duration-fast, 160ms) var(--fr-ease-out, ease);
 }
 
 .scenario-preset-card.is-selected .scenario-preset-check {
-  visibility: visible;
+  border-color: var(--brand, #ef4776);
+  background: var(--brand, #ef4776);
+  color: #ffffff;
 }
 
 .scenario-preset-card-desc {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--muted, #64748b);
+  font-size: var(--fr-text-sm, 12px);
+  line-height: 1.55;
+  color: var(--muted, #5d6678);
+  overflow-wrap: anywhere;
 }
 
 .scenario-presets-preview {
-  padding: 10px 12px;
-  border: 1px dashed var(--line, #cbd5e1);
-  border-radius: 10px;
-  background: var(--surface, #ffffff);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--fr-card-border, var(--line));
+  border-radius: var(--fr-radius-md, 10px);
+  background: var(--surface-soft, #f7f8fb);
 }
 
 .scenario-presets-preview-title {
-  font-size: 12px;
+  color: var(--ink, #172033);
+  font-size: var(--fr-text-base, 13px);
   font-weight: 600;
-  margin-bottom: 6px;
+  line-height: 1.4;
 }
 
 .scenario-presets-preview-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 6px 20px;
   margin: 0;
   padding-left: 18px;
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--fr-text-sm, 12px);
+  line-height: 1.55;
   color: var(--ink, #172033);
 }
 
+.scenario-presets-preview-list li {
+  overflow-wrap: anywhere;
+}
+
+.scenario-presets-preview-list li::marker {
+  color: var(--brand, #ef4776);
+}
+
 .scenario-presets-safety {
-  margin: 6px 0 0;
-  font-size: 11px;
-  color: var(--muted, #64748b);
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--fr-card-border, var(--line));
+  font-size: var(--fr-text-sm, 12px);
+  line-height: 1.5;
+  color: var(--muted, #5d6678);
 }
 
 .scenario-presets-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--fr-action-gap, 8px);
+  padding-top: 2px;
+}
+
+.scenario-presets-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scenario-preset-card,
+  .scenario-preset-check {
+    transition: none;
+  }
 }
 </style>

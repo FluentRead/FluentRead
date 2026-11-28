@@ -170,7 +170,8 @@
     "settings.cloud.autoSync.statusConflict": "{count} conflit(s) détecté(s). Écriture automatique en pause pour examen manuel.",
     "settings.cloud.autoSync.statusLocked": "Synchronisation automatique en pause : phrase E2EE verrouillée.",
     "settings.cloud.autoSync.statusOffline": "Hors ligne. Nouvelle tentative dès le retour du réseau.",
-    "settings.cloud.autoSync.statusError": "Échec temporaire de la synchronisation automatique. Nouvel essai différé."
+    "settings.cloud.autoSync.statusError": "Échec temporaire de la synchronisation automatique. Nouvel essai différé.",
+    "settings.cloud.e2ee.rememberDeviceNoAutoSync": "Conserver chiffrée sur cet appareil"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "La sauvegarde cloud des paramètres généraux contient des champs hors de sa portée. Créez une nouvelle sauvegarde.",
@@ -187,6 +188,9 @@
     "云端备份使用自定义端到端加密口令保护，请先输入同步口令。": "La sauvegarde cloud est protégée par une phrase secrète E2EE personnalisée. Saisissez-la d’abord.",
     "同步口令不正确，或云端配置已损坏；本机配置未被修改": "Phrase secrète incorrecte ou sauvegarde endommagée. Les réglages locaux n’ont pas changé.",
     "加密口令模式无效": "Mode de phrase secrète de chiffrement invalide.",
-    "同步口令至少需要 12 个字符，最多 1024 个字符": "La phrase secrète doit contenir entre 12 et 1024 caractères."
+    "同步口令至少需要 12 个字符，最多 1024 个字符": "La phrase secrète doit contenir entre 12 et 1024 caractères.",
+    "本机学习数据已变化，请重新生成同步预览。": "Les données d’apprentissage locales ont changé. Générez un nouvel aperçu de synchronisation.",
+    "本机学习数据写入和配置恢复失败，请重新打开设置检查；云端保留本次加密快照。": "Échec de l’enregistrement des données d’apprentissage et de la restauration des paramètres. Rouvrez les paramètres pour vérifier ; l’instantané chiffré dans le cloud a été conservé.",
+    "合并后的单词本超出 5000 条上限，请清理后再同步": "Le lexique fusionné dépasse la limite de 5 000 entrées. Nettoyez-le avant de synchroniser."
   }
 }

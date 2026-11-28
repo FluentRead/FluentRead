@@ -23,6 +23,9 @@ import {createWebDavBackupHandler, WEBDAV_BACKUP_MESSAGE_TYPE} from '@/src/app/b
 import type {createWebDavBackup} from '@/src/services/config/webDavBackup';
 import type {DriveRemote} from '@/src/platform/google-drive/api';
 import {initialDriveDirection} from '@/src/features/settings/model/googleDrivePreview';
+import {PersonalCorrectionError} from '@/src/core/personal-corrections/public';
+import {MaterialError} from '@/src/features/vocabulary/materialModel';
+import {VocabularyBookError} from '@/src/features/vocabulary/repository';
 
 const CUSTOM_PASS = 'ZeroKnowledge-Passphrase!2026';
 const OTHER_PASS = 'AnotherStrong-Passphrase!2026';
@@ -286,6 +289,7 @@ describe('Zero-Knowledge Custom E2EE Passphrase & Downgrade Resistance', () => {
         expect(await bareWebdav.handle({type: WEBDAV_BACKUP_MESSAGE_TYPE, clientId: 'c1', action: 'prepare', passphrase: 123}, {})).toMatchObject({success: false, errorKey: 'settings.cloud.e2ee.invalidPassphrase'});
         expect(await bareWebdav.handle({type: WEBDAV_BACKUP_MESSAGE_TYPE, clientId: 'c1', action: 'prepare', learningScope: {includeVocabulary: true}}, {})).toMatchObject({success: true});
         expect(await bareWebdav.handle({type: WEBDAV_BACKUP_MESSAGE_TYPE, clientId: 'c1', action: 'prepare', learningScope: {includeVocabulary: false}}, {})).toMatchObject({success: true});
+        expect(await bareWebdav.handle({type: WEBDAV_BACKUP_MESSAGE_TYPE, clientId: 'c1', action: 'commit', id: 'p1', direction: 'upload', choices: {}}, {})).toMatchObject({success: true});
 
         // With passphrases store: configure -> prepare -> commit -> clear
         for (const [handler, type, svc] of [
@@ -311,6 +315,18 @@ describe('Zero-Knowledge Custom E2EE Passphrase & Downgrade Resistance', () => {
             vi.mocked(svc.prepare).mockRejectedValueOnce(new DriveEncryptionError('wrong', 'wrong-passphrase'));
             expect(await handler.handle({type, clientId: 'c1', action: 'prepare', keyMode: 'custom', passphrase: OTHER_PASS} as never, {})).toMatchObject({
                 success: false, errorKey: 'settings.cloud.e2ee.wrongPassphrase',
+            });
+        }
+
+        // Google Drive handler whitelists learning repository errors
+        for (const err of [
+            new PersonalCorrectionError('校订超限'),
+            new VocabularyBookError('limit-exceeded', '单词本超限'),
+            new MaterialError('limit-exceeded', '材料超限'),
+        ]) {
+            vi.mocked(driveService.prepare).mockRejectedValueOnce(err);
+            expect(await driveHandler.handle({type: GOOGLE_DRIVE_SYNC_MESSAGE_TYPE, clientId: 'c1', action: 'prepare', keyMode: 'app'}, {})).toEqual({
+                success: false, error: err.message,
             });
         }
     });

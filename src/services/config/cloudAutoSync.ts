@@ -46,7 +46,7 @@ export interface CloudAutoSyncAlarmApi {
     onAlarm: {
         addListener(listener: (alarm: {name: string}) => void): void;
     };
-    get(name: string): Promise<{name: string} | undefined>;
+    get(name: string): Promise<{name: string; periodInMinutes?: number} | undefined>;
     create(name: string, info: {delayInMinutes: number; periodInMinutes: number}): void | Promise<void>;
     clear(name: string): Promise<boolean> | void;
 }
@@ -178,6 +178,7 @@ export function createCloudAutoSync(ports: CloudAutoSyncPorts) {
         const now = ports.now();
         if (!current.enabled && !options.force) return current;
         if (options.signal?.aborted) return current;
+        if (!options.force && (current.state === 'passphrase-locked' || current.state === 'conflict')) return current;
         if (!options.force && current.nextRetryAt !== null && now < current.nextRetryAt) return current;
         if (!ports.isOnline()) {
             const offline: CloudAutoSyncStatus = {...current, state: 'offline', lastAttemptAt: now};
@@ -290,6 +291,34 @@ export function createCloudAutoSync(ports: CloudAutoSyncPorts) {
         }
     }
 
+    async function resetAfterManualSync(syncedAt?: number): Promise<CloudAutoSyncStatus> {
+        const current = await load();
+        const now = syncedAt ?? ports.now();
+        const next: CloudAutoSyncStatus = {
+            ...current,
+            state: current.enabled ? 'synced' : 'idle',
+            lastSyncedAt: now,
+            nextRetryAt: null,
+            consecutiveFailures: 0,
+            conflictCount: 0,
+        };
+        delete next.lastErrorKey;
+        return save(next);
+    }
+
+    async function notifyPassphraseChanged(): Promise<CloudAutoSyncStatus> {
+        const current = await load();
+        if (current.state !== 'passphrase-locked') return current;
+        const next: CloudAutoSyncStatus = {
+            ...current,
+            state: 'idle',
+            nextRetryAt: null,
+            consecutiveFailures: 0,
+        };
+        delete next.lastErrorKey;
+        return save(next);
+    }
+
     function install(): Promise<void> {
         ports.alarms?.onAlarm.addListener(alarm => {
             if (alarm.name !== CLOUD_AUTO_SYNC_ALARM) return;
@@ -303,7 +332,9 @@ export function createCloudAutoSync(ports: CloudAutoSyncPorts) {
                 return;
             }
             const existing = await ports.alarms.get(CLOUD_AUTO_SYNC_ALARM);
-            if (!existing) await syncAlarm(current);
+            if (!existing || (existing.periodInMinutes !== undefined && existing.periodInMinutes !== current.intervalMinutes)) {
+                await syncAlarm(current);
+            }
         });
     }
 
@@ -312,6 +343,8 @@ export function createCloudAutoSync(ports: CloudAutoSyncPorts) {
         configure: (patch: CloudAutoSyncConfigPatch) => exclusive(() => configure(patch)),
         runNow: (signal?: AbortSignal) => exclusive(() => runOnce({force: true, signal})),
         runScheduled: (signal?: AbortSignal) => exclusive(() => runOnce({force: false, signal})),
+        resetAfterManualSync: (syncedAt?: number) => exclusive(() => resetAfterManualSync(syncedAt)),
+        notifyPassphraseChanged: () => exclusive(notifyPassphraseChanged),
         install,
     };
 }

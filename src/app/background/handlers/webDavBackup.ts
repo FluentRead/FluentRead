@@ -13,6 +13,9 @@ import {WebDavError, type WebDavConnectionInput} from '@/src/platform/webdav/con
 import {CloudSyncError} from '@/src/core/config/cloudSync';
 import {DriveConfigError} from '@/src/core/config/driveSync';
 import {hasAnyLearningSyncScope, LearningSyncError, normalizeLearningSyncScope} from '@/src/core/config/learningSync';
+import {PersonalCorrectionError} from '@/src/core/personal-corrections/public';
+import {MaterialError} from '@/src/features/vocabulary/materialModel';
+import {VocabularyBookError} from '@/src/features/vocabulary/repository';
 import {DriveEncryptionError, type DriveEncryptionKeyMode} from '@/src/platform/google-drive/encryption';
 import {GOOGLE_DRIVE_APPLICATION_PASSPHRASE} from '@/src/platform/google-drive/constants';
 
@@ -80,6 +83,7 @@ export function createWebDavBackupHandler(
                 } else if (message.action === 'configurePassphrase' && extras?.passphrases) {
                     if (!message.passphraseConfig || typeof message.passphraseConfig !== 'object' || Array.isArray(message.passphraseConfig)) return {success: false, errorKey: 'settings.webdav.error.action'};
                     data = await extras.passphrases.configure(message.passphraseConfig as CloudPassphraseConfigInput);
+                    if (extras.autoSync) await extras.autoSync.notifyPassphraseChanged();
                 } else if (message.action === 'clearPassphrase' && extras?.passphrases) {
                     data = await extras.passphrases.clear();
                 } else if (message.action === 'autoSyncStatus' && extras?.autoSync) {
@@ -92,8 +96,11 @@ export function createWebDavBackupHandler(
                 } else if (message.action === 'prepareDelete') data = await service.prepareDelete(tabId, clientId);
                 else if (message.action === 'commitDelete' && typeof message.id === 'string' && message.id.length > 0 && message.id.length <= 64) data = await service.commitDelete(message.id, tabId, clientId);
                 else if (message.action === 'settings') data = await service.settings();
-                else if (message.action === 'clear') data = await service.clear(message.revision, tabId, clientId);
-                else if (message.action === 'save' || message.action === 'test') {
+                else if (message.action === 'clear') {
+                    data = await service.clear(message.revision, tabId, clientId);
+                    if (extras?.autoSync) await extras.autoSync.configure({enabled: false});
+                    if (extras?.passphrases) await extras.passphrases.clear();
+                } else if (message.action === 'save' || message.action === 'test') {
                     if (!message.connection || typeof message.connection !== 'object' || Array.isArray(message.connection)) return {success: false, errorKey: 'settings.webdav.error.action'};
                     const input = message.connection as WebDavConnectionInput;
                     data = message.action === 'save' ? await service.save(input, tabId, clientId) : await service.test(input);
@@ -123,6 +130,7 @@ export function createWebDavBackupHandler(
                             legacyPassphrase: resolved.legacyPassphrase,
                         })
                         : await service.commit(message.id, resolved.passphrase, message.direction as 'upload' | 'download' | 'merge', choices as Record<string, unknown>, tabId, clientId);
+                    if (extras?.autoSync) await extras.autoSync.resetAfterManualSync();
                 } else return {success: false, errorKey: 'settings.webdav.error.action'};
                 return {success: true, data};
             } catch (error) {
@@ -133,7 +141,12 @@ export function createWebDavBackupHandler(
                     if (error.code === 'invalid-passphrase') return {success: false, errorKey: 'settings.cloud.e2ee.invalidPassphrase'};
                     return {success: false, errorKey: error.message.includes('过大') ? 'settings.webdav.error.tooLarge' : 'settings.webdav.error.decrypt'};
                 }
-                if (error instanceof CloudSyncError || error instanceof DriveConfigError || error instanceof LearningSyncError) return {success: false, error: error.message};
+                if (error instanceof CloudSyncError
+                    || error instanceof DriveConfigError
+                    || error instanceof LearningSyncError
+                    || error instanceof PersonalCorrectionError
+                    || error instanceof VocabularyBookError
+                    || error instanceof MaterialError) return {success: false, error: error.message};
                 return {success: false, errorKey: 'settings.webdav.error.failure'};
             }
         },

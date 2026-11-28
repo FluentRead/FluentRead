@@ -7,13 +7,22 @@
 export const LEARNING_SYNC_FORMAT = 'fluentread-learning-sync' as const;
 export const LEARNING_SYNC_VERSION = 1 as const;
 export const LEARNING_SYNC_MAX_BYTES = 12 * 1024 * 1024;
+export const LEARNING_SYNC_MAX_TREE_NODES = 50_000;
 export const LEARNING_SYNC_MAX_VOCABULARY = 5_000;
 export const LEARNING_SYNC_MAX_VOCABULARY_CONTEXTS = 8;
+export const LEARNING_SYNC_MAX_VOCABULARY_TRANSLATIONS = 64;
 export const LEARNING_SYNC_MAX_CORRECTIONS = 1_000;
 export const LEARNING_SYNC_MAX_CORRECTION_PROJECTS = 100;
+export const LEARNING_SYNC_MAX_CORRECTIONS_BYTES = 4 * 1024 * 1024;
 export const LEARNING_SYNC_MAX_MATERIALS = 2_000;
-export const LEARNING_SYNC_MAX_MATERIAL_TOPICS = 20;
+export const LEARNING_SYNC_MAX_MATERIAL_URL = 8_192 * 16 + 16;
+export const LEARNING_SYNC_MAX_MATERIAL_FINGERPRINT = 256;
+export const LEARNING_SYNC_MAX_MATERIAL_TOPICS = 30;
 export const LEARNING_SYNC_MAX_MATERIAL_NOTES = 200;
+
+const UUID_V4_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+const CORRECTION_MATERIAL_ID_PATTERN = /^material-[a-f0-9]{64}$/;
+const CORRECTION_LANGUAGE_PATTERN = /^(?:auto|[a-zA-Z]{2,3}(?:[-_][a-zA-Z0-9]{2,8})*)$/;
 
 export class LearningSyncError extends Error {}
 
@@ -182,15 +191,43 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function assertSafeTree(value: unknown, depth = 0): void {
+function assertSafeTree(value: unknown, depth = 0, budget = {nodes: 0}): void {
     if (depth > 20) throw new LearningSyncError('学习同步数据结构过深');
     if (!value || typeof value !== 'object') return;
+    if (++budget.nodes > LEARNING_SYNC_MAX_TREE_NODES) throw new LearningSyncError('学习同步数据结构节点过多');
     for (const [key, child] of Object.entries(value)) {
         if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
             throw new LearningSyncError('学习同步数据包含无效字段');
         }
-        assertSafeTree(child, depth + 1);
+        assertSafeTree(child, depth + 1, budget);
     }
+}
+
+function assertUuidV4(value: unknown, label: string): string {
+    if (typeof value !== 'string' || !UUID_V4_PATTERN.test(value)) {
+        throw new LearningSyncError(`学习同步字段「${label}」无效`);
+    }
+    return value.toLowerCase();
+}
+
+function assertCorrectionMaterialId(value: unknown, label: string): string {
+    if (typeof value !== 'string' || !CORRECTION_MATERIAL_ID_PATTERN.test(value)) {
+        throw new LearningSyncError(`学习同步字段「${label}」无效`);
+    }
+    return value;
+}
+
+function assertCorrectionLanguage(value: unknown, label: string): string {
+    if (typeof value !== 'string' || !CORRECTION_LANGUAGE_PATTERN.test(value)) {
+        throw new LearningSyncError(`学习同步字段「${label}」无效`);
+    }
+    return value;
+}
+
+function createUniqueUuidV4(used: Set<string>): string {
+    const candidate = crypto.randomUUID().toLowerCase();
+    used.add(candidate);
+    return candidate;
 }
 
 function assertBoundedString(value: unknown, label: string, max: number, allowEmpty = false): string {
@@ -255,8 +292,12 @@ function validateVocabularyEntry(raw: unknown): LearningSyncVocabularyEntry {
     }
     if (raw.noteUpdatedAt !== undefined) assertNonNegativeFinite(raw.noteUpdatedAt, 'vocabulary.noteUpdatedAt');
     if (!isPlainRecord(raw.translations)) throw new LearningSyncError('单词本译文映射无效');
+    const translationEntries = Object.entries(raw.translations);
+    if (translationEntries.length > LEARNING_SYNC_MAX_VOCABULARY_TRANSLATIONS) {
+        throw new LearningSyncError('单词本译文语言数量超出上限');
+    }
     const translations: Record<string, LearningSyncVocabularyTranslation> = {};
-    for (const [lang, snapshot] of Object.entries(raw.translations)) {
+    for (const [lang, snapshot] of translationEntries) {
         assertBoundedString(lang, 'vocabulary.translationLang', 64);
         if (!isPlainRecord(snapshot)) throw new LearningSyncError('单词本译文条目无效');
         translations[lang] = {
@@ -317,41 +358,50 @@ function validatePersonalCorrections(raw: unknown): LearningSyncPersonalCorrecti
     const projects: LearningSyncCorrectionProject[] = raw.projects.map(project => {
         if (!isPlainRecord(project)) throw new LearningSyncError('个人校订项目无效');
         return {
-            id: assertBoundedString(project.id, 'corrections.project.id', 128),
+            id: assertUuidV4(project.id, 'corrections.project.id'),
             label: assertBoundedString(project.label, 'corrections.project.label', 80),
         };
     });
     const projectIds = new Set(projects.map(project => project.id));
+    if (projectIds.size !== projects.length) throw new LearningSyncError('个人校订项目标识重复');
     const entries: LearningSyncCorrectionEntry[] = raw.entries.map(entry => {
         if (!isPlainRecord(entry) || !isPlainRecord(entry.scope)) throw new LearningSyncError('个人校订记录无效');
         const kind = entry.scope.kind;
         if (kind !== 'material' && kind !== 'project') throw new LearningSyncError('个人校订范围无效');
-        const scopeId = assertBoundedString(entry.scope.id, 'corrections.scope.id', 128);
+        const scopeId = kind === 'material'
+            ? assertCorrectionMaterialId(entry.scope.id, 'corrections.scope.id')
+            : assertUuidV4(entry.scope.id, 'corrections.scope.id');
         if (kind === 'project' && !projectIds.has(scopeId)) throw new LearningSyncError('个人校订引用了不存在的项目');
         const entryRevision = assertNonNegativeInt(entry.revision, 'corrections.entry.revision');
         if (entryRevision < 1 || entryRevision > revision) throw new LearningSyncError('个人校订记录版本无效');
         return {
-            id: assertBoundedString(entry.id, 'corrections.entry.id', 128),
+            id: assertUuidV4(entry.id, 'corrections.entry.id'),
             scope: {kind, id: scopeId, label: assertBoundedString(entry.scope.label, 'corrections.scope.label', 80)},
             source: assertBoundedString(entry.source, 'corrections.source', 20_000),
             translation: assertBoundedString(entry.translation, 'corrections.translation', 20_000),
-            sourceLanguage: assertBoundedString(entry.sourceLanguage, 'corrections.sourceLanguage', 64),
-            targetLanguage: assertBoundedString(entry.targetLanguage, 'corrections.targetLanguage', 64),
+            sourceLanguage: assertCorrectionLanguage(entry.sourceLanguage, 'corrections.sourceLanguage'),
+            targetLanguage: assertCorrectionLanguage(entry.targetLanguage, 'corrections.targetLanguage'),
             context: assertBoundedString(entry.context, 'corrections.context', 4_000, true),
             revision: entryRevision,
             ...(entry.updatedAt !== undefined ? {updatedAt: assertNonNegativeFinite(entry.updatedAt, 'corrections.entry.updatedAt')} : {}),
         };
     });
+    if (new Set(entries.map(entry => entry.id)).size !== entries.length) throw new LearningSyncError('个人校订记录标识重复');
     const memberships: LearningSyncCorrectionMembership[] = raw.memberships.map(item => {
         if (!isPlainRecord(item)) throw new LearningSyncError('个人校订归属关系无效');
-        const projectId = assertBoundedString(item.projectId, 'corrections.membership.projectId', 128);
+        const projectId = assertUuidV4(item.projectId, 'corrections.membership.projectId');
         if (!projectIds.has(projectId)) throw new LearningSyncError('个人校订归属引用了不存在的项目');
         return {
-            materialId: assertBoundedString(item.materialId, 'corrections.membership.materialId', 128),
+            materialId: assertCorrectionMaterialId(item.materialId, 'corrections.membership.materialId'),
             projectId,
         };
     });
-    return {version: 1, revision, entries, projects, memberships};
+    if (new Set(memberships.map(item => item.materialId)).size !== memberships.length) throw new LearningSyncError('个人校订归属材料重复');
+    const validated: LearningSyncPersonalCorrections = {version: 1, revision, entries, projects, memberships};
+    if (new TextEncoder().encode(JSON.stringify(validated)).length > LEARNING_SYNC_MAX_CORRECTIONS_BYTES) {
+        throw new LearningSyncError('个人校订同步数据超过 4 MiB 上限，请清理后再同步');
+    }
+    return validated;
 }
 
 function validateReadingMaterial(raw: unknown): LearningSyncReadingMaterial {
@@ -364,23 +414,28 @@ function validateReadingMaterial(raw: unknown): LearningSyncReadingMaterial {
     }
     const source: LearningSyncMaterialSource = {
         kind: raw.kind,
-        ...(raw.source.url !== undefined ? {url: assertBoundedString(raw.source.url, 'material.source.url', 2_048, true)} : {}),
+        ...(raw.source.url !== undefined ? {url: assertBoundedString(raw.source.url, 'material.source.url', LEARNING_SYNC_MAX_MATERIAL_URL, true)} : {}),
         ...(raw.source.title !== undefined ? {title: assertBoundedString(raw.source.title, 'material.source.title', 240, true)} : {}),
-        ...(raw.source.fingerprint !== undefined ? {fingerprint: assertBoundedString(raw.source.fingerprint, 'material.source.fingerprint', 128, true)} : {}),
+        ...(raw.source.fingerprint !== undefined ? {fingerprint: assertBoundedString(raw.source.fingerprint, 'material.source.fingerprint', LEARNING_SYNC_MAX_MATERIAL_FINGERPRINT, true)} : {}),
     };
     let locator: LearningSyncMaterialLocator | undefined;
     if (raw.locator !== undefined) {
         if (!isPlainRecord(raw.locator) || (raw.locator.kind !== 'text' && raw.locator.kind !== 'document' && raw.locator.kind !== 'video')) {
             throw new LearningSyncError('阅读材料进度位置无效');
         }
+        let page: number | undefined;
+        if (raw.locator.page !== undefined) {
+            page = assertNonNegativeInt(raw.locator.page, 'material.locator.page');
+            if (page < 1 || page > 1_000_000) throw new LearningSyncError('学习同步计数「material.locator.page」无效');
+        }
         locator = {
             kind: raw.locator.kind,
-            ...(raw.locator.quote !== undefined ? {quote: assertBoundedString(raw.locator.quote, 'material.locator.quote', 500, true)} : {}),
-            ...(raw.locator.page !== undefined ? {page: assertNonNegativeInt(raw.locator.page, 'material.locator.page')} : {}),
+            ...(raw.locator.quote !== undefined ? {quote: assertBoundedString(raw.locator.quote, 'material.locator.quote', 6_000, true)} : {}),
+            ...(page !== undefined ? {page} : {}),
             ...(raw.locator.section !== undefined ? {section: assertBoundedString(raw.locator.section, 'material.locator.section', 240, true)} : {}),
             ...(raw.locator.startMs !== undefined ? {startMs: assertNonNegativeFinite(raw.locator.startMs, 'material.locator.startMs')} : {}),
             ...(raw.locator.endMs !== undefined ? {endMs: assertNonNegativeFinite(raw.locator.endMs, 'material.locator.endMs')} : {}),
-            ...(raw.locator.fingerprint !== undefined ? {fingerprint: assertBoundedString(raw.locator.fingerprint, 'material.locator.fingerprint', 128, true)} : {}),
+            ...(raw.locator.fingerprint !== undefined ? {fingerprint: assertBoundedString(raw.locator.fingerprint, 'material.locator.fingerprint', LEARNING_SYNC_MAX_MATERIAL_FINGERPRINT, true)} : {}),
         };
     }
     if (!Array.isArray(raw.topics) || raw.topics.length > LEARNING_SYNC_MAX_MATERIAL_TOPICS) {
@@ -394,8 +449,8 @@ function validateReadingMaterial(raw: unknown): LearningSyncReadingMaterial {
         if (!isPlainRecord(note)) throw new LearningSyncError('阅读材料笔记无效');
         return {
             id: assertBoundedString(note.id, 'material.note.id', 256),
-            ...(note.excerpt !== undefined ? {excerpt: assertBoundedString(note.excerpt, 'material.note.excerpt', 500, true)} : {}),
-            ...(note.note !== undefined ? {note: assertBoundedString(note.note, 'material.note.note', 4_000, true)} : {}),
+            ...(note.excerpt !== undefined ? {excerpt: assertBoundedString(note.excerpt, 'material.note.excerpt', 6_000, true)} : {}),
+            ...(note.note !== undefined ? {note: assertBoundedString(note.note, 'material.note.note', 12_000, true)} : {}),
             ...(note.createdAt !== undefined ? {createdAt: assertNonNegativeFinite(note.createdAt, 'material.note.createdAt')} : {}),
             ...(note.updatedAt !== undefined ? {updatedAt: assertNonNegativeFinite(note.updatedAt, 'material.note.updatedAt')} : {}),
         };
@@ -403,11 +458,11 @@ function validateReadingMaterial(raw: unknown): LearningSyncReadingMaterial {
     let aliases: string[] | undefined;
     if (raw.aliases !== undefined) {
         if (!Array.isArray(raw.aliases) || raw.aliases.length > 100) throw new LearningSyncError('阅读材料别名无效');
-        aliases = raw.aliases.map(alias => assertBoundedString(alias, 'material.alias', 2_048));
+        aliases = raw.aliases.map(alias => assertBoundedString(alias, 'material.alias', LEARNING_SYNC_MAX_MATERIAL_URL + 16));
     }
     return {
         id: assertBoundedString(raw.id, 'material.id', 256),
-        identityKey: assertBoundedString(raw.identityKey, 'material.identityKey', 2_048),
+        identityKey: assertBoundedString(raw.identityKey, 'material.identityKey', LEARNING_SYNC_MAX_MATERIAL_URL + 16),
         ...(aliases ? {aliases} : {}),
         kind: raw.kind,
         title: assertBoundedString(raw.title, 'material.title', 240),
@@ -461,15 +516,21 @@ function stripContext(context: LearningSyncVocabularyContext, includeContext: bo
 function mergeVocabularyContexts(
     left: readonly LearningSyncVocabularyContext[],
     right: readonly LearningSyncVocabularyContext[],
-    includeContext: boolean,
+    includeLocalContext: boolean,
+    preserveRemoteContext: boolean,
 ): LearningSyncVocabularyContext[] {
     const byKey = new Map<string, LearningSyncVocabularyContext>();
-    for (const ctx of [...left, ...right]) {
-        const sanitized = stripContext(ctx, includeContext);
-        const key = `${sanitized.text ?? ''}\u0000${sanitized.sourceUrl ?? ''}\u0000${includeContext ? '' : sanitized.capturedAt}`;
+    const add = (ctx: LearningSyncVocabularyContext, keepDetails: boolean) => {
+        const sanitized = stripContext(ctx, keepDetails);
+        const hasDetails = sanitized.text !== undefined || sanitized.sourceUrl !== undefined;
+        const key = hasDetails
+            ? `${sanitized.text ?? ''}\u0000${sanitized.sourceUrl ?? ''}`
+            : `ts\u0000${sanitized.capturedAt}`;
         const prev = byKey.get(key);
         if (!prev || sanitized.capturedAt >= prev.capturedAt) byKey.set(key, sanitized);
-    }
+    };
+    for (const ctx of left) add(ctx, includeLocalContext);
+    for (const ctx of right) add(ctx, preserveRemoteContext);
     return [...byKey.values()]
         .sort((a, b) => a.capturedAt - b.capturedAt)
         .slice(-LEARNING_SYNC_MAX_VOCABULARY_CONTEXTS);
@@ -478,7 +539,8 @@ function mergeVocabularyContexts(
 function mergeVocabularyEntry(
     local: LearningSyncVocabularyEntry,
     remote: LearningSyncVocabularyEntry,
-    includeContext: boolean,
+    includeLocalContext: boolean,
+    preserveRemoteContext: boolean,
 ): LearningSyncVocabularyEntry {
     const translations: Record<string, LearningSyncVocabularyTranslation> = {};
     for (const [lang, snap] of [...Object.entries(local.translations), ...Object.entries(remote.translations)]) {
@@ -505,7 +567,7 @@ function mergeVocabularyEntry(
         translations,
         phonetic: newerMeta.phonetic || local.phonetic || remote.phonetic,
         partOfSpeech: newerMeta.partOfSpeech || local.partOfSpeech || remote.partOfSpeech,
-        contexts: mergeVocabularyContexts(local.contexts, remote.contexts, includeContext),
+        contexts: mergeVocabularyContexts(local.contexts, remote.contexts, includeLocalContext, preserveRemoteContext),
         createdAt: Math.min(local.createdAt, remote.createdAt),
         updatedAt: Math.max(local.updatedAt, remote.updatedAt),
         lastSeenAt: Math.max(local.lastSeenAt, remote.lastSeenAt),
@@ -527,6 +589,7 @@ export function mergeLearningVocabulary(
 ): {merged: LearningSyncVocabularySection; diff: Omit<LearningCategoryDiffSummary, 'enabled' | 'remoteAvailable'>} {
     const localEntries = local?.entries ?? [];
     const remoteEntries = remote?.entries ?? [];
+    const preserveRemoteContext = includeContext || remote?.includesContext === true;
     const localMap = new Map(localEntries.map(entry => [entry.identityKey, entry]));
     const remoteMap = new Map(remoteEntries.map(entry => [entry.identityKey, entry]));
     const mergedEntries: LearningSyncVocabularyEntry[] = [];
@@ -541,10 +604,11 @@ export function mergeLearningVocabulary(
             addedToRemote++;
             mergedEntries.push({...entry, contexts: entry.contexts.map(c => stripContext(c, includeContext))});
         } else {
-            const combined = mergeVocabularyEntry(entry, peer, includeContext);
+            const combined = mergeVocabularyEntry(entry, peer, includeContext, preserveRemoteContext);
+            const localView = {...combined, contexts: combined.contexts.map(c => stripContext(c, includeContext))};
             const normalizedLocal = {...entry, contexts: entry.contexts.map(c => stripContext(c, includeContext))};
-            const normalizedRemote = {...peer, id: entry.id, contexts: peer.contexts.map(c => stripContext(c, includeContext))};
-            if (JSON.stringify(combined) !== JSON.stringify(normalizedLocal)) updatedFromRemote++;
+            const normalizedRemote = {...peer, id: entry.id, contexts: peer.contexts.map(c => stripContext(c, preserveRemoteContext))};
+            if (JSON.stringify(localView) !== JSON.stringify(normalizedLocal)) updatedFromRemote++;
             if (JSON.stringify(combined) !== JSON.stringify(normalizedRemote)) updatedToRemote++;
             mergedEntries.push(combined);
         }
@@ -552,13 +616,15 @@ export function mergeLearningVocabulary(
     for (const peer of remoteEntries) {
         if (!localMap.has(peer.identityKey)) {
             addedFromRemote++;
-            mergedEntries.push({...peer, contexts: peer.contexts.map(c => stripContext(c, includeContext))});
+            mergedEntries.push({...peer, contexts: peer.contexts.map(c => stripContext(c, preserveRemoteContext))});
         }
     }
+    if (mergedEntries.length > LEARNING_SYNC_MAX_VOCABULARY) {
+        throw new LearningSyncError('合并后的单词本超出 5000 条上限，请清理后再同步');
+    }
     mergedEntries.sort((a, b) => a.createdAt - b.createdAt || a.identityKey.localeCompare(b.identityKey));
-    const bounded = mergedEntries.slice(0, LEARNING_SYNC_MAX_VOCABULARY);
     return {
-        merged: {includesContext: includeContext, entries: bounded},
+        merged: {includesContext: preserveRemoteContext, entries: mergedEntries},
         diff: {
             localCount: localEntries.length,
             remoteCount: remoteEntries.length,
@@ -612,6 +678,7 @@ export function mergeLearningPersonalCorrections(
 
     const localByKey = new Map(left.entries.map(entry => [correctionIdentity(entry), entry]));
     const remoteByKey = new Map(right.entries.map(entry => [correctionIdentity(entry), entry]));
+    const usedEntryIds = new Set<string>();
     const mergedEntries: LearningSyncCorrectionEntry[] = [];
     let addedFromRemote = 0;
     let updatedFromRemote = 0;
@@ -621,6 +688,7 @@ export function mergeLearningPersonalCorrections(
     for (const entry of left.entries) {
         const key = correctionIdentity(entry);
         const peer = remoteByKey.get(key);
+        usedEntryIds.add(entry.id);
         if (!peer) {
             addedToRemote++;
             mergedEntries.push({...entry, scope: {...entry.scope}});
@@ -636,8 +704,10 @@ export function mergeLearningPersonalCorrections(
         const key = correctionIdentity(peer);
         if (!localByKey.has(key) && mergedEntries.length < LEARNING_SYNC_MAX_CORRECTIONS) {
             if (peer.scope.kind === 'project' && !projectMap.has(peer.scope.id)) continue;
+            const peerId = usedEntryIds.has(peer.id) ? createUniqueUuidV4(usedEntryIds) : peer.id;
+            usedEntryIds.add(peerId);
             addedFromRemote++;
-            mergedEntries.push({...peer, scope: {...peer.scope}});
+            mergedEntries.push({...peer, id: peerId, scope: {...peer.scope}});
         }
     }
 
@@ -690,13 +760,18 @@ function mergeReadingMaterialRecord(
         .filter(alias => alias !== local.identityKey)
         .slice(-100);
     const locator = furtherProgress.locator ?? local.locator ?? remote.locator;
+    const fingerprint = newer.source.fingerprint ?? local.source.fingerprint ?? remote.source.fingerprint;
+    const source: LearningSyncMaterialSource = {
+        ...newer.source,
+        ...(fingerprint ? {fingerprint} : {}),
+    };
     return {
         id: local.id,
         identityKey: local.identityKey,
         ...(aliases.length ? {aliases} : {}),
         kind: local.kind,
         title: newer.title,
-        source: {...newer.source},
+        source,
         ...(locator ? {locator: {...locator}} : {}),
         topics,
         notes: mergeMaterialNotes(local.notes, remote.notes),
@@ -734,14 +809,14 @@ export function mergeLearningReadingMaterials(
         }
     }
     for (const peer of remoteList) {
-        if (!localMap.has(peer.identityKey) && merged.length < LEARNING_SYNC_MAX_MATERIALS) {
+        if (!localMap.has(peer.identityKey)) {
             addedFromRemote++;
             merged.push(structuredClone(peer));
         }
     }
     merged.sort((a, b) => b.lastReadAt - a.lastReadAt || a.identityKey.localeCompare(b.identityKey));
     return {
-        merged,
+        merged: merged.slice(0, LEARNING_SYNC_MAX_MATERIALS),
         diff: {
             localCount: localList.length,
             remoteCount: remoteList.length,

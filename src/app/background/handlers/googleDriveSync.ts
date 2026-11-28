@@ -15,6 +15,9 @@ import {DriveEncryptionError, type DriveEncryptionKeyMode} from '@/src/platform/
 import {CloudSyncError} from '@/src/core/config/cloudSync';
 import {DriveConfigError} from '@/src/core/config/driveSync';
 import {hasAnyLearningSyncScope, LearningSyncError, normalizeLearningSyncScope} from '@/src/core/config/learningSync';
+import {PersonalCorrectionError} from '@/src/core/personal-corrections/public';
+import {MaterialError} from '@/src/features/vocabulary/materialModel';
+import {VocabularyBookError} from '@/src/features/vocabulary/repository';
 
 export const GOOGLE_DRIVE_SYNC_MESSAGE_TYPE = 'googleDriveEncryptedSync';
 export interface DriveSyncMessage {
@@ -117,7 +120,14 @@ export function createGoogleDriveSyncHandler(
                     if (error.code === 'invalid-passphrase') return {success: false, error: error.message, errorKey: 'settings.cloud.e2ee.invalidPassphrase'};
                     return {success: false, error: error.message === '同步配置过大，请减少自定义设置后重试' ? error.message : '同步文件无法解密或已损坏；请检查云端备份，本机配置未被修改。'};
                 }
-                return {success: false, error: error instanceof DriveError || error instanceof CloudSyncError || error instanceof DriveConfigError || error instanceof LearningSyncError ? error.message : '同步未完成，请检查网络和配置存储后重新预览。'};
+                const isKnownError = error instanceof DriveError
+                    || error instanceof CloudSyncError
+                    || error instanceof DriveConfigError
+                    || error instanceof LearningSyncError
+                    || error instanceof PersonalCorrectionError
+                    || error instanceof VocabularyBookError
+                    || error instanceof MaterialError;
+                return {success: false, error: isKnownError ? error.message : '同步未完成，请检查网络和配置存储后重新预览。'};
             }
         },
     };

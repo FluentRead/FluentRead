@@ -9,8 +9,13 @@ import {
     hasAnyLearningSyncScope,
     hasLearningBundleContent,
     LEARNING_SYNC_FORMAT,
+    LEARNING_SYNC_MAX_CORRECTION_PROJECTS,
+    LEARNING_SYNC_MAX_CORRECTIONS,
+    LEARNING_SYNC_MAX_CORRECTIONS_BYTES,
+    LEARNING_SYNC_MAX_MATERIAL_FINGERPRINT,
     LEARNING_SYNC_MAX_MATERIAL_NOTES,
     LEARNING_SYNC_MAX_MATERIAL_TOPICS,
+    LEARNING_SYNC_MAX_MATERIAL_URL,
     LEARNING_SYNC_MAX_MATERIALS,
     LEARNING_SYNC_MAX_VOCABULARY,
     LEARNING_SYNC_VERSION,
@@ -20,6 +25,7 @@ import {
     type LearningSyncBundle,
     type LearningSyncMaterialLocator,
     type LearningSyncMaterialNote,
+    type LearningSyncMaterialSource,
     type LearningSyncPreviewSummary,
     type LearningSyncReadingMaterial,
     type LearningSyncScope,
@@ -36,7 +42,7 @@ export interface LearningSyncVocabularyPort {
 
 export interface LearningSyncMaterialPort {
     exportData(now?: number): Promise<MaterialBackup>;
-    importData(input: unknown, now?: number): Promise<unknown>;
+    importData(input: unknown, now?: number, guard?: unknown, options?: {authoritative?: boolean}): Promise<unknown>;
 }
 
 export interface LearningCloudSyncPorts {
@@ -59,6 +65,12 @@ export interface LearningCloudSyncService {
         remote: LearningSyncBundle | null,
         merged: LearningSyncBundle | null,
     ): LearningSyncBundle | null;
+    validateApply(
+        direction: 'upload' | 'download' | 'merge',
+        scope: LearningSyncScope,
+        remote: LearningSyncBundle | null,
+        merged: LearningSyncBundle | null,
+    ): Promise<void>;
     applyLocal(
         direction: 'upload' | 'download' | 'merge',
         scope: LearningSyncScope,
@@ -67,20 +79,31 @@ export interface LearningCloudSyncService {
     ): Promise<void>;
 }
 
+const MATERIAL_REPO_MAX_RECORDS = 10_000;
+
 function stripUndefined<T extends object>(record: T): T {
     return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined)) as T;
 }
 
 function projectMaterialLocator(locator: MaterialRecord['locator']): LearningSyncMaterialLocator | undefined {
     if (!locator) return undefined;
+    const page = typeof locator.page === 'number' && Number.isSafeInteger(locator.page) && locator.page >= 1 && locator.page <= 1_000_000
+        ? locator.page
+        : undefined;
+    const startMs = typeof locator.startMs === 'number' && Number.isFinite(locator.startMs) && locator.startMs >= 0
+        ? Math.floor(locator.startMs)
+        : undefined;
+    const endMs = typeof locator.endMs === 'number' && Number.isFinite(locator.endMs) && locator.endMs >= (startMs ?? 0)
+        ? Math.floor(locator.endMs)
+        : undefined;
     return stripUndefined<LearningSyncMaterialLocator>({
         kind: locator.kind,
-        quote: locator.quote?.slice(0, 500),
-        page: locator.page,
+        quote: locator.quote?.slice(0, 6_000),
+        page,
         section: locator.section?.slice(0, 240),
-        startMs: locator.startMs,
-        endMs: locator.endMs,
-        fingerprint: locator.fingerprint?.slice(0, 128),
+        startMs,
+        endMs,
+        fingerprint: locator.fingerprint?.slice(0, LEARNING_SYNC_MAX_MATERIAL_FINGERPRINT),
     });
 }
 
@@ -90,23 +113,23 @@ function projectMaterialRecord(record: MaterialRecord): LearningSyncReadingMater
         .slice(0, LEARNING_SYNC_MAX_MATERIAL_NOTES)
         .map(ref => stripUndefined<LearningSyncMaterialNote>({
             id: ref.id,
-            excerpt: ref.excerpt?.slice(0, 500),
-            note: ref.note?.slice(0, 4_000),
+            excerpt: ref.excerpt?.slice(0, 6_000),
+            note: ref.note?.slice(0, 12_000),
             createdAt: ref.createdAt,
             updatedAt: ref.updatedAt,
         }));
     const locator = projectMaterialLocator(record.locator);
     return stripUndefined<LearningSyncReadingMaterial>({
         id: record.id,
-        identityKey: record.identityKey,
-        aliases: record.aliases?.length ? record.aliases.slice(-100) : undefined,
+        identityKey: record.identityKey.slice(0, LEARNING_SYNC_MAX_MATERIAL_URL + 16),
+        aliases: record.aliases?.length ? record.aliases.slice(-100).map(alias => alias.slice(0, LEARNING_SYNC_MAX_MATERIAL_URL + 16)) : undefined,
         kind: record.kind,
         title: record.title.slice(0, 240),
         source: stripUndefined({
             kind: record.source.kind,
-            url: record.source.url,
+            url: record.source.url?.slice(0, LEARNING_SYNC_MAX_MATERIAL_URL),
             title: record.source.title?.slice(0, 240),
-            fingerprint: record.source.fingerprint,
+            fingerprint: record.source.fingerprint?.slice(0, LEARNING_SYNC_MAX_MATERIAL_FINGERPRINT),
         }),
         locator,
         topics: record.topics.slice(0, LEARNING_SYNC_MAX_MATERIAL_TOPICS),
@@ -115,6 +138,38 @@ function projectMaterialRecord(record: MaterialRecord): LearningSyncReadingMater
         updatedAt: record.updatedAt,
         lastReadAt: record.lastReadAt,
         archivedAt: record.archivedAt,
+    });
+}
+
+function mergePreservedLocator(
+    incoming: LearningSyncMaterialLocator | undefined,
+    source: LearningSyncMaterialSource,
+    existing?: MaterialRecord,
+): MaterialRecord['locator'] {
+    if (!incoming) return undefined;
+    const local = existing?.locator;
+    if (!local || local.kind !== incoming.kind) return {...incoming};
+    const sameQuote = !incoming.quote || !local.quote || incoming.quote === local.quote;
+    const sameFingerprint = !source.fingerprint || !local.fingerprint || local.fingerprint === source.fingerprint;
+    const samePage = incoming.page === undefined || local.page === undefined || incoming.page === local.page;
+    const keepTextAnchors = sameQuote && sameFingerprint;
+    const keepDocRef = incoming.kind === 'document'
+        && source.kind === 'document'
+        && Boolean(local.documentReference)
+        && samePage
+        && sameFingerprint
+        && (!source.fingerprint || local.documentReference!.materialId === source.fingerprint);
+    return stripUndefined({
+        ...incoming,
+        ...(keepTextAnchors ? {
+            prefix: local.prefix,
+            suffix: local.suffix,
+            paragraphId: local.paragraphId,
+        } : {}),
+        ...(keepDocRef ? {
+            fingerprint: local.documentReference!.materialId,
+            documentReference: structuredClone(local.documentReference),
+        } : {}),
     });
 }
 
@@ -128,14 +183,18 @@ function toMaterialRecord(item: LearningSyncReadingMaterial, existing?: Material
         createdAt: note.createdAt,
         updatedAt: note.updatedAt,
     }));
+    const source: LearningSyncMaterialSource = stripUndefined({
+        ...item.source,
+        fingerprint: item.source.fingerprint ?? existing?.source.fingerprint,
+    });
     return stripUndefined<MaterialRecord>({
         id: existing?.id ?? item.id,
         identityKey: item.identityKey,
         aliases: item.aliases?.length ? [...item.aliases] : undefined,
         kind: item.kind,
         title: item.title,
-        source: {...item.source},
-        locator: item.locator ? {...item.locator} : undefined,
+        source,
+        locator: mergePreservedLocator(item.locator, source, existing),
         topics: [...item.topics],
         references: [...preservedRefs, ...noteRefs].slice(0, 1_000),
         createdAt: item.createdAt,
@@ -159,8 +218,10 @@ export function createLearningCloudSync(ports: LearningCloudSyncPorts): Learning
                 includePrivateContext: scope.includeVocabularyContext,
                 now: now(),
             });
+            if (exported.entries.length > LEARNING_SYNC_MAX_VOCABULARY) {
+                throw new LearningSyncError('本机单词本超出 5000 条同步上限，请清理后再同步');
+            }
             const entries: LearningSyncVocabularyEntry[] = exported.entries
-                .slice(0, LEARNING_SYNC_MAX_VOCABULARY)
                 .map(entry => stripUndefined<LearningSyncVocabularyEntry>({
                     id: entry.id,
                     identityKey: entry.identityKey,
@@ -206,7 +267,8 @@ export function createLearningCloudSync(ports: LearningCloudSyncPorts): Learning
         }
         if (scope.includeReadingMaterials) {
             const exported = await ports.materials.exportData(now());
-            bundle.readingMaterials = exported.materials
+            const sorted = [...exported.materials].sort((a, b) => b.lastReadAt - a.lastReadAt || a.identityKey.localeCompare(b.identityKey));
+            bundle.readingMaterials = sorted
                 .slice(0, LEARNING_SYNC_MAX_MATERIALS)
                 .map(projectMaterialRecord);
         }
@@ -262,6 +324,66 @@ export function createLearningCloudSync(ports: LearningCloudSyncPorts): Learning
         throw new LearningSyncError('个人校订在同步期间发生变化，请重新生成预览后重试');
     }
 
+    async function validateApply(
+        direction: 'upload' | 'download' | 'merge',
+        scope: LearningSyncScope,
+        remote: LearningSyncBundle | null,
+        merged: LearningSyncBundle | null,
+    ): Promise<void> {
+        if (direction === 'upload' || !hasAnyLearningSyncScope(scope)) return;
+        const source = direction === 'merge' ? merged : remote;
+        if (!source) return;
+        if (scope.includeVocabulary && source.vocabulary) {
+            const existing = await ports.vocabulary.exportData({includePrivateContext: false, now: now()});
+            const keys = new Set(existing.entries.map(entry => entry.identityKey));
+            for (const entry of source.vocabulary.entries) keys.add(entry.identityKey);
+            if (keys.size > LEARNING_SYNC_MAX_VOCABULARY) {
+                throw new LearningSyncError('合并后的单词本超出 5000 条上限，请清理后再同步');
+            }
+        }
+        if (scope.includePersonalCorrections && source.personalCorrections) {
+            const {value} = await ports.personalCorrections.read();
+            const projectIds = new Set([
+                ...value.state.projects.map(project => project.id),
+                ...source.personalCorrections.projects.map(project => project.id),
+            ]);
+            const entryKeys = new Set([
+                ...value.state.entries.map(entry => `${entry.scope.kind}\u0000${entry.scope.id}\u0000${entry.sourceLanguage}\u0000${entry.targetLanguage}\u0000${entry.source}`),
+                ...source.personalCorrections.entries.map(entry => `${entry.scope.kind}\u0000${entry.scope.id}\u0000${entry.sourceLanguage}\u0000${entry.targetLanguage}\u0000${entry.source}`),
+            ]);
+            const membershipIds = new Set([
+                ...value.state.memberships.map(item => item.materialId),
+                ...source.personalCorrections.memberships.map(item => item.materialId),
+            ]);
+            if (entryKeys.size > LEARNING_SYNC_MAX_CORRECTIONS
+                || projectIds.size > LEARNING_SYNC_MAX_CORRECTION_PROJECTS
+                || membershipIds.size > LEARNING_SYNC_MAX_CORRECTIONS) {
+                throw new LearningSyncError('合并后的个人校订超出条目上限，请清理后再同步');
+            }
+            const combined = mergeLearningPersonalCorrections(value.state, source.personalCorrections).merged;
+            const cleanEntries = combined.entries.map(({updatedAt: _updatedAt, ...rest}) => rest);
+            const nextState = {
+                version: 1 as const,
+                revision: combined.revision,
+                entries: cleanEntries,
+                projects: combined.projects,
+                memberships: combined.memberships,
+            };
+            const bytes = new TextEncoder().encode(JSON.stringify({state: nextState, undo: []})).length;
+            if (bytes > LEARNING_SYNC_MAX_CORRECTIONS_BYTES) {
+                throw new LearningSyncError('合并后的个人校订超过 4 MiB 上限，请清理后再同步');
+            }
+        }
+        if (scope.includeReadingMaterials && source.readingMaterials) {
+            const existing = await ports.materials.exportData(now());
+            const keys = new Set(existing.materials.map(item => item.identityKey));
+            for (const item of source.readingMaterials) keys.add(item.identityKey);
+            if (keys.size > MATERIAL_REPO_MAX_RECORDS) {
+                throw new LearningSyncError('合并后的阅读材料超出上限，请清理后再同步');
+            }
+        }
+    }
+
     async function applyLocal(
         direction: 'upload' | 'download' | 'merge',
         scope: LearningSyncScope,
@@ -273,12 +395,17 @@ export function createLearningCloudSync(ports: LearningCloudSyncPorts): Learning
         if (!source) return;
         const timestamp = now();
         if (scope.includeVocabulary && source.vocabulary) {
+            const includeContext = scope.includeVocabularyContext;
+            const entries = source.vocabulary.entries.map(entry => ({
+                ...entry,
+                contexts: entry.contexts.map(ctx => (includeContext ? {...ctx} : {capturedAt: ctx.capturedAt})),
+            }));
             await ports.vocabulary.importData({
                 format: 'fluentread-vocabulary-book',
                 version: 1,
                 exportedAt: timestamp,
-                includesPrivateContext: source.vocabulary.includesContext,
-                entries: source.vocabulary.entries,
+                includesPrivateContext: includeContext,
+                entries,
                 reviewLogs: [],
             }, timestamp);
         }
@@ -294,9 +421,9 @@ export function createLearningCloudSync(ports: LearningCloudSyncPorts): Learning
                 version: 1,
                 exportedAt: timestamp,
                 materials,
-            }, timestamp);
+            }, timestamp, undefined, {authoritative: true});
         }
     }
 
-    return {captureLocal, preview, selectCloudBundle, applyLocal};
+    return {captureLocal, preview, selectCloudBundle, validateApply, applyLocal};
 }

@@ -37,7 +37,10 @@ export function userscriptMessages<T extends Record<string, string>>(messages: T
         && !key.startsWith('popup.quickSettings.') && !key.startsWith('popup.quickTranslation.')
         && !key.startsWith('popup.compact.') && !key.startsWith('popup.displayMode.') && !key.startsWith('popup.pageFont.') && !key.startsWith('document.config.')
         && !key.startsWith('document.translationRecovery.')
-        && !key.startsWith('document.retainedRevisions.') && !key.startsWith('document.translationProgress.'))) as T;
+        && !key.startsWith('document.retainedRevisions.') && !key.startsWith('document.translationProgress.')
+        && !key.startsWith('settings.cloud.e2ee.')
+        && !key.startsWith('settings.cloud.learning.')
+        && !key.startsWith('settings.cloud.autoSync.'))) as T;
 }
 export const zhCNMessages = userscriptMessages(extensionChinese);
 
@@ -62,6 +65,15 @@ const nativeOnlyLegacySources = new Set([
     '译文仅保留在本页，请下载后再离开。',
     '当前翻译和校订结果只保留在本页，离开后无法恢复。建议先下载需要的结果。',
     '重新翻译会替换现有译文和人工校订。你也可以返回并先下载当前结果。',
+    // 扩展专用的云备份端到端加密、学习资产同步与自动同步报错文案。
+    '同步加密口令模式已变化，请重新生成预览。',
+    '云端备份使用自定义端到端加密口令保护，请先输入同步口令。',
+    '同步口令不正确，或云端配置已损坏；本机配置未被修改',
+    '加密口令模式无效',
+    '同步口令至少需要 12 个字符，最多 1024 个字符',
+    '本机学习数据已变化，请重新生成同步预览。',
+    '本机学习数据写入和配置恢复失败，请重新打开设置检查；云端保留本次加密快照。',
+    '合并后的单词本超出 5000 条上限，请清理后再同步',
 ]);
 
 // Userscript does not mount settings-video or its native ASR runtime. Keep config-diff

@@ -69,7 +69,7 @@ Drive 已上传但未完成核验时单独显示警示，不误报未上传，�
           <select :id="`${kind}-e2ee-remember`" class="cloud-native-select" :disabled="busy || previewVisible" data-testid="cloud-e2ee-remember" @change="changeE2eeRemember">
             <option value="none" :selected="e2eeRemember === 'none'">{{ t('settings.cloud.e2ee.rememberNone') }}</option>
             <option value="session" :selected="e2eeRemember === 'session'">{{ t('settings.cloud.e2ee.rememberSession') }}</option>
-            <option value="device" :selected="e2eeRemember === 'device'">{{ t('settings.cloud.e2ee.rememberDevice') }}</option>
+            <option value="device" :selected="e2eeRemember === 'device'">{{ t(hasAutoSyncSupport ? 'settings.cloud.e2ee.rememberDevice' : 'settings.cloud.e2ee.rememberDeviceNoAutoSync') }}</option>
           </select>
         </div>
         <div class="cloud-e2ee-actions">
@@ -447,9 +447,9 @@ function toggleLearning(field: keyof LearningSyncScope, value: boolean | string 
 function buildPrepareOptions(): CloudBackupPrepareOptions | undefined {
   const options: CloudBackupPrepareOptions = {};
   if (hasAnyLearningSyncScope(learningScope)) options.learningScope = {...learningScope};
-  if (hasPassphraseSupport.value && e2eeMode.value === 'custom') {
-    options.keyMode = 'custom';
-    if (!passphraseState.value?.hasStoredPassphrase && passphraseValid.value) {
+  if (hasPassphraseSupport.value) {
+    options.keyMode = e2eeMode.value;
+    if (e2eeMode.value === 'custom' && passphraseValid.value) {
       activeEphemeralPassphrase.value = passphraseDraft.value;
       options.passphrase = passphraseDraft.value;
     } else {
@@ -461,11 +461,14 @@ function buildPrepareOptions(): CloudBackupPrepareOptions | undefined {
   return Object.keys(options).length > 0 ? options : undefined;
 }
 function buildCommitOptions(): CloudBackupCommitOptions | undefined {
-  if (!hasPassphraseSupport.value || e2eeMode.value !== 'custom') return undefined;
-  return {
-    keyMode: 'custom',
-    ...(activeEphemeralPassphrase.value ? {passphrase: activeEphemeralPassphrase.value} : {}),
-  };
+  if (!hasPassphraseSupport.value) return undefined;
+  if (e2eeMode.value === 'custom') {
+    return {
+      keyMode: 'custom',
+      ...(activeEphemeralPassphrase.value ? {passphrase: activeEphemeralPassphrase.value} : {}),
+    };
+  }
+  return {keyMode: 'app'};
 }
 async function requestPreview() {
   const prepareOptions = buildPrepareOptions();
@@ -592,8 +595,18 @@ function saveSensitivePreference(value: boolean): boolean {
   } catch {error.value = t('settings.cloud.sensitiveSaveFailed'); return false;}
 }
 function handleSensitivePreferenceChange(event: StorageEvent) {
-  if (event.storageArea === localStorage && (event.key === sensitivePreferenceKey || event.key === null)) includeSensitive.value = event.newValue === 'true';
-  if (event.storageArea === localStorage && (event.key === learningPreferenceKey || event.key === null)) loadLearningPreference();
+  if (event.storageArea === localStorage && (event.key === sensitivePreferenceKey || event.key === null)) {
+    includeSensitive.value = event.newValue === 'true';
+    if (hasAutoSyncSupport.value && autoSyncState.value?.enabled) {
+      void client.configureAutoSync!({includeSensitive: includeSensitive.value}).then(next => {if (alive) autoSyncState.value = next;}).catch(() => undefined);
+    }
+  }
+  if (event.storageArea === localStorage && (event.key === learningPreferenceKey || event.key === null)) {
+    loadLearningPreference();
+    if (hasAutoSyncSupport.value && autoSyncState.value?.enabled) {
+      void client.configureAutoSync!({learningScope: {...learningScope}}).then(next => {if (alive) autoSyncState.value = next;}).catch(() => undefined);
+    }
+  }
 }
 function confirmSensitive() {
   if (!riskAcknowledged.value) return;
@@ -623,6 +636,10 @@ async function commit() {
       if (alive) {
         status.value = result;
         activeEphemeralPassphrase.value = undefined;
+        if (!passphraseState.value?.hasStoredPassphrase || passphraseState.value.storageScope === 'none') {
+          passphraseDraft.value = '';
+          passphraseConfirm.value = '';
+        }
         ElMessage.success(t('settings.cloud.syncComplete', {provider: props.provider}));
       }
     } finally {if (alive) previewVisible.value = false;}
@@ -644,6 +661,10 @@ async function refreshStatus() {await perform(async () => {
       passphraseState.value = nextPassphrase;
       e2eeMode.value = nextPassphrase.mode;
       e2eeRemember.value = nextPassphrase.storageScope === 'none' ? 'session' : nextPassphrase.storageScope;
+      if (!nextPassphrase.hasStoredPassphrase) {
+        passphraseDraft.value = '';
+        passphraseConfirm.value = '';
+      }
     }
     if (nextAutoSync) autoSyncState.value = nextAutoSync;
   }

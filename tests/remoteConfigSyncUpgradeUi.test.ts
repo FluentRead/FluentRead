@@ -264,7 +264,7 @@ describe('RemoteConfigSync upgraded E2EE, learning sync, and auto-sync UI & clie
         expect(host.querySelector('[data-testid="cloud-learning-diff-vocabulary"]')?.textContent).toContain('settings.cloud.learning.diffSummary');
         expect(host.querySelector('[data-testid="cloud-learning-diff-corrections"]')?.textContent).toContain('settings.cloud.learning.noChanges');
         await click(host, '[data-testid="webdav-confirm"]');
-        expect(client.commit).toHaveBeenCalledWith('preview-upgrade-1', 'merge', {});
+        expect(client.commit).toHaveBeenCalledWith('preview-upgrade-1', 'merge', {}, {keyMode: 'app'});
 
         // WebDAV auto-sync toggle, interval change, and manual safe merge trigger
         await click(host, '[data-testid="cloud-auto-sync-enabled"]');
@@ -277,6 +277,18 @@ describe('RemoteConfigSync upgraded E2EE, learning sync, and auto-sync UI & clie
         await click(host, '[data-testid="cloud-auto-sync-run-now"]');
         expect(client.runAutoSyncNow).toHaveBeenCalledOnce();
         expect(host.querySelector('[data-testid="cloud-auto-sync-status"]')?.textContent).toBe('settings.cloud.autoSync.statusSynced');
+
+        // Google Drive UI (without auto-sync) hides "(for auto-sync)" label in device retention option
+        const driveClient = fullClient();
+        delete (driveClient as Partial<typeof driveClient>).autoSyncStatus;
+        delete (driveClient as Partial<typeof driveClient>).configureAutoSync;
+        delete (driveClient as Partial<typeof driveClient>).runAutoSyncNow;
+        const driveHost = await mountRemote(driveClient, 'google-drive');
+        const driveCustom = driveHost.querySelector<HTMLInputElement>('[data-testid="cloud-e2ee-mode-custom"]')!;
+        driveCustom.checked = true;
+        driveCustom.dispatchEvent(new dom.window.Event('change', {bubbles: true}));
+        await settle();
+        expect(driveHost.querySelector('[data-testid="cloud-e2ee-remember"] option[value="device"]')?.textContent).toBe('settings.cloud.e2ee.rememberDeviceNoAutoSync');
     });
 
     it('sends extended passphrase, learningScope, and autoSync messages from typed clients', async () => {

@@ -376,6 +376,12 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
         const session = await ports.auth.open(false);
         if (session.account.id !== current.preview.account.id) throw new CloudSyncError(ports.accountChangedError ?? '同步连接已变化，请重新生成预览。');
         if (!driveValuesEqual(await ports.snapshot(), current.originalLocal)) throw new CloudSyncError('本机配置已变化，请重新生成同步预览。');
+        if (ports.learning && hasAnyLearningSyncScope(current.learningScope)) {
+            const freshLocalLearning = await ports.learning.captureLocal(current.learningScope);
+            if (!driveValuesEqual(freshLocalLearning, current.localLearning)) {
+                throw new CloudSyncError('本机学习数据已变化，请重新生成同步预览。');
+            }
+        }
         const sensitiveDiff = current.preview.includeSensitive && current.preview.remoteIncludesSensitive;
         let next: DriveSyncConfig;
         if (direction === 'upload') next = current.local;
@@ -385,8 +391,11 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
             next = sensitiveDiff ? merged : restoreDriveSyncSettings(current.local, merged);
         }
         else throw new CloudSyncError('无效的同步方向，请重新选择。');
-        // 必须在任何云端写入之前验证完整配置及服务引用；不能依赖 apply 才发现无效合并。
+        // 必须在任何云端写入之前验证完整配置、服务引用与学习数据容量边界；不能依赖 apply 才发现无效合并。
         next = parseDriveSyncPayload(driveSyncPayload(next, true));
+        if (ports.learning && hasAnyLearningSyncScope(current.learningScope) && direction !== 'upload') {
+            await ports.learning.validateApply(direction, current.learningScope, current.remoteLearning, current.mergedLearning);
+        }
         const cloudConfig = projectDriveSyncConfig(next, current.preview.includeSensitive);
         const nextCloudLearning = ports.learning && (hasAnyLearningSyncScope(current.learningScope) || current.remoteLearning)
             ? ports.learning.selectCloudBundle(direction, current.learningScope, current.localLearning, current.remoteLearning, current.mergedLearning)
@@ -414,7 +423,14 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
             }
         }
         if (ports.learning && hasAnyLearningSyncScope(current.learningScope) && direction !== 'upload') {
-            await ports.learning.applyLocal(direction, current.learningScope, current.remoteLearning, current.mergedLearning);
+            try {
+                await ports.learning.applyLocal(direction, current.learningScope, current.remoteLearning, current.mergedLearning);
+            } catch (learningError) {
+                if (localChanged) {
+                    try {await ports.apply(current.originalLocal);} catch {throw new CloudSyncError('本机学习数据写入和配置恢复失败，请重新打开设置检查；云端保留本次加密快照。');}
+                }
+                throw learningError;
+            }
         }
         await ports.writeState({version: 1, connected: false, accountId: session.account.id, baseline: content, lastSyncedAt: ports.now(), lastSyncedAccount: session.account});
         return {...ports.auth.availability(), account: session.account, lastSyncedAt: ports.now()};

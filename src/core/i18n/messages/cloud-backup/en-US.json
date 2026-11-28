@@ -170,7 +170,8 @@
     "settings.cloud.autoSync.statusConflict": "{count} conflict(s) detected. Automatic writes paused for manual review.",
     "settings.cloud.autoSync.statusLocked": "Auto-sync paused because the custom E2EE passphrase is locked.",
     "settings.cloud.autoSync.statusOffline": "Offline. Auto-sync will retry when back online.",
-    "settings.cloud.autoSync.statusError": "Auto-sync failed temporarily. Retry scheduled with backoff."
+    "settings.cloud.autoSync.statusError": "Auto-sync failed temporarily. Retry scheduled with backoff.",
+    "settings.cloud.e2ee.rememberDeviceNoAutoSync": "Keep encrypted on this device"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "The general-settings cloud backup contains fields outside its scope. Generate a new backup.",
@@ -187,6 +188,9 @@
     "云端备份使用自定义端到端加密口令保护，请先输入同步口令。": "The cloud backup is protected with a custom E2EE passphrase. Enter your passphrase first.",
     "同步口令不正确，或云端配置已损坏；本机配置未被修改": "Incorrect sync passphrase or damaged cloud backup. Local settings were not changed.",
     "加密口令模式无效": "Invalid encryption passphrase mode.",
-    "同步口令至少需要 12 个字符，最多 1024 个字符": "The sync passphrase must be between 12 and 1024 characters."
+    "同步口令至少需要 12 个字符，最多 1024 个字符": "The sync passphrase must be between 12 and 1024 characters.",
+    "本机学习数据已变化，请重新生成同步预览。": "Local learning data changed. Generate a new sync preview.",
+    "本机学习数据写入和配置恢复失败，请重新打开设置检查；云端保留本次加密快照。": "Failed to save learning data and restore local settings. Reopen settings to inspect; the encrypted cloud snapshot was preserved.",
+    "合并后的单词本超出 5000 条上限，请清理后再同步": "Merged wordbook exceeds the 5,000-entry limit. Clean up entries before syncing."
   }
 }

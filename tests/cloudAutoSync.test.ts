@@ -13,6 +13,10 @@ import {DriveEncryptionError} from '@/src/platform/google-drive/encryption';
 import type {DriveSyncPreview} from '@/src/services/config/remoteConfigSync';
 import {createWebDavBackupHandler, WEBDAV_BACKUP_MESSAGE_TYPE} from '@/src/app/background/handlers/webDavBackup';
 import type {createWebDavBackup} from '@/src/services/config/webDavBackup';
+import {createCloudPassphraseStore} from '@/src/services/config/cloudPassphraseStore';
+import {PersonalCorrectionError} from '@/src/core/personal-corrections/public';
+import {MaterialError} from '@/src/features/vocabulary/materialModel';
+import {VocabularyBookError} from '@/src/features/vocabulary/repository';
 
 function previewFixture(patch: Partial<DriveSyncPreview> = {}): DriveSyncPreview {
     return {
@@ -34,10 +38,13 @@ function autoSyncFixture() {
     let clock = 10_000;
     let online = true;
     let available = true;
-    const alarms: CloudAutoSyncAlarmApi & {fire: (name: string) => void; active: Map<string, unknown>} = {
+    const alarms: CloudAutoSyncAlarmApi & {fire: (name: string) => void; active: Map<string, {delayInMinutes: number; periodInMinutes: number}>} = {
         active: new Map(),
         onAlarm: {addListener: listener => {listeners.push(listener);}},
-        get: vi.fn(async name => (alarms.active.has(name) ? {name} : undefined)),
+        get: vi.fn(async name => {
+            const info = alarms.active.get(name);
+            return info ? {name, periodInMinutes: info.periodInMinutes} : undefined;
+        }),
         create: vi.fn(async (name, info) => {alarms.active.set(name, info);}),
         clear: vi.fn(async name => alarms.active.delete(name)),
         fire: name => listeners.forEach(listener => listener({name})),
@@ -120,11 +127,14 @@ describe('Optional Scheduled Auto-Sync', () => {
         expect(disabled).toMatchObject({enabled: false, state: 'idle', consecutiveFailures: 0, nextRetryAt: null});
         expect(f.alarms.clear).toHaveBeenCalledWith(CLOUD_AUTO_SYNC_ALARM);
 
-        // Startup install clears stale alarm when disabled, and recreates missing alarm when enabled
+        // Startup install clears stale alarm when disabled, recreates missing alarm, and reconciles mismatched interval
         await f.autoSync.install();
         expect(f.alarms.clear).toHaveBeenCalledTimes(2);
         await f.autoSync.configure({enabled: true, intervalMinutes: 360});
         f.alarms.active.clear();
+        await f.autoSync.install();
+        expect(f.alarms.create).toHaveBeenLastCalledWith(CLOUD_AUTO_SYNC_ALARM, {delayInMinutes: 360, periodInMinutes: 360});
+        f.alarms.active.set(CLOUD_AUTO_SYNC_ALARM, {delayInMinutes: 30, periodInMinutes: 30});
         await f.autoSync.install();
         expect(f.alarms.create).toHaveBeenLastCalledWith(CLOUD_AUTO_SYNC_ALARM, {delayInMinutes: 360, periodInMinutes: 360});
     });
@@ -242,11 +252,30 @@ describe('Optional Scheduled Auto-Sync', () => {
         expect(await f.autoSync.runNow()).toMatchObject({state: 'idle'});
         f.setAvailable(true);
 
-        // Passphrase locked or invalid from store -> passphrase-locked without mutation
+        // Passphrase locked or invalid from store -> passphrase-locked without mutation, and scheduled runs short-circuit until unlocked!
         vi.mocked(f.ports.resolvePassphrase).mockRejectedValueOnce(new DriveEncryptionError('locked', 'passphrase-required'));
         expect(await f.autoSync.runNow()).toMatchObject({state: 'passphrase-locked', lastErrorKey: 'settings.cloud.e2ee.passphraseRequired'});
+        const callsWhileLocked = vi.mocked(f.ports.prepare).mock.calls.length;
+        expect(await f.autoSync.runScheduled()).toMatchObject({state: 'passphrase-locked'});
+        expect(vi.mocked(f.ports.prepare).mock.calls.length).toBe(callsWhileLocked);
+        expect(await f.autoSync.notifyPassphraseChanged()).toMatchObject({state: 'idle', consecutiveFailures: 0});
+        expect(await f.autoSync.notifyPassphraseChanged()).toMatchObject({state: 'idle'});
         vi.mocked(f.ports.resolvePassphrase).mockRejectedValueOnce(new DriveEncryptionError('invalid', 'invalid-passphrase'));
         expect(await f.autoSync.runNow()).toMatchObject({state: 'passphrase-locked', lastErrorKey: 'settings.cloud.e2ee.passphraseRequired'});
+        await f.autoSync.notifyPassphraseChanged();
+
+        // Conflict state also short-circuits scheduled runs until resolved by manual sync!
+        vi.mocked(f.ports.prepare).mockResolvedValueOnce(previewFixture({
+            changes: [{id: '0', label: 'Theme', local: 'dark', remote: 'light', sensitive: false, conflict: true, recommended: null}],
+        }));
+        expect(await f.autoSync.runNow()).toMatchObject({state: 'conflict', conflictCount: 1});
+        const callsWhileConflict = vi.mocked(f.ports.prepare).mock.calls.length;
+        expect(await f.autoSync.runScheduled()).toMatchObject({state: 'conflict'});
+        expect(vi.mocked(f.ports.prepare).mock.calls.length).toBe(callsWhileConflict);
+        expect(await f.autoSync.resetAfterManualSync(99_000)).toMatchObject({state: 'synced', lastSyncedAt: 99_000, conflictCount: 0, consecutiveFailures: 0, nextRetryAt: null});
+        await f.autoSync.configure({enabled: false});
+        expect(await f.autoSync.resetAfterManualSync()).toMatchObject({state: 'idle', lastSyncedAt: 10_000});
+        await f.autoSync.configure({enabled: true, intervalMinutes: 30});
 
         // Unexpected error from resolvePassphrase bubbles up
         vi.mocked(f.ports.resolvePassphrase).mockRejectedValueOnce(new Error('storage broken'));
@@ -283,12 +312,21 @@ describe('Optional Scheduled Auto-Sync', () => {
         expect(await noAlarmSync.configure({enabled: true})).toMatchObject({enabled: true});
     });
 
-    it('exposes autoSync actions through the WebDAV background handler', async () => {
+    it('exposes autoSync actions, clears passphrase & alarm on WebDAV clear, resets on manual commit/passphrase change, and whitelists learning errors', async () => {
         const f = autoSyncFixture();
+        const deviceMap = new Map<string, unknown>();
+        const passphrases = createCloudPassphraseStore({
+            provider: 'webdav',
+            deviceStorage: {
+                async getItem<T>(k: string) {return (deviceMap.get(k) ?? null) as T | null;},
+                async setItem(k: string, v: unknown) {deviceMap.set(k, v);},
+                async removeItem(k: string) {deviceMap.delete(k);},
+            },
+        });
         const webdavService = Object.fromEntries(
-            ['status', 'settings', 'save', 'test', 'clear', 'prepare', 'commit', 'cancel', 'prepareDelete', 'commitDelete'].map(k => [k, vi.fn()]),
+            ['status', 'settings', 'save', 'test', 'clear', 'prepare', 'commit', 'cancel', 'prepareDelete', 'commitDelete'].map(k => [k, vi.fn(async () => ({ok: true}))]),
         ) as unknown as ReturnType<typeof createWebDavBackup>;
-        const handler = createWebDavBackupHandler(webdavService, () => true, {autoSync: f.autoSync});
+        const handler = createWebDavBackupHandler(webdavService, () => true, {passphrases, autoSync: f.autoSync});
 
         expect(await handler.handle({type: WEBDAV_BACKUP_MESSAGE_TYPE, clientId: 'c1', action: 'autoSyncStatus'}, {})).toMatchObject({
             success: true, data: {enabled: false, intervalMinutes: 60},
@@ -302,5 +340,37 @@ describe('Optional Scheduled Auto-Sync', () => {
         expect(await handler.handle({type: WEBDAV_BACKUP_MESSAGE_TYPE, clientId: 'c1', action: 'runAutoSyncNow'}, {})).toMatchObject({
             success: true, data: {state: 'synced'},
         });
+
+        // configurePassphrase wakes autoSync from passphrase-locked
+        vi.mocked(f.ports.resolvePassphrase).mockRejectedValueOnce(new DriveEncryptionError('locked', 'passphrase-required'));
+        await f.autoSync.runNow();
+        expect((await f.autoSync.status()).state).toBe('passphrase-locked');
+        await handler.handle({type: WEBDAV_BACKUP_MESSAGE_TYPE, clientId: 'c1', action: 'configurePassphrase', passphraseConfig: {mode: 'custom', passphrase: 'StrongPassphrase!2026', rememberScope: 'device'}}, {});
+        expect((await f.autoSync.status()).state).toBe('idle');
+
+        // Manual commit resets autoSync conflict/backoff state
+        vi.mocked(f.ports.prepare).mockResolvedValueOnce(previewFixture({changes: [{id: '0', label: 'T', local: 'a', remote: 'b', sensitive: false, conflict: true, recommended: null}]}));
+        await f.autoSync.runNow();
+        expect((await f.autoSync.status()).state).toBe('conflict');
+        await handler.handle({type: WEBDAV_BACKUP_MESSAGE_TYPE, clientId: 'c1', action: 'commit', id: 'p1', direction: 'upload', choices: {}}, {});
+        expect((await f.autoSync.status()).state).toBe('synced');
+
+        // Clearing WebDAV connection disables autoSync, clears alarm, and wipes stored passphrase secrets!
+        await handler.handle({type: WEBDAV_BACKUP_MESSAGE_TYPE, clientId: 'c1', action: 'clear', revision: 'rev-1'}, {});
+        expect(await f.autoSync.status()).toMatchObject({enabled: false, state: 'idle'});
+        expect(await passphrases.status()).toMatchObject({hasStoredPassphrase: false, storageScope: 'none'});
+        expect(f.alarms.clear).toHaveBeenCalledWith(CLOUD_AUTO_SYNC_ALARM);
+
+        // Whitelisted repository errors surface their messages cleanly
+        for (const err of [
+            new PersonalCorrectionError('校订超限'),
+            new VocabularyBookError('limit-exceeded', '单词本超限'),
+            new MaterialError('limit-exceeded', '材料超限'),
+        ]) {
+            vi.mocked(webdavService.prepare).mockRejectedValueOnce(err);
+            expect(await handler.handle({type: WEBDAV_BACKUP_MESSAGE_TYPE, clientId: 'c1', action: 'prepare', keyMode: 'app'}, {})).toEqual({
+                success: false, error: err.message,
+            });
+        }
     });
 });

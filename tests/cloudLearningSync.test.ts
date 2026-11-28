@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto';
 import {describe, expect, it, vi} from 'vitest';
 import {Config, normalizeConfig} from '@/src/core/config/model';
 import {driveSyncPayload, parseDriveSyncSnapshot, toDriveSyncConfig} from '@/src/core/config/driveSync';
@@ -8,6 +9,8 @@ import {
     hasLearningBundleContent,
     LEARNING_SYNC_FORMAT,
     LEARNING_SYNC_MAX_BYTES,
+    LEARNING_SYNC_MAX_MATERIALS,
+    LEARNING_SYNC_MAX_VOCABULARY,
     LEARNING_SYNC_VERSION,
     LearningSyncError,
     mergeLearningPersonalCorrections,
@@ -30,6 +33,9 @@ import {decryptDriveConfig} from '@/src/platform/google-drive/encryption';
 import {initialDriveDirection} from '@/src/features/settings/model/googleDrivePreview';
 import type {VocabularyBookExport} from '@/src/features/vocabulary/learningModel';
 import type {MaterialBackup, MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
+import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
+import {PersonalCorrectionRepository} from '@/src/platform/storage/personalCorrectionRepository';
+import type {ConfigStoragePort} from '@/src/platform/storage/configStorage';
 import type {PersonalCorrectionSnapshot} from '@/src/services/personal-corrections/store';
 import type {CloudSyncRemote} from '@/src/core/config/cloudSync';
 
@@ -238,39 +244,69 @@ describe('Learning Sync Core Domain & Deterministic Merge', () => {
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, vocabulary: {includesContext: true, entries: [vocabEntry({reviewCount: 1.5})]}})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, vocabulary: {includesContext: true, entries: [vocabEntry({term: ''})]}})).toThrow(LearningSyncError);
 
-        // Personal corrections validation errors
+        // Personal corrections strict schema validation errors (UUID v4, material ID, language, uniqueness, 4 MiB)
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: null})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 0, entries: 'bad', projects: [], memberships: []}})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 0, entries: [], projects: [null], memberships: []}})).toThrow(LearningSyncError);
+        expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 0, entries: [], projects: [{id: 'not-a-uuid', label: 'P'}], memberships: []}})).toThrow(LearningSyncError);
+        expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 0, entries: [], projects: [{id: PROJ_1, label: 'P1'}, {id: PROJ_1, label: 'P2'}], memberships: []}})).toThrow('项目标识重复');
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [null], projects: [], memberships: []}})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [correctionEntry({scope: {kind: 'bad' as 'material', id: MAT_ID_1, label: 'x'}})], projects: [], memberships: []}})).toThrow(LearningSyncError);
+        expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [correctionEntry({scope: {kind: 'material', id: 'bad-mat', label: 'x'}})], projects: [], memberships: []}})).toThrow(LearningSyncError);
+        expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [correctionEntry({sourceLanguage: 'bad lang!'})], projects: [], memberships: []}})).toThrow(LearningSyncError);
+        expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [correctionEntry({id: UUID_1}), correctionEntry({id: UUID_1, source: 'other'})], projects: [], memberships: []}})).toThrow('记录标识重复');
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [correctionEntry({scope: {kind: 'project', id: PROJ_1, label: 'x'}})], projects: [], memberships: []}})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [correctionEntry({revision: 5})], projects: [], memberships: []}})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [], projects: [], memberships: [null]}})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [], projects: [], memberships: [{materialId: MAT_ID_1, projectId: PROJ_1}]}})).toThrow(LearningSyncError);
+        expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [], projects: [{id: PROJ_1, label: 'P'}], memberships: [{materialId: MAT_ID_1, projectId: PROJ_1}, {materialId: MAT_ID_1, projectId: PROJ_1}]}})).toThrow('归属材料重复');
 
-        // Reading materials validation errors
+        // Vocabulary translations cap & node-count budget
+        const tooManyLangs = Object.fromEntries(Array.from({length: 65}, (_, i) => [`l${i}`, {text: 't', updatedAt: 1}]));
+        expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, vocabulary: {includesContext: false, entries: [vocabEntry({translations: tooManyLangs})]}})).toThrow('译文语言数量超出上限');
+        const hugeNodes = {format: LEARNING_SYNC_FORMAT, version: 1, extra: Array.from({length: 50_005}, () => ({}))};
+        expect(() => validateLearningSyncBundle(hugeNodes)).toThrow('节点过多');
+
+        // Reading materials validation errors (including page < 1 & long URL / 256-char fingerprint acceptance)
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: 'bad'})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: [null]})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: [readingMaterial({kind: 'bad' as 'article'})]})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: [readingMaterial({source: {kind: 'video'}})]})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: [readingMaterial({locator: {kind: 'bad' as 'text'}})]})).toThrow(LearningSyncError);
+        expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: [readingMaterial({locator: {kind: 'document', page: 0}})]})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: [readingMaterial({topics: 'bad' as never})]})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: [readingMaterial({notes: 'bad' as never})]})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: [readingMaterial({notes: [null as never]})]})).toThrow(LearningSyncError);
         expect(() => validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: [readingMaterial({aliases: 'bad' as never})]})).toThrow(LearningSyncError);
+        const longUrlMat = readingMaterial({
+            source: {kind: 'article', url: `https://example.test/${'a'.repeat(5_000)}`, fingerprint: 'f'.repeat(256)},
+            locator: {kind: 'document', page: 1, fingerprint: 'f'.repeat(256)},
+        });
+        expect(validateLearningSyncBundle({format: LEARNING_SYNC_FORMAT, version: 1, readingMaterials: [longUrlMat]}).readingMaterials?.[0]?.source.fingerprint).toHaveLength(256);
 
-        // 12 MiB byte bound enforcement
-        const hugeEntries = Array.from({length: 650}, (_, index) => correctionEntry({
+        // 4 MiB personal corrections cap
+        const hugeCorrections = Array.from({length: 250}, (_, index) => correctionEntry({
             id: `11111111-1111-4111-8111-${String(index).padStart(12, '0')}`,
             source: 'a'.repeat(10_000),
             translation: 'b'.repeat(10_000),
         }));
-        expect(JSON.stringify(hugeEntries).length).toBeGreaterThan(LEARNING_SYNC_MAX_BYTES);
         expect(() => validateLearningSyncBundle({
             format: LEARNING_SYNC_FORMAT,
             version: 1,
-            personalCorrections: {version: 1, revision: 1, entries: hugeEntries, projects: [], memberships: []},
+            personalCorrections: {version: 1, revision: 1, entries: hugeCorrections, projects: [], memberships: []},
+        })).toThrow('4 MiB');
+
+        // 12 MiB total bundle byte bound enforcement (using reading materials)
+        const hugeMaterials = Array.from({length: 1_200}, (_, index) => readingMaterial({
+            id: `mat-${index}`,
+            identityKey: `article:https://example.test/${index}`,
+            notes: [{id: `n-${index}`, note: 'x'.repeat(11_500)}],
+        }));
+        expect(JSON.stringify(hugeMaterials).length).toBeGreaterThan(LEARNING_SYNC_MAX_BYTES);
+        expect(() => validateLearningSyncBundle({
+            format: LEARNING_SYNC_FORMAT,
+            version: 1,
+            readingMaterials: hugeMaterials,
         })).toThrow('12 MiB');
     });
 
@@ -317,7 +353,7 @@ describe('Learning Sync Core Domain & Deterministic Merge', () => {
             ],
         };
 
-        // Without context: strips text & sourceUrl while keeping newer review + newer note + newer per-lang translation!
+        // Without local context: strips local text & sourceUrl while preserving existing remote cloud contexts, newer review, newer note, and newer per-lang translation!
         const stripped = mergeLearningVocabulary(local, remote, false);
         expect(stripped.diff).toEqual({
             localCount: 2,
@@ -334,7 +370,16 @@ describe('Learning Sync Core Domain & Deterministic Merge', () => {
         expect(shared.note).toBe('local note');
         expect(shared.translations['zh-CN'].text).toBe('云端新译');
         expect(shared.translations.ja.text).toBe('ローカル');
-        expect(shared.contexts.every(ctx => ctx.text === undefined && ctx.sourceUrl === undefined)).toBe(true);
+        // Local-only entry never leaks text/sourceUrl; remote cloud context is preserved in cloud merge bundle
+        const localOnly = stripped.merged.entries.find(e => e.identityKey === 'en\u0000local-only')!;
+        expect(localOnly.contexts.every(ctx => ctx.text === undefined && ctx.sourceUrl === undefined)).toBe(true);
+        expect(shared.contexts.some(ctx => ctx.text === 'Private sentence')).toBe(true);
+        expect(shared.contexts.some(ctx => ctx.text === 'A moment of serendipity.')).toBe(false);
+
+        // Merged vocabulary exceeding 5,000 entries throws explicitly instead of dropping words
+        const halfA = Array.from({length: 2_600}, (_, i) => vocabEntry({id: UUID_1, identityKey: `en\u0000a${i}`, term: `a${i}`, normalizedTerm: `a${i}`}));
+        const halfB = Array.from({length: 2_600}, (_, i) => vocabEntry({id: UUID_2, identityKey: `en\u0000b${i}`, term: `b${i}`, normalizedTerm: `b${i}`}));
+        expect(() => mergeLearningVocabulary({includesContext: false, entries: halfA}, {includesContext: false, entries: halfB}, false)).toThrow('5000');
 
         // With context enabled: preserves deduplicated contexts
         const withCtx = mergeLearningVocabulary(local, remote, true);
@@ -368,13 +413,17 @@ describe('Learning Sync Core Domain & Deterministic Merge', () => {
                 phonetic: '/r/',
                 partOfSpeech: 'adj.',
                 translations: {'zh-CN': {text: '云端较旧译', updatedAt: 100}},
-                contexts: [{capturedAt: 100, text: 'Same sentence', sourceUrl: 'https://example.test/same'}],
+                contexts: [
+                    {capturedAt: 100, text: 'Same sentence', sourceUrl: 'https://example.test/same'},
+                    {capturedAt: 120, text: 'Text only'},
+                    {capturedAt: 130, sourceUrl: 'https://example.test/url-only'},
+                ],
             })]},
             true,
         );
         expect(localWinsVocab.merged.entries[0]).toMatchObject({note: '', phonetic: '/r/', partOfSpeech: 'adj.'});
         expect(localWinsVocab.merged.entries[0]?.translations['zh-CN']?.text).toBe('本地最新译');
-        expect(localWinsVocab.merged.entries[0]?.contexts).toEqual([{capturedAt: 500, text: 'Same sentence', sourceUrl: 'https://example.test/same'}]);
+        expect(localWinsVocab.merged.entries[0]?.contexts).toHaveLength(3);
     });
 
     it('deterministically merges personal corrections and reading materials metadata', () => {
@@ -772,5 +821,316 @@ describe('Learning Sync Core Domain & Deterministic Merge', () => {
             {format: LEARNING_SYNC_FORMAT, version: 1, personalCorrections: {version: 1, revision: 1, entries: [correctionEntry()], projects: [], memberships: []}},
             null,
         )).rejects.toThrow(LearningSyncError);
+    });
+
+    it('persists authoritative merges in real Dexie MaterialRepository and real PersonalCorrectionRepository while preserving local locator metadata', async () => {
+        const DOC_FP = 'a'.repeat(32);
+        const db = new MaterialDatabase(`CloudLearningSyncReal-${crypto.randomUUID()}`);
+        const materialRepo = new MaterialRepository(db);
+        const backing = new Map<string, unknown>();
+        const storagePort: ConfigStoragePort = {
+            writeOwner: true,
+            async getItem<T>(key: string) {return (backing.has(key) ? structuredClone(backing.get(key)) : null) as T | null;},
+            async setItem(key: string, value: unknown) {backing.set(key, structuredClone(value));},
+            async removeItem(key: string) {backing.delete(key);},
+            watch() {return () => undefined;},
+            async setItemIfUnchanged(key: string, expected: unknown, value: unknown) {
+                const current = backing.has(key) ? backing.get(key) : null;
+                if (JSON.stringify(current) !== JSON.stringify(expected)) return false;
+                backing.set(key, structuredClone(value));
+                return true;
+            },
+        };
+        const correctionRepo = new PersonalCorrectionRepository(storagePort);
+        const vocabImported: VocabularyBookExport[] = [];
+        let vocabSeed: VocabularyBookExport = {
+            format: 'fluentread-vocabulary-book',
+            version: 1,
+            exportedAt: 100,
+            includesPrivateContext: false,
+            entries: [],
+            reviewLogs: [],
+        };
+        const service = createLearningCloudSync({
+            vocabulary: {
+                exportData: vi.fn(async () => structuredClone(vocabSeed)),
+                importData: vi.fn(async (data: unknown) => {vocabImported.push(data as VocabularyBookExport);}),
+            },
+            personalCorrections: correctionRepo,
+            materials: materialRepo,
+            now: () => 2_000,
+        });
+
+        try {
+            // 1. Seed real Dexie MaterialRepository with newer local updatedAt (500), non-note ref, exact documentReference + prefix/suffix/paragraphId
+            const docRef = {
+                version: 1 as const,
+                materialId: DOC_FP,
+                locator: {version: 1 as const, source: 'Exact PDF sentence.', scope: 'p.3', position: 'line-1'},
+            };
+            await materialRepo.capture({
+                source: {kind: 'document', title: 'Local PDF', fingerprint: DOC_FP},
+                locator: {kind: 'document', page: 3, quote: 'Exact PDF sentence.', prefix: 'Before ', suffix: ' After', paragraphId: 'para-3', fingerprint: DOC_FP, documentReference: docRef},
+                reference: {kind: 'vocabulary', id: UUID_1, excerpt: 'Exact PDF sentence.'},
+                capturedAt: 500,
+            }, 500);
+            const seededDoc = (await materialRepo.exportData(500)).materials[0]!;
+            await materialRepo.update(seededDoc.id, {topics: ['local-topic']}, 500);
+
+            // Seed real PersonalCorrectionRepository with UUID_1, a project, and a membership
+            const corrRead = await correctionRepo.read();
+            await correctionRepo.write(corrRead.expected, {
+                state: {
+                    version: 1,
+                    revision: 1,
+                    projects: [{id: PROJ_1, label: 'Local Project'}],
+                    memberships: [{materialId: MAT_ID_1, projectId: PROJ_1}],
+                    entries: [correctionEntry({id: UUID_1, source: 'alpha', translation: '阿尔法'})],
+                },
+                undo: [],
+            });
+
+            // 2. Remote has older updatedAt (300) on same document WITHOUT source.fingerprint, plus a remote note & topic, AND a colliding UUID_1 correction!
+            const remoteBundle: LearningSyncBundle = {
+                format: LEARNING_SYNC_FORMAT,
+                version: 1,
+                vocabulary: {
+                    includesContext: true,
+                    entries: [vocabEntry({contexts: [{capturedAt: 300, text: 'Secret Page Sentence', sourceUrl: 'https://secret.invalid/doc', pageTitle: 'Secret'}]})],
+                },
+                personalCorrections: {
+                    version: 1,
+                    revision: 2,
+                    projects: [{id: PROJ_2, label: 'Remote Project'}],
+                    memberships: [{materialId: MAT_ID_2, projectId: PROJ_2}],
+                    entries: [correctionEntry({id: UUID_1, source: 'beta', translation: '贝塔', revision: 2})],
+                },
+                readingMaterials: [{
+                    id: 'remote-doc-id',
+                    identityKey: seededDoc.identityKey,
+                    kind: 'document',
+                    title: 'Remote Older Title',
+                    source: {kind: 'document', title: 'Remote Older Title'},
+                    locator: {kind: 'document', page: 3, quote: 'Exact PDF sentence.'},
+                    topics: ['remote-topic'],
+                    notes: [{id: 'remote-note-1', note: 'Merged from remote', createdAt: 300, updatedAt: 300}],
+                    createdAt: 200,
+                    updatedAt: 300,
+                    lastReadAt: 300,
+                    archivedAt: null,
+                }],
+            };
+
+            const scope = {includeVocabulary: true, includeVocabularyContext: false, includePersonalCorrections: true, includeReadingMaterials: true};
+            const localBundle = await service.captureLocal(scope);
+            const {merged} = service.preview(scope, localBundle, remoteBundle);
+            await service.validateApply('merge', scope, remoteBundle, merged);
+            await service.applyLocal('merge', scope, remoteBundle, merged);
+
+            // Verify Fix 1 & Fix 2: Real Dexie MaterialRepository did NOT skip update despite local.updatedAt (500) >= remote.updatedAt (300),
+            // AND preserved non-note vocabulary reference, source.fingerprint, documentReference, prefix, suffix, paragraphId!
+            const afterMaterials = (await materialRepo.exportData(2_000)).materials;
+            expect(afterMaterials).toHaveLength(1);
+            const savedDoc = afterMaterials[0]!;
+            expect(savedDoc.topics).toEqual(['local-topic', 'remote-topic']);
+            expect(savedDoc.references.some(r => r.kind === 'note' && r.id === 'remote-note-1')).toBe(true);
+            expect(savedDoc.references.some(r => r.kind === 'vocabulary' && r.id === UUID_1)).toBe(true);
+            expect(savedDoc.source.fingerprint).toBe(DOC_FP);
+            expect(savedDoc.locator).toMatchObject({
+                kind: 'document',
+                page: 3,
+                quote: 'Exact PDF sentence.',
+                prefix: 'Before',
+                suffix: 'After',
+                paragraphId: 'para-3',
+                fingerprint: DOC_FP,
+                documentReference: docRef,
+            });
+
+            // Verify Fix 3: Real PersonalCorrectionRepository persisted BOTH distinct entries with resolved unique UUID v4s!
+            const afterCorr = (await correctionRepo.read()).value.state;
+            expect(afterCorr.entries).toHaveLength(2);
+            expect(new Set(afterCorr.entries.map(e => e.id)).size).toBe(2);
+            expect(afterCorr.entries.map(e => e.source).sort()).toEqual(['alpha', 'beta']);
+
+            // Verify incompatible locator (different quote/page) drops stale text anchors & documentReference safely
+            await service.applyLocal('download', scope, {
+                format: LEARNING_SYNC_FORMAT,
+                version: 1,
+                readingMaterials: [{
+                    ...remoteBundle.readingMaterials![0]!,
+                    locator: {kind: 'document', page: 9, quote: 'Different PDF sentence.'},
+                }],
+            }, null);
+            const movedDoc = (await materialRepo.exportData(2_000)).materials[0]!;
+            expect(movedDoc.locator?.page).toBe(9);
+            expect(movedDoc.locator?.prefix).toBeUndefined();
+            expect(movedDoc.locator?.documentReference).toBeUndefined();
+
+            // Verify Fix 7: Download with includeVocabularyContext: false stripped private contexts before importing locally!
+            await service.applyLocal('download', scope, remoteBundle, null);
+            expect(vocabImported.every(imp => !imp.includesPrivateContext && imp.entries[0]?.contexts.every(c => c.text === undefined && c.sourceUrl === undefined && c.pageTitle === undefined))).toBe(true);
+            // Also cover includeVocabularyContext: true branch in applyLocal
+            await service.applyLocal('download', {...scope, includeVocabularyContext: true}, remoteBundle, null);
+            expect(vocabImported.at(-1)?.entries[0]?.contexts[0]?.text).toBe('Secret Page Sentence');
+
+            // Verify validateApply rejects over-capacity vocab, corrections (>1000 / >4MiB), and materials (>10000) BEFORE any write!
+            await service.validateApply('upload', scope, remoteBundle, merged);
+            await service.validateApply('download', scope, null, null);
+            await service.validateApply('download', scope, {format: LEARNING_SYNC_FORMAT, version: 1}, null);
+            vocabSeed = {...vocabSeed, entries: Array.from({length: LEARNING_SYNC_MAX_VOCABULARY + 1}, (_, i) => vocabEntry({id: UUID_1, identityKey: `en\u0000cap${i}`, term: `cap${i}`, normalizedTerm: `cap${i}`}))};
+            await expect(service.captureLocal({includeVocabulary: true, includeVocabularyContext: false, includePersonalCorrections: false, includeReadingMaterials: false})).rejects.toThrow('5000');
+            await expect(service.validateApply('download', {includeVocabulary: true, includeVocabularyContext: false, includePersonalCorrections: false, includeReadingMaterials: false}, remoteBundle, null)).rejects.toThrow('5000');
+            vocabSeed = {...vocabSeed, entries: []};
+
+            // Over-limit corrections (>4 MiB) & (>1000 entries/projects)
+            const bigCorrBundle: LearningSyncBundle = {
+                format: LEARNING_SYNC_FORMAT,
+                version: 1,
+                personalCorrections: {
+                    version: 1,
+                    revision: 2,
+                    projects: Array.from({length: 101}, (_, i) => ({id: `11111111-1111-4111-8111-${String(i).padStart(12, '0')}`, label: `P${i}`})),
+                    memberships: [],
+                    entries: [],
+                },
+            };
+            await expect(service.validateApply('download', {includeVocabulary: false, includeVocabularyContext: false, includePersonalCorrections: true, includeReadingMaterials: false}, bigCorrBundle, null)).rejects.toThrow('超出条目上限');
+            const fourMbCorr: LearningSyncBundle = {
+                format: LEARNING_SYNC_FORMAT,
+                version: 1,
+                personalCorrections: {
+                    version: 1,
+                    revision: 2,
+                    projects: [],
+                    memberships: [],
+                    entries: Array.from({length: 230}, (_, i) => correctionEntry({
+                        id: `22222222-2222-4222-8222-${String(i).padStart(12, '0')}`,
+                        source: 's'.repeat(10_000),
+                        translation: 't'.repeat(10_000),
+                    })),
+                },
+            };
+            await expect(service.validateApply('download', {includeVocabulary: false, includeVocabularyContext: false, includePersonalCorrections: true, includeReadingMaterials: false}, fourMbCorr, null)).rejects.toThrow('4 MiB');
+
+            // Over-limit materials (>10,000) & captureLocal sorting/clamping of invalid page/endMs
+            const manyMaterialsPort = createLearningCloudSync({
+                vocabulary: {exportData: vi.fn(), importData: vi.fn()},
+                personalCorrections: correctionRepo,
+                materials: {
+                    exportData: vi.fn(async () => ({
+                        format: 'fluentread-learning-materials' as const,
+                        version: 1 as const,
+                        exportedAt: 100,
+                        materials: Array.from({length: 10_001}, (_, i) => ({
+                            id: `m-${i}`,
+                            identityKey: `article:https://example.test/m/${i}`,
+                            kind: 'article' as const,
+                            title: `M${i}`,
+                            source: {kind: 'article' as const, url: `https://example.test/m/${i}`},
+                            locator: i === 10_000
+                                ? {kind: 'video' as const, page: 0, startMs: 100, endMs: 50}
+                                : i === 9_999
+                                    ? {kind: 'document' as const, page: 2, startMs: 10, endMs: 50}
+                                    : i === 9_998
+                                        ? {kind: 'video' as const, endMs: 50}
+                                        : undefined,
+                            topics: [],
+                            references: [],
+                            createdAt: 100,
+                            updatedAt: 100,
+                            lastReadAt: i >= 9_998 ? 10_000 : i,
+                            archivedAt: null,
+                        })),
+                    })),
+                    importData: vi.fn(),
+                },
+            });
+            await expect(manyMaterialsPort.validateApply('download', {includeVocabulary: false, includeVocabularyContext: false, includePersonalCorrections: false, includeReadingMaterials: true}, remoteBundle, null)).rejects.toThrow('超出上限');
+            const clamped = await manyMaterialsPort.captureLocal({includeVocabulary: false, includeVocabularyContext: false, includePersonalCorrections: false, includeReadingMaterials: true});
+            expect(clamped?.readingMaterials).toHaveLength(LEARNING_SYNC_MAX_MATERIALS);
+            expect(clamped?.readingMaterials?.[0]?.lastReadAt).toBe(10_000);
+        } finally {
+            db.close();
+            await db.delete();
+        }
+    });
+
+    it('detects stale local learning data before commit and rolls back local config when learning applyLocal fails', async () => {
+        let localCfg = sampleConfig({to: 'ja'});
+        let remote: CloudSyncRemote | null = null;
+        let state: unknown = null;
+        const localLearning = createInMemoryLearningPorts({
+            vocabulary: {
+                format: 'fluentread-vocabulary-book',
+                version: 1,
+                exportedAt: 100,
+                includesPrivateContext: false,
+                entries: [vocabEntry({term: 'initial', normalizedTerm: 'initial', identityKey: 'en\u0000initial'})],
+                reviewLogs: [],
+            },
+        });
+        const makePorts = (learningSvc: ReturnType<typeof createLearningCloudSync>): DriveSyncPorts => ({
+            auth: {
+                availability: () => ({available: true, reason: ''}),
+                open: vi.fn(async () => ({account: {id: 'g-stale', email: 'stale@example.test'}, request: async <T>(op: (t: string) => Promise<T>) => op('tok')})),
+                disconnect: vi.fn(async () => undefined),
+            },
+            api: {
+                read: vi.fn(async () => remote),
+                remove: vi.fn(async () => {remote = null;}),
+                write: vi.fn(async (_s, content) => {
+                    const file = {id: 'f-stale', version: String(Number(remote?.file.version ?? 0) + 1), modifiedTime: ''};
+                    remote = {file, content};
+                    return file;
+                }),
+            },
+            snapshot: vi.fn(async () => structuredClone(localCfg)),
+            apply: vi.fn(async v => {localCfg = structuredClone(v);}),
+            readState: vi.fn(async () => state),
+            writeState: vi.fn(async v => {state = v;}),
+            now: () => 5_000,
+            learning: learningSvc,
+        });
+
+        const vocabScope = {includeVocabulary: true, includeVocabularyContext: false, includePersonalCorrections: false, includeReadingMaterials: false};
+        const ports = makePorts(localLearning.service);
+        const svc = createGoogleDriveSync(ports);
+
+        // 1. Local learning mutates between prepare and commit -> commit rejects cleanly before api.write!
+        const p1 = await svc.prepare(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 1, 'c1', false, {learningScope: vocabScope});
+        await localLearning.service.applyLocal('download', vocabScope, {
+            format: LEARNING_SYNC_FORMAT,
+            version: 1,
+            vocabulary: {includesContext: false, entries: [vocabEntry({id: UUID_2, term: 'added-later', normalizedTerm: 'added-later', identityKey: 'en\u0000added-later'})]},
+        }, null);
+        await expect(svc.commit(p1.id, GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 'upload', {}, 1, 'c1')).rejects.toThrow('本机学习数据已变化');
+        expect(ports.api.write).not.toHaveBeenCalled();
+
+        // 2. Seed remote with a different config ('fr') + vocab; fail applyLocal on download -> rolls back localCfg to 'ja'!
+        const pUpload = await svc.prepare(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 1, 'c1', false, {learningScope: vocabScope});
+        await svc.commit(pUpload.id, GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 'upload', {}, 1, 'c1');
+        localCfg = sampleConfig({to: 'fr'});
+        const failingLearning: ReturnType<typeof createLearningCloudSync> = {
+            ...localLearning.service,
+            applyLocal: vi.fn(async () => {throw new LearningSyncError('disk full');}),
+        };
+        const rollbackPorts = makePorts(failingLearning);
+        const rollbackSvc = createGoogleDriveSync(rollbackPorts);
+        const p2 = await rollbackSvc.prepare(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 1, 'c1', false, {learningScope: vocabScope});
+        await expect(rollbackSvc.commit(p2.id, GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 'download', {}, 1, 'c1')).rejects.toThrow('disk full');
+        expect(localCfg.to).toBe('fr');
+
+        // 3. Double failure: applyLocal fails AND rollback apply fails -> surfaces clear recovery error!
+        vi.mocked(rollbackPorts.apply)
+            .mockImplementationOnce(async v => {localCfg = structuredClone(v);})
+            .mockRejectedValueOnce(new Error('rollback failed'));
+        const p3 = await rollbackSvc.prepare(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 1, 'c1', false, {learningScope: vocabScope});
+        await expect(rollbackSvc.commit(p3.id, GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 'download', {}, 1, 'c1')).rejects.toThrow('本机学习数据写入和配置恢复失败');
+
+        // 4. Local config unchanged + applyLocal fails -> rethrows learning error without unnecessary rollback!
+        localCfg = sampleConfig({to: 'ja'});
+        const p4 = await rollbackSvc.prepare(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 1, 'c1', false, {learningScope: vocabScope});
+        await expect(rollbackSvc.commit(p4.id, GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 'download', {}, 1, 'c1')).rejects.toThrow('disk full');
     });
 });

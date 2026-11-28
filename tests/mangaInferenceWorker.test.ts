@@ -13,14 +13,20 @@ const mocks = vi.hoisted(() => {
     return {
         createOcr: vi.fn(), createPainter: vi.fn(), create, session: {create},
         initialization: vi.fn(),loadSeg:vi.fn(),inputs:[] as Array<{type:string;data:Float32Array;dims:number[];dispose:ReturnType<typeof vi.fn>}>,
+        downloadListener: undefined as ((state?: {phase:'downloading'|'verifying'|'error'|'paused';file:string;loaded:number;total:number;source:string}) => void) | undefined,
         realInitialization: undefined as typeof import('@/src/shared/onnx/resources')['paceLocalInitialization'] | undefined,
     };
 });
+class MockMangaModelAssetError extends Error { override name = 'MangaModelAssetError'; }
 vi.mock('onnxruntime-web/webgpu', () => ({InferenceSession: mocks.session,env:{wasm:{}},Tensor:class {
     type:string;data:Float32Array;dims:number[];dispose=vi.fn();
     constructor(type:string,data:Float32Array,dims:number[]){this.type=type;this.data=data;this.dims=dims;mocks.inputs.push(this);}
 }}));
-vi.mock('@/src/features/image-translation/services/mangaOcrAssets',()=>({loadMangaTextSegmentationAsset:mocks.loadSeg}));
+vi.mock('@/src/features/image-translation/services/mangaOcrAssets',()=>({
+    loadMangaTextSegmentationAsset:mocks.loadSeg,
+    MangaModelAssetError:MockMangaModelAssetError,
+    subscribeMangaDownloadState:(listener: typeof mocks.downloadListener)=>{mocks.downloadListener=listener;return ()=>{mocks.downloadListener=undefined;};},
+}));
 vi.mock('@/src/shared/onnx/resources', async importOriginal => {
     const resources = await importOriginal<typeof import('@/src/shared/onnx/resources')>();
     mocks.realInitialization = resources.paceLocalInitialization;
@@ -749,5 +755,26 @@ describe('Worker 协作取消消息协议', () => {
         expect(terminal().find(m => m.requestId === 415)).toMatchObject({success: false, aborted: true});
         expect(await send({requestId: 416, type: 'inpaint'})).toMatchObject({success: true});
         expect(mocks.createPainter.mock.calls.length).toBe(painterCallsBefore + 2);
+    });
+
+    it('转发 Worker 内下载状态并在资源或存储配额错误时标记 errorKind 为 asset', async () => {
+        // 尚无当前请求时忽略空闲下载事件。
+        const snap = {phase: 'downloading' as const, file: 'lama-manga-dynamic.onnx', loaded: 100, total: 1000, source: 'huggingface.co'};
+        mocks.downloadListener?.(snap);
+        expect(scope.postMessage).not.toHaveBeenCalled();
+
+        mocks.createPainter.mockImplementationOnce(async () => {
+            mocks.downloadListener?.(snap);
+            mocks.downloadListener?.(undefined);
+            throw new MockMangaModelAssetError('模型下载未完成');
+        });
+        const assetFail = await send({requestId: 501, type: 'prepare-inpaint'});
+        expect(scope.postMessage).toHaveBeenCalledWith({requestId: 501, download: snap}, []);
+        expect(scope.postMessage).toHaveBeenCalledWith({requestId: 501, download: null}, []);
+        expect(assetFail).toEqual({requestId: 501, success: false, error: '模型下载未完成', errorKind: 'asset'});
+
+        mocks.createOcr.mockRejectedValueOnce(new DOMException('存储空间不足', 'QuotaExceededError'));
+        const quotaFail = await send({requestId: 502, type: 'prepare-ocr'});
+        expect(quotaFail).toEqual({requestId: 502, success: false, error: '存储空间不足', errorKind: 'asset'});
     });
 });

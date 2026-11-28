@@ -121,7 +121,7 @@ export function startOffscreenApp(): void {
             onProgress => downloadImageOcrLanguages(languages, undefined, onProgress),
         ),
         removeOcrLanguages: removeImageOcrLanguages,
-        mangaModelStatus:async () => ({...await mangaOcrModelStatus(), inference:mangaInferenceClient.getDiagnostics()}),
+        mangaModelStatus:async () => ({...await mangaOcrModelStatus(mangaInferenceClient.getDownloadState()), inference:mangaInferenceClient.getDiagnostics()}),
         removeMangaModels,
         videoAi: {
             transcribe: (request) => localVideoTranscription.transcribeLocalVideoAudio(request),

@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
-import {canShareImageOverflowClipping, isImagePresentationOccluded, presentationMatchesSource, resolveImagePresentation, surfaceStyleToBitmap} from '@/src/features/image-translation/content/presentation';
+import {canShareImageOverflowClipping, isImagePresentationOccluded, presentationMatchesSource, resolveImagePresentation, resolveMangaPresentationBounds, surfaceStyleToBitmap} from '@/src/features/image-translation/content/presentation';
 import {isNativeModal, isOpenImageViewer, samePreviewImage, visibleImageViewers} from '@/src/features/image-translation/content/imagePreview';
 
 type Style = Partial<CSSStyleDeclaration> & {backgroundImage?: string};
@@ -210,6 +210,82 @@ describe('image presentation foreground ownership', () => {
         if (mode === 'color') env.styles.get(env.overlay)!.backgroundColor = 'rgb(255, 255, 255)';
         if (mode === 'static') env.styles.get(env.overlay)!.position = 'static';
         expect(isImagePresentationOccluded(env.image, visible, null)).toBe(true);
+    });
+
+    it('manga bounds return full rect without hit-test or occlusion, hide on center or >=3 corners, and clip top/bottom HUD bars cleanly', () => {
+        const env = fixture();
+        const rect = {left: 0, top: 0, right: 1000, bottom: 900};
+        expect(resolveMangaPresentationBounds(env.image, rect, null)).toEqual(rect);
+
+        const dialog = env.document.createElement('div');
+        Object.assign(env.document, {elementsFromPoint: () => [env.image]});
+        expect(resolveMangaPresentationBounds(env.image, rect, null)).toEqual(rect);
+
+        // Center occluded -> null
+        Object.assign(env.document, {elementsFromPoint: (x: number, y: number) => x === 500 && y === 450 ? [dialog, env.image] : [env.image]});
+        expect(resolveMangaPresentationBounds(env.image, rect, null)).toBeNull();
+
+        // 3 corners occluded -> null
+        Object.assign(env.document, {elementsFromPoint: (x: number, y: number) => (x === 500 && y === 450) || (x === 900 && y === 90) ? [env.image] : [dialog, env.image]});
+        expect(resolveMangaPresentationBounds(env.image, rect, null)).toBeNull();
+
+        // Bottom absolute footer & top fixed header: trims bottom and top while keeping center manga visible
+        const footer = env.document.createElement('div');
+        const footerChild = env.document.createElement('span');
+        footer.append(footerChild);
+        footer.getBoundingClientRect = () => ({left: 0, top: 820, right: 1000, bottom: 900, width: 1000, height: 80}) as DOMRect;
+        footerChild.getBoundingClientRect = () => ({left: 10, top: 840, right: 200, bottom: 880, width: 190, height: 40}) as DOMRect;
+        env.styles.set(footer, {position: 'absolute'});
+        env.styles.set(footerChild, {position: 'static'});
+        env.document.body.append(footer);
+
+        const header = env.document.createElement('div');
+        header.getBoundingClientRect = () => ({left: 0, top: 0, right: 1000, bottom: 64, width: 1000, height: 64}) as DOMRect;
+        env.styles.set(header, {position: 'fixed'});
+        env.document.body.append(header);
+
+        Object.assign(env.document, {elementsFromPoint: (x: number, y: number) => {
+            if (x === 100 && y === 810) return [footerChild, footer, env.image];
+            if (x === 900 && y === 90) return [header, env.image];
+            return [env.image];
+        }});
+        expect(resolveMangaPresentationBounds(env.image, rect, null)).toEqual({left: 0, top: 64, right: 1000, bottom: 820});
+
+        // Sticky bar, static chain hitting surface ancestor (stops walking), and tall corner blocker crossing centerY
+        const sticky = env.document.createElement('div');
+        sticky.getBoundingClientRect = () => ({left: 0, top: 0, right: 1000, bottom: 50, width: 1000, height: 50}) as DOMRect;
+        env.styles.set(sticky, {position: 'sticky'});
+        env.document.body.append(sticky);
+        const siblingBlocker = env.document.createElement('div');
+        siblingBlocker.getBoundingClientRect = () => ({left: 0, top: 800, right: 1000, bottom: 900, width: 1000, height: 100}) as DOMRect;
+        env.styles.set(siblingBlocker, {position: 'static'});
+        env.image.parentElement!.append(siblingBlocker);
+        Object.assign(env.document, {elementsFromPoint: (x: number, y: number) => {
+            if (x === 100 && y === 90) return [sticky, env.image];
+            if (x === 900 && y === 810) return [siblingBlocker, env.image];
+            return [env.image];
+        }});
+        expect(resolveMangaPresentationBounds(env.image, rect, null)).toEqual({left: 0, top: 50, right: 1000, bottom: 800});
+
+        // Deep static chain (>6 levels) & out-of-range rects (top <= centerY / bottom >= centerY) leave bounds untouched
+        let chainParent: Element = env.document.body;
+        for (let i = 0; i < 8; i++) {
+            const next = env.document.createElement('div');
+            env.styles.set(next, {position: 'static'});
+            chainParent.append(next);
+            chainParent = next;
+        }
+        chainParent.getBoundingClientRect = () => ({left: 0, top: 300, right: 200, bottom: 900, width: 200, height: 600}) as DOMRect;
+        const topFull = env.document.createElement('div');
+        topFull.getBoundingClientRect = () => ({left: 0, top: 0, right: 200, bottom: 600, width: 200, height: 600}) as DOMRect;
+        env.styles.set(topFull, {position: 'fixed'});
+        env.document.body.append(topFull);
+        Object.assign(env.document, {elementsFromPoint: (x: number, y: number) => {
+            if (x === 100 && y === 810) return [chainParent, env.image];
+            if (x === 100 && y === 90) return [topFull, env.image];
+            return [env.image];
+        }});
+        expect(resolveMangaPresentationBounds(env.image, rect, null)).toEqual(rect);
     });
 });
 

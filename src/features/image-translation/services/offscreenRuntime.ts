@@ -2,7 +2,7 @@
  * @file src/features/image-translation/services/offscreenRuntime.ts
  * 后台选择的本地后端在加载图片前交给已有推理客户端，在串行任务边界生效。
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译、漫画局部修补及圈选文本识别主入口。
- * 主要内容：组合基础图像 I/O、Alpha 保护与全页救援渲染以及 OCR/修补运行时；将候选原文保护传播、漫画空白气泡补绘及普通图排版修补拆分为清晰阶段，保持原子回退与画布全量释放。
+ * 主要内容：组合基础图像 I/O、Alpha 保护与全页救援渲染以及 OCR/修补运行时；将候选原文保护传播、漫画空白气泡补绘及普通图排版修补拆分为清晰阶段，保持原子回退与画布全量释放；漫画背景清除模型因网络或存储资源失败时自动回退本地确定性修补并保留现有 GPU OCR 会话。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；图像加载/裁剪/消息 I/O 归 offscreenImageIo，透明保护几何与救援渲染归 alphaMatteRenderer。
  */
 import {selectChangedTranslations, type OcrLine} from '@/src/features/image-translation/core';
@@ -23,6 +23,7 @@ import {getImageParagraphGapEvidence} from './imageParagraphGapEvidence';
 import {isSingleFrameImageData} from './imageDetectionSnapshot';
 import type {ImageTextSegmentationSupport} from './imageTextSegmentation';
 import {mangaInferenceClient} from './mangaInferenceClient';
+import {MangaModelAssetError} from './mangaOcrAssets';
 import {recognizeImage} from './ocrRuntime';
 import {
     getImageTextBackgroundColor,
@@ -309,14 +310,24 @@ async function renderMangaTranslatedCanvas(
         }
     }
     const protection = translatedLines.length ? planMangaAlphaProtection(sourcePixels.data, width, height, translatedLines as MangaRegion[]) : undefined;
-    const pixels = translatedLines.length ? await mangaInpaintingRuntime.repair(sourcePixels.data, width, height, translatedLines as MangaRegion[], signal,
-        (percent, initializing) => reportProgress(requestId, initializing ? 'initializing' : 'preparing', percent),
-        (done, total) => reportProgress(requestId, 'cleaning', Math.floor(done * 100 / total)), backgrounds, {
-            reuseUniformPixels: true, protection,
-            ...(translatedLines.some(line => line.quarterTurn) ? {onRotatedLabelRestored: (index: number) => {
-                backgrounds[index] = {...backgrounds[index], uniform: false};
-            }} : {}),
-        }) : sourcePixels.data;
+    let pixels: Uint8ClampedArray = sourcePixels.data;
+    if (translatedLines.length) {
+        try {
+            pixels = await mangaInpaintingRuntime.repair(sourcePixels.data, width, height, translatedLines as MangaRegion[], signal,
+                (percent, initializing) => reportProgress(requestId, initializing ? 'initializing' : 'preparing', percent),
+                (done, total) => reportProgress(requestId, 'cleaning', Math.floor(done * 100 / total)), backgrounds, {
+                    reuseUniformPixels: true, protection,
+                    ...(translatedLines.some(line => line.quarterTurn) ? {onRotatedLabelRestored: (index: number) => {
+                        backgrounds[index] = {...backgrounds[index], uniform: false};
+                    }} : {}),
+                });
+        } catch (error) {
+            if (!(error instanceof MangaModelAssetError) || signal?.aborted) throw error;
+            // 背景文字清除模型下载失败或超时时，回退本地确定性修补，不中断漫画翻译且保留 GPU OCR 会话。
+            const complex = translatedLines.filter((_, index) => !backgrounds[index]?.uniform);
+            if (complex.length) pixels = inpaintTextRegions(sourcePixels.data, width, height, complex, true, protection);
+        }
+    }
     if (pixels !== sourcePixels.data) sourcePixels.data.set(pixels);
     if (translatedLines.length) {
         const dirtyRegions = translatedLines.filter((_, index) => !backgrounds[index]?.uniform);

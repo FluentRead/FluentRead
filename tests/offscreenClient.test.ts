@@ -982,4 +982,85 @@ describe('Offscreen platform client', () => {
         await expect(chromeOffscreenClient.hasDocument()).resolves.toBe(false);
         expect(runtime.getContexts).toHaveBeenCalledWith({contextTypes: ['OFFSCREEN_DOCUMENT']});
     });
+
+    it('rebuilds once when the message port closes before a response is received', async () => {
+        let runtimeError: {message?: string} | undefined;
+        let businessAttempts = 0;
+        const runtime: OffscreenRuntimeApi = {
+            get lastError() { return runtimeError; },
+            getContexts: vi.fn(async () => [{}]),
+            sendMessage: vi.fn((message: unknown, callback: (response: unknown) => void) => {
+                if ((message as {type?: unknown})?.type === OFFSCREEN_READY_MESSAGE_TYPE) {
+                    callback({success: true, ready: true});
+                    return;
+                }
+                businessAttempts += 1;
+                if (businessAttempts === 1) {
+                    runtimeError = {message: 'The message port closed before a response was received.'};
+                    callback(undefined);
+                    runtimeError = undefined;
+                    return;
+                }
+                callback({success: true, recovered: true});
+            }),
+        };
+        const closeDocument = vi.fn(async () => undefined);
+        const createDocument = vi.fn(async () => undefined);
+        const client = createOffscreenClient({
+            getRuntime: () => runtime,
+            getOffscreen: () => ({createDocument, closeDocument}),
+            readyRetryAttempts: 1,
+        });
+
+        await expect(client.send<{success: boolean; recovered: boolean}>({type: 'PING'}))
+            .resolves.toEqual({success: true, recovered: true});
+        expect(closeDocument).toHaveBeenCalledOnce();
+        expect(createDocument).toHaveBeenCalledOnce();
+    });
+
+    it('uses capped exponential backoff for ready polling and cleans timers when deadline expires', async () => {
+        vi.useFakeTimers();
+        const attemptTimes: number[] = [];
+        const startedAt = Date.now();
+        let readyAttempts = 0;
+        const runtime: OffscreenRuntimeApi = {
+            getContexts: vi.fn(async () => [{}]),
+            sendMessage: vi.fn((message: unknown, callback: (response: unknown) => void) => {
+                if ((message as {type?: unknown})?.type === OFFSCREEN_READY_MESSAGE_TYPE) {
+                    attemptTimes.push(Date.now() - startedAt);
+                    readyAttempts += 1;
+                    callback({success: true, ready: readyAttempts >= 7});
+                }
+            }),
+        };
+        const client = createOffscreenClient({
+            getRuntime: () => runtime,
+            getOffscreen: () => ({createDocument: vi.fn(async () => undefined)}),
+            readyRetryAttempts: 10,
+            preparationTimeoutMs: 5_000,
+        });
+
+        const ensure = client.ensureDocument();
+        await vi.advanceTimersByTimeAsync(1_200);
+        await expect(ensure).resolves.toBeUndefined();
+        expect(attemptTimes).toEqual([0, 25, 75, 175, 375, 775, 1175]);
+        expect(vi.getTimerCount()).toBe(0);
+
+        const timeoutRuntime: OffscreenRuntimeApi = {
+            getContexts: vi.fn(async () => [{}]),
+            sendMessage: vi.fn((_message: unknown, callback: (response: unknown) => void) => {
+                callback({success: true, ready: false});
+            }),
+        };
+        const timeoutClient = createOffscreenClient({
+            getRuntime: () => timeoutRuntime,
+            getOffscreen: () => ({createDocument: vi.fn(async () => undefined)}),
+            readyRetryAttempts: 10,
+            preparationTimeoutMs: 60,
+        });
+        const failing = timeoutClient.ensureDocument().then(() => null, (error: unknown) => error);
+        await vi.advanceTimersByTimeAsync(60);
+        await expect(failing).resolves.toMatchObject({message: '无法创建 Offscreen 文档：Offscreen 文档准备超时'});
+        expect(vi.getTimerCount()).toBe(0);
+    });
 });

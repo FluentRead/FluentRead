@@ -872,7 +872,8 @@ describe('平台字幕布局操作预算与失效边界', () => {
         expect(f.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
         f.video.currentTime = 1; await vi.advanceTimersByTimeAsync(250);
         expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('到达时需要两行的大字号译文');
-        expect(measureHeight).toHaveBeenCalledTimes(11);
+        // 同步命中缓存直接写入译文并只执行一次排版测量，消除原先空闪导致的额外 1 次测量。
+        expect(measureHeight).toHaveBeenCalledTimes(10);
         measureHeight.mockClear(); await vi.advanceTimersByTimeAsync(1000); expect(measureHeight).not.toHaveBeenCalled();
     });
 
@@ -1023,5 +1024,292 @@ describe('B 站无字幕本地识别接入', () => {
             : {code: 0, data: {cid: 456, subtitle: {subtitles: [{lan: 'en', subtitle_url: '//aisubtitle.hdslb.com/a.json'}]}}})));
         f.choose('off'); f.choose('bilingual'); await vi.advanceTimersByTimeAsync(500);
         expect(f.generate().hidden).toBe(true); expect(f.shadow()!.querySelector('.source')!.textContent).toBe(f.source);
+    });
+});
+
+describe('平台运行时可靠性、低延迟与跨浏览器增强', () => {
+    it('课程请求失败或为空时回退到 TextTrack 与原生字幕节点，加载中不误译原生 DOM', async () => {
+        const f = courseFixture('edx');
+        f.config.videoCourseAutoStart.edx = true;
+        let rejectFetch!: (error: Error) => void;
+        f.fetch.mockImplementationOnce(() => new Promise((_, reject) => { rejectFetch = reject; }));
+        f.start();
+        // loading 阶段没有 TextTrack 时不抢译原生字幕 DOM
+        expect(f.translate).not.toHaveBeenCalled();
+        rejectFetch(new Error('offline'));
+        await vi.advanceTimersByTimeAsync(120);
+        // 失败后自动回退到原生 .closed-captions DOM
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('Native caption');
+        expect(f.translate).toHaveBeenCalledWith('Native caption', expect.any(AbortSignal));
+
+        // 存在可用 TextTrack 时优先回退到 TextTrack（含 activeCues O(1) 快路径与 offset 回退）
+        const activeTrack = new f.window.EventTarget() as unknown as TextTrack & {mode: TextTrackMode; cues: unknown[]; activeCues: unknown[]};
+        Object.assign(activeTrack, {
+            kind: 'subtitles', language: 'en', label: 'English', mode: 'showing',
+            activeCues: [{startTime: 0, endTime: 2, text: 'Active <b>fast</b> cue'}],
+            cues: [{startTime: 0, endTime: 2, text: 'Fallback scanned cue'}],
+        });
+        (f.video.textTracks as unknown as TextTrack[]).push(activeTrack);
+        f.video.dispatchEvent(new f.window.Event('timeupdate'));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('Active fast cue');
+
+        // 校时非零时绕过 activeCues 改扫 track.cues
+        f.config.videoSubtitleOffsetMs = 100; f.change();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('Fallback scanned cue');
+    });
+
+    it('安全守护 Popover API、只读 TextTrack.mode 以及菜单上方空间不足时的下方翻转', async () => {
+        const f = courseFixture('edx');
+        const showPopover = vi.fn(() => { throw new Error('popover failed'); });
+        const hidePopover = vi.fn(() => { throw new Error('hide failed'); });
+        const origCreateElement = f.document.createElement.bind(f.document);
+        vi.spyOn(f.document, 'createElement').mockImplementation((tag: string) => {
+            const el = origCreateElement(tag);
+            if (tag === 'div') {
+                Object.defineProperty(el, 'showPopover', {configurable: true, value: showPopover});
+                Object.defineProperty(el, 'hidePopover', {configurable: true, value: hidePopover});
+                Object.defineProperty(el, 'matches', {configurable: true, value: () => true});
+            }
+            return el;
+        });
+        f.start();
+        const button = f.menu().querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
+        const menu = f.menu().querySelector<HTMLElement>('#fluent-read-video-subtitle-menu')!;
+        expect(menu.getAttribute('popover')).toBe('manual');
+        // 按钮靠近顶部（上方空间不足，下方空间充足）-> 菜单翻转到按钮下方
+        button.getBoundingClientRect = () => ({left: 200, right: 240, top: 20, bottom: 52, width: 40, height: 32}) as DOMRect;
+        menu.getBoundingClientRect = () => ({left: 0, top: 0, width: 280, height: 150}) as DOMRect;
+        button.click();
+        expect(showPopover).toHaveBeenCalledOnce();
+        expect(Number.parseFloat(menu.style.top)).toBe(60);
+        // 按钮高度超过视口剩余空间时夹边到安全视口内
+        menu.getBoundingClientRect = () => ({left: 0, top: 0, width: 280, height: 890}) as DOMRect;
+        button.click(); // close -> invokes guarded hidePopover
+        expect(hidePopover).toHaveBeenCalledOnce();
+        button.click(); // reopen with huge height -> clamped
+        expect(Number.parseFloat(menu.style.top)).toBe(8);
+
+        // 只读 TextTrack.mode 写入失败不中断渲染
+        const readonlyTrack = {
+            kind: 'subtitles', language: 'en', label: 'RO',
+            get mode() { return 'showing' as TextTrackMode; },
+            set mode(_v: TextTrackMode) { throw new Error('readonly mode'); },
+            cues: [{startTime: 0, endTime: 2, text: 'Readonly track text'}],
+        } as unknown as TextTrack;
+        (f.video.textTracks as unknown as TextTrack[]).push(readonlyTrack);
+        f.config.videoCourseAutoStart.edx = true; f.change();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.document.getElementById('fluent-read-course-controls')).not.toBeNull();
+    });
+
+    it('过滤自有文本节点变更、支持后台与暂停轮询节流、立即响应 seeked/timeupdate/cuechange 并持续预取', async () => {
+        const frames: FrameRequestCallback[] = [];
+        let mutationCallback!: MutationCallback;
+        const f = courseFixture('edx');
+        vi.stubGlobal('MutationObserver', class {
+            constructor(cb: MutationCallback) { mutationCallback = cb; }
+            observe() {}
+            disconnect() {}
+        });
+        Object.assign(f.window, {
+            requestAnimationFrame: (cb: FrameRequestCallback) => { frames.push(cb); return frames.length; },
+            cancelAnimationFrame: vi.fn(),
+        });
+        f.config.videoCourseAutoStart.edx = true;
+        f.config.videoService = 'openai';
+        f.fetch.mockImplementation(async () => new Response(JSON.stringify({
+            start: [2000, 15000],
+            end: [14000, 20000],
+            text: ['First long cue.', 'Second cue at 15s.'],
+        })));
+        Object.assign(f.video, {currentTime: 0.5, paused: false, playbackRate: 1});
+        const dispose = f.start();
+        await vi.advanceTimersByTimeAsync(100);
+        // 片头静默期（currentTime=0.5s, 第一句在 2s）AI 30s 预取窗口已预热后续句子
+        expect(f.translate).toHaveBeenCalledWith('First long cue.', expect.any(AbortSignal));
+        expect(f.translate).toHaveBeenCalledWith('Second cue at 15s.', expect.any(AbortSignal));
+
+        // 跳到第一句并派发 seeked -> 无需等待 250ms 轮询，立即同步命中缓存
+        f.video.currentTime = 3;
+        f.video.dispatchEvent(new f.window.Event('seeked'));
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('First long cue.');
+        expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('测试译文');
+
+        // 自有容器内的 Text 节点 characterData 变更及探针 childList 变更均不触发重排调度
+        const host = f.document.getElementById('fluent-read-platform-captions')!;
+        const textNode = f.document.createTextNode('owned');
+        host.appendChild(textNode);
+        const probe = f.document.createElement('span');
+        probe.setAttribute('aria-hidden', 'true');
+        probe.setAttribute('style', 'padding-top:env(safe-area-inset-top,0px)');
+        const measure = vi.fn(f.video.getBoundingClientRect);
+        f.video.getBoundingClientRect = measure;
+        mutationCallback([
+            {type: 'characterData', target: textNode, addedNodes: [], removedNodes: []},
+            {type: 'childList', target: f.document.body, addedNodes: [probe], removedNodes: []},
+            {type: 'childList', target: f.document.body, addedNodes: [host], removedNodes: []},
+        ] as unknown as MutationRecord[], {} as MutationObserver);
+        await vi.advanceTimersByTimeAsync(100);
+        expect(measure).not.toHaveBeenCalled();
+
+        // rAF 合并 scroll 与 visualViewport 监听
+        f.window.dispatchEvent(new f.window.Event('scroll'));
+        f.window.dispatchEvent(new f.window.Event('scroll'));
+        expect(frames).toHaveLength(1);
+        frames.splice(0).forEach(cb => cb(0));
+        expect(measure).toHaveBeenCalledTimes(1);
+        measure.mockClear();
+
+        // 后台页暂停 250ms 轮询，切回可见立即 sync
+        Object.defineProperty(f.document, 'visibilityState', {configurable: true, value: 'hidden'});
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(measure).not.toHaveBeenCalled();
+        Object.defineProperty(f.document, 'visibilityState', {configurable: true, value: 'visible'});
+        f.document.dispatchEvent(new f.window.Event('visibilitychange'));
+        expect(measure).toHaveBeenCalled();
+
+        // 暂停事件节流 250ms 轮询，play 立即恢复并 sync
+        Object.assign(f.video, {paused: true});
+        f.video.dispatchEvent(new f.window.Event('pause', {bubbles: true}));
+        measure.mockClear();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(measure).not.toHaveBeenCalled();
+        Object.assign(f.video, {paused: false});
+        f.video.dispatchEvent(new f.window.Event('play', {bubbles: true}));
+        expect(measure).toHaveBeenCalled();
+
+        // 触发 rAF 队列内销毁释放 cancelAnimationFrame
+        f.window.dispatchEvent(new f.window.Event('scroll'));
+        dispose();
+        expect(f.window.cancelAnimationFrame).toHaveBeenCalled();
+    });
+
+    it('穿透开放 Shadow DOM 发现 Disney+ 视频与字幕并即时响应 TextTrack cuechange', async () => {
+        const f = fixture('https://www.disneyplus.com/video/demo', '<div id="player-host"></div>');
+        const host = f.document.getElementById('player-host')!;
+        const shadow = host.attachShadow({mode: 'open'});
+        const wrapper = f.document.createElement('div');
+        const video = f.document.createElement('video') as unknown as HTMLVideoElement;
+        video.getBoundingClientRect = () => ({left: 0, top: 0, width: 800, height: 450}) as DOMRect;
+        Object.assign(video, {currentTime: 1, paused: false, ended: false, seeking: false});
+        const track = new f.window.EventTarget() as unknown as TextTrack & {mode: TextTrackMode; cues: Array<{startTime: number; endTime: number; text: string}>};
+        Object.assign(track, {
+            kind: 'subtitles', language: 'en', label: 'English', mode: 'showing',
+            cues: [{startTime: 0, endTime: 2, text: 'Initial cue.'}],
+        });
+        Object.defineProperty(video, 'textTracks', {value: [track], configurable: true});
+        wrapper.appendChild(video);
+        shadow.appendChild(wrapper);
+        const overlay = f.document.createElement('div');
+        overlay.className = 'dss-hls-subtitle-overlay';
+        overlay.textContent = 'Shadow overlay cue';
+        host.appendChild(overlay);
+
+        const dispose = f.start();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('Initial cue.');
+
+        // cuechange 立即更新字幕，不等待 250ms 轮询
+        (track as unknown as {cues: {startTime: number; endTime: number; text: string}[]}).cues = [{startTime: 0, endTime: 2, text: 'Cuechange immediate.'}];
+        track.dispatchEvent(new f.window.Event('cuechange'));
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('Cuechange immediate.');
+
+        // 清空轨道后穿透 ShadowRoot host 找到宿主侧原生字幕层
+        (track as unknown as {cues: {startTime: number; endTime: number; text: string}[]}).cues = [];
+        video.dispatchEvent(new f.window.Event('timeupdate'));
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('Shadow overlay cue');
+        await vi.advanceTimersByTimeAsync(100);
+
+        // Shadow DOM 视频直接派发非冒泡/非穿透的 pause/play/seeking 事件也能生效
+        Object.assign(video, {paused: true});
+        video.dispatchEvent(new f.window.Event('pause'));
+        const shadowMeasure = vi.fn(video.getBoundingClientRect);
+        video.getBoundingClientRect = shadowMeasure;
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(shadowMeasure).not.toHaveBeenCalled();
+        Object.assign(video, {paused: false});
+        video.dispatchEvent(new f.window.Event('play'));
+        expect(shadowMeasure).toHaveBeenCalled();
+        shadowMeasure.mockClear();
+        video.dispatchEvent(new f.window.Event('seeking'));
+        await vi.advanceTimersByTimeAsync(100);
+        expect(shadowMeasure).toHaveBeenCalled();
+
+        // 无 rAF 环境滚动走 schedule 回退，非 video play 事件被忽略，视频移除时解绑事件
+        f.window.dispatchEvent(new f.window.Event('scroll'));
+        f.document.body.dispatchEvent(new f.window.Event('play', {bubbles: true}));
+        video.remove();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
+        dispose();
+    });
+
+    it('停用/隐藏后重新启用仍保留 seeked 与 timeupdate 即时监听，多视频非课程页从 pollPaused 恢复', async () => {
+        // 1) 课程页停用 videoTranslationEnabled 再重新启用，seeked/timeupdate 仍即时响应
+        const f = courseFixture('edx');
+        f.config.videoCourseAutoStart.edx = true;
+        f.fetch.mockImplementation(async () => new Response(JSON.stringify({
+            start: [0, 5000],
+            end: [2000, 7000],
+            text: ['First cue.', 'Second cue.'],
+        })));
+        Object.assign(f.video, {currentTime: 0.5, paused: true, playbackRate: 1});
+        const disposeCourse = f.start();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('First cue.');
+
+        f.config.videoTranslationEnabled = false; f.change();
+        expect(f.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
+        f.config.videoTranslationEnabled = true; f.change();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('First cue.');
+
+        // 跳到第二句并直接派发 seeked（不推进 250ms 轮询定时器）
+        f.video.currentTime = 5.5;
+        f.video.dispatchEvent(new f.window.Event('seeked'));
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('Second cue.');
+
+        // 回到第一句并派发 timeupdate（同样无需等待 250ms 轮询）
+        f.video.currentTime = 0.5;
+        f.video.dispatchEvent(new f.window.Event('timeupdate'));
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('First cue.');
+        disposeCourse();
+
+        // 2) 非课程页隐藏 videoSubtitleVisible 再恢复，且多视频暂停后由另一视频 play 唤醒 pollPaused
+        const d = fixture('https://www.disneyplus.com/video/demo', `
+            <div class="p1"><video id="v1" src="one.mp4"></video><div class="dss-hls-subtitle-overlay">Video 1 cue</div></div>
+            <div class="p2"><video id="v2" src="two.mp4"></video><div class="dss-hls-subtitle-overlay">Video 2 cue</div></div>
+        `);
+        const v1 = d.document.getElementById('v1') as unknown as HTMLVideoElement;
+        const v2 = d.document.getElementById('v2') as unknown as HTMLVideoElement;
+        v1.getBoundingClientRect = () => ({left: 0, top: 0, width: 800, height: 450}) as DOMRect;
+        v2.getBoundingClientRect = () => ({left: 0, top: 500, width: 640, height: 360}) as DOMRect;
+        Object.assign(v1, {currentTime: 1, paused: false, ended: false, seeking: false});
+        Object.assign(v2, {currentTime: 1, paused: true, ended: false, seeking: false});
+        Object.defineProperty(v1, 'textTracks', {value: [], configurable: true});
+        Object.defineProperty(v2, 'textTracks', {value: [], configurable: true});
+
+        const disposeDisney = d.start();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(d.shadow()?.querySelector('.source')?.textContent).toBe('Video 1 cue');
+
+        // 隐藏再显示：seeked 监听立即恢复
+        d.config.videoSubtitleVisible = false; d.change();
+        expect(d.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
+        d.config.videoSubtitleVisible = true; d.change();
+        d.document.querySelector('.p1 .dss-hls-subtitle-overlay')!.textContent = 'Video 1 after show';
+        v1.dispatchEvent(new d.window.Event('seeked'));
+        expect(d.shadow()?.querySelector('.source')?.textContent).toBe('Video 1 after show');
+
+        // v1 暂停进入 pollPaused，随后 v2 开始播放 -> 必须重置 pollPaused 并切换到 v2
+        Object.assign(v1, {paused: true});
+        v1.dispatchEvent(new d.window.Event('pause'));
+        Object.assign(v2, {paused: false});
+        v2.dispatchEvent(new d.window.Event('play', {bubbles: true}));
+        await vi.advanceTimersByTimeAsync(100);
+        expect(d.shadow()?.querySelector('.source')?.textContent).toBe('Video 2 cue');
+        disposeDisney();
     });
 });

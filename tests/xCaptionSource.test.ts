@@ -112,6 +112,7 @@ describe('X 原生字幕来源', () => {
   });
   it('原生时间轴的静音空档不混入缓存或 sidecar 的旧字幕', () => {
     const {source, state, korean, english} = fixture();
+    state.video.currentTime = 3;
     Object.assign(korean, {activeCues: []});
     Object.assign(english, {activeCues: []});
     state.aiCues = [{startMs: 0, durationMs: 5000, text: 'Old AI subtitle'}];
@@ -214,6 +215,7 @@ describe('X 原生字幕来源', () => {
   it('原生空档及 cues 增删每轮重新判定 timeline，保留 sidecar 和 AI 回退顺序', () => {
     const f = fixture();
     const measured = measuredNativeSelection(f);
+    f.state.video.currentTime = 3;
     f.korean.activeCues.splice(0);
     f.state.aiCues = [{startMs: 0, durationMs: 5000, text: 'AI fallback'}];
     f.state.sidecarCues = [{startMs: 0, durationMs: 5000, text: 'Sidecar fallback'}];
@@ -331,5 +333,245 @@ describe('X 原生字幕来源', () => {
     ccButton.setAttribute('aria-label', 'Turn on captions');
     expect(readXNativeCaptionControlState(f.state.player)).toBe('off');
     expect(f.source.sync()!.textContent).toBe('');
+  });
+
+  it('缓存原生 CC 按钮与字幕段引用避免 60 FPS 重复 querySelectorAll，并在断连或换播放器后重查', () => {
+    const f = fixture();
+    Object.assign(f.state.video, {textTracks: []});
+    f.state.sidecarCues = [{startMs: 0, durationMs: 5000, text: 'Cached CC caption'}];
+
+    const ccButton = f.document.createElement('button');
+    ccButton.setAttribute('aria-label', 'Turn off captions');
+    const neutralButton = f.document.createElement('button');
+    neutralButton.setAttribute('aria-label', 'Closed captions');
+    f.state.player.append(neutralButton, ccButton);
+
+    const queryAllSpy = vi.spyOn(f.state.player, 'querySelectorAll');
+    const container = f.source.sync()!;
+    expect(container.textContent).toBe('Cached CC caption');
+    expect(queryAllSpy).toHaveBeenCalledTimes(1);
+
+    const segmentQuerySpy = vi.spyOn(container, 'querySelector');
+    for (let i = 0; i < 20; i += 1) {
+      expect(f.source.sync()!.textContent).toBe('Cached CC caption');
+    }
+    expect(queryAllSpy).toHaveBeenCalledTimes(1);
+    expect(segmentQuerySpy).not.toHaveBeenCalled();
+
+    // 原生 CC 按钮移除后自动重查；字幕段被外部替换后自动重查。
+    ccButton.remove();
+    f.source.sync();
+    expect(queryAllSpy).toHaveBeenCalledTimes(2);
+
+    const replacement = f.document.createElement('span');
+    replacement.className = 'ytp-caption-segment';
+    container.innerHTML = '';
+    container.appendChild(replacement);
+    expect(f.source.sync()!.textContent).toBe('Cached CC caption');
+    expect(segmentQuerySpy).toHaveBeenCalledTimes(1);
+
+    // player 为空时安全返回 null 状态。
+    expect(readXNativeCaptionControlState(null)).toBeNull();
+    f.state.player = undefined as unknown as HTMLElement;
+    f.state.video = null as unknown as HTMLVideoElement;
+    f.document.body.innerHTML = '';
+    expect(f.source.isNativeCaptionActive()).toBe(true);
+  });
+
+  it('sidecarCues 在有序时走二分查句，在无序与非有限时间下正确回退', () => {
+    const f = fixture();
+    Object.assign(f.state.video, {textTracks: []});
+    f.state.sidecarCues = [
+      {startMs: 0, durationMs: 5000, text: 'Long base'},
+      {startMs: 1000, durationMs: 500, text: 'Short overlap'},
+      {startMs: 2000, durationMs: 1000, text: 'Tie first'},
+      {startMs: 2000, durationMs: 1000, text: 'Tie second'},
+    ];
+    f.state.video.currentTime = 1.2;
+    expect(f.source.sync()!.textContent).toBe('Short overlap');
+    f.state.video.currentTime = 1.8;
+    expect(f.source.sync()!.textContent).toBe('Long base');
+    f.state.video.currentTime = 2.5;
+    expect(f.source.sync()!.textContent).toBe('Tie first');
+    f.state.video.currentTime = 6;
+    expect(f.source.sync()!.textContent).toBe('');
+    f.state.video.currentTime = Number.NaN;
+    expect(f.source.sync()!.textContent).toBe('');
+
+    // 无序 sidecar 回退线性扫描。
+    f.state.sidecarCues = [
+      {startMs: 2000, durationMs: 1000, text: 'Later'},
+      {startMs: 500, durationMs: 2000, text: 'Earlier'},
+    ];
+    f.state.video.currentTime = 2.2;
+    expect(f.source.sync()!.textContent).toBe('Later');
+    f.state.video.currentTime = 1.0;
+    expect(f.source.sync()!.textContent).toBe('Earlier');
+  });
+
+  it('Firefox/Safari 下 activeCues 为空但 track.cues 有效时按 currentTime 回退读取', () => {
+    const f = fixture();
+    const cues = [
+      {startTime: NaN, endTime: 2, text: 'Invalid'},
+      {startTime: 0, endTime: 2, text: 'First line'},
+      {startTime: 1, endTime: 3, text: '<X-word-ms ms=10>Second line</X-word-ms>'},
+      {startTime: 1, endTime: 3, text: '   '},
+    ];
+    const track = {kind: 'subtitles', mode: 'showing', language: 'en', activeCues: null, cues};
+    Object.assign(f.state.video, {currentTime: 1.5, textTracks: [track]});
+    const container = f.source.sync()!;
+    expect(container.textContent).toBe('First line\nSecond line');
+    expect(container.dataset.fluentReadCaptionSource).toBe('native');
+
+    // currentTime 落在所有 cue 之外或 NaN 时返回空文本。
+    f.state.video.currentTime = 4;
+    expect(f.source.sync()!.textContent).toBe('');
+    f.state.video.currentTime = Number.NaN;
+    expect(f.source.sync()!.textContent).toBe('');
+
+    // 覆盖未定义 cue.text、空 activeCues 文本、非按钮/弹出菜单控件、hasNativeTracks、非 X 页与边界退化分支。
+    const emptyTextTrack = {
+      kind: 'captions', mode: 'showing', language: '',
+      activeCues: [{startTime: 0, endTime: 2, text: undefined}],
+      cues: [{startTime: 0, endTime: 2, text: undefined}],
+    };
+    const fallbackUndefinedTrack = {
+      kind: 'captions', mode: 'showing', language: '',
+      activeCues: [],
+      cues: [{startTime: 0, endTime: 2, text: undefined}],
+    };
+    const readOnlyDisabled = {
+      kind: 'subtitles', language: 'en', activeCues: [], cues: [],
+      get mode() { return 'disabled'; },
+      set mode(_v: string) { throw new Error('readonly'); },
+    };
+    Object.assign(f.state.video, {currentTime: 1, textTracks: [emptyTextTrack, fallbackUndefinedTrack, readOnlyDisabled]});
+    expect(f.source.hasNativeTracks()).toBe(true);
+    expect(f.source.sync()!.textContent).toBe('');
+    expect(f.source.readNativeTrack()).toBeNull();
+    // 显式选择只读 disabled 轨时触发跳过 disabled 轨分支；cues 为 null 与非字幕 kind 轨安全跳过。
+    f.state.language = 'en';
+    expect(f.source.sync()!.textContent).toBe('');
+    f.state.language = 'auto';
+    Object.assign(f.state.video, {textTracks: [{kind: 'metadata', mode: 'showing', language: 'en', activeCues: [], cues: null}]});
+    expect(f.source.hasNativeTracks()).toBe(false);
+    Object.assign(f.state.video, {textTracks: [{kind: 'subtitles', mode: 'showing', language: 'en', activeCues: [], cues: null}]});
+    expect(f.source.readNativeTrack()).toBeNull();
+
+    // 按钮识别边界：非按钮标签、menu 弹窗非开关、aria-pressed="true"、CC 文本按钮、host hidden 轨和 remember on。
+    const div = f.document.createElement('div');
+    expect(isXNativeCaptionControl(div)).toBe(false);
+    const menuBtn = f.document.createElement('button');
+    menuBtn.setAttribute('aria-haspopup', 'menu');
+    menuBtn.setAttribute('aria-label', 'Captions');
+    expect(isXNativeCaptionControl(menuBtn)).toBe(false);
+    const ccTextBtn = f.document.createElement('button');
+    ccTextBtn.textContent = 'CC';
+    ccTextBtn.setAttribute('aria-pressed', 'true');
+    const ambiguousCcBtn = f.document.createElement('button');
+    ambiguousCcBtn.setAttribute('aria-label', 'Closed captions');
+    expect(isXNativeCaptionControl(ccTextBtn)).toBe(true);
+    f.state.player.append(ambiguousCcBtn, ccTextBtn);
+    expect(readXNativeCaptionControlState(f.state.player)).toBe('on');
+    ambiguousCcBtn.remove();
+
+    const hiddenHostTrack = {kind: 'subtitles', mode: 'hidden', language: 'en', activeCues: [{startTime: 0, endTime: 2, text: 'Host hidden'}], cues: [{startTime: 0, endTime: 2, text: 'Host hidden'}]};
+    Object.assign(f.state.video, {textTracks: [hiddenHostTrack]});
+    expect(f.source.sync()!.textContent).toBe('Host hidden');
+    // 控制栏卸载后，宿主 hidden 轨配合 rememberedButtonState='on' 仍保持激活。
+    ccTextBtn.remove();
+    expect(f.source.sync()!.textContent).toBe('Host hidden');
+
+    // CC=off 记忆在宿主重新 showing 后清空。
+    ccTextBtn.setAttribute('aria-pressed', 'false');
+    f.state.player.appendChild(ccTextBtn);
+    expect(f.source.sync()!.textContent).toBe('');
+    ccTextBtn.remove();
+    hiddenHostTrack.mode = 'showing';
+    expect(f.source.sync()!.textContent).toBe('Host hidden');
+
+    // 容器缺少 segment 时安全返回容器。
+    const emptyContainer = f.source.sync()!;
+    emptyContainer.innerHTML = '';
+    expect(f.source.sync()).toBe(emptyContainer);
+
+    // 非 X 的 HTML 媒体页分支与无播放器返回 null 分支。
+    vi.stubGlobal('window', {location: {hostname: 'example.com', pathname: '/video.mp4', href: 'https://example.com/video.mp4'}});
+    Object.assign(f.state.video, {textTracks: [{kind: 'subtitles', mode: 'showing', language: '', activeCues: [{startTime: 0, endTime: 2, text: 'HTML cue'}], cues: [{startTime: 0, endTime: 2, text: 'HTML cue'}]}]});
+    expect(f.source.readNativeTrack()).toEqual({languageCode: 'original', cues: [{startMs: 0, durationMs: 2000, text: 'HTML cue'}]});
+    expect(f.source.isNativeCaptionActive()).toBe(true);
+    f.state.player = undefined as unknown as HTMLElement;
+    expect(f.source.sync()).toBe(emptyContainer);
+    f.state.player = f.document.querySelector('[data-testid="videoPlayer"]') as HTMLElement;
+    f.state.video = null as unknown as HTMLVideoElement;
+    expect(f.source.sync()).toBe(emptyContainer);
+    expect(f.source.readNativeTrack()).toBeNull();
+    expect(f.source.hasNativeTracks()).toBe(false);
+    f.state.player = undefined as unknown as HTMLElement;
+    f.document.body.innerHTML = '';
+    expect(f.source.sync()).toBeNull();
+
+    // 非支持页面直接返回 null。
+    vi.stubGlobal('window', {location: {hostname: 'www.youtube.com', pathname: '/watch', href: 'https://www.youtube.com/watch?v=1'}});
+    expect(f.source.sync()).toBeNull();
+  });
+
+  it('排除 FluentRead 自建原生全屏/画中画轨道，并在缓存 CC 按钮失去开关语义或 restoreTracks 后正确重查', () => {
+    const f = fixture();
+    const ownedCue = {startTime: 0, endTime: 2, text: 'FluentRead translated cue'};
+    const ownedTrack = {
+      kind: 'subtitles',
+      label: 'FluentRead',
+      mode: 'showing',
+      language: 'zh-CN',
+      activeCues: [ownedCue],
+      cues: [ownedCue],
+    };
+    const trackElement = f.document.createElement('track');
+    trackElement.setAttribute('data-fluent-read-native-subtitles', 'true');
+    Object.defineProperty(trackElement, 'track', {configurable: true, value: ownedTrack});
+    f.state.video.appendChild(trackElement);
+
+    // 仅存在 FluentRead 自有轨时：hasNativeTracks 为 false、readNativeTrack 为 null，且不遮蔽 sidecar。
+    Object.assign(f.state.video, {textTracks: [ownedTrack]});
+    f.state.sidecarCues = [{startMs: 0, durationMs: 5000, text: 'Sidecar still visible'}];
+    expect(f.source.hasNativeTracks()).toBe(false);
+    expect(f.source.readNativeTrack()).toBeNull();
+    expect(f.source.isNativeCaptionActive()).toBe(true);
+    const container = f.source.sync()!;
+    expect(container.textContent).toBe('Sidecar still visible');
+    expect(container.dataset.fluentReadCaptionSource).toBe('sidecar');
+    expect(ownedTrack.mode).toBe('showing');
+
+    // 同时存在宿主轨道与 FluentRead 自有轨时：只选择并导出宿主轨道，绝不修改自有轨。
+    Object.assign(f.state.video, {textTracks: [ownedTrack, f.english, f.korean]});
+    expect(f.source.hasNativeTracks()).toBe(true);
+    expect(f.source.sync()!.textContent).toBe('오늘은 좋은 날입니다.');
+    expect(f.source.readNativeTrack()).toEqual({
+      languageCode: 'ko',
+      cues: [{startMs: 0, durationMs: 2000, text: '오늘은 좋은 날입니다.'}],
+    });
+
+    // 缓存 CC 按钮变为无开关状态（readControlButtonState 返回 null）时清空缓存并重扫发现有效开关。
+    Object.assign(f.state.video, {textTracks: [ownedTrack]});
+    const firstBtn = f.document.createElement('button');
+    firstBtn.setAttribute('aria-label', 'Turn off captions');
+    const secondBtn = f.document.createElement('button');
+    secondBtn.setAttribute('aria-label', 'Closed captions');
+    secondBtn.setAttribute('aria-pressed', 'false');
+    f.state.player.appendChild(firstBtn);
+    expect(f.source.sync()!.textContent).toBe('Sidecar still visible');
+
+    // firstBtn 失去明确 on/off 语义但仍保持 CC 控件身份，同时挂入 secondBtn (aria-pressed=false)。
+    firstBtn.setAttribute('aria-label', 'Closed captions');
+    f.state.player.appendChild(secondBtn);
+    expect(f.source.sync()!.textContent).toBe('');
+
+    // restoreTracks 清空所有缓存引用且不触碰 FluentRead 自有轨道。
+    f.source.restoreTracks();
+    expect(ownedTrack.mode).toBe('showing');
+    secondBtn.remove();
+    firstBtn.remove();
+    expect(f.source.sync()!.textContent).toBe('Sidecar still visible');
   });
 });

@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/offscreen/transcription.worker.ts
  * 文件职责：运行独立的 Whisper ONNX Worker，复用模型 session 并执行受限时长的本地音频推理。
- * 主要内容：配置 WASM/WebGPU 和分模块精度、串行复用模型，每窗检测语言并共享特征与编码，跳过数字静音、恢复裁剪偏移并拒绝异常重复。生成计时器协作停止解码；独立 Offscreen owner 的墙钟超时负责终止 Worker，同线程计时器不保证原生算子中的实时中断。
+ * 主要内容：配置 WASM/WebGPU 和分模块精度、串行复用模型，每窗整体只安排一次 CPU 间歇（WebGPU 跳过人工休眠），每窗检测语言并共享特征与编码，跳过数字静音、恢复裁剪偏移，在退化重试时复用已检出语种避免重复语言检测，仅对真实 WebGPU 或多线程 WASM 初始化/推理故障标记 CPU 回退。生成计时器协作停止解码；独立 Offscreen owner 的墙钟超时负责终止 Worker，同线程计时器不保证原生算子中的实时中断。
  * 模块边界：只运行模型与 Worker 消息循环，入站先经唯一 Worker 协议校验；不访问页面 DOM、后台消息或共享 Offscreen 业务状态。
  */
 import {forceSingleThreadInference, localWasmThreads, paceLocalInference, paceLocalInitialization} from '@/src/shared/onnx/resources';
@@ -57,6 +57,15 @@ class WebGpuFallbackError extends Error {
   constructor(cause: unknown) {
     super(cause instanceof Error ? cause.message : String(cause));
     this.name = 'WebGpuFallbackError';
+  }
+}
+
+class WasmThreadFallbackError extends Error {
+  readonly retryWithCpu = true;
+
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'WasmThreadFallbackError';
   }
 }
 
@@ -171,14 +180,19 @@ async function createWasmTranscriber(modelId: string, model: ReturnType<typeof n
   };
 
   try {
-    return await create('q4');
-  } catch (q4Error) {
-    // Small 的质量档位固定 FP32 encoder/q4 decoder；失败不偷偷下载另一整组精度。
-    if (model === 'small') throw q4Error;
-    console.warn('[FluentRead] Worker WASM/q4 Whisper 初始化失败，退回 WASM/q8', q4Error);
-    // q8 是真实 fallback；写入当前选择的缓存，后续重建 worker 不会再次下载。
-    await cacheVideoAiQ8ModelFiles(model);
-    return create('q8');
+    try {
+      return await create('q4');
+    } catch (q4Error) {
+      // Small 的质量档位固定 FP32 encoder/q4 decoder；失败不偷偷下载另一整组精度。
+      if (model === 'small') throw q4Error;
+      console.warn('[FluentRead] Worker WASM/q4 Whisper 初始化失败，退回 WASM/q8', q4Error);
+      // q8 是真实 fallback；写入当前选择的缓存，后续重建 worker 不会再次下载。
+      await cacheVideoAiQ8ModelFiles(model);
+      return await create('q8');
+    }
+  } catch (error) {
+    if (localWasmThreads() > 1) throw new WasmThreadFallbackError(error);
+    throw error;
   }
 }
 
@@ -204,7 +218,7 @@ async function createLocalTranscriber(
       const wasm = env.backends.onnx.wasm;
       gpuTranscriber = await paceLocalInitialization(() => wasm
         ? withCompressedWasmBinary(wasm, resolveOnnxWasmAssetPaths(extensionUrl).wasm, createPipeline)
-        : createPipeline());
+        : createPipeline(), {skipRest: true});
       transcriberBackend = 'webgpu';
       transcriberDtype = 'q4';
       transcriberEncoderDtype = model === 'small' ? 'fp32' : 'q4';
@@ -268,9 +282,10 @@ async function getLocalTranscriber(model: unknown): Promise<LocalTranscriber> {
 
 async function runModelInference<T>(operation: () => Promise<T>): Promise<T> {
   try {
-    return await paceLocalInference(operation);
+    return await operation();
   } catch (error) {
     if (transcriberBackend === 'webgpu') throw new WebGpuFallbackError(error);
+    if (transcriberBackend === 'wasm' && localWasmThreads() > 1) throw new WasmThreadFallbackError(error);
     throw error;
   }
 }
@@ -358,47 +373,68 @@ function cleanTranscriptText(value: unknown): string {
   return /^\[(?:blank_audio|silence)\]$/i.test(text) ? '' : text;
 }
 
+interface ReusedLanguageDetection {
+  language: string;
+  confidence: number;
+  detectionMs: number;
+  encoderReuse: boolean;
+}
+
 async function transcribeAudioOnce(
   request: WorkerRequest,
   model: ReturnType<typeof normalizeVideoLocalTranscriptionModel>,
   boundedAudio: Float32Array,
   retryDegenerate = false,
   generationAudioSeconds = boundedAudio.length / 16_000,
+  forcedLanguageDetection?: ReusedLanguageDetection,
 ): Promise<WorkerTranscriptionResult> {
   const transcriber = await getLocalTranscriber(model);
   const inferenceStartedAt = performance.now();
-  const explicitSourceLanguage = normalizeWhisperSourceLanguage(request.sourceLanguage);
-  const languageDetection = explicitSourceLanguage ? undefined
-    : await resolveWhisperSourceLanguage(transcriber, boundedAudio);
-  const effectiveSourceLanguage = explicitSourceLanguage || languageDetection!.language;
-  // 正文、timestamp 和 EOS 共用 decoder 预算。Base/Small 保留多字节语言所需容量；
-  // Tiny 使用已验证的有界时长预算，所有模型仍受独立停止条件约束。
-  const stoppingCriteria = new InterruptableStoppingCriteria();
+  const explicitSourceLanguage = forcedLanguageDetection?.language || normalizeWhisperSourceLanguage(request.sourceLanguage);
   const inferenceTimeoutMs = getVideoLocalTranscriptionInferenceTimeoutMs(model);
-  const timeout = self.setTimeout(() => stoppingCriteria.interrupt(), inferenceTimeoutMs);
-  let output: { text?: unknown; chunks?: unknown };
-  try {
-    const options = buildWhisperTranscriptionGenerationOptions(model, effectiveSourceLanguage, generationAudioSeconds, stoppingCriteria);
-    if (retryDegenerate) {
-      options.no_repeat_ngram_size = 4;
-      options.repetition_penalty = 1.15;
+  // 同一窗内的编码复用、语言检测与解码属于单次窗口任务，只在整窗外围安排一次
+  // CPU 间歇（WebGPU 跳过人工休眠），避免子步骤之间被重复插入休眠。
+  const {output, languageDetection, interrupted} = await paceLocalInference(async () => {
+    const detected = explicitSourceLanguage ? undefined
+      : await resolveWhisperSourceLanguage(transcriber, boundedAudio);
+    const effectiveSourceLanguage = explicitSourceLanguage || detected!.language;
+    // 正文、timestamp 和 EOS 共用 decoder 预算。Base/Small 保留多字节语言所需容量；
+    // Tiny 使用已验证的有界时长预算，所有模型仍受独立停止条件约束。
+    const stoppingCriteria = new InterruptableStoppingCriteria();
+    const timeout = self.setTimeout(() => stoppingCriteria.interrupt(), inferenceTimeoutMs);
+    try {
+      const options = buildWhisperTranscriptionGenerationOptions(model, effectiveSourceLanguage, generationAudioSeconds, stoppingCriteria);
+      if (retryDegenerate) {
+        options.no_repeat_ngram_size = 4;
+        options.repetition_penalty = 1.15;
+      }
+      const operation = (generationOptions: Record<string, unknown>) => withWhisperStoppingCriteria(
+        transcriber.model, stoppingCriteria, env.version,
+        () => runModelInference(() => transcriber(boundedAudio, generationOptions)),
+      );
+      const generate = () => detected?.encoder
+        ? detected.encoder.transcribe(options, operation)
+        : operation(options);
+      const generated = await (detected?.processor
+        ? detected.processor.transcribe(options, generate)
+        : generate()) as { text?: unknown; chunks?: unknown };
+      return {
+        output: generated,
+        languageDetection: detected ? {
+          language: detected.language,
+          confidence: detected.confidence,
+          detectionMs: detected.detectionMs,
+          encoderReuse: Boolean(detected.encoder),
+        } : undefined,
+        interrupted: stoppingCriteria.interrupted,
+      };
+    } finally {
+      self.clearTimeout(timeout);
+      try {detected?.encoder?.dispose();}
+      finally {disposeTensorTree(detected?.processed);}
     }
-    const operation = (generationOptions: Record<string, unknown>) => withWhisperStoppingCriteria(
-      transcriber.model, stoppingCriteria, env.version,
-      () => runModelInference(() => transcriber(boundedAudio, generationOptions)),
-    );
-    const generate = () => languageDetection?.encoder
-      ? languageDetection.encoder.transcribe(options, operation)
-      : operation(options);
-    output = await (languageDetection?.processor
-      ? languageDetection.processor.transcribe(options, generate)
-      : generate()) as { text?: unknown; chunks?: unknown };
-  } finally {
-    self.clearTimeout(timeout);
-    try {languageDetection?.encoder?.dispose();}
-    finally {disposeTensorTree(languageDetection?.processed);}
-  }
-  if (stoppingCriteria.interrupted) {
+  }, {skipRest: transcriberBackend === 'webgpu'});
+  if (interrupted) {
     const error = new Error(`本地视频 AI 推理超过 ${inferenceTimeoutMs / 1000} 秒`);
     throw transcriberBackend === 'webgpu' ? new WebGpuFallbackError(error) : error;
   }
@@ -406,10 +442,16 @@ async function transcribeAudioOnce(
   if (isDegenerateVideoTranscript(output?.text) || (Array.isArray(output?.chunks)
     && output.chunks.some(chunk => isDegenerateVideoTranscript(chunk?.text)))) {
     if (!retryDegenerate) {
-      const retried = await transcribeAudioOnce(request, model, boundedAudio, true, generationAudioSeconds);
+      // 退化重试直接沿用已检出语种，不再重复执行语言检测。
+      const retried = await transcribeAudioOnce(
+        request,
+        model,
+        boundedAudio,
+        true,
+        generationAudioSeconds,
+        languageDetection,
+      );
       retried.inferenceMs = performance.now() - inferenceStartedAt;
-      // 同一 auto 请求重试仍逐窗检测，因此 retry 的检测计时始终存在。
-      if (languageDetection) retried.languageDetectionMs = languageDetection.detectionMs + retried.languageDetectionMs!;
       return retried;
     }
     throw new Error('AI 字幕识别出现异常重复，请确认有人声并重新识别，或尝试其他模型');
@@ -422,6 +464,7 @@ async function transcribeAudioOnce(
       .filter((segment) => segment.text && segment.endMs > segment.startMs) as LocalVideoTranscriptionSegment[]
     : [];
   const inferenceMs = performance.now() - inferenceStartedAt;
+  const detectionMeta = languageDetection || forcedLanguageDetection;
   // dispatcher 串行：成功加载后到响应序列化前不会执行 dispose/模型切换，
   // 创建成功路径必定已设置 backend 和双模块 dtype；静音早返另行处理。
   const result = {
@@ -436,10 +479,10 @@ async function transcribeAudioOnce(
     dtype: transcriberDtype,
     encoderDtype: transcriberEncoderDtype,
     decoderDtype: transcriberDtype,
-    detectedLanguage: languageDetection?.language,
-    languageConfidence: languageDetection?.confidence,
-    languageDetectionMs: languageDetection?.detectionMs,
-    encoderReuse: languageDetection ? Boolean(languageDetection.encoder) : undefined,
+    detectedLanguage: detectionMeta?.language,
+    languageConfidence: detectionMeta?.confidence,
+    languageDetectionMs: detectionMeta?.detectionMs,
+    encoderReuse: detectionMeta?.encoderReuse,
   };
   return result;
 }
@@ -557,7 +600,7 @@ workerScope.onmessage = (event) => {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       };
-      if (!isOnnxJspiUnsupportedError(error) && (error instanceof WebGpuFallbackError || localWasmThreads() > 1)) response.retryWithCpu = true;
+      if (!isOnnxJspiUnsupportedError(error) && (error instanceof WebGpuFallbackError || error instanceof WasmThreadFallbackError)) response.retryWithCpu = true;
       post(response);
     }
   });

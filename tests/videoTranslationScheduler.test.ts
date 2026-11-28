@@ -176,4 +176,104 @@ describe('VideoTranslationScheduler', () => {
       await tick();
     }
   });
+
+  it('两路预取已满且无等待当前句时不枚举任务，新当前句或提升预取可立即占用第三路', async () => {
+    const calls: string[] = [];
+    const releases = new Map<string, (text: string) => void>();
+    const scheduler = new VideoTranslationScheduler(source => new Promise(resolve => {
+      calls.push(source);
+      releases.set(source, resolve);
+    }));
+    const jobs = [
+      scheduler.request('p1', true),
+      scheduler.request('p2', true),
+    ];
+    await tick();
+    expect(calls).toEqual(['p1', 'p2']);
+
+    const valuesSpy = vi.spyOn(Map.prototype, 'values');
+    try {
+      jobs.push(scheduler.request('p3', true));
+      jobs.push(scheduler.request('p4', true));
+      expect(valuesSpy).not.toHaveBeenCalled();
+    } finally {
+      valuesSpy.mockRestore();
+    }
+
+    // 提升已排队预取到 current lane，立即启动占用第三路。
+    const promoted = scheduler.request('p4');
+    await tick();
+    expect(calls).toEqual(['p1', 'p2', 'p4']);
+    // 对已启动任务重复按 current 请求不重复计数。
+    expect(scheduler.request('p4')).toBe(promoted);
+    expect(scheduler.request('p1')).toBe(jobs[0]);
+
+    releases.get('p1')!('1');
+    releases.get('p2')!('2');
+    releases.get('p4')!('4');
+    await tick();
+    expect(calls).toEqual(['p1', 'p2', 'p4', 'p3']);
+    releases.get('p3')!('3');
+    await expect(Promise.all(jobs)).resolves.toEqual(['1', '2', '3', '4']);
+  });
+
+  it('abortPrefetchesNotIn 立即移除未启动旧预取并中止在途旧预取，不提前释放并发槽', async () => {
+    const started: Array<{source: string; signal: AbortSignal; resolve: (text: string) => void; reject: (err: unknown) => void}> = [];
+    const scheduler = new VideoTranslationScheduler((source, signal) => new Promise((resolve, reject) => {
+      started.push({source, signal, resolve, reject});
+    }));
+
+    const activeKeep = scheduler.request('keep-active', true);
+    const activeDrop = scheduler.request('drop-active', true);
+    const currentJob = scheduler.request('current-job', false);
+    const waitingDrop = scheduler.request('drop-waiting', true);
+    const waitingKeep = scheduler.request('keep-waiting', true);
+    await tick();
+
+    expect(started.map(item => item.source)).toEqual(['keep-active', 'drop-active', 'current-job']);
+    const removed = scheduler.abortPrefetchesNotIn(new Set(['keep-active', 'keep-waiting']));
+    expect(removed).toEqual(['drop-active', 'drop-waiting']);
+    await expect(waitingDrop).rejects.toMatchObject({name: 'AbortError'});
+
+    // 在途旧预取已收到 abort，但尚未结算时不提前腾出并发槽；立即重请求同 key 不复用已中止任务。
+    const dropEntry = started.find(item => item.source === 'drop-active')!;
+    const keepEntry = started.find(item => item.source === 'keep-active')!;
+    const currentEntry = started.find(item => item.source === 'current-job')!;
+    expect(dropEntry.signal.aborted).toBe(true);
+    expect(keepEntry.signal.aborted).toBe(false);
+    expect(currentEntry.signal.aborted).toBe(false);
+
+    const reRequestedDrop = scheduler.request('drop-active', false);
+    expect(reRequestedDrop).not.toBe(activeDrop);
+    await tick();
+    // 三个槽位仍被旧 transport 占满，新请求必须等待旧任务结算后才启动。
+    expect(started).toHaveLength(3);
+
+    // 底层响应 abort 后转为 AbortError 并释放槽位，立即启动新的高优先级同 key 请求。
+    dropEntry.reject(new Error('network cancelled'));
+    await expect(activeDrop).rejects.toMatchObject({name: 'AbortError'});
+    await tick();
+    expect(started).toHaveLength(4);
+    expect(started[3]!.source).toBe('drop-active');
+    expect(started[3]!.signal.aborted).toBe(false);
+    started[3]!.resolve('D-NEW');
+    await expect(reRequestedDrop).resolves.toBe('D-NEW');
+
+    keepEntry.resolve('K');
+    currentEntry.resolve('C');
+    await tick();
+
+    const nextEntry = started.find(item => item.source === 'keep-waiting')!;
+    expect(nextEntry).toBeDefined();
+    nextEntry.resolve('W');
+    await expect(Promise.all([activeKeep, currentJob, waitingKeep])).resolves.toEqual(['K', 'C', 'W']);
+
+    // 在微任务启动前中止已标记 started 的预取，不调用 translate 且以 AbortError 拒绝。
+    const neverCalled = vi.fn(async () => 'never');
+    const preMicrotask = new VideoTranslationScheduler(neverCalled);
+    const p = preMicrotask.request('pre-microtask', true);
+    expect(preMicrotask.abortPrefetchesNotIn(new Set())).toEqual(['pre-microtask']);
+    await expect(p).rejects.toMatchObject({name: 'AbortError'});
+    expect(neverCalled).not.toHaveBeenCalled();
+  });
 });

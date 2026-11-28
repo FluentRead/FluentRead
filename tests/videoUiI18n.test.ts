@@ -22,6 +22,7 @@ import {
   renderVideoSubtitleOrder,
   renderVideoModelPrompt,
   renderVideoSubtitleTiming,
+  renderVideoTranslationStatus,
   setVideoMenuDownloadStatus,
   syncVideoPlayerMenuLayout,
   revealVideoMenuBodyControl,
@@ -376,6 +377,12 @@ describe('video player menu composition', () => {
     vi.advanceTimersByTime(120);
     expect(help.hidden).toBe(true);
     open();
+    leave(toggle);
+    // 在 120ms 缓冲期内键盘焦点回到按钮时，定时器到期仍保持说明可见。
+    active = toggle;
+    vi.advanceTimersByTime(120);
+    expect(help.hidden).toBe(false);
+    active = null;
     leave(help);
     vi.advanceTimersByTime(120);
     expect(help.hidden).toBe(true);
@@ -1437,6 +1444,7 @@ describe('video player menu composition', () => {
 
     expect(button.dataset.progress).toBe('determinate');
     expect(button.style.getPropertyValue('--fluent-read-video-ai-progress')).toBe('88%');
+    expect(button.style.getPropertyValue('--fluent-read-video-ai-progress-scale')).toBe('0.88');
 
     renderVideoAiMenu(menu, state({active: true, fullActive: true, phase: 'ready'}), 'zh-CN');
     expect(button.querySelector('.fluent-read-video-menu-label')?.textContent).toBe('关闭 AI 字幕');
@@ -1475,6 +1483,7 @@ describe('video player menu composition', () => {
     renderVideoAiMenu(menu, state({downloading: true, downloadProgress: {loaded: 41_000_000, total: 100_000_000}, error: '旧错误'}), 'zh-CN');
     expect(button.dataset.progress).toBe('determinate');
     expect(button.style.getPropertyValue('--fluent-read-video-ai-progress')).toBe('41%');
+    expect(button.style.getPropertyValue('--fluent-read-video-ai-progress-scale')).toBe('0.41');
     expect(button.querySelector('[data-state]')?.textContent).toBe('41%');
     expect(button.title).toBe('41% · 41 MB / 100 MB');
     expect(button.disabled).toBe(true);
@@ -1502,5 +1511,183 @@ describe('video player menu composition', () => {
     const xMenu = createVideoPlayerMenu('zh-CN', true);
     xMenu.querySelector('.fluent-read-video-menu-tools')!.remove();
     expect(() => setVideoMenuToolsOpen(xMenu, true)).not.toThrow();
+  });
+
+  it('memoizes desktop layout measurement across identical 1Hz sync ticks and invalidates on visibility or locale changes', () => {
+    const {document} = parseHTML('<!doctype html><body><div id="player"></div></body>');
+    vi.stubGlobal('document', document);
+    const player = document.getElementById('player')!;
+    const menu = createVideoPlayerMenu('zh-CN', false);
+    player.appendChild(menu);
+    menu.hidden = false;
+    Object.defineProperties(player, {clientWidth: {configurable: true, value: 640}, clientHeight: {configurable: true, value: 220}});
+    const measure = vi.fn(() => 240);
+    Object.defineProperty(menu, 'scrollHeight', {configurable: true, get: measure});
+    syncVideoPlayerMenuLayout(menu);
+    expect(menu.dataset.layout).toBe('wide');
+    expect(measure).toHaveBeenCalledOnce();
+    // 相同几何与状态下的周期同步直接命中缓存，不再读写 scrollHeight。
+    syncVideoPlayerMenuLayout(menu);
+    syncVideoPlayerMenuLayout(menu);
+    expect(measure).toHaveBeenCalledOnce();
+    // 展开下载或切换语言时缓存失效并重新测量。
+    handleVideoMenuDisclosure(menu, 'toggle-subtitle-downloads');
+    expect(measure).toHaveBeenCalledTimes(2);
+    refreshVideoUiText(menu, 'en-US');
+    syncVideoPlayerMenuLayout(menu);
+    expect(measure).toHaveBeenCalledTimes(3);
+
+    // 高度相关的辅助提示与状态行变化均使桌面布局签名失效并重新测量。
+    renderVideoSubtitleOrder(menu, 'original-first', false, false);
+    syncVideoPlayerMenuLayout(menu);
+    expect(measure).toHaveBeenCalledTimes(4);
+
+    const nativeHint = menu.querySelector<HTMLElement>('[data-native-fullscreen-hint]')!;
+    nativeHint.hidden = false;
+    syncVideoPlayerMenuLayout(menu);
+    expect(measure).toHaveBeenCalledTimes(5);
+
+    const readingStatus = menu.querySelector<HTMLElement>('[data-reading-status]')!;
+    readingStatus.hidden = false;
+    readingStatus.textContent = 'Reading loading';
+    syncVideoPlayerMenuLayout(menu);
+    expect(measure).toHaveBeenCalledTimes(6);
+    readingStatus.textContent = 'Reading failed with longer detail';
+    syncVideoPlayerMenuLayout(menu);
+    expect(measure).toHaveBeenCalledTimes(7);
+
+    menu.querySelector<HTMLElement>('[data-action="retry-reading-annotation"]')!.hidden = false;
+    syncVideoPlayerMenuLayout(menu);
+    expect(measure).toHaveBeenCalledTimes(8);
+
+    menu.querySelector<HTMLElement>('[data-reading-bilingual]')!.hidden = false;
+    syncVideoPlayerMenuLayout(menu);
+    expect(measure).toHaveBeenCalledTimes(9);
+
+    renderVideoTranslationStatus(menu, null, {status: 'error', message: 'First error'}, 'en-US');
+    expect(measure).toHaveBeenCalledTimes(10);
+    renderVideoTranslationStatus(menu, null, {status: 'error', message: 'Longer multiline error message', canRetry: false}, 'en-US');
+    expect(measure).toHaveBeenCalledTimes(11);
+
+    // AI 紧凑菜单的工具页与模型确认页在状态行、按钮与选项变化时同样重测。
+    const aiMenu = createVideoPlayerMenu('en-US', true);
+    player.appendChild(aiMenu);
+    aiMenu.hidden = false;
+    const aiMeasure = vi.fn(() => 240);
+    Object.defineProperty(aiMenu, 'scrollHeight', {configurable: true, get: aiMeasure});
+    setVideoMenuToolsOpen(aiMenu, true);
+    expect(aiMeasure).toHaveBeenCalledTimes(1);
+    renderVideoAiModelSelection(aiMenu, {model: 'base', available: true, disabled: false}, 'en-US');
+    syncVideoPlayerMenuLayout(aiMenu);
+    expect(aiMeasure).toHaveBeenCalledTimes(2);
+    renderVideoSourceStatus(aiMenu, {enabled: true, source: 'cache', cueCount: 5, checking: false, generating: false, translationFailed: false, canRegenerate: true}, 'en-US');
+    syncVideoPlayerMenuLayout(aiMenu);
+    expect(aiMeasure).toHaveBeenCalledTimes(3);
+    renderVideoModelPrompt(aiMenu, {options: VIDEO_LOCAL_TRANSCRIPTION_MODELS, downloaded: [], recommended: 'base', selected: 'base', purpose: 'setup'}, 'en-US');
+    expect(aiMeasure).toHaveBeenCalledTimes(4);
+    renderVideoModelPrompt(aiMenu, {options: VIDEO_LOCAL_TRANSCRIPTION_MODELS, downloaded: [], recommended: 'base', selected: 'base', purpose: 'selection'}, 'en-US');
+    expect(aiMeasure).toHaveBeenCalledTimes(5);
+    renderVideoModelPrompt(aiMenu, {options: VIDEO_LOCAL_TRANSCRIPTION_MODELS, downloaded: ['base'], recommended: 'base', selected: 'base', purpose: 'selection'}, 'en-US');
+    expect(aiMeasure).toHaveBeenCalledTimes(6);
+  });
+
+  it('surfaces non-AI translation error/retrying status with one-click retry and updates player button attribute without redundant writes', () => {
+    const {document} = parseHTML('<!doctype html><body><div id="player"></div></body>');
+    vi.stubGlobal('document', document);
+    const player = document.getElementById('player')!;
+    const menu = createVideoPlayerMenu('zh-CN', false);
+    const button = document.createElement('button');
+    player.appendChild(menu);
+    Object.defineProperties(player, {clientWidth: {value: 640}, clientHeight: {value: 360}});
+    const row = menu.querySelector<HTMLElement>('[data-translation-status]')!;
+    const hint = menu.querySelector<HTMLElement>('[data-translation-status-hint]')!;
+    const retry = row.querySelector<HTMLButtonElement>('[data-action="retry-subtitle-translation"]')!;
+    expect(row.hidden).toBe(true);
+    expect(button.hasAttribute('data-fluent-read-video-status')).toBe(false);
+
+    renderVideoTranslationStatus(menu, button, {status: 'error'}, 'en-US');
+    expect(row.hidden).toBe(false);
+    expect(row.dataset.error).toBe('true');
+    expect(row.dataset.status).toBe('error');
+    expect(hint.textContent).toBe('Translation failed');
+    expect(retry.hidden).toBe(false);
+    expect(button.getAttribute('data-fluent-read-video-status')).toBe('error');
+
+    const setAttrSpy = vi.spyOn(button, 'setAttribute');
+    renderVideoTranslationStatus(menu, button, {status: 'error'}, 'en-US');
+    expect(setAttrSpy).not.toHaveBeenCalled();
+    setAttrSpy.mockRestore();
+
+    renderVideoTranslationStatus(menu, button, {status: 'retrying', canRetry: false}, 'en-US');
+    expect(row.dataset.error).toBe('false');
+    expect(row.dataset.status).toBe('retrying');
+    expect(hint.textContent).toContain('retrying automatically');
+    expect(retry.hidden).toBe(true);
+    expect(button.getAttribute('data-fluent-read-video-status')).toBe('retrying');
+
+    renderVideoTranslationStatus(menu, button, {status: 'retrying', message: '自定义限流提示'}, 'zh-CN');
+    expect(hint.textContent).toBe('自定义限流提示');
+    expect(retry.hidden).toBe(false);
+
+    renderVideoTranslationStatus(menu, button, {status: 'idle'}, 'zh-CN');
+    expect(row.hidden).toBe(true);
+    expect(hint.textContent).toBe('');
+    expect(button.hasAttribute('data-fluent-read-video-status')).toBe(false);
+    // 再次 idle 与缺失按钮/菜单/AI 菜单均安全无异常。
+    renderVideoTranslationStatus(menu, null, {status: 'error'}, 'en-US');
+    expect(row.hidden).toBe(false);
+    renderVideoTranslationStatus(menu, null, {status: 'idle'});
+    expect(row.hidden).toBe(true);
+    renderVideoTranslationStatus(null, button, {status: 'idle'});
+    renderVideoTranslationStatus(createVideoPlayerMenu('zh-CN', true), button, {status: 'error'});
+    expect(button.getAttribute('data-fluent-read-video-status')).toBe('error');
+  });
+
+  it('removes aria-live from AI toggle, styles export format select via CSS class and navigates select/timing/prompt actions', () => {
+    const {document, HTMLElement} = parseHTML('<!doctype html><body></body>');
+    vi.stubGlobal('document', document);
+    vi.stubGlobal('HTMLElement', HTMLElement);
+    const aiMenu = createVideoPlayerMenu('zh-CN', true);
+    expect(aiMenu.querySelector('[data-action="toggle-ai-subtitle"]')?.hasAttribute('aria-live')).toBe(false);
+    const format = aiMenu.querySelector<HTMLSelectElement>('[data-subtitle-format]')!;
+    expect(format.classList.contains('fluent-read-video-menu-format-select')).toBe(true);
+    expect(format.getAttribute('style')).toBeNull();
+    refreshVideoUiText(aiMenu, 'en-US');
+    expect(format.getAttribute('aria-label')).toBe('Subtitle file format');
+
+    // 键盘导航包含导出格式 select，且支持校时与模型确认按钮组的左右方向键切换。
+    const ytMenu = createVideoPlayerMenu('en-US', false);
+    ytMenu.hidden = false;
+    renderVideoSubtitleTiming(ytMenu, 500, true, 'en-US');
+    handleVideoMenuDisclosure(ytMenu, 'toggle-subtitle-downloads');
+    const select = ytMenu.querySelector<HTMLSelectElement>('[data-subtitle-format]')!;
+    const later = ytMenu.querySelector<HTMLButtonElement>('[data-action="subtitle-later"]')!;
+    const earlier = ytMenu.querySelector<HTMLButtonElement>('[data-action="subtitle-earlier"]')!;
+    const selectFocus = vi.spyOn(select, 'focus');
+    const laterFocus = vi.spyOn(later, 'focus');
+    handleVideoMenuNavigation({key: 'ArrowDown', target: later, currentTarget: ytMenu, isTrusted: true,
+      stopPropagation: vi.fn(), preventDefault: vi.fn()} as unknown as KeyboardEvent);
+    expect(selectFocus).toHaveBeenCalledOnce();
+    // 焦点位于原生 select 时，上下/首尾键保留原生选项切换而不劫持默认行为。
+    for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End']) {
+      const stopPropagation = vi.fn();
+      const preventDefault = vi.fn();
+      handleVideoMenuNavigation({key, target: select, currentTarget: ytMenu, isTrusted: true,
+        stopPropagation, preventDefault} as unknown as KeyboardEvent);
+      expect(stopPropagation).toHaveBeenCalledOnce();
+      expect(preventDefault).not.toHaveBeenCalled();
+    }
+    handleVideoMenuNavigation({key: 'ArrowRight', target: earlier, currentTarget: ytMenu, isTrusted: true,
+      stopPropagation: vi.fn(), preventDefault: vi.fn()} as unknown as KeyboardEvent);
+    expect(laterFocus).toHaveBeenCalledOnce();
+
+    renderVideoModelPrompt(aiMenu, {options: VIDEO_LOCAL_TRANSCRIPTION_MODELS, downloaded: [], recommended: 'base', selected: 'base'}, 'en-US');
+    aiMenu.hidden = false;
+    const cancel = aiMenu.querySelector<HTMLButtonElement>('[data-action="model-prompt-cancel"].fluent-read-video-model-prompt-cancel')!;
+    const confirm = aiMenu.querySelector<HTMLButtonElement>('[data-action="model-prompt-confirm"]')!;
+    const confirmFocus = vi.spyOn(confirm, 'focus');
+    handleVideoMenuNavigation({key: 'ArrowRight', target: cancel, currentTarget: aiMenu, isTrusted: true,
+      stopPropagation: vi.fn(), preventDefault: vi.fn()} as unknown as KeyboardEvent);
+    expect(confirmFocus).toHaveBeenCalledOnce();
   });
 });

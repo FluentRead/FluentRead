@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/VideoLocalModelSettings.vue
  * 文件职责：提供本地视频字幕识别方式、Whisper 模型下载与跨浏览器共享、本机 Qwen 服务地址和字幕缓存管理。
- * 主要内容：紧凑卡片选择模型并显示缓存来源，支持授权共享目录、下载到共享位置、迁移已有文件和清除本机副本；下载来源始终自动处理且不展示供应方信息，失败可重试，旧视图迟到回包不会覆盖新状态。
+ * 主要内容：紧凑卡片选择模型并显示缓存来源，支持授权共享目录、下载到共享位置、迁移已有文件和清除本机副本；下载来源始终自动处理且不展示供应方信息，失败可重试，返回标签页时合并并发的 visibilitychange 与 focus 刷新避免重复 IPC，旧视图迟到回包不会覆盖新状态。
  * 模块边界：沿用设置草稿及显式保存，不在加载/切换时探测本机服务；通过视频 feature 公共配置和后台消息获取浏览器模型状态，不直接执行识别或操作网页播放器；下载进度只读取后台转存的变化事件。
  -->
 <template>
@@ -443,12 +443,19 @@ watch(() => [mounted.value, revision.value], () => {
     if (current() && areaName === 'local' && changes[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]) void refresh();
   };
   // 回到设置时重新核对模型文件与字幕统计；Cache Storage 丢失文件不会触发 storage.onChanged。
-  const refreshVisibleCacheStats = () => {
-    if (current() && !clearingCache.value && document.visibilityState !== 'hidden') {
-      void refresh();
-      void refreshSharedDirectory();
-      void refreshCacheStats();
-    }
+  // 合并同一次切回标签页同时触发的 visibilitychange 与 focus，避免双倍 IPC 轮询。
+  let lastVisibleRefreshAt = -Infinity;
+  let lastVisibleRefreshType = '';
+  const refreshVisibleCacheStats = (event?: Event) => {
+    if (!current() || clearingCache.value || document.visibilityState === 'hidden') return;
+    const now = Date.now();
+    const type = event?.type || '';
+    if (type && lastVisibleRefreshType && type !== lastVisibleRefreshType && now - lastVisibleRefreshAt < 300) return;
+    lastVisibleRefreshAt = now;
+    lastVisibleRefreshType = type;
+    void refresh();
+    void refreshSharedDirectory();
+    void refreshCacheStats();
   };
   browser.storage.onChanged.addListener(handleStorageChange);
   const stopProgress = watchDownloadProgress(modelOptions.map(item => videoModelDownloadId(item.value)), (id, next) => {

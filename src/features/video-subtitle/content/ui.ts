@@ -1,15 +1,15 @@
 /**
  * @file src/features/video-subtitle/content/ui.ts
  *
- * 文件职责：封装视频字幕 content UI 的界面语言转换、可访问名称刷新及桌面/触屏安全视口菜单样式，并以播放器级样式持续隐藏由 FluentRead 接管的 YouTube 原生字幕。
- * 主要内容：提供视频菜单本地化、局部外观变量、显式读音开关与示例说明、紧凑下载折叠入口、独立纯文本读音行及按语言命名；双语顺序用原文与译文双行示意并标记暂未生效的偏好，字幕按偏好交换原译文顺序，读音始终紧跟原文并计入字幕布局，防止缩成不可读小字；菜单仅管理自身交互，不参与字幕的宽度与水平居中计算；保留逐字高亮、校时与就地模型选择控件，仅过滤 YouTube 滚动窗口实际裁切的旧行并完整保留可见片段中的合法重复，按实际画面及同视频可见底控约束字幕几何、换行与大字号完整高度，并封装字幕清理、媒体时钟读取、样式及字幕下载。
+ * 文件职责：封装视频字幕 content UI 的界面语言转换、可访问名称刷新、受守卫的字幕层/外观样式同步及桌面/触屏安全视口菜单样式，并以播放器级样式持续隐藏由 FluentRead 接管的 YouTube 原生字幕。
+ * 主要内容：提供视频菜单本地化、局部外观变量与快照缓存、显式读音开关与示例说明、紧凑下载折叠入口与格式化导出下拉样式、独立纯文本读音行及按语言命名；双语顺序用原文与译文双行示意并标记暂未生效的偏好，字幕按偏好交换原译文顺序并使用 dir="auto" 适配 RTL，读音始终紧跟原文并计入字幕布局，防止缩成不可读小字；菜单仅管理自身交互，不参与字幕的宽度与水平居中计算；保留逐字高亮、校时与就地模型选择控件，支持 Safari 全屏与单次安全区扣减、CSS containment、GPU 合成进度条、高对比强制配色与状态指示；仅过滤 YouTube 滚动窗口实际裁切的旧行并复用每批几何测量，按实际画面及同视频可见底控约束字幕几何、换行与大字号完整高度，并封装字幕清理、媒体时钟读取、样式及字幕下载。
  * 模块边界：只读取界面配置并操作视频 feature 拥有的节点、样式和下载链接，不发起翻译或识别请求；任务生命周期由 runtime 管理。
  * 课程菜单：样式工厂可在课程 Shadow Root 内复用同一份品牌色、图标、分段按钮和正文密度，避免各平台维护不同外观。
  */
 
 import {serializeSubtitleFile, type SubtitleExportFormat} from './subtitleExport';
 import {htmlMediaForPlayer} from './htmlMedia';
-import {getVideoSubtitleAppearanceCssVars, normalizeVideoSubtitleAppearance} from '@/src/core/config/videoSubtitleAppearance';
+import {getVideoSubtitleAppearanceCssVars, normalizeVideoSubtitleAppearance, type VideoSubtitleAppearance} from '@/src/core/config/videoSubtitleAppearance';
 import {config} from '@/src/services/config/store';
 import {type VideoSubtitleDisplayMode} from '@/src/core/config/model';
 import {sanitizeSubtitleFilename, type VideoSubtitleCue} from './youtubeSubtitleData';
@@ -17,12 +17,28 @@ import {getCaptionPlatform} from './platforms';
 import {timedTextTrackKey} from './timedTextTrackCache';
 import {fitVideoSubtitleFontSize} from './subtitleLayout';
 import {getYoutubeSubtitleControlsScope} from './youtubeControlsScope';
-import {getVisibleYoutubeSubtitleControls, positionMobileYoutubeSubtitle, resetSubtitlePanelLayout, finishSubtitlePanelLayout,
-  prepareSubtitlePanelLayout, findOwnedSubtitlePanel, syncSubtitleScrollHostState, setSubtitlePanelScrollable, VIDEO_SUBTITLE_SCROLL_HOST_ID} from './subtitleControlLayout';
+import {
+  getFullscreenElement,
+  getVisibleSubtitleControlEntries,
+  positionMobileYoutubeSubtitle,
+  resetSubtitlePanelLayout,
+  finishSubtitlePanelLayout,
+  prepareSubtitlePanelLayout,
+  findOwnedSubtitlePanel,
+  syncSubtitleScrollHostState,
+  setSubtitlePanelScrollable,
+  setStyleIfChanged,
+  removeStyleIfPresent,
+  setAttrIfChanged,
+  setDataIfChanged,
+  VIDEO_SUBTITLE_SCROLL_HOST_ID,
+  type VisibleSubtitleControl,
+} from './subtitleControlLayout';
 import {createVideoKaraokeController, setVideoCaptionText, type VideoKaraokeController, VIDEO_KARAOKE_FILL_PROPERTY, VIDEO_KARAOKE_STATE_ATTRIBUTE, VIDEO_KARAOKE_TEXT_ATTRIBUTE, VIDEO_KARAOKE_UNIT_CLASS} from './karaoke';
 import {VIDEO_NATIVE_CAPTION_HIDDEN_CLASS} from './youtubeNativeCaptionVisibility';
 
 export {VIDEO_NATIVE_CAPTION_HIDDEN_CLASS} from './youtubeNativeCaptionVisibility';
+export {setStyleIfChanged, removeStyleIfPresent, setAttrIfChanged, setDataIfChanged} from './subtitleControlLayout';
 
 import {
     normalizeUiLanguage,
@@ -120,6 +136,7 @@ export const VIDEO_FALLBACK_CONTROLS_CLASS = 'fluent-read-video-controls';
 export const VIDEO_PLAYER_HOST_CLASS = 'fluent-read-video-player-host';
 export const VIDEO_PLAYER_ACTIVE_ATTRIBUTE = 'data-fluent-read-video-active';
 export const VIDEO_PLAYER_PROGRESS_ATTRIBUTE = 'data-fluent-read-video-progress';
+export const VIDEO_PLAYER_STATUS_ATTRIBUTE = 'data-fluent-read-video-status';
 export const VIDEO_X_SETTINGS_CONTROL_SELECTOR = [
   '[data-testid="videoPlayer"] button[aria-label*="Settings" i]',
   '[data-testid="videoPlayer"] button[aria-label*="设置"]',
@@ -141,7 +158,10 @@ export const VIDEO_NORMALIZED_CAPTION_CLASS = 'fluent-read-video-normalized-capt
 export const VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS = 'fluent-read-video-normalized-caption-active';
 export const VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS = 'fluent-read-video-subtitle-panel-active';
 
-export const YOUTUBE_HOST_PATTERN = /(^|\.)youtube\.com$/i;
+export const YOUTUBE_HOST_PATTERN = /(^|\.)youtube(?:-nocookie)?\.com$/i;
+const YOUTUBE_MAIN_HOST_PATTERN = /(^|\.)youtube\.com$/i;
+const YOUTUBE_EMBED_PATH_PATTERN = /^\/embed\/[\w-]{11}\/?$/u;
+const YOUTUBE_LIVE_PATH_PATTERN = /^\/live\/[\w-]{11}\/?$/u;
 export const X_SUBTITLE_RESOURCE_MESSAGE = 'fluent-read-x-video-subtitle-resource';
 
 export const VIDEO_CAPTION_STABILITY_MS = 80;
@@ -215,9 +235,11 @@ export function renderVideoReadingAnnotation(player: HTMLElement, text: string, 
   if (line.parentElement !== panel) panel.appendChild(line);
   const changed = line.textContent !== text;
   if (changed) line.textContent = text;
-  line.lang = language ? `${language}-Latn` : '';
-  line.dataset.readingLabelKey = `video.readingAnnotation.${language || 'label'}`;
-  line.setAttribute('aria-label', videoUi(line.dataset.readingLabelKey));
+  const nextLang = language ? `${language}-Latn` : '';
+  if (line.lang !== nextLang) line.lang = nextLang;
+  const labelKey = `video.readingAnnotation.${language || 'label'}`;
+  setDataIfChanged(line, 'readingLabelKey', labelKey);
+  setAttrIfChanged(line, 'aria-label', videoUi(labelKey));
   return changed;
 }
 
@@ -250,14 +272,17 @@ export function downloadSubtitleSrt(srt: string, languageCode: string, cues?: re
 }
 
 export function isYouTubeVideoPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {
-  return YOUTUBE_HOST_PATTERN.test(locationLike.hostname)
-    && (locationLike.pathname === '/watch' || locationLike.pathname.startsWith('/shorts/') || isYouTubeEmbedPage(locationLike));
+  return isYouTubeEmbedPage(locationLike)
+    || (YOUTUBE_MAIN_HOST_PATTERN.test(locationLike.hostname)
+      && (locationLike.pathname === '/watch'
+        || locationLike.pathname.startsWith('/shorts/')
+        || YOUTUBE_LIVE_PATH_PATTERN.test(locationLike.pathname)));
 }
 
-/** YouTube iframe 播放器使用独立 /embed/{videoId} 文档；只接受真实视频 ID。 */
+/** YouTube iframe 播放器使用独立 /embed/{videoId} 文档（含 youtube-nocookie.com）；只接受真实视频 ID。 */
 export function isYouTubeEmbedPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {
   return YOUTUBE_HOST_PATTERN.test(locationLike.hostname)
-    && /^\/embed\/[\w-]{11}\/?$/u.test(locationLike.pathname);
+    && YOUTUBE_EMBED_PATH_PATTERN.test(locationLike.pathname);
 }
 
 export function isXVideoPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {
@@ -278,28 +303,44 @@ export function isSupportedVideoPage(locationLike: Pick<Location, 'hostname' | '
   return isYouTubeVideoPage(locationLike) || isXVideoPage(locationLike) || getCaptionPlatform(locationLike) !== null || isHtmlMediaPage(locationLike);
 }
 
-/** 读取当前播放器可见的原生字幕，不读取插件自己的译文节点。 */
-export function getVisibleCaptionSegments(container: Element): HTMLElement[] {
+/** 读取当前播放器可见的原生字幕，同时保留滚动窗口阶段已读取的片段矩形避免重复测量。 */
+function getVisibleCaptionSegmentsWithRects(container: Element): Array<{element: HTMLElement; rect?: DOMRect}> {
   const nativeSegments = Array.from(container.querySelectorAll<HTMLElement>(VIDEO_CAPTION_SEGMENT_SELECTOR));
   const candidates = nativeSegments.length > 0
     ? nativeSegments
     : Array.from(container.querySelectorAll<HTMLElement>(VIDEO_CAPTION_FALLBACK_SEGMENT_SELECTOR));
 
   const candidateSet = new Set(candidates);
-  return candidates.filter((segment) => {
+  const rollupRects = new Map<Element, DOMRect>();
+  const visible: Array<{element: HTMLElement; rect?: DOMRect}> = [];
+  for (const segment of candidates) {
     // 查询不包含容器自身；只排除本次候选中的祖先，保留外层片段的完整文本。
+    let nested = false;
     for (let ancestor = segment.parentElement; ancestor && ancestor !== container; ancestor = ancestor.parentElement) {
-      if (candidateSet.has(ancestor)) return false;
+      if (candidateSet.has(ancestor)) {nested = true; break;}
     }
+    if (nested) continue;
     const rollup = segment.closest?.('.ytp-caption-window-rollup');
-    if (!rollup) return true;
-    const windowRect = rollup.getBoundingClientRect();
+    if (!rollup) {visible.push({element: segment}); continue;}
+    let windowRect = rollupRects.get(rollup);
+    if (!windowRect) {
+      windowRect = rollup.getBoundingClientRect();
+      rollupRects.set(rollup, windowRect);
+    }
     const segmentRect = segment.getBoundingClientRect();
     // visibility:hidden 是插件隐藏原生行的方式，不能据此过滤；只排除
     // YouTube 滚动窗口实际裁掉的旧行。未布局时保留原文，避免误判为空。
-    return !windowRect.height || !segmentRect.height
-      || (segmentRect.bottom > windowRect.top && segmentRect.top < windowRect.bottom);
-  });
+    if (!windowRect.height || !segmentRect.height
+      || (segmentRect.bottom > windowRect.top && segmentRect.top < windowRect.bottom)) {
+      visible.push({element: segment, rect: segmentRect});
+    }
+  }
+  return visible;
+}
+
+/** 读取当前播放器可见的原生字幕，不读取插件自己的译文节点。 */
+export function getVisibleCaptionSegments(container: Element): HTMLElement[] {
+  return getVisibleCaptionSegmentsWithRects(container).map(({element}) => element);
 }
 
 export function readVisibleCaptionText(container: Element | null): string {
@@ -464,7 +505,7 @@ export function getOrCreateTranslationOverlay(player: HTMLElement): HTMLElement 
   overlay.className = 'fluent-read-video-subtitle notranslate';
   overlay.setAttribute('data-fluent-read-ui', 'video-subtitle');
   overlay.setAttribute('translate', 'no');
-  overlay.setAttribute('aria-live', 'polite');
+  overlay.setAttribute('dir', 'auto');
   overlay.setAttribute('aria-label', videoUi('video.translationOverlayAriaLabel'));
   panel.appendChild(overlay);
   return overlay;
@@ -483,7 +524,7 @@ export function getOrCreateNormalizedCaptionOverlay(player: HTMLElement): HTMLEl
   overlay.className = 'fluent-read-video-subtitle-original notranslate';
   overlay.setAttribute('data-fluent-read-ui', 'video-subtitle');
   overlay.setAttribute('translate', 'no');
-  overlay.setAttribute('aria-live', 'polite');
+  overlay.setAttribute('dir', 'auto');
   overlay.setAttribute('aria-label', videoUi('video.originalOverlayAriaLabel'));
   panel.appendChild(overlay);
   return overlay;
@@ -491,9 +532,12 @@ export function getOrCreateNormalizedCaptionOverlay(player: HTMLElement): HTMLEl
 
 /** 字幕运行时只保留状态所有权，自有 DOM 的清空交由 UI 层完成。 */
 export function clearRenderedVideoTranslation(owner: Document): void {
-  owner.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => resetSubtitlePanelLayout(panel));
+  owner.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => {
+    subtitleLayoutSnapshots.delete(panel);
+    resetSubtitlePanelLayout(panel);
+  });
   owner.querySelectorAll(`#${VIDEO_TRANSLATION_OVERLAY_ID}`).forEach(node => writeVideoCaptionText(node, ''));
-  owner.querySelectorAll(`#${VIDEO_READING_OVERLAY_ID}`).forEach(node => {node.textContent='';});
+  owner.querySelectorAll(`#${VIDEO_READING_OVERLAY_ID}`).forEach(node => {if (node.textContent !== '') node.textContent = '';});
 }
 
 export function deactivateNormalizedVideoCaption(owner: Document): void {
@@ -510,7 +554,11 @@ export function readVideoPlaybackTimeMs(player: HTMLElement | null, fallback: HT
 }
 
 export function removeTranslationOverlay(): void {
-  document.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => resetSubtitlePanelLayout(panel, true));
+  document.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => {
+    subtitleLayoutSnapshots.delete(panel);
+    appliedAppearanceKeys.delete(panel);
+    resetSubtitlePanelLayout(panel, true);
+  });
   document.querySelectorAll(`#${VIDEO_TRANSLATION_LAYER_ID}`).forEach((node) => node.remove());
   document.querySelectorAll(`#${VIDEO_TRANSLATION_OVERLAY_ID}`).forEach((node) => node.remove());
   document.querySelectorAll(`#${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID}`).forEach((node) => node.remove());
@@ -542,12 +590,27 @@ export function getXSubtitleBottomInset(player: HTMLElement, viewport?: Pick<DOM
 }
 
 /** 将实际视频画面（扣除 contain 留白）换算到字幕层坐标；YouTube 移动页面和 X 共用，不改写宿主视频布局。 */
-export function getVideoSubtitleViewport(player: HTMLElement, layer: HTMLElement) {
+export function getVideoSubtitleViewport(player: HTMLElement, layer: HTMLElement, measuredPlayerRect?: DOMRect) {
   const media = htmlMediaForPlayer(player);
-  if (media) return {left: 0, top: 0, width: player.clientWidth || player.getBoundingClientRect().width, height: player.clientHeight || player.getBoundingClientRect().height, right: 0, bottom: 0, controlsInset: media.tagName === 'AUDIO' ? 8 : 56};
+  if (media) {
+    const fallbackRect = (!player.clientWidth || !player.clientHeight)
+      ? (measuredPlayerRect || player.getBoundingClientRect())
+      : undefined;
+    return {
+      left: 0,
+      top: 0,
+      width: player.clientWidth || fallbackRect!.width,
+      height: player.clientHeight || fallbackRect!.height,
+      right: 0,
+      bottom: 0,
+      controlsInset: media.tagName === 'AUDIO' ? 8 : 56,
+      visibleControls: undefined as readonly VisibleSubtitleControl[] | undefined,
+      layerRect: undefined as DOMRect | undefined,
+    };
+  }
   const video = player.querySelector('video');
   const layerRect = layer.getBoundingClientRect();
-  const playerRect = player.getBoundingClientRect();
+  const playerRect = measuredPlayerRect || player.getBoundingClientRect();
   const videoRect = video?.getBoundingClientRect();
   if (!video || !videoRect || videoRect.width <= 0 || videoRect.height <= 0 || layerRect.width <= 0 || layerRect.height <= 0) return null;
   const style = getComputedStyle(video);
@@ -582,6 +645,9 @@ export function getVideoSubtitleViewport(player: HTMLElement, layer: HTMLElement
   const bottom = Math.min(y + height, videoRect.bottom, playerRect.bottom, layerRect.bottom);
   const scaleX = layer.clientWidth > 0 ? layerRect.width / layer.clientWidth : 1;
   const scaleY = layer.clientHeight > 0 ? layerRect.height / layer.clientHeight : 1;
+  const paintedViewport = {left, right, top, bottom, height: Math.max(0, bottom - top)};
+  const xPage = isXVideoPage();
+  const visibleControls = xPage ? undefined : getVisibleSubtitleControlEntries(player);
   return {
     left: (left - layerRect.left) / scaleX,
     top: (top - layerRect.top) / scaleY,
@@ -589,19 +655,60 @@ export function getVideoSubtitleViewport(player: HTMLElement, layer: HTMLElement
     height: Math.max(0, bottom - top) / scaleY,
     right: (layerRect.right - right) / scaleX,
     bottom: (layerRect.bottom - bottom) / scaleY,
-    controlsInset: (isXVideoPage() ? getXSubtitleBottomInset(player, {left, right, top, bottom, height: Math.max(0, bottom - top)})
-      : getYoutubeSubtitleBottomInset(player, {left, right, top, bottom, height: Math.max(0, bottom - top)})) / scaleY,
+    controlsInset: (xPage ? getXSubtitleBottomInset(player, paintedViewport)
+      : getYoutubeSubtitleBottomInset(visibleControls!, paintedViewport)) / scaleY,
+    visibleControls,
+    layerRect,
   };
 }
 
 /** 只避开真实可见的底部控件；移动视频高度不足时不能保留桌面的 52px 起步底距。 */
-function getYoutubeSubtitleBottomInset(player: HTMLElement, viewport: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'height'>): number {
+function getYoutubeSubtitleBottomInset(
+  visibleControls: readonly VisibleSubtitleControl[],
+  viewport: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'height'>,
+): number {
   let inset = 12;
-  for (const rect of getVisibleYoutubeSubtitleControls(player)) {
+  for (const {rect} of visibleControls) {
     if (rect.right <= viewport.left || rect.left >= viewport.right || rect.top < viewport.top + viewport.height * .65 || rect.top >= viewport.bottom) continue;
     inset = Math.max(inset, viewport.bottom - rect.top + 8);
   }
   return inset;
+}
+
+interface CachedSubtitleAppearance {
+  key: string;
+  appearance: VideoSubtitleAppearance;
+  cssVars: Record<string, string>;
+}
+
+let cachedAppearanceState: CachedSubtitleAppearance | null = null;
+const appliedAppearanceKeys = new WeakMap<HTMLElement, string>();
+
+interface SubtitleLayoutSnapshot {
+  key: string;
+  player: HTMLElement;
+  layer: HTMLElement;
+  scope: HTMLElement;
+  parent: HTMLElement | null;
+  fullscreenElement: Element | null;
+  panelRectFn: HTMLElement['getBoundingClientRect'];
+  panelScrollHeightGetter: (() => unknown) | undefined;
+}
+
+const subtitleLayoutSnapshots = new WeakMap<HTMLElement, SubtitleLayoutSnapshot>();
+
+function getAppearanceRawKey(value: unknown): string {
+  if (!value || typeof value !== 'object') return '';
+  const s = value as Record<string, unknown>;
+  return `${s.skin}|${s.textColor}|${s.translationColor}|${s.position}|${s.bilingualOrder}|${s.bottomOffset}|${s.autoBottom}|${s.backgroundVisible}|${s.backgroundOpacity}|${s.outlineStyle}|${s.outlineColor}|${s.outlineWidth}|${s.lineSpacing}|${s.maxWidth}|${s.fontScale}|${s.karaoke}|${s.readingAnnotation}`;
+}
+
+function getCachedSubtitleAppearance(raw: unknown): CachedSubtitleAppearance {
+  const key = getAppearanceRawKey(raw);
+  if (cachedAppearanceState && cachedAppearanceState.key === key) return cachedAppearanceState;
+  const appearance = normalizeVideoSubtitleAppearance(raw);
+  cachedAppearanceState = {key, appearance, cssVars: getVideoSubtitleAppearanceCssVars(appearance)};
+  return cachedAppearanceState;
 }
 
 export function syncTranslationOverlayPosition(container: HTMLElement | null): void {
@@ -614,118 +721,229 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
   if (!overlay || !panel || !player || !layer) return;
 
   const playerRect = player.getBoundingClientRect();
-  const viewport = getVideoSubtitleViewport(player, layer);
+  const viewport = getVideoSubtitleViewport(player, layer, playerRect);
+  const xPage = isXVideoPage();
+  const htmlMediaPage = isHtmlMediaPage();
+  const youtubePage = isYouTubeVideoPage();
+  const scope = getYoutubeSubtitleControlsScope(player);
+  const fullscreenElement = getFullscreenElement(document);
+  const fullscreen = Boolean(fullscreenElement?.contains(player));
+  const menu = document.getElementById(VIDEO_TRANSLATION_MENU_ID);
+  const menuOpen = menu instanceof HTMLElement && !menu.hidden;
+  const learningOpen = Boolean(scope.querySelector('#fluent-read-video-learning-panel.fluent-read-video-ui[data-fluent-read-ui="video-subtitle"]'));
+  const cachedAppearance = getCachedSubtitleAppearance(config.videoSubtitleAppearance);
+  const {appearance} = cachedAppearance;
+  const overlayText = overlay.textContent || '';
+  const normalizedText = normalizedOverlay?.textContent || '';
+  const readingText = panel.querySelector(`#${VIDEO_READING_OVERLAY_ID}`)?.textContent || '';
+  const active = Boolean(overlayText.trim() || normalizedText.trim());
+  const playerWidth = viewport ? viewport.width : playerRect.width || 960;
+  const playerHeight = viewport ? viewport.height : playerRect.height || 540;
+  const compactPlayer = playerWidth <= 600 || window.matchMedia?.('(pointer: coarse)').matches === true;
+  const displayMode = normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode);
+  const normalizedCaptionActive = layer.classList.contains(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS);
+  const needsNativeAvoidance = active && !xPage && !compactPlayer && appearance.position === 'bottom' && displayMode === 'bilingual' && !normalizedCaptionActive;
+  let nativeCaptionTop: number | null = null;
+  if (needsNativeAvoidance) {
+    // 仅在译文需要避开桌面原生行时测量，忽略切换期间空的原生容器，并复用滚动窗口阶段的片段矩形。
+    const visibleCaptionSegments = getVisibleCaptionSegmentsWithRects(container)
+      .map(({element, rect}) => rect || element.getBoundingClientRect())
+      .filter(rect => rect.width > 0 && rect.height > 0);
+    if (visibleCaptionSegments.length > 0) {
+      nativeCaptionTop = Math.min(...visibleCaptionSegments.map((rect) => rect.top - playerRect.top));
+    }
+  }
+  const visibleControlsKey = viewport?.visibleControls
+    ? viewport.visibleControls.map(({element, rect}) => `${rect.left},${rect.top},${rect.width},${rect.height},${player.contains(element) ? 1 : 0}`).join(';')
+    : '';
+  const scrollHostRect = panel.parentElement?.id === VIDEO_SUBTITLE_SCROLL_HOST_ID
+    ? panel.parentElement.getBoundingClientRect()
+    : null;
+  const snapshotKey = [
+    playerRect.left, playerRect.top, playerRect.width, playerRect.height,
+    layer.clientWidth, layer.clientHeight,
+    viewport ? `${viewport.left},${viewport.top},${viewport.width},${viewport.height},${viewport.right},${viewport.bottom},${viewport.controlsInset}` : 'none',
+    visibleControlsKey,
+    scrollHostRect ? `${scrollHostRect.left},${scrollHostRect.top},${scrollHostRect.width},${scrollHostRect.height}` : '',
+    cachedAppearance.key,
+    overlayText, normalizedText, readingText,
+    active ? 1 : 0, menuOpen ? 1 : 0, learningOpen ? 1 : 0,
+    fullscreen ? 1 : 0, compactPlayer ? 1 : 0,
+    xPage ? 1 : 0, htmlMediaPage ? 1 : 0, youtubePage ? 1 : 0,
+    config.on !== false ? 1 : 0, config.videoTranslationEnabled !== false ? 1 : 0, config.videoSubtitleVisible !== false ? 1 : 0,
+    displayMode, normalizedCaptionActive ? 1 : 0,
+    nativeCaptionTop === null ? '' : nativeCaptionTop,
+    panel.classList.contains(VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS) ? 1 : 0,
+    panel.dataset.fluentReadSubtitleLayout || '',
+  ].join('\u001f');
+  const panelRectFn = panel.getBoundingClientRect;
+  const panelScrollHeightGetter = Object.getOwnPropertyDescriptor(panel, 'scrollHeight')?.get;
+  const previousSnapshot = subtitleLayoutSnapshots.get(panel);
+  if (
+    previousSnapshot
+    && previousSnapshot.key === snapshotKey
+    && previousSnapshot.player === player
+    && previousSnapshot.layer === layer
+    && previousSnapshot.scope === scope
+    && previousSnapshot.parent === panel.parentElement
+    && previousSnapshot.fullscreenElement === fullscreenElement
+    && previousSnapshot.panelRectFn === panelRectFn
+    && previousSnapshot.panelScrollHeightGetter === panelScrollHeightGetter
+  ) {
+    return;
+  }
+
+  const saveSnapshot = () => {
+    const finalHostRect = panel.parentElement?.id === VIDEO_SUBTITLE_SCROLL_HOST_ID
+      ? panel.parentElement.getBoundingClientRect()
+      : null;
+    const finalKey = [
+      playerRect.left, playerRect.top, playerRect.width, playerRect.height,
+      layer.clientWidth, layer.clientHeight,
+      viewport ? `${viewport.left},${viewport.top},${viewport.width},${viewport.height},${viewport.right},${viewport.bottom},${viewport.controlsInset}` : 'none',
+      visibleControlsKey,
+      finalHostRect ? `${finalHostRect.left},${finalHostRect.top},${finalHostRect.width},${finalHostRect.height}` : '',
+      cachedAppearance.key,
+      overlayText, normalizedText, readingText,
+      active ? 1 : 0, menuOpen ? 1 : 0, learningOpen ? 1 : 0,
+      fullscreen ? 1 : 0, compactPlayer ? 1 : 0,
+      xPage ? 1 : 0, htmlMediaPage ? 1 : 0, youtubePage ? 1 : 0,
+      config.on !== false ? 1 : 0, config.videoTranslationEnabled !== false ? 1 : 0, config.videoSubtitleVisible !== false ? 1 : 0,
+      displayMode, normalizedCaptionActive ? 1 : 0,
+      nativeCaptionTop === null ? '' : nativeCaptionTop,
+      panel.classList.contains(VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS) ? 1 : 0,
+      panel.dataset.fluentReadSubtitleLayout || '',
+    ].join('\u001f');
+    subtitleLayoutSnapshots.set(panel, {
+      key: finalKey,
+      player,
+      layer,
+      scope,
+      parent: panel.parentElement,
+      fullscreenElement,
+      panelRectFn,
+      panelScrollHeightGetter,
+    });
+  };
+
   if (viewport) {
-    layer.style.setProperty('clip-path', `inset(${viewport.top}px ${viewport.right}px ${viewport.bottom}px ${viewport.left}px)`, 'important');
+    setStyleIfChanged(layer, 'clip-path', `inset(${viewport.top}px ${viewport.right}px ${viewport.bottom}px ${viewport.left}px)`, 'important');
   } else {
-    if (isXVideoPage()) layer.style.setProperty('clip-path', 'inset(50%)', 'important');
-    else layer.style.removeProperty('clip-path');
+    if (xPage) setStyleIfChanged(layer, 'clip-path', 'inset(50%)', 'important');
+    else removeStyleIfPresent(layer, 'clip-path');
   }
   // 测量阶段不解除同句滚动交互；临时宿主与原 layer 始终使用相同坐标与显示状态。
   prepareSubtitlePanelLayout(panel, layer, player);
 
-  const playerWidth = viewport ? viewport.width : playerRect.width || 960;
-  const menu = document.getElementById(VIDEO_TRANSLATION_MENU_ID);
-  const menuOpen = menu instanceof HTMLElement && !menu.hidden;
-  const learningOpen = Boolean(getYoutubeSubtitleControlsScope(player).querySelector('#fluent-read-video-learning-panel.fluent-read-video-ui[data-fluent-read-ui="video-subtitle"]'));
-  const appearance = normalizeVideoSubtitleAppearance(config.videoSubtitleAppearance);
-  Object.entries(getVideoSubtitleAppearanceCssVars(appearance)).forEach(([name, value]) => panel.style.setProperty(name, value));
-  panel.dataset.fluentReadSubtitleSkin = appearance.skin;
+  if (appliedAppearanceKeys.get(panel) !== cachedAppearance.key) {
+    for (const [name, value] of Object.entries(cachedAppearance.cssVars)) {
+      setStyleIfChanged(panel, name, value);
+    }
+    setDataIfChanged(panel, 'fluentReadSubtitleSkin', appearance.skin);
+    appliedAppearanceKeys.set(panel, cachedAppearance.key);
+  }
   const availableWidth = Math.max(0, Math.min(playerWidth - 24, playerWidth * appearance.maxWidth / 100));
   const baseFontSize = Math.min(Math.max(playerWidth * .022, 16), 30);
   const fontScale = appearance.fontScale / 100;
-  panel.style.setProperty('--fluent-read-video-subtitle-font-size', `${baseFontSize * fontScale}px`);
+  setStyleIfChanged(panel, '--fluent-read-video-subtitle-font-size', `${baseFontSize * fontScale}px`);
 
   // 双语面板固定在播放器底部安全区上方；字幕内容变化只会改变面板向上的高度，
   // 不会把整组字幕重新锚定到不同的 top。
-  const active = Boolean(overlay.textContent?.trim() || normalizedOverlay?.textContent?.trim());
   panel.classList.toggle(VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS, active);
-  panel.style.width = 'max-content';
-  const fullscreen = Boolean(document.fullscreenElement?.contains(player));
-  panel.style.setProperty('max-width', fullscreen
+  setStyleIfChanged(panel, 'width', 'max-content');
+  setStyleIfChanged(panel, 'max-width', fullscreen
     ? `min(${availableWidth}px, calc(100% - max(12px, env(safe-area-inset-left, 0px)) - max(12px, env(safe-area-inset-right, 0px))))`
     : `${availableWidth}px`, 'important');
-  const playerHeight = viewport ? viewport.height : playerRect.height || 540;
-  const compactPlayer = playerWidth <= 600 || window.matchMedia?.('(pointer: coarse)').matches === true;
-  const autoBottom = (isXVideoPage() || isHtmlMediaPage() || compactPlayer) && appearance.position === 'bottom' && appearance.autoBottom;
+  const autoBottom = (xPage || htmlMediaPage || compactPlayer) && appearance.position === 'bottom' && appearance.autoBottom;
   const requestedOffset = autoBottom ? viewport?.controlsInset ?? getXSubtitleBottomInset(player) : appearance.bottomOffset === 10 ? Math.min(Math.max(playerHeight * .1, 52), 96) : Math.max(12, playerHeight * appearance.bottomOffset / 100);
   const offset = Math.min(requestedOffset, Math.max(0, playerHeight - 24));
   const bottomInset = `${(viewport?.bottom || 0) + offset}px`;
-  panel.style.setProperty('--fluent-read-video-subtitle-bottom', fullscreen ? `max(${bottomInset}, calc(env(safe-area-inset-bottom, 0px) + 12px))` : bottomInset);
+  setStyleIfChanged(panel, '--fluent-read-video-subtitle-bottom', fullscreen ? `max(${bottomInset}, calc(env(safe-area-inset-bottom, 0px) + 12px))` : bottomInset);
   const topInset = `${(viewport?.top || 0) + offset}px`;
-  panel.style.setProperty('top', appearance.position === 'top' ? fullscreen ? `max(${topInset}, calc(env(safe-area-inset-top, 0px) + 12px))` : topInset : appearance.position === 'center' ? viewport ? `${viewport.top + playerHeight / 2}px` : '50%' : 'auto', 'important');
-  panel.style.setProperty('bottom', appearance.position === 'bottom' ? 'var(--fluent-read-video-subtitle-bottom)' : 'auto', 'important');
+  setStyleIfChanged(panel, 'top', appearance.position === 'top' ? fullscreen ? `max(${topInset}, calc(env(safe-area-inset-top, 0px) + 12px))` : topInset : appearance.position === 'center' ? viewport ? `${viewport.top + playerHeight / 2}px` : '50%' : 'auto', 'important');
+  setStyleIfChanged(panel, 'bottom', appearance.position === 'bottom' ? 'var(--fluent-read-video-subtitle-bottom)' : 'auto', 'important');
   const maximumHeight = Math.max(0, playerHeight - (appearance.position === 'center' ? 24 : offset + 12));
-  panel.style.setProperty('max-height', fullscreen ? `min(${maximumHeight}px, calc(100% - max(env(safe-area-inset-top, 0px), env(safe-area-inset-bottom, 0px)) - max(env(safe-area-inset-top, 0px), env(safe-area-inset-bottom, 0px)) - 24px))` : `${maximumHeight}px`, 'important');
-  panel.style.transform = appearance.position === 'center' ? 'translateY(-50%)' : 'none';
-  if (!active) {resetSubtitlePanelLayout(panel); return;}
+  setStyleIfChanged(panel, 'max-height', fullscreen ? `min(${maximumHeight}px, calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px))` : `${maximumHeight}px`, 'important');
+  setStyleIfChanged(panel, 'transform', appearance.position === 'center' ? 'translateY(-50%)' : 'none');
+  if (!active) {resetSubtitlePanelLayout(panel); saveSnapshot(); return;}
 
   // 背景只包住双语文本，并始终以视频画面中心为锚点；菜单浮层不挤占字幕空间。
   // 长字幕仍受播放器宽度限制，超出时在面板内部换行，而不是把半透明背景铺满整行。
   const centerPanel = () => {
-    panel.style.left = `${(viewport?.left || 0) + 12}px`;
-    const layerRect = layer.getBoundingClientRect();
-    const measuredWidth = panel.getBoundingClientRect().width / (layer.clientWidth > 0 && layerRect.width > 0 ? layerRect.width / layer.clientWidth : 1);
+    setStyleIfChanged(panel, 'left', `${(viewport?.left || 0) + 12}px`);
+    const layerRect = viewport?.layerRect || layer.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const measuredWidth = panelRect.width / (layer.clientWidth > 0 && layerRect.width > 0 ? layerRect.width / layer.clientWidth : 1);
     const width = Math.min(Math.max(measuredWidth, 0), availableWidth);
     const usableRight = playerWidth - 12;
     const left = Math.max(12, Math.min((usableRight - width + 12) / 2, usableRight - width));
     const panelLeft = `${(viewport?.left || 0) + left}px`;
-    panel.style.left = fullscreen
+    setStyleIfChanged(panel, 'left', fullscreen
       ? `max(${(viewport?.left || 0) + 12}px, env(safe-area-inset-left, 0px), min(${panelLeft}, calc(100% - max(12px, env(safe-area-inset-right, 0px)) - ${width}px)))`
-      : panelLeft;
+      : panelLeft);
+    return panelRect;
   };
   // 菜单或学习面板开启时撤回兄弟宿主；字幕回原层且不接收指针，避免遮挡当前交互面板。
-  if (!menuOpen && !learningOpen && isYouTubeVideoPage() && compactPlayer && autoBottom && config.on !== false
+  if (!menuOpen && !learningOpen && youtubePage && compactPlayer && autoBottom && config.on !== false
     && config.videoTranslationEnabled !== false && config.videoSubtitleVisible !== false && viewport) {
     centerPanel();
-    if (positionMobileYoutubeSubtitle(panel, player, layer, viewport, availableWidth)) return;
+    if (positionMobileYoutubeSubtitle(panel, player, layer, viewport, availableWidth, viewport.visibleControls, viewport.layerRect)) {
+      saveSnapshot();
+      return;
+    }
   }
   finishSubtitlePanelLayout(panel, menuOpen || learningOpen);
-  fitVideoSubtitleFontSize(baseFontSize * fontScale,
-    fullscreen ? Math.min(maximumHeight, panel.clientHeight || maximumHeight) : maximumHeight,
-    size => panel.style.setProperty('--fluent-read-video-subtitle-font-size', `${size}px`),
-    () => panel.scrollHeight, panel.querySelector(`#${VIDEO_READING_OVERLAY_ID}`)?.textContent ? 16 : 8);
-  if (!menuOpen && panel.querySelector(`#${VIDEO_READING_OVERLAY_ID}`)?.textContent && panel.scrollHeight > maximumHeight + 1) setSubtitlePanelScrollable(panel, true);
-  centerPanel();
+  const fitMaxHeight = fullscreen ? Math.min(maximumHeight, panel.clientHeight || maximumHeight) : maximumHeight;
+  const hasReading = Boolean(readingText);
+  const requestedFontSize = baseFontSize * fontScale;
+  const fontFitKey = `${overlayText}\0${normalizedText}\0${readingText}\0${availableWidth}|${fitMaxHeight}|${requestedFontSize}|${hasReading ? 1 : 0}|${displayMode}|${normalizedCaptionActive ? 1 : 0}|${appearance.karaoke ? 1 : 0}|${appearance.skin}|${appearance.lineSpacing}|${appearance.outlineStyle}|${appearance.outlineWidth}`;
+  fitVideoSubtitleFontSize(
+    requestedFontSize,
+    fitMaxHeight,
+    size => setStyleIfChanged(panel, '--fluent-read-video-subtitle-font-size', `${size}px`),
+    () => panel.scrollHeight,
+    hasReading ? 16 : 8,
+    {target: panel, key: fontFitKey},
+  );
+  if (!menuOpen && hasReading && panel.scrollHeight > maximumHeight + 1) setSubtitlePanelScrollable(panel, true);
+  const centeredPanelRect = centerPanel();
 
   // 双语模式下原生字幕仍然可见时，译文面板要放在原生字幕上方，不能用固定底部
   // 位置压住 YouTube 的分段字幕。逐词合并已经显示整段原文时，原文在同一个面板内，
   // 则继续使用固定底部锚点，避免随着原生 DOM 的词宽变化上下跳动。
-  const displayMode = normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode);
-  const normalizedCaptionActive = layer?.classList.contains(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS) === true;
-  if (!isXVideoPage() && !compactPlayer && appearance.position === 'bottom' && displayMode === 'bilingual' && !normalizedCaptionActive) {
-    // 仅在译文需要避开桌面原生行时测量，忽略切换期间空的原生容器。
-    const visibleCaptionSegments = getVisibleCaptionSegments(container)
-      .map(element => element.getBoundingClientRect())
-      .filter(rect => rect.width > 0 && rect.height > 0);
-    if (visibleCaptionSegments.length === 0) return;
-    const playerHeight = playerRect.height || 540;
-    const nativeCaptionTop = Math.min(...visibleCaptionSegments.map((rect) => rect.top - playerRect.top));
-    const panelHeight = panel.getBoundingClientRect().height;
-    const fallbackBottom = Math.min(Math.max(playerHeight * .1, 52), 96);
-    const maxBottom = Math.max(12, playerHeight - panelHeight - 12);
-    const requestedBottom = playerHeight - nativeCaptionTop + 8;
+  if (needsNativeAvoidance && nativeCaptionTop !== null) {
+    const resolvedPlayerHeight = playerRect.height || 540;
+    const panelHeight = centeredPanelRect.height;
+    const fallbackBottom = Math.min(Math.max(resolvedPlayerHeight * .1, 52), 96);
+    const maxBottom = Math.max(12, resolvedPlayerHeight - panelHeight - 12);
+    const requestedBottom = resolvedPlayerHeight - nativeCaptionTop + 8;
     const bottom = Math.max(fallbackBottom, Math.min(requestedBottom, maxBottom));
-    panel.style.setProperty('--fluent-read-video-subtitle-bottom', fullscreen ? `max(${bottom}px, calc(env(safe-area-inset-bottom, 0px) + 12px))` : `${bottom}px`);
+    setStyleIfChanged(panel, '--fluent-read-video-subtitle-bottom', fullscreen ? `max(${bottom}px, calc(env(safe-area-inset-bottom, 0px) + 12px))` : `${bottom}px`);
   }
+  saveSnapshot();
 }
 
 export function applyVideoDisplayState(container: HTMLElement): void {
   if (config.on === false || config.videoTranslationEnabled === false || config.videoSubtitleVisible === false) {
-    document.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => resetSubtitlePanelLayout(panel));
+    document.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => {
+      subtitleLayoutSnapshots.delete(panel);
+      resetSubtitlePanelLayout(panel);
+    });
   }
   const mode = normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode);
   const enabled = config.on !== false && config.videoTranslationEnabled !== false;
   container.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, enabled && mode === 'translation-only');
   container.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, enabled && mode === 'original-only');
   container.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, enabled && config.videoSubtitleVisible === false);
-  container.setAttribute('data-fluent-read-video-display-mode', mode);
+  setAttrIfChanged(container, 'data-fluent-read-video-display-mode', mode);
   const layer = document.getElementById(VIDEO_TRANSLATION_LAYER_ID);
   layer?.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, enabled && mode === 'translation-only');
   layer?.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, enabled && mode === 'original-only');
   layer?.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, enabled && config.videoSubtitleVisible === false);
-  layer?.setAttribute('data-fluent-read-video-display-mode', mode);
-  if (layer) syncSubtitleScrollHostState(layer);
+  if (layer) {
+    setAttrIfChanged(layer, 'data-fluent-read-video-display-mode', mode);
+    syncSubtitleScrollHostState(layer);
+  }
 }
 
 /** 同一份播放器样式可供顶层页面与课程字幕 Shadow Root 使用。 */
@@ -755,6 +973,9 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       pointer-events: none !important;
       visibility: visible !important;
     }
+    #${VIDEO_TRANSLATION_LAYER_ID} {
+      contain: layout style !important;
+    }
     #${VIDEO_SUBTITLE_SCROLL_HOST_ID} {
       inset: auto !important;
       left: 0 !important;
@@ -770,6 +991,7 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       position: absolute !important;
       z-index: 2 !important;
       box-sizing: border-box !important;
+      contain: layout style !important;
       max-width: calc(100% - 24px) !important;
       min-width: 0 !important;
       bottom: var(--fluent-read-video-subtitle-bottom, clamp(52px, 10%, 96px)) !important;
@@ -820,6 +1042,8 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       paint-order: stroke fill !important;
       text-shadow: var(--fluent-read-video-subtitle-text-shadow, 0 1px 2px rgba(0, 0, 0, .72)) !important;
       white-space: pre-wrap !important;
+      text-wrap: balance !important;
+      -webkit-font-smoothing: antialiased !important;
       overflow-wrap: anywhere !important;
       min-width: 0 !important;
       pointer-events: none !important;
@@ -847,6 +1071,8 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       paint-order: stroke fill !important;
       text-shadow: var(--fluent-read-video-subtitle-text-shadow, 0 1px 2px rgba(0, 0, 0, .9)) !important;
       white-space: pre-wrap !important;
+      text-wrap: balance !important;
+      -webkit-font-smoothing: antialiased !important;
       overflow-wrap: anywhere !important;
       min-width: 0 !important;
       pointer-events: none !important;
@@ -992,6 +1218,12 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
     #${VIDEO_TRANSLATION_BUTTON_ID}:not(.${VIDEO_TRANSLATION_ACTIVE_CLASS}) .fluent-read-video-subtitle-button-icon {
       background: rgba(236, 72, 153, .16) !important;
       box-shadow: 0 0 0 1px rgba(236, 72, 153, .62), 0 2px 8px rgba(236, 72, 153, .2) !important;
+    }
+    #${VIDEO_TRANSLATION_BUTTON_ID}[${VIDEO_PLAYER_STATUS_ATTRIBUTE}="error"] .fluent-read-video-subtitle-button-icon {
+      box-shadow: 0 0 0 1.5px #f59e0b, 0 2px 8px rgba(245, 158, 11, .42) !important;
+    }
+    #${VIDEO_TRANSLATION_BUTTON_ID}[${VIDEO_PLAYER_STATUS_ATTRIBUTE}="retrying"] .fluent-read-video-subtitle-button-icon {
+      box-shadow: 0 0 0 1.5px rgba(251, 191, 36, .85), 0 2px 8px rgba(251, 191, 36, .3) !important;
     }
     .${VIDEO_FALLBACK_CONTROLS_CLASS} {
       position: absolute !important;
@@ -1174,8 +1406,8 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       font-weight: 650 !important;
     }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-settings {
-      min-width: 0 !important;
-      min-height: 22px !important;
+      min-width: 24px !important;
+      min-height: 24px !important;
       padding: 0 5px !important;
       color: var(--fr-video-menu-muted) !important;
       font-size: 10px !important;
@@ -1198,7 +1430,8 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
     }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-title .fluent-read-video-menu-settings { margin-left: auto !important; }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-close:hover { background: var(--fr-video-menu-control-hover) !important; }
-    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-source {
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-source,
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-translation-status {
       display: grid !important;
       grid-template-columns: minmax(0, 1fr) auto !important;
       align-items: center !important;
@@ -1216,7 +1449,9 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       color: var(--fr-video-menu-muted) !important;
       font: inherit !important;
     }
-    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-source[data-error="true"] .fluent-read-video-menu-source-hint { color: #e4bd8d !important; }
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-source[data-error="true"] .fluent-read-video-menu-source-hint,
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-translation-status[data-error="true"] .fluent-read-video-menu-source-hint,
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-translation-status[data-status="retrying"] .fluent-read-video-menu-source-hint { color: #e4bd8d !important; }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-source-actions { display: flex !important; flex-wrap: wrap !important; gap: 4px 12px !important; }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-secondary {
       min-height: 30px !important;
@@ -1362,7 +1597,7 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       background: var(--fr-video-menu-control) !important;
     }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-step:hover:not(:disabled) { background: var(--fr-video-menu-control-hover) !important; }
-    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-step-reset { width: 22px !important; margin-right: 2px !important; background: transparent !important; color: var(--fr-video-menu-muted) !important; }
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-step-reset { width: 24px !important; min-height: 24px !important; margin-right: 2px !important; background: transparent !important; color: var(--fr-video-menu-muted) !important; }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-step-reset:hover { color: var(--fr-video-menu-text) !important; }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-step-reset:disabled { display: none !important; }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-timing-value {
@@ -1441,15 +1676,18 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       left: 0 !important;
       bottom: 0 !important;
       display: none !important;
-      width: var(--fluent-read-video-ai-progress, 0%) !important;
+      width: 100% !important;
       height: 2px !important;
       background: var(--fr-video-menu-brand) !important;
-      transition: width .3s ease !important;
+      transform-origin: left center !important;
+      transform: scaleX(var(--fluent-read-video-ai-progress-scale, 0)) !important;
+      transition: transform .3s ease !important;
     }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-ai[data-progress="determinate"] .fluent-read-video-menu-progress { display: block !important; }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-ai[data-progress="indeterminate"] .fluent-read-video-menu-progress {
       display: block !important;
       width: 36% !important;
+      transform: none !important;
       animation: fluent-read-video-menu-indeterminate 1.2s ease-in-out infinite !important;
     }
     @keyframes fluent-read-video-menu-indeterminate { from { transform: translateX(-100%); } to { transform: translateX(280%); } }
@@ -1458,6 +1696,30 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       display: grid !important;
       grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
       gap: 4px !important;
+    }
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-format-select {
+      grid-column: 1 / -1 !important;
+      width: 100% !important;
+      min-height: 28px !important;
+      padding: 4px 8px !important;
+      border: 1px solid var(--fr-video-menu-border) !important;
+      border-radius: 6px !important;
+      color: var(--fr-video-menu-text) !important;
+      background: var(--fr-video-menu-control) !important;
+      font: inherit !important;
+      font-size: 11px !important;
+      cursor: pointer !important;
+    }
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-format-select:hover {
+      background: var(--fr-video-menu-control-hover) !important;
+    }
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-format-select:focus-visible {
+      outline: 2px solid var(--fr-video-menu-brand-text) !important;
+      outline-offset: -2px !important;
+    }
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-format-select option {
+      background: var(--fr-video-menu-surface) !important;
+      color: var(--fr-video-menu-text) !important;
     }
     /* 单列菜单只有约 72px 一格，图标改放在文字上方，长语言也不会被截断。 */
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-download {
@@ -1718,7 +1980,8 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       #${VIDEO_TRANSLATION_BUTTON_ID} { min-width: 44px !important; min-height: 44px !important; }
       #${VIDEO_TRANSLATION_MENU_ID} { scroll-padding-top: calc(44px + 6px) !important; }
       /* 双 ID 优先于 compact/wide 的次级按钮规则，关闭、模式、返回与操作均保留完整触控面积。 */
-      #${VIDEO_TRANSLATION_MENU_ID}#${VIDEO_TRANSLATION_MENU_ID} button {
+      #${VIDEO_TRANSLATION_MENU_ID}#${VIDEO_TRANSLATION_MENU_ID} button,
+      #${VIDEO_TRANSLATION_MENU_ID}#${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-format-select {
         min-width: 44px !important;
         min-height: 44px !important;
         touch-action: manipulation !important;
@@ -1795,7 +2058,8 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
       height: 44px !important;
     }
     /* 窄屏与带鼠标的手机测试视口也保留完整触控面积，长标签自然换行。 */
-    #${VIDEO_TRANSLATION_MENU_ID}#${VIDEO_TRANSLATION_MENU_ID}[data-presentation="viewport"] button {
+    #${VIDEO_TRANSLATION_MENU_ID}#${VIDEO_TRANSLATION_MENU_ID}[data-presentation="viewport"] button,
+    #${VIDEO_TRANSLATION_MENU_ID}#${VIDEO_TRANSLATION_MENU_ID}[data-presentation="viewport"] .fluent-read-video-menu-format-select {
       min-width: 44px !important;
       min-height: 44px !important;
       flex-shrink: 0 !important;
@@ -1920,6 +2184,20 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
     @media (prefers-reduced-motion: reduce) {
       #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-download[aria-busy="true"]::before,
       #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-ai .fluent-read-video-menu-progress { animation: none !important; transition: none !important; }
+    }
+    @media (forced-colors: active) {
+      #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-mode[aria-checked="true"],
+      #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-model-option[aria-checked="true"],
+      #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-reading-toggle[aria-checked="true"],
+      #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-download-toggle[aria-expanded="true"] {
+        border: 2px solid Highlight !important;
+      }
+      #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-model-option-radio {
+        border: 1.5px solid CanvasText !important;
+      }
+      #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-model-option[aria-checked="true"] .fluent-read-video-model-option-radio {
+        border: 4px solid Highlight !important;
+      }
     }
     #ytp-caption-window-container.${VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS} .ytp-caption-segment,
     #ytp-caption-window-container.${VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS} .captions-text,

@@ -157,6 +157,7 @@ describe('HLS audio', () => {
     const controller = new AbortController();
     const pending = readBoundedMediaResponse(new Response(new ReadableStream({
       pull() { return new Promise<void>(() => undefined); },
+      cancel() { return Promise.reject(new Error('late reader cancel rejection')); },
     })), 10, controller.signal);
     await Promise.resolve();
     controller.abort();
@@ -250,5 +251,69 @@ describe('HLS audio', () => {
     const pending = readXHlsAudio(base, '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nchild.m3u8', controller.signal, fetchResource);
     await expect(pending).resolves.toBeNull();
     expect(releaseLock).toHaveBeenCalled();
+  });
+
+  it('retries transient 5xx, 429, network and per-segment timeouts while refunding partial bytes and failing immediately on 4xx', async () => {
+    vi.useFakeTimers();
+    const manifest = '#EXTM3U\n#EXT-X-MAP:URI="init.mp4"\n#EXTINF:1,\nflaky.m4s\n#EXTINF:1,\nsteady.m4s\n#EXT-X-ENDLIST';
+    let flakyAttempts = 0;
+    const flakyFetcher = vi.fn((url: string, options: {signal: AbortSignal}) => {
+      if (url.endsWith('init.mp4')) return Promise.resolve(response(audioInit));
+      if (url.endsWith('steady.m4s')) return Promise.resolve(response(textBytes('S')));
+      flakyAttempts += 1;
+      if (flakyAttempts === 1) return Promise.resolve(new Response('busy', {status: 503}));
+      if (flakyAttempts === 2) {
+        return new Promise<Response>((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(new DOMException('segment timeout', 'AbortError')), {once: true});
+        });
+      }
+      return Promise.resolve(response(textBytes('F')));
+    });
+    try {
+      const reading = readXHlsAudio(base, manifest, new AbortController().signal, flakyFetcher);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await expect(reading).resolves.toMatchObject({bytes: joinBytes(audioInit, textBytes('FS')), durationMs: 2000});
+      expect(flakyAttempts).toBe(3);
+
+      // 403 on a segment must fail immediately without wasting retries.
+      const forbiddenFetcher = vi.fn(async (url: string) => url.endsWith('init.mp4')
+        ? response(audioInit)
+        : new Response('denied', {status: 403}));
+      await expect(readXHlsAudio(base, manifest, new AbortController().signal, forbiddenFetcher)).rejects.toThrow('无效');
+      expect(forbiddenFetcher.mock.calls.filter(([url]) => url.endsWith('flaky.m4s'))).toHaveLength(1);
+
+      // Aborting during retry backoff stops immediately without issuing another fetch or leaving dangling timers.
+      const singleSegmentManifest = '#EXTM3U\n#EXT-X-MAP:URI="init.mp4"\n#EXTINF:1,\nflaky.m4s\n#EXT-X-ENDLIST';
+      const abortController = new AbortController();
+      let retryCalls = 0;
+      const retryingFetcher = vi.fn(async (url: string) => {
+        if (url.endsWith('init.mp4')) return response(audioInit);
+        retryCalls += 1;
+        return new Response('rate limited', {status: 429});
+      });
+      const aborted = readXHlsAudio(base, singleSegmentManifest, abortController.signal, retryingFetcher);
+      for (let i = 0; i < 30 && retryCalls === 0; i += 1) await Promise.resolve();
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+      expect(retryCalls).toBe(1);
+      abortController.abort();
+      await expect(aborted).resolves.toBeNull();
+      expect(retryCalls).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
+
+      // Aborting synchronously during attempt cleanup before backoff skips timer scheduling and stops cleanly.
+      const syncAbortController = new AbortController();
+      let syncCalls = 0;
+      const syncAbortFetcher = vi.fn(async (url: string, options: {signal: AbortSignal}) => {
+        if (url.endsWith('init.mp4')) return response(audioInit);
+        syncCalls += 1;
+        options.signal.addEventListener('abort', () => syncAbortController.abort(), {once: true});
+        return new Response('rate limited', {status: 429});
+      });
+      await expect(readXHlsAudio(base, singleSegmentManifest, syncAbortController.signal, syncAbortFetcher)).resolves.toBeNull();
+      expect(syncCalls).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

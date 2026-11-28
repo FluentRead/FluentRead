@@ -207,6 +207,22 @@ describe('video subtitle background ownership', () => {
         await firstRejected;
         await expect(f.cancel(1, 2, 'another-tab')).resolves.toEqual({success: true});
     });
+    it.each([
+        'Could not establish connection. Receiving end does not exist.',
+        'Could not establish connection.',
+        'The message port closed before a response was received.',
+        'Receiving end does not exist.',
+    ])('ignores stale offscreen missing-receiver failure (%s) during generation handoff', async reason => {
+        const f = waitingForPreviousCancellation('fluentReadTranscribeLocalVideoAudio');
+        const first = f.start(1);
+        const firstRejected = expect(first).rejects.toThrow('generation 已取消');
+        const second = f.start(2);
+        f.previousCancel.reject(reason === 'Receiving end does not exist.' ? reason as unknown as Error : new Error(reason));
+        await expect(second).resolves.toMatchObject({success: true, text: 'current owner response'});
+        f.previousResponse.resolve({success: true, text: 'obsolete first response', model: 'tiny'});
+        await firstRejected;
+        await expect(f.cancel(2)).resolves.toEqual({success: true});
+    });
     it.each(['official', 'mirror', 'auto', 'https://untrusted.invalid', undefined])('validates cache-download source preference %s before forwarding', async preference => {
         const {handlers, offscreen} = setup();
         await find(handlers, 'fluentReadPrepareLocalVideoModel').handle({model: 'small', preference}, context(1));

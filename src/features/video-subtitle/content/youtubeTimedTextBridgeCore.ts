@@ -59,6 +59,8 @@ export interface YoutubeTimedTextBridgeEnvironment {
     readonly resourcePolicy?: {
         matches(url: string, href: string): boolean;
         payload(url: string, text: unknown, href: string): TimedTextPayload | null;
+        /** 判定两个页面地址是否仍属于同一视频/文档上下文，避免播放期参数漂移丢弃响应。 */
+        isSamePage?: (left: string, right: string) => boolean;
         /** 仅站点适配器可选择在消费方晚于网络响应时回放最近资源。 */
         replayLatest?: boolean;
         /** X 的 HLS loader 常用 arraybuffer/blob，按站点显式允许后才转成有界文本。 */
@@ -100,10 +102,39 @@ export function getYoutubeRequestUrl(input: unknown): string {
     return typeof record.url === 'string' ? record.url : '';
 }
 
+function getYoutubePageVideoId(url: URL): string {
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+    const host = url.hostname.toLowerCase();
+    const isNoCookie = host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com');
+    const isYoutube = host === 'youtube.com' || host.endsWith('.youtube.com');
+    if (isNoCookie) return url.pathname.match(/^\/embed\/([\w-]{11})\/?$/u)?.[1] || '';
+    if (!isYoutube) return '';
+    if (url.pathname === '/watch') return url.searchParams.get('v') || '';
+    if (url.pathname.startsWith('/shorts/')) return url.pathname.match(/^\/shorts\/([^/]+)\/?$/u)?.[1] || '';
+    if (url.pathname.startsWith('/embed/')) return url.pathname.match(/^\/embed\/([\w-]{11})\/?$/u)?.[1] || '';
+    if (url.pathname.startsWith('/live/')) return url.pathname.match(/^\/live\/([\w-]{11})\/?$/u)?.[1] || '';
+    return '';
+}
+
+function defaultIsSamePage(left: string, right: string): boolean {
+    if (left === right) return true;
+    try {
+        const leftUrl = new URL(left);
+        const rightUrl = new URL(right);
+        if (leftUrl.origin !== rightUrl.origin) return false;
+        const leftId = getYoutubePageVideoId(leftUrl);
+        return Boolean(leftId && leftId === getYoutubePageVideoId(rightUrl));
+    } catch {
+        return false;
+    }
+}
+
 export function isYoutubeTimedTextUrl(value: string, baseHref: string): boolean {
     try {
         const url = new URL(value, baseHref);
-        return (url.hostname === 'youtube.com' || url.hostname.endsWith('.youtube.com'))
+        const host = url.hostname.toLowerCase();
+        return (host === 'youtube.com' || host.endsWith('.youtube.com')
+            || host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com'))
             && url.pathname.includes('/api/timedtext');
     } catch {
         return false;
@@ -164,6 +195,7 @@ export function installYoutubeTimedTextBridgeCore(
     let active = true;
     const matches = environment.resourcePolicy?.matches ?? isYoutubeTimedTextUrl;
     const payloadFor = environment.resourcePolicy?.payload ?? createYoutubeTimedTextPayload;
+    const isSamePage = environment.resourcePolicy?.isSamePage ?? defaultIsSamePage;
     const replayCache = new Map<string, {payload: TimedTextPayload; pageHref: string}>();
     let replayResponseChars = 0;
     const replayEnabled = environment.resourcePolicy?.replayLatest === true;
@@ -237,7 +269,7 @@ export function installYoutubeTimedTextBridgeCore(
         if (!replayEnabled) return;
         const currentHref = environment.getHref();
         for (const {payload, pageHref} of replayCache.values()) {
-            if (pageHref !== currentHref) continue;
+            if (!isSamePage(pageHref, currentHref)) continue;
             try {
                 environment.postMessage(payload, environment.getOrigin());
             } catch {
@@ -247,7 +279,7 @@ export function installYoutubeTimedTextBridgeCore(
     };
     const publish = (url: string, responseText: unknown, href = environment.getHref()) => {
         if (!active) return;
-        if (href !== environment.getHref()) return;
+        if (!isSamePage(href, environment.getHref())) return;
         const payload = payloadFor(url, responseText, href);
         if (!payload) return;
         rememberReplayPayload(payload, href);
@@ -262,7 +294,7 @@ export function installYoutubeTimedTextBridgeCore(
         const requestUrl = getYoutubeRequestUrl(input);
         const requestHref = environment.getHref();
         const response = await Reflect.apply(originalFetch, this, [input, init]);
-        if (active && requestHref === environment.getHref() && matches(requestUrl, requestHref)) {
+        if (active && isSamePage(requestHref, environment.getHref()) && matches(requestUrl, requestHref)) {
             try {
                 void readResponseText(response.clone())
                     .then((responseText) => publish(requestUrl, responseText, requestHref))

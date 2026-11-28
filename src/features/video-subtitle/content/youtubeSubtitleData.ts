@@ -524,6 +524,7 @@ export function getYoutubeVideoId(locationLike: Pick<Location, 'hostname' | 'pat
   try {
     const url = new URL(locationLike.pathname + locationLike.search, `https://${locationLike.hostname}`);
     if (url.pathname.startsWith('/embed/')) return url.pathname.match(/^\/embed\/([\w-]{11})\/?$/u)?.[1] || '';
+    if (url.pathname.startsWith('/live/')) return url.pathname.match(/^\/live\/([\w-]{11})\/?$/u)?.[1] || '';
     return url.searchParams.get('v') || url.pathname.split('/').filter(Boolean).pop() || '';
   } catch {
     return '';

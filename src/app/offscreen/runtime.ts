@@ -1,7 +1,7 @@
 /**
  * @file src/app/offscreen/runtime.ts
  * 文件职责：作为 Chrome Offscreen 与 Firefox/Safari MV2 后台 iframe 共用 DOM 页面的组合根，创建独占 TTS 播放器并安装一次 runtime 消息监听，把浏览器资源适配给各离屏用例。
- * 主要内容：装配按需创建、空闲释放的字幕读音 Worker；智能高亮消息携带所选模型，模型下载与状态互相独立、推理共用单 Worker 预算；将 base64 音频解码为 Uint8Array，注入 Audio、Blob URL 创建/释放和带 frame/page 路由的状态回传，向播放控制入口注入扩展 ID 校验，组合 Chrome Translation、OCR、图片/区域翻译与语言包下载依赖，把朗读模型、字幕模型和语言包的下载进度发布给后台，注册 message listener。
+ * 主要内容：装配按需创建、空闲释放的字幕读音 Worker；智能高亮消息携带所选模型，模型下载与状态互相独立、推理共用单 Worker 预算；将 base64 音频解码为 Uint8Array，注入 Audio、Blob URL 创建/释放和带 frame/page 路由的状态回传，向播放控制入口注入扩展 ID 校验，组合 Chrome Translation、OCR、图片/区域翻译与语言包下载依赖，把朗读模型、字幕模型和语言包的下载进度发布给后台，注册 message listener 并在 pagehide 时统一释放包括本地视频转写 Worker 在内的离屏资源。
  * 模块边界：本文件只负责 Web API 资源与用例装配，不解析业务消息、不实现 OCR/翻译，也不创建 Offscreen document；两种浏览器容器的文档生命周期均由 platform/offscreen client 和 WXT 入口管理。
  */
 import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
@@ -32,7 +32,7 @@ import {normalizeVideoLocalTranscriptionModel} from '@/src/features/video-subtit
 import {createSelectionTtsPlayer} from './ttsPlayback';
 import {disposeChromeTranslationModels, translateWithChromeApi, type ChromeTranslationEnvironment} from './translation';
 import {moveVideoAiModelToSharedDirectory} from '@/src/features/video-subtitle/offscreen/modelCache';
-import {removeLocalVideoTranscriptionModel, cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
+import * as localVideoTranscription from '@/src/features/video-subtitle/offscreen/transcription';
 import {
     disposeLocalTtsWorker,
     getLocalTtsModelStatus,
@@ -124,19 +124,19 @@ export function startOffscreenApp(): void {
         mangaModelStatus:async () => ({...await mangaOcrModelStatus(), inference:mangaInferenceClient.getDiagnostics()}),
         removeMangaModels,
         videoAi: {
-            transcribe: (request) => transcribeLocalVideoAudio(request),
+            transcribe: (request) => localVideoTranscription.transcribeLocalVideoAudio(request),
             // 预热只加载已缓存的模型；只有预下载才有网络进度可发布。
             prepare: (request) => request.keepWarm === true
-                ? prepareLocalVideoTranscriptionModel(request.model, {keepWarm: true, streamId: request.streamId})
+                ? localVideoTranscription.prepareLocalVideoTranscriptionModel(request.model, {keepWarm: true, streamId: request.streamId})
                 : downloads.track(
                     videoModelDownloadId(normalizeVideoLocalTranscriptionModel(request.model)),
-                    onProgress => prepareLocalVideoTranscriptionModel(request.model, {keepWarm: false, onProgress, preference: request.preference}),
+                    onProgress => localVideoTranscription.prepareLocalVideoTranscriptionModel(request.model, {keepWarm: false, onProgress, preference: request.preference}),
                 ),
-            cancel: cancelLocalVideoTranscription,
-            removeModel: request => removeLocalVideoTranscriptionModel(request.model),
+            cancel: localVideoTranscription.cancelLocalVideoTranscription,
+            removeModel: request => localVideoTranscription.removeLocalVideoTranscriptionModel(request.model),
             shareModel: request => downloads.track(
                 videoModelDownloadId(normalizeVideoLocalTranscriptionModel(request.model)),
-                onProgress => moveVideoAiModelToSharedDirectory(request.model, onProgress, removeLocalVideoTranscriptionModel),
+                onProgress => moveVideoAiModelToSharedDirectory(request.model, onProgress, localVideoTranscription.removeLocalVideoTranscriptionModel),
             ),
         },
         localTranslation: {
@@ -175,6 +175,9 @@ export function startOffscreenApp(): void {
         disposeImageOcrWorker();
         disposeLocalTranslationWorker();
         disposeLocalTtsWorker();
+        if ('disposeLocalVideoTranscriber' in localVideoTranscription) {
+            localVideoTranscription.disposeLocalVideoTranscriber();
+        }
         disposeMangaModels();
         informationHighlight.dispose();
     }, {once: true});

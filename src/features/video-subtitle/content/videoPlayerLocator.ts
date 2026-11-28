@@ -1,9 +1,11 @@
 /**
  * @file src/features/video-subtitle/content/videoPlayerLocator.ts
- * 文件职责：在 X/YouTube 及普通 HTML 音视频 DOM 中选择当前媒体，并维护稳定的视频身份。
- * 主要内容：按全屏、用户悬浮/聚焦、当前帖子和可见性排序候选；视频结构与可见性变化立即重扫，忽略播放器字幕文字更新，繁忙信息流的外部 DOM 更新合并为低频重扫。
+ * 文件职责：在 X/YouTube 及普通 HTML 音视频 DOM（含开放 Shadow DOM）中选择当前媒体，并维护稳定的视频身份。
+ * 主要内容：按跨浏览器全屏、用户悬浮/聚焦、当前帖子和可见性排序候选；视频结构与可见性变化立即重扫，忽略播放器字幕文字更新，繁忙信息流的外部 DOM 更新合并为低频重扫。
  * 模块边界：只读取播放器 DOM 与页面事件，不创建 FluentRead 节点、不处理字幕或配置；绑定和生命周期由上层负责。
  */
+import {getFullscreenElement, onFullscreenChange} from '@/src/platform/dom/fullscreen';
+import {containsDeep, hasSelectorDeep, querySelectorAllDeep} from '@/src/shared/dom/shadowQuery';
 
 export interface VideoPlayerTarget {
   readonly video: HTMLMediaElement;
@@ -119,14 +121,19 @@ function hasCurrentXVideoLink(video: HTMLMediaElement, view: Window): boolean {
   return Boolean(status && findXVideoScope(video, view, status));
 }
 
+function queryMediaElements(root: ParentNode, selector: string): HTMLMediaElement[] {
+  const light = Array.from(root.querySelectorAll<HTMLMediaElement>(selector));
+  return light.length ? light : querySelectorAllDeep<HTMLMediaElement>(root, selector);
+}
+
 export function getVideoPlayerForVideo(video: HTMLMediaElement, view: Window = window): HTMLElement {
-  const fullscreen = view.document.fullscreenElement;
+  const fullscreen = getFullscreenElement(view.document);
   const youtubePlayer = video.closest<HTMLElement>('#movie_player, .html5-video-player');
   // YouTube 可以将 html 设为全屏，再用 fixed 撑满实际播放器；html 此时可能
   // 高度为 0。只有播放器在全屏子树之外时才需要改用更内层的全屏容器。
-  if (youtubePlayer && (!fullscreen || fullscreen.contains(youtubePlayer))) return youtubePlayer;
-  if (fullscreen && fullscreen !== video && fullscreen.contains(video)
-    && fullscreen.querySelectorAll('video, audio').length === 1) {
+  if (youtubePlayer && (!fullscreen || containsDeep(fullscreen, youtubePlayer))) return youtubePlayer;
+  if (fullscreen && fullscreen !== video && containsDeep(fullscreen, video)
+    && queryMediaElements(fullscreen, 'video, audio').length === 1) {
     return fullscreen as HTMLElement;
   }
 
@@ -151,8 +158,8 @@ function videoKey(video: HTMLMediaElement): string {
 }
 
 function isFullscreenVideo(video: HTMLMediaElement, document: Document): boolean {
-  const fullscreen = document.fullscreenElement;
-  return Boolean(fullscreen && (fullscreen === video || fullscreen.contains(video)))
+  const fullscreen = getFullscreenElement(document);
+  return Boolean(fullscreen && containsDeep(fullscreen, video))
     || Boolean((video as HTMLMediaElement & { webkitDisplayingFullscreen?: boolean }).webkitDisplayingFullscreen);
 }
 
@@ -173,7 +180,7 @@ function interactionVideo(
   if (direct && ['VIDEO', 'AUDIO'].includes(direct.tagName)) return direct as HTMLMediaElement;
   if (selected?.player.contains(target)) return selected.video;
 
-  const fullscreen = document.fullscreenElement;
+  const fullscreen = getFullscreenElement(document);
   if (fullscreen && fullscreen.contains(target)) {
     const videos = fullscreen.querySelectorAll('video, audio');
     if (videos.length === 1) return videos[0] as HTMLMediaElement;
@@ -339,7 +346,7 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
   const containsVideo = (node: Node): boolean => {
     if (node.nodeType !== 1 && node.nodeType !== 11) return false;
     const element = node as Element;
-    return ['video', 'audio'].includes(element.tagName?.toLowerCase()) || Boolean(element.querySelector?.('video, audio'));
+    return ['video', 'audio'].includes(element.tagName?.toLowerCase()) || hasSelectorDeep(node as ParentNode, 'video, audio');
   };
   const isVideoContent = (node: Node): boolean => isElement(node)
     && (['video', 'audio'].includes(node.tagName.toLowerCase())
@@ -385,7 +392,7 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
   document.addEventListener('mouseover', onPointer, true);
   document.addEventListener('focusin', onFocus, true);
   document.addEventListener('focusout', onFocusOut, true);
-  document.addEventListener('fullscreenchange', onFullscreen, true);
+  const stopFullscreen = onFullscreenChange(document, onFullscreen, true);
   document.addEventListener('webkitbeginfullscreen', onFullscreen, true);
   document.addEventListener('webkitendfullscreen', onFullscreen, true);
   view.addEventListener('resize', onFullscreen, true);
@@ -416,7 +423,7 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
       document.removeEventListener('mouseover', onPointer, true);
       document.removeEventListener('focusin', onFocus, true);
       document.removeEventListener('focusout', onFocusOut, true);
-      document.removeEventListener('fullscreenchange', onFullscreen, true);
+      stopFullscreen();
       document.removeEventListener('webkitbeginfullscreen', onFullscreen, true);
       document.removeEventListener('webkitendfullscreen', onFullscreen, true);
       view.removeEventListener('resize', onFullscreen, true);
@@ -428,6 +435,25 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
   };
 }
 
+function collectVisibleMedia(document: Document, selector: string, view: Window): HTMLMediaElement[] {
+  const light = Array.from(document.querySelectorAll<HTMLMediaElement>(selector))
+    .filter((video) => isVisibleVideo(video, view));
+  if (light.length === 0) {
+    return querySelectorAllDeep<HTMLMediaElement>(document, selector)
+      .filter((video) => isVisibleVideo(video, view));
+  }
+  const fullscreen = getFullscreenElement(document);
+  if (fullscreen && !light.some((video) => containsDeep(fullscreen, video))) {
+    const extra = fullscreen.matches(selector)
+      ? [fullscreen as HTMLMediaElement]
+      : querySelectorAllDeep<HTMLMediaElement>(fullscreen, selector);
+    for (const video of extra) {
+      if (isVisibleVideo(video, view)) light.push(video);
+    }
+  }
+  return light;
+}
+
 export function selectVideoPlayerTarget(
   document: Document,
   options: {window?: Window; isXPage?: boolean; selected?: VideoPlayerTarget | null;
@@ -435,8 +461,8 @@ export function selectVideoPlayerTarget(
 ): VideoPlayerTarget | null {
   const view = options.window || window;
   const isXPage = options.isXPage ?? /(^|\.)x\.com$|(^|\.)twitter\.com$/i.test(view.location.hostname);
-  const candidates = Array.from(document.querySelectorAll<HTMLMediaElement>(options.includeAudio ? 'video, audio' : 'video'))
-    .filter((video) => isVisibleVideo(video, view))
+  const selector = options.includeAudio ? 'video, audio' : 'video';
+  const candidates = collectVisibleMedia(document, selector, view)
     .map((video) => {
       const player = getVideoPlayerForVideo(video, view);
       const candidate = {video, player, key: videoKey(video), fullscreen: isFullscreenVideo(video, document), interacting: false};

@@ -34,7 +34,7 @@ export function getDocumentExportPreview(document: ParsedDocument, translations:
 }
 
 const SUBTITLE_FORMATS = new Set<DocumentFormat>(['srt', 'vtt', 'ass', 'lrc']);
-const RICH_FORMATS = new Set<DocumentFormat>(['epub', 'html', 'markdown', 'txt']);
+const RICH_FORMATS = new Set<DocumentFormat>(['epub', 'html', 'markdown', 'txt', 'tex']);
 
 export function isSubtitleDocumentFormat(format?: DocumentFormat): boolean {
     return format !== undefined && SUBTITLE_FORMATS.has(format);
@@ -95,7 +95,7 @@ export function hasDocumentPlaceholder(value: string | undefined): boolean {
 }
 
 export function formatDocumentReaderText(format: DocumentFormat | undefined, value: string, docxInline?: true): string {
-    if (docxInline) return stripDocumentInlineMarkers(value).trim();
+    if (docxInline || format === 'tex') return stripDocumentInlineMarkers(value).trim();
     if (format === 'html' || format === 'epub') return value.replace(/<[^>]+>/gu, '').trim();
     if (format === 'markdown') {
         return value

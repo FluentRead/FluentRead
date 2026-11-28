@@ -198,7 +198,11 @@ export class CourseCaptionSource {
             const cid = await this.ports.manifest(request.id, signal);
             const signed = this.findSignedBilibiliUrl(cid);
             const id = request.id.split(':')[0];
-            const url = signed || `https://api.bilibili.com/x/player/v2?cid=${cid}&${id.startsWith('av') ? `aid=${id.slice(2)}` : `bvid=${id}`}`;
+            const queryKey = id.startsWith('av') ? `aid=${id.slice(2)}`
+                : id.startsWith('ep') ? `ep_id=${id.slice(2)}`
+                : id.startsWith('ss') ? `season_id=${id.slice(2)}`
+                : `bvid=${id}`;
+            const url = signed || `https://api.bilibili.com/x/player/v2?cid=${cid}&${queryKey}`;
             const result = await this.loadBilibiliFromUrl(request, cid, url, signal);
             return !result.cues.length && !signed ? {...result, bilibiliUnsignedCid: cid} : result;
         }

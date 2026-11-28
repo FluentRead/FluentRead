@@ -50,7 +50,15 @@ import {
     normalizeSelectionTtsRate,
     normalizeSelectionTtsVoiceOrder,
 } from '../selectionTts';
+import {
+    DEFAULT_COMMAND_PALETTE_HOTKEY,
+    normalizeCommandPaletteEnabled,
+    normalizeCommandPaletteHotkey,
+    normalizeCustomCommandPaletteHotkey,
+    resolveCommandPaletteHotkey,
+} from '../commandPalette';
 import {resolveVideoSubtitleModeHotkey} from '../videoSubtitleShortcut';
+import {resolveWritingHotkey} from '../writing';
 import {normalizeContextMenuEntryPreferences} from '@/src/core/context-menu/domain';
 import {resolveConfiguredHotkey} from '@/src/core/hotkey';
 import {normalizeFloatingBallDisabledDomains} from '@/src/core/site-rules/domain';
@@ -226,6 +234,12 @@ function normalizeToolsAndQuickProfiles(normalized: Config, source: Partial<Conf
     if (normalized.sectionTranslationHotkey === 'custom' && !normalized.customSectionTranslationHotkey) {
         normalized.sectionTranslationHotkey = DEFAULT_SECTION_TRANSLATION_HOTKEY;
     }
+    normalized.commandPaletteEnabled = normalizeCommandPaletteEnabled(source.commandPaletteEnabled);
+    normalized.customCommandPaletteHotkey = normalizeCustomCommandPaletteHotkey(source.customCommandPaletteHotkey);
+    normalized.commandPaletteHotkey = normalizeCommandPaletteHotkey(source.commandPaletteHotkey);
+    if (normalized.commandPaletteHotkey === 'custom' && !normalized.customCommandPaletteHotkey) {
+        normalized.commandPaletteHotkey = DEFAULT_COMMAND_PALETTE_HOTKEY;
+    }
     if (typeof normalized.contextMenuEnabled !== 'boolean') {
         normalized.contextMenuEnabled = true;
     }
@@ -257,6 +271,12 @@ function normalizeToolsAndQuickProfiles(normalized: Config, source: Partial<Conf
                     : []),
                 ...(normalized.videoSubtitleModeHotkeyEnabled
                     ? [resolveVideoSubtitleModeHotkey(normalized.videoSubtitleModeHotkey, normalized.customVideoSubtitleModeHotkey)]
+                    : []),
+                ...(resolveWritingHotkey(normalized.writing)
+                    ? [resolveWritingHotkey(normalized.writing)]
+                    : []),
+                ...(normalized.commandPaletteEnabled
+                    ? [resolveCommandPaletteHotkey(normalized.commandPaletteHotkey, normalized.customCommandPaletteHotkey)]
                     : []),
                 inputBoxTranslationTriggerHotkey(
                     normalized.inputBoxTranslationTrigger,

@@ -83,8 +83,17 @@ describe('content UI localization boundaries', () => {
         const passthrough = {setup: (_: unknown, {slots}: {slots: Vue.Slots}) => () => Vue.h('section', slots.default?.())};
         const empty = {render: () => null};
         const mounted = ui.mount('src/features/settings/ui/WritingSettings.vue', {config}, {
+            'element-plus': {ElMessage: {warning: vi.fn()}},
             '@/src/core/config/catalog': catalog, '@/src/core/config/harness': harness, '@/src/core/config/customOpenAI': customOpenAI,
             '@/src/core/config/writing': writing,
+            '@/src/core/hotkey': {canonicalizeHotkey: () => '', parseHotkey: () => ({isValid: false, modifiers: []}), resolveConfiguredHotkey: () => ''},
+            '@/src/core/config/areaTranslation': {resolveAreaTranslationHotkey: () => ''},
+            '@/src/core/config/clickSelection': {resolveReservedClickSelectionHotkey: () => ''},
+            '@/src/core/config/paragraphCopy': {resolveParagraphCopyHotkey: () => ''},
+            '@/src/core/config/sectionTranslation': {resolveSectionTranslationHotkey: () => ''},
+            '@/src/core/config/videoSubtitleShortcut': {resolveVideoSubtitleModeHotkey: () => ''},
+            '@/src/core/config/commandPalette': {resolveCommandPaletteHotkey: () => ''},
+            '@/src/core/config/quickTranslation': {findEnabledQuickTranslationHotkeyConflict: () => undefined, inputBoxTranslationTriggerHotkey: () => '', quickTranslationActionKey: () => 'hover'},
             '@/src/core/config/serviceAvailability': {markDisabledTranslationServices},
             '@/src/core/config/writingReadiness': {resolveWritingReadiness: () => ({supported: true, message: '', issue: ''})},
             '@/src/services/translation/capabilities': {filterAvailableTranslationServices: (items: unknown[]) => items, getTranslationServiceUnavailableMessage: () => ''},
@@ -93,6 +102,7 @@ describe('content UI localization boundaries', () => {
             './components/SettingsGroup.vue': {default: passthrough}, './components/SettingsItem.vue': {default: passthrough},
             './components/WritingStylePreview.vue': {default: empty},
         }, {
+            'el-button': passthrough,
             'el-input': empty,
             'el-select': {props: ['modelValue'], setup: (_: unknown, {slots}: {slots: Vue.Slots}) => () => Vue.h('div', slots.default?.())},
             'el-option': {props: ['value', 'label'], setup: (props: Record<string, unknown>) => () => Vue.h('span', {'data-option-value': props.value}, String(props.label ?? ''))},

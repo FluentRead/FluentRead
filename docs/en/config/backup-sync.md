@@ -27,21 +27,44 @@ Undo accidental configuration tweaks instantly without needing a backup file:
 - **Settings history → Recent changes:** Lists changed keys, before/after values, timestamps, and a **Compare with current** preview.
 - **Automatic snapshots:** Captured every **6 hours** (up to **10 entries** each). Excludes vocabulary, usage stats, and API credentials.
 
-## 3. Cloud backup scope & sensitive data boundary {#cloud-backup-scope-and-sensitive-settings}
+## 3. Cloud backup scope, E2EE passphrase & learning sync {#cloud-backup-scope-and-sensitive-settings}
 
-Google Drive and WebDAV backups are **always manual** (never auto-uploaded on edits) and stay completely independent of each other.
+Google Drive and WebDAV backups are **manual by default** (WebDAV also supports optional scheduled auto-sync) and stay completely independent of each other.
 
 | Sync scope | Included data | Default |
 | --- | --- | --- |
 | **Basic settings (v2)** | Languages, appearance, shortcuts, site rules, UI preferences | **Always on** (restoring preserves local keys & connections) |
 | **Sensitive settings (v1)** | API keys, credentials, provider/model choices, endpoints, auth headers, custom bodies & private prompts | **Off by default** (requires reading risks & clicking **Agree and enable**) |
+| **Wordbook** | Saved entries, review schedules, mastery levels, and notes (source contexts have a separate opt-in toggle, off by default) | **Off by default** (confirmed in sync preview) |
+| **Personal corrections** | Confirmed translation correction rules and project assignments, merged deterministically by identity and latest version | **Off by default** (confirmed in sync preview) |
+| **Reading materials metadata** | Titles, source URLs, reading progress, topics, and personal notes without large local file blobs | **Off by default** (confirmed in sync preview) |
 
-::: danger Important encryption notice
-Cloud backups are encrypted locally with a **fixed public application passphrase**—anyone who obtains the file can decrypt it. Keep only **Basic settings** enabled for everyday sync; if you opt into Sensitive settings, protect your cloud account and directory permissions carefully and never share the file.
+All learning asset toggles are off by default; when enabled, the sync preview shows per-category local/cloud counts and incoming `+N / ~M` diffs before confirmation.
+
+### End-to-end encryption (E2EE) passphrase
+
+Cloud backups derive an `AES-256-GCM` key locally with `PBKDF2-SHA256` (600,000 iterations) and authenticated additional data (AAD) to prevent downgrade attacks:
+
+- **Legacy compatible mode (default app passphrase):** Uses the fixed public application passphrase (v1 envelope) for zero-password convenience, though **anyone obtaining the file can decrypt it**.
+- **Custom E2EE passphrase (zero-knowledge):** Protects cloud files with your own passphrase of at least 12 characters (v2 envelope binding `keyMode: "custom"` into AAD). Custom passphrases are never stored in `browser.storage.sync`, config exports, logs, or cloud files. You can keep the passphrase for a single sync, for the current browser session only, or saved on this device in the extension's background local storage (for scheduled WebDAV auto-sync), with one-click forget.
+  - **Device retention boundary:** When "Keep on this device" is selected, the passphrase is stored in the extension's background local encrypted IndexedDB using the same at-rest protection boundary as `local:credentials` — protecting against `browser.storage.sync`, config exports, logs, and web page / content-script access. However, anyone with full access to your local browser profile could still reach local extension storage; choose per-sync or session-only retention for maximum isolation.
+
+::: danger Zero-knowledge & encryption notice
+- In legacy compatible mode, files use a **fixed public application passphrase**—anyone who obtains the file can decrypt it. Enable a **custom E2EE passphrase** when syncing sensitive settings.
+- Under zero-knowledge encryption, forgetting your custom passphrase means remote backups cannot be recovered. Keep a safe copy of your passphrase.
 :::
 
-- Cloud backups exclude wordbooks, reading chats, usage statistics, and recent documents; sensitive consent is stored per browser.
+- Cloud backups exclude reading chats, usage statistics, and recent documents; sensitive and learning toggles are stored per browser.
 - Turning off Sensitive settings does not retroactively scrub older cloud files—perform a Basic save/merge to rewrite the current file and manage provider version history separately.
+- Current versions seamlessly read legacy-compatible (v1) backups: when you switch to a custom E2EE passphrase, an existing legacy backup is decrypted on read and re-encrypted with your custom passphrase (v2) when you save or merge. If a remote backup requires a custom passphrase and none (or the wrong one) is supplied, FluentRead prompts without modifying local data.
+
+### Optional scheduled auto-sync (WebDAV)
+
+WebDAV supports optional **Scheduled auto-sync** (off by default) with configurable intervals (30 minutes, 1 hour, 6 hours, or 24 hours):
+
+- Performs **safe three-way merges** only: never blindly overwrites local or remote data when there is no common baseline or when conflicts exist. Conflicts pause automatic writes and surface a clear status for manual review.
+- Pauses safely without data loss when a custom E2EE passphrase is locked.
+- Serializes with manual sync operations, skips cleanly while offline, and retries transient failures with exponential backoff.
 
 ## 4. Google Drive configuration sync {#google-drive-configuration-sync}
 

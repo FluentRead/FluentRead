@@ -9,6 +9,7 @@ import type {UiLanguage} from './types';
 const sources = ['ChatGPT 套餐', '通过本机助手登录 ChatGPT，使用账户获准的套餐模型与额度。'] as const;
 const labels: Readonly<Record<UiLanguage, readonly [string, string]>> = {
     'zh-CN': sources,
+    'zh-TW': ['ChatGPT 方案', '透過本機助手登入 ChatGPT，使用帳戶核准的方案模型與額度。'],
     'en-US': ['ChatGPT Plan', 'Sign in to ChatGPT through the local helper and use the models and allowance authorized for your account.'],
     'ja-JP': ['ChatGPT プラン', 'ローカルヘルパーで ChatGPT にログインし、アカウントで許可されたプランのモデルと利用枠を使います。'],
     'ko-KR': ['ChatGPT 요금제', '로컬 도우미로 ChatGPT에 로그인하고 계정에 허용된 요금제 모델과 사용량을 이용합니다.'],

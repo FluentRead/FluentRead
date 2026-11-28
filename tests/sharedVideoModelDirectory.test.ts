@@ -13,10 +13,11 @@ const url = sharedModelFileUrl('tiny', 'config.json');
 const data = () => new Response('valid model bytes', {headers: {'Content-Length': '17'}});
 
 describe('user-authorized shared Whisper directory', () => {
-    it.each(['zh-CN', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const)('keeps shared-directory copy local to the extension settings in %s', language => {
+    it.each(['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const)('keeps shared-directory copy local to the extension settings in %s', language => {
         expect(translateSharedVideoModelText('跨浏览器共享模型', language)).toBeTruthy();
         expect(translateSharedVideoModelText('existing unrelated label', language)).toBeUndefined();
         if (language === 'en-US') expect(translateSharedVideoModelText('跨浏览器共享模型', language)).toBe('Share models across browsers');
+        if (language === 'zh-TW') expect(translateSharedVideoModelText('跨浏览器共享模型', language)).toBe('跨瀏覽器共享模型');
     });
     it.each(['open', 'request', 'transaction', 'abort'].flatMap(phase => [false, true].map(withError => [phase, withError] as const)))('surfaces IndexedDB %s failures (%s) and closes opened connections', async (phase, withError) => {
         const f = sharedDirectoryFixture();

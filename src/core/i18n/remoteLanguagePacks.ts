@@ -8,7 +8,7 @@
 import {buildGithubAssetMirrorUrls} from '../assets/mirrors';
 import type {LegacyPatternEntry, MessageCatalog, RegisteredUiLanguage, UiLanguageBundle} from './types';
 
-export type RemoteDeltaUiLanguage = Exclude<RegisteredUiLanguage, 'en-US'>;
+export type RemoteDeltaUiLanguage = Exclude<RegisteredUiLanguage, 'en-US' | 'zh-TW'>;
 
 export interface RemoteLanguageBaseAsset {
     readonly language: RemoteDeltaUiLanguage;

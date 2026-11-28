@@ -32,6 +32,7 @@ import {translationStatsFrenchMessages} from './translationStats';
 import {localTranslationFrenchMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
+import {task7Messages, task7LegacyText} from './task7Features';
 
 import countForms from './count-forms.json';
 
@@ -46,6 +47,7 @@ export const frFRMessages = {
     "feedback.retryHint": "Réessayez dans un instant. Le texte source et votre sélection restent disponibles.",
     ...countForms['fr-FR'],
     ...personalCorrectionMessages['fr-FR'],
+    ...task7Messages['fr-FR'],
     "document.config.loadFailed": "Impossible de charger les paramètres. Rechargez la page et réessayez.",
     "popup.compact.translate": "Traduire",
     "popup.compact.restore": "Rétablir",
@@ -356,7 +358,15 @@ export const frFRMessages = {
     "writing.entry.chooseReference": "Choisissez d’abord une autre langue de traduction.",
     "writing.entry.saveError": "Échec de l’enregistrement. Réessayez.",
     "writing.entry.openError": "Ouvrez les réglages depuis le menu de l’extension.",
-    "writing.experience.enableDescription": "Rédigez et améliorez vos réponses dans GitHub et Gmail, puis relisez-les avant l’envoi.",
+    "writing.hotkey.label": "Raccourci universel",
+    "writing.hotkey.description": "Appuyez sur ce raccourci dans n’importe quel champ de saisie ou éditeur sur le web pour ouvrir l’assistant à la demande sans ajouter de bouton flottant.",
+    "writing.hotkey.edit": "Modifier le raccourci de l’assistant de rédaction",
+    "writing.hotkey.disabled": "Raccourci désactivé",
+    "writing.hotkey.reset": "Réinitialiser",
+    "writing.hotkey.requireModifier": "Choisissez une combinaison incluant Ctrl, Alt ou Shift.",
+    "writing.hotkey.conflict": "Ce raccourci est déjà utilisé par {feature}. Choisissez une autre combinaison.",
+    "writing.hotkey.entryHint": "Appuyez sur {shortcut} dans n’importe quel éditeur du web pour ouvrir l’assistant.",
+    "writing.experience.enableDescription": "Rédigez et améliorez vos réponses dans Gmail, GitHub, Outlook, X, Reddit, LinkedIn, Slack, Discord, Notion ou tout éditeur web, puis relisez-les avant l’envoi.",
     "writing.experience.disabled": "Le bouton de rédaction est masqué. Vos préférences sont conservées.",
     "writing.experience.paused": "Démarrez l’extension pour utiliser l’assistant de rédaction.",
     "writing.experience.inheritModel": "Modèle du service · {model}",
@@ -2573,6 +2583,7 @@ const frFRLegacyTextBase: Readonly<Record<string, string>> = {
     'FluentRead 备份': 'Sauvegarde FluentRead',
     'FluentRead 翻译中心': 'Centre de traduction FluentRead',
     ...mimoRetirementLegacyText['fr-FR'],
+    ...task7LegacyText['fr-FR'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'Les clés pay-as-you-go MiMo commencent généralement par sk- ; Veuillez vous assurer que la clé provient de la page des clés API.',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'L’initialisation du service OCR a échoué. Veuillez rouvrir la page des paramètres et réessayer.',
     'Offscreen 文档': 'Document hors écran',

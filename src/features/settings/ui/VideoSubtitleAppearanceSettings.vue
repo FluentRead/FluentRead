@@ -179,6 +179,7 @@ const controlI18n = useControlI18n();
 const {t, translateLegacy: translateControlLabel} = controlI18n;
 const topOffsetLabels: Readonly<Record<UiLanguage, string>> = {
   'zh-CN': '顶部偏移',
+  'zh-TW': '頂部偏移',
   'en-US': 'Top offset',
   'ja-JP': '上端オフセット',
   'ko-KR': '상단 간격',
@@ -188,6 +189,7 @@ const topOffsetLabels: Readonly<Record<UiLanguage, string>> = {
 };
 const topOffsetAriaLabels: Readonly<Record<UiLanguage, string>> = {
   'zh-CN': '字幕顶部偏移',
+  'zh-TW': '字幕頂部偏移',
   'en-US': 'Subtitle top offset',
   'ja-JP': '字幕の上端オフセット',
   'ko-KR': '자막 상단 간격',
@@ -197,6 +199,7 @@ const topOffsetAriaLabels: Readonly<Record<UiLanguage, string>> = {
 };
 const fontScaleNumberAriaLabels: Readonly<Record<UiLanguage, string>> = {
   'zh-CN': '字幕字号数值',
+  'zh-TW': '字幕字號數值',
   'en-US': 'Subtitle font size value',
   'ja-JP': '字幕サイズ数値',
   'ko-KR': '자막 크기 수치',

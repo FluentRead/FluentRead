@@ -32,6 +32,7 @@ import {translationStatsSpanishMessages} from './translationStats';
 import {localTranslationSpanishMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
+import {task7Messages, task7LegacyText} from './task7Features';
 
 import countForms from './count-forms.json';
 
@@ -46,6 +47,7 @@ export const esESMessages = {
     "feedback.retryHint": "Vuelve a intentarlo en un momento. Se conservarán el texto original y la selección.",
     ...countForms['es-ES'],
     ...personalCorrectionMessages['es-ES'],
+    ...task7Messages['es-ES'],
     "document.config.loadFailed": "No se pudieron cargar los ajustes. Recarga la página e inténtalo de nuevo.",
     "popup.compact.translate": "Traducir",
     "popup.compact.restore": "Restaurar",
@@ -356,7 +358,15 @@ export const esESMessages = {
     "writing.entry.chooseReference": "Elige primero otro idioma de traducción.",
     "writing.entry.saveError": "No se pudo guardar. Vuelve a intentarlo.",
     "writing.entry.openError": "Abre los ajustes desde el menú de la extensión.",
-    "writing.experience.enableDescription": "Redacta y mejora respuestas en GitHub y Gmail. Revísalas antes de enviarlas.",
+    "writing.hotkey.label": "Atajo universal",
+    "writing.hotkey.description": "Pulsa este atajo con el foco en cualquier campo o editor de cualquier sitio web para abrir el asistente bajo demanda sin añadir botones flotantes.",
+    "writing.hotkey.edit": "Editar atajo del asistente de escritura",
+    "writing.hotkey.disabled": "Atajo desactivado",
+    "writing.hotkey.reset": "Restablecer",
+    "writing.hotkey.requireModifier": "Elige una combinación con Ctrl, Alt o Shift.",
+    "writing.hotkey.conflict": "Este atajo ya lo usa {feature}. Elige otra combinación.",
+    "writing.hotkey.entryHint": "Pulsa {shortcut} dentro de cualquier editor en cualquier sitio para abrir el asistente.",
+    "writing.experience.enableDescription": "Redacta y mejora respuestas en Gmail, GitHub, Outlook, X, Reddit, LinkedIn, Slack, Discord, Notion o cualquier editor web. Revísalas antes de enviarlas.",
     "writing.experience.disabled": "El botón de escritura está oculto. Tus preferencias se conservan.",
     "writing.experience.paused": "Inicia la extensión para usar el asistente de escritura.",
     "writing.experience.inheritModel": "Modelo del servicio · {model}",
@@ -2576,6 +2586,7 @@ const esESLegacyTextBase: Readonly<Record<string, string>> = {
     'FluentRead 备份': 'Copia de seguridad de FluentRead',
     'FluentRead 翻译中心': 'Centro de Traducción FluentRead',
     ...mimoRetirementLegacyText['es-ES'],
+    ...task7LegacyText['es-ES'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'Las teclas de pago por uso de MiMo suelen empezar con sk-; Por favor, asegúrate de que la clave proviene de la página de Claves API.',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'Falló la inicialización del servicio OCR. Por favor, vuelve a abrir la página de configuración e inténtalo de nuevo.',
     'Offscreen 文档': 'Documento fuera de pantalla',

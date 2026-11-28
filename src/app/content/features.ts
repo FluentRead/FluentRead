@@ -69,3 +69,4 @@ export {
 
 export {mountShareCard, unmountShareCard, isShareCardMounted} from '@/src/features/share-card/public';
 export {mountVocabularyReencounter, unmountVocabularyReencounter} from '@/src/features/vocabulary/content/public';
+export {mountCommandPalette, unmountCommandPalette, isCommandPaletteMounted} from '@/src/features/command-palette/public';

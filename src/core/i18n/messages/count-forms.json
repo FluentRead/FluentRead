@@ -13,6 +13,20 @@
     "glossary.entryCount.plural.many": "{count} 条术语",
     "glossary.entryCount.plural.other": "{count} 条术语"
   },
+  "zh-TW": {
+    "popup.translationCount.plural.one": "{count} 次翻譯",
+    "popup.translationCount.plural.few": "{count} 次翻譯",
+    "popup.translationCount.plural.many": "{count} 次翻譯",
+    "popup.translationCount.plural.other": "{count} 次翻譯",
+    "common.itemCount.plural.one": "{count} 項",
+    "common.itemCount.plural.few": "{count} 項",
+    "common.itemCount.plural.many": "{count} 項",
+    "common.itemCount.plural.other": "{count} 項",
+    "glossary.entryCount.plural.one": "{count} 條術語",
+    "glossary.entryCount.plural.few": "{count} 條術語",
+    "glossary.entryCount.plural.many": "{count} 條術語",
+    "glossary.entryCount.plural.other": "{count} 條術語"
+  },
   "en-US": {
     "popup.translationCount.plural.one": "{count} translation",
     "popup.translationCount.plural.few": "{count} translations",

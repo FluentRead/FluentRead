@@ -58,6 +58,23 @@ it('keeps the HTML media fallback available in an embedded Coursera lecture', as
     await startHtmlMediaFrameApp(ctx());
     expect(ports.activate).toBeDefined();
 });
+it('mounts, suspends, resumes, and cleans up in an embedded player.vimeo.com iframe', async () => {
+    page('https://player.vimeo.com/video/123456789');
+    await startHtmlMediaFrameApp(ctx());
+    expect(ports.activate).toBeDefined();
+    const dispose = ports.activate!();
+    await vi.waitFor(() => expect(ports.mount).toHaveBeenCalledOnce());
+    ports.suspended = true;
+    ports.actions!.suspend();
+    expect(ports.stopScanner).toHaveBeenCalledOnce();
+    ports.suspended = false;
+    ports.actions!.resume();
+    expect(ports.activate).toBeDefined();
+    dispose();
+    expect(ports.unmount).toHaveBeenCalledOnce();
+    ports.actions!.dispose();
+    expect(ports.listeners.size).toBe(0);
+});
 it('loads the subtitle module only after media appears and respects scanner cleanup', async () => {
     await startHtmlMediaFrameApp(ctx()); expect(ports.activate).toBeDefined(); expect(ports.mount).not.toHaveBeenCalled();
     const dispose = ports.activate!(); await vi.waitFor(() => expect(ports.mount).toHaveBeenCalledOnce());

@@ -1,10 +1,13 @@
 /**
  * @file src/features/video-subtitle/content/platforms.ts
- * 文件职责：定义会议及课程视频的站点边界、字幕节点与明确开启控件，并选择目标语言人工轨。
- * 主要内容：识别会议、上课和影视播放的站点入口；规范化语言别名并排除自动生成或机器翻译轨。
+ * 文件职责：定义会议、课程及主流流媒体视频的站点边界、字幕节点与明确开启控件，并选择目标语言人工轨。
+ * 主要内容：识别会议、上课与 Netflix/Prime Video/TED/Vimeo/Disney+ 等视频播放站点入口；规范化语言别名并排除自动生成或机器翻译轨。
  * 模块边界：只处理传入的位置、轨道和节点，不读取配置、请求网络或修改宿主页面。
  */
-export type CaptionPlatform = 'meet' | 'teams' | 'zoom' | 'bilibili' | 'udemy' | 'edx' | 'coursera' | 'disney';
+export type CaptionPlatform =
+    | 'meet' | 'teams' | 'zoom'
+    | 'bilibili' | 'udemy' | 'edx' | 'coursera'
+    | 'disney' | 'netflix' | 'primevideo' | 'ted' | 'vimeo';
 
 export function getCourseraLectureId(pathname: string): string {
     return pathname.match(/^\/learn\/[\w%-]+\/lecture\/([\w-]{1,80})(?:\/[\w%-]+)?\/?$/u)?.[1] ?? '';
@@ -20,11 +23,20 @@ export function getCaptionPlatform(location: Pick<Location, 'hostname' | 'pathna
     if (/(^|\.)edx\.org$/.test(host)) return 'edx';
     if (import.meta.env.BROWSER !== 'userscript' && (host === 'www.coursera.org' || host === 'coursera.org') && getCourseraLectureId(location.pathname)) return 'coursera';
     if (/(^|\.)disneyplus\.com$/.test(host)) return 'disney';
+    if (/(^|\.)netflix\.com$/.test(host)) return 'netflix';
+    if (/(^|\.)primevideo\.com$/.test(host)) return 'primevideo';
+    if (/^(?:www\.)?amazon\.(?:com|co\.jp|co\.uk|de)$/.test(host) && /^\/(?:gp\/video|detail)(?:\/|$)/.test(location.pathname)) return 'primevideo';
+    if (/(^|\.)ted\.com$/.test(host)) return 'ted';
+    if (host === 'vimeo.com' || host === 'www.vimeo.com' || host === 'player.vimeo.com') return 'vimeo';
     return null;
 }
 
 export function isMeetingCaptionPlatform(platform: CaptionPlatform): boolean {
     return platform === 'meet' || platform === 'teams' || platform === 'zoom';
+}
+
+export function isStreamingCaptionPlatform(platform: CaptionPlatform): boolean {
+    return platform === 'disney' || platform === 'netflix' || platform === 'primevideo' || platform === 'ted' || platform === 'vimeo';
 }
 
 export const PLATFORM_CAPTION_SELECTORS: Record<CaptionPlatform, string> = {
@@ -36,6 +48,10 @@ export const PLATFORM_CAPTION_SELECTORS: Record<CaptionPlatform, string> = {
     edx: '.closed-captions',
     coursera: '.vjs-text-track-display, .vjs-text-track-cue',
     disney: '.dss-hls-subtitle-overlay, .hive-subtitle-renderer, .shaka-text-container',
+    netflix: '.player-timedtext-text-container, .player-timedtext',
+    primevideo: '.atvwebplayersdk-captions-text, .f35bt6a',
+    ted: '.vjs-text-track-display, .vjs-text-track-cue, [data-testid="caption-text"], .ted-captions',
+    vimeo: '.vp-captions, .vp-telecine',
 };
 
 const CAPTION_BUTTON_SELECTORS: Partial<Record<CaptionPlatform, string>> = {

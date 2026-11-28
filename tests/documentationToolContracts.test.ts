@@ -339,8 +339,8 @@ describe('documentation delivery CLI contracts', () => {
         expect(result.code).toBe(1); expect(result.err).toContain(diagnostic);
     });
     it.each([
-        ['missing locale', Object.fromEntries(Object.entries(descriptions).filter(([language]) => language !== 'es-ES')), 'Product descriptions cover the same seven languages'],
-        ['unsupported locale', {...Object.fromEntries(Object.entries(descriptions).filter(([language]) => language !== 'es-ES')), 'pt-BR':'Fixture'}, 'Product descriptions cover the same seven languages'],
+        ['missing locale', Object.fromEntries(Object.entries(descriptions).filter(([language]) => language !== 'es-ES')), 'Product descriptions cover the same eight languages'],
+        ['unsupported locale', {...Object.fromEntries(Object.entries(descriptions).filter(([language]) => language !== 'es-ES')), 'pt-BR':'Fixture'}, 'Product descriptions cover the same eight languages'],
         ['empty text', {...descriptions, 'ja-JP':''}, 'ja-JP: empty or untrimmed product description'],
         ['non-string text', {...descriptions, 'ko-KR':42}, 'ko-KR: empty or untrimmed product description'],
         ['untrimmed text', {...descriptions, 'es-ES':` ${descriptions['es-ES']}`}, 'es-ES: empty or untrimmed product description'],

@@ -32,6 +32,7 @@ import {translationStatsRussianMessages} from './translationStats';
 import {localTranslationRussianMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
+import {task7Messages, task7LegacyText} from './task7Features';
 
 import countForms from './count-forms.json';
 
@@ -46,6 +47,7 @@ export const ruRUMessages = {
     "feedback.retryHint": "Повторите попытку чуть позже. Исходный текст и выделенная область сохранятся.",
     ...countForms['ru-RU'],
     ...personalCorrectionMessages['ru-RU'],
+    ...task7Messages['ru-RU'],
     "document.config.loadFailed": "Не удалось загрузить настройки. Обновите страницу и повторите попытку.",
     "popup.compact.translate": "Перевести",
     "popup.compact.restore": "Вернуть",
@@ -356,7 +358,15 @@ export const ruRUMessages = {
     "writing.entry.chooseReference": "Сначала выберите другой язык перевода.",
     "writing.entry.saveError": "Не удалось сохранить. Повторите попытку.",
     "writing.entry.openError": "Откройте настройки из меню расширения.",
-    "writing.experience.enableDescription": "Создавайте и улучшайте ответы в GitHub и Gmail. Проверьте текст перед отправкой.",
+    "writing.hotkey.label": "Универсальная горячая клавиша",
+    "writing.hotkey.description": "Нажмите это сочетание в любом поле ввода или редакторе на любом сайте, чтобы открыть помощника по запросу без добавления плавающих кнопок.",
+    "writing.hotkey.edit": "Изменить сочетание клавиш помощника по письму",
+    "writing.hotkey.disabled": "Сочетание отключено",
+    "writing.hotkey.reset": "Сбросить",
+    "writing.hotkey.requireModifier": "Выберите сочетание с клавишей Ctrl, Alt или Shift.",
+    "writing.hotkey.conflict": "Это сочетание уже используется функцией «{feature}». Выберите другое.",
+    "writing.hotkey.entryHint": "Нажмите {shortcut} в любом поле ввода на любом сайте, чтобы открыть помощника.",
+    "writing.experience.enableDescription": "Создавайте и улучшайте ответы в Gmail, GitHub, Outlook, X, Reddit, LinkedIn, Slack, Discord, Notion и любом веб-редакторе. Проверьте текст перед отправкой.",
     "writing.experience.disabled": "Кнопка помощника скрыта. Настройки сохранены.",
     "writing.experience.paused": "Запустите расширение, чтобы использовать помощника по письму.",
     "writing.experience.inheritModel": "Модель сервиса · {model}",
@@ -2579,6 +2589,7 @@ const ruRULegacyTextBase: Readonly<Record<string, string>> = {
     'FluentRead 备份': 'FluentRead резервное копие',
     'FluentRead 翻译中心': 'Центр перевода FluentRead',
     ...mimoRetirementLegacyText['ru-RU'],
+    ...task7LegacyText['ru-RU'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'Клавиши MiMo pay-as-you-go обычно начинаются с sk-; Пожалуйста, убедитесь, что ключ взят со страницы ключей API.',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'Инициализация сервиса OCR не удалась. Пожалуйста, откройте страницу настроек и попробуйте снова.',
     'Offscreen 文档': 'Документ за кадром',

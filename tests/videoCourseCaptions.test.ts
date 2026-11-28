@@ -8,7 +8,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {normalizeVideoCourseAutoStart} from '@/src/core/config/videoCourse';
 import {Config, normalizeConfig} from '@/src/core/config/model';
-import {captionRecord, chooseBilibiliCaption, chooseUdemyCaption, getBilibiliPart, getCourseCaptionRequest, hasBilibiliCaptionHint, parseCourseCaptionJson, resolveCourseCaptionUrl, type CourseCaptionRequest} from '@/src/features/video-subtitle/content/courseCaptionData';
+import {captionRecord, chooseBilibiliCaption, chooseUdemyCaption, getBilibiliPart, getCourseCaptionRequest, hasBilibiliCaptionHint, isBilibiliBangumiPart, parseCourseCaptionJson, resolveCourseCaptionUrl, type CourseCaptionRequest} from '@/src/features/video-subtitle/content/courseCaptionData';
 import {CourseCaptionSource} from '@/src/features/video-subtitle/content/courseCaptionSource';
 import {installBilibiliCaptionBridge, requestBilibiliCaptionManifest} from '@/src/features/video-subtitle/content/bilibiliCaptionBridge';
 import {startBilibiliCaptionBridgeApp} from '@/src/app/content/bilibiliCaptionBridge';
@@ -64,15 +64,22 @@ describe('课程字幕配置与身份', () => {
     it.each([
         ['/video/BV1xx411c7mD/?p=2', 'BV1xx411c7mD:2'], ['/zh-Hans/video/av123?p=3', 'av123:3'],
         ['/list/123?bvid=BV1xx411c7mD&p=0', 'BV1xx411c7mD:1'], ['/video/av123?p=1.1', 'av123:1'],
-        ['/video/av123?p=9007199254740992', 'av123:1'], ['/list/123', ''], ['/video/invalid', ''], ['/bangumi/play/ep123', ''],
-    ])('分 P 地址 %s', (path, expected) => expect(getBilibiliPart(new URL(path, bili))).toBe(expected));
-    it('只为课程视频生成请求，小节和语言变化产生不同身份', () => {
+        ['/video/av123?p=9007199254740992', 'av123:1'], ['/list/123', ''], ['/video/invalid', ''],
+        ['/bangumi/play/ep123', 'ep123'], ['/bangumi/play/ss456/', 'ss456'],
+        ['/zh-Hans/bangumi/play/ep789', 'ep789'], ['/bangumi/play/ep0', ''], ['/bangumi/play/invalid', ''],
+    ])('分 P 与番剧地址 %s', (path, expected) => expect(getBilibiliPart(new URL(path, bili))).toBe(expected));
+    it('只为课程与可访问番剧视频生成请求，小节和语言变化产生不同身份', () => {
+        expect(isBilibiliBangumiPart('ep123')).toBe(true);
+        expect(isBilibiliBangumiPart('ss456')).toBe(true);
+        expect(isBilibiliBangumiPart('BV1xx411c7mD:1')).toBe(false);
         expect(getCourseCaptionRequest('bilibili', bili, video())?.id).toBe('BV1xx411c7mD:2');
         const original = getCourseCaptionRequest('bilibili', bili, video(), 'auto', 'zh-Hans')!;
         expect(original.language).toBe('auto'); expect(original.target).toBe('zh-Hans');
         expect(getCourseCaptionRequest('bilibili', bili, video(), 'en', 'zh-Hans')?.key).not.toBe(original.key);
         expect(getCourseCaptionRequest('bilibili', bili, video(), 'auto', 'en')?.key).not.toBe(original.key);
-        expect(getCourseCaptionRequest('bilibili', new URL('/bangumi/play/ep1', bili), video())).toBeNull();
+        expect(getCourseCaptionRequest('bilibili', new URL('/bangumi/play/ep1', bili), video())?.id).toBe('ep1');
+        expect(getCourseCaptionRequest('bilibili', new URL('/bangumi/play/ss2', bili), video())?.id).toBe('ss2');
+        expect(getCourseCaptionRequest('bilibili', new URL('/bangumi/media/md1', bili), video())).toBeNull();
         expect(getCourseCaptionRequest('udemy', udemy, video())?.key).toBe('programming/123');
         expect(getCourseCaptionRequest('udemy', new URL('/course/demo/learn/', udemy), video())).toBeNull();
         expect(getCourseCaptionRequest('edx', edx, video())).toBeNull();
@@ -246,7 +253,17 @@ describe('课程字幕请求生命周期', () => {
         const mismatch = sourceFixture(bili, [{code: 0, data: {cid: 999}}]); mismatch.source.sync(mismatch.request, 'media'); await settled(mismatch.source);
         expect(mismatch.source.status).toBe('error');
     });
-    it('B 站无签名资源回退固定接口，没有字幕时保持空状态', async () => {
+    it('B 站无签名资源回退固定接口，支持番剧 ep_id/season_id，没有字幕时保持空状态', async () => {
+        const ep = sourceFixture(bili, [{code: 0, data: {cid: 456, subtitle: {subtitles: []}}}]);
+        ep.source.sync({platform: 'bilibili', key: 'ep123', id: 'ep123', language: '', url: ''}, 'bangumi-ep');
+        await settled(ep.source);
+        expect(String(ep.fetch.mock.calls[0][0])).toContain('ep_id=123');
+        expect(ep.source.status).toBe('empty');
+        const ss = sourceFixture(bili, [{code: 0, data: {cid: 456, subtitle: {subtitles: []}}}]);
+        ss.source.sync({platform: 'bilibili', key: 'ss456', id: 'ss456', language: '', url: ''}, 'bangumi-ss');
+        await settled(ss.source);
+        expect(String(ss.fetch.mock.calls[0][0])).toContain('season_id=456');
+        expect(ss.source.status).toBe('empty');
         const f = sourceFixture(bili, [{code: 0, data: {cid: 456, subtitle: {subtitles: []}}}]);
         f.source.sync(f.request, 'media'); await settled(f.source);
         expect(f.fetch.mock.calls[0][0]).toBe('https://api.bilibili.com/x/player/v2?cid=456&bvid=BV1xx411c7mD');
@@ -498,12 +515,18 @@ describe('只读 B 站播放器桥', () => {
         f.message(request, 'https://evil.test'); f.message(request, bili.origin, null); expect(f.post).not.toHaveBeenCalled();
         f.message(request); expect(f.post).toHaveBeenLastCalledWith({type: 'fluent-read:bilibili-caption-manifest:response', requestId: 'id', part: request.part, cid: 456}, bili.origin);
         f.message({...request, part: 'av123:2'}); expect(f.post).toHaveBeenCalledTimes(2);
+        f.page.player = {getManifest: () => ({epId: 88, seasonId: 99, cid: 456})};
+        f.message({...request, part: 'ep88'}); expect(f.post).toHaveBeenLastCalledWith({type: 'fluent-read:bilibili-caption-manifest:response', requestId: 'id', part: 'ep88', cid: 456}, bili.origin);
+        f.message({...request, part: 'ss99'}); expect(f.post).toHaveBeenLastCalledWith({type: 'fluent-read:bilibili-caption-manifest:response', requestId: 'id', part: 'ss99', cid: 456}, bili.origin);
+        f.page.player = {getManifest: () => ({epid: 77, ssid: 66, cid: 456})};
+        f.message({...request, part: 'ep77'}); expect(f.post).toHaveBeenCalledTimes(5);
+        f.message({...request, part: 'ss66'}); expect(f.post).toHaveBeenCalledTimes(6);
         f.page.player = {getManifest: () => ({bvid: 'BV1xx411c7mD', p: 2, cid: 0})}; f.message(request);
-        f.page.player = {getManifest: () => ({bvid: 'BV1xx411c7mD', p: 2, cid: '456'})}; f.message(request); expect(f.post).toHaveBeenCalledTimes(2);
-        f.page.dispatchEvent(Object.assign(new Event('pagehide'), {persisted: true})); f.message(request); expect(f.post).toHaveBeenCalledTimes(2);
+        f.page.player = {getManifest: () => ({bvid: 'BV1xx411c7mD', p: 2, cid: '456'})}; f.message(request); expect(f.post).toHaveBeenCalledTimes(6);
+        f.page.dispatchEvent(Object.assign(new Event('pagehide'), {persisted: true})); f.message(request); expect(f.post).toHaveBeenCalledTimes(6);
         f.page.dispatchEvent(new Event('pageshow'));
-        f.page.player = {getManifest: () => ({bvid: 'BV1xx411c7mD', p: 2, cid: 456})}; f.message(request); expect(f.post).toHaveBeenCalledTimes(3);
-        f.page.dispatchEvent(Object.assign(new Event('pagehide'), {persisted: false})); f.message(request); expect(f.post).toHaveBeenCalledTimes(3); dispose();
+        f.page.player = {getManifest: () => ({bvid: 'BV1xx411c7mD', p: 2, cid: 456})}; f.message(request); expect(f.post).toHaveBeenCalledTimes(7);
+        f.page.dispatchEvent(Object.assign(new Event('pagehide'), {persisted: false})); f.message(request); expect(f.post).toHaveBeenCalledTimes(7); dispose();
     });
     it('manifest.p 缺失或非法时默认按第 1P 匹配单 P 与播单播放器', () => {
         const f = bridgePage();

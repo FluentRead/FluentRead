@@ -1,15 +1,17 @@
 /**
  * @file src/features/document-translation/core/document.ts
- * 文件职责：作为文档翻译核心领域模型的统一入口，提供格式识别、MIME 与大小上限元数据、多格式文本解析分发及双语/纯译文无损渲染。
- * 主要内容：聚合导出核心数据结构与辅助方法，协调 Markdown/TXT、HTML、字幕、JSON 与 CSV/TSV 格式解析子模块，并实现按列筛选、有界长度渲染与下载文件命名。
- * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX 二进制，也不发起翻译请求；具体格式解析下沉至 ./formats/* 子模块，文件 I/O 归 services/binary。
+ * 文件职责：作为文档翻译核心领域模型的统一入口，提供格式识别、MIME 与大小上限元数据、多格式文本解析分发（含 LaTeX `.tex`）及双语/纯译文无损渲染，并承载 PDF/EPUB/DOCX/PPTX/XLSX 二进制文档的类型契约。
+ * 主要内容：聚合导出核心数据结构与辅助方法，协调 Markdown/TXT、HTML、LaTeX、字幕、JSON 与 CSV/TSV 格式解析子模块，并实现按列筛选、有界长度渲染与下载文件命名。
+ * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX/PPTX/XLSX 二进制，也不发起翻译请求；具体格式解析下沉至 ./formats/* 与 ./latex 子模块，文件 I/O 归 services/binary。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {escapeMarkdownTableTranslation} from './markdownTable';
 import {encodeDelimitedCell, isSpreadsheetFormula} from './delimited';
+import {parseLatexDocument, renderLatexTranslation, sanitizeLatexCommandText} from './latex';
 import {
     DOCUMENT_MAX_BYTES,
     PDF_MAX_BYTES,
+    PPTX_MAX_BYTES,
     SUPPORTED_DOCUMENT_EXTENSIONS,
     type BinaryDocumentData,
     type DocumentFormat,
@@ -28,7 +30,10 @@ import {
     type PdfDocumentPage,
     type PdfDocumentRun,
     type PdfPreservedRegion,
+    type PptxDocumentPart,
     type SegmentPart,
+    type XlsxDocumentSheet,
+    type XlsxSheetSegment,
 } from './formats/shared';
 import {
     inspectMarkdownLine,
@@ -57,6 +62,7 @@ export type {DelimitedColumn} from './delimited';
 export {
     DOCUMENT_MAX_BYTES,
     PDF_MAX_BYTES,
+    PPTX_MAX_BYTES,
     SUPPORTED_DOCUMENT_EXTENSIONS,
     formatJsonPath,
     inspectMarkdownLine,
@@ -77,6 +83,9 @@ export {
     type PdfDocumentPage,
     type PdfDocumentRun,
     type PdfPreservedRegion,
+    type PptxDocumentPart,
+    type XlsxDocumentSheet,
+    type XlsxSheetSegment,
 };
 
 /** 列号取自源文件，非法或过期的存储项不会影响其它格式，也不会留下空选择。 */
@@ -103,9 +112,12 @@ const FORMAT_LABELS: Record<DocumentFormat, string> = {
     pdf: 'PDF 文件',
     epub: 'ePub 电子书',
     docx: 'DOCX 文档',
+    pptx: 'PPTX 演示文稿',
+    xlsx: 'XLSX 电子表格',
     html: 'HTML 文件',
     txt: 'TXT 文件',
     markdown: 'Markdown 文件',
+    tex: 'LaTeX 文档',
     srt: 'SRT 字幕',
     vtt: 'VTT 字幕',
     ass: 'ASS 字幕',
@@ -125,9 +137,12 @@ export function getDocumentFormat(fileName: string): DocumentFormat | null {
     if (extension === 'pdf') return 'pdf';
     if (extension === 'epub') return 'epub';
     if (extension === 'docx') return 'docx';
+    if (extension === 'pptx') return 'pptx';
+    if (extension === 'xlsx') return 'xlsx';
     if (extension === 'html' || extension === 'htm') return 'html';
     if (extension === 'txt') return 'txt';
     if (extension === 'md' || extension === 'markdown') return 'markdown';
+    if (extension === 'tex') return 'tex';
     if (extension === 'srt') return 'srt';
     if (extension === 'vtt') return 'vtt';
     if (extension === 'ass' || extension === 'ssa') return 'ass';
@@ -137,9 +152,12 @@ export function getDocumentFormat(fileName: string): DocumentFormat | null {
     return null;
 }
 
-/** 一个文件允许的最大字节数：PDF 使用更宽的上限，其余格式沿用通用上限。 */
+/** 一个文件允许的最大字节数：PDF 与 PPTX 使用更宽的上限，其余格式沿用通用上限。 */
 export function getDocumentMaxBytes(fileName: string): number {
-    return getDocumentFormat(fileName) === 'pdf' ? PDF_MAX_BYTES : DOCUMENT_MAX_BYTES;
+    const format = getDocumentFormat(fileName);
+    if (format === 'pdf') return PDF_MAX_BYTES;
+    if (format === 'pptx') return PPTX_MAX_BYTES;
+    return DOCUMENT_MAX_BYTES;
 }
 
 export function getDocumentAcceptAttribute(): string {
@@ -163,10 +181,13 @@ export function getDocumentMimeType(format: DocumentFormat): string {
     if (format === 'pdf') return 'application/pdf';
     if (format === 'epub') return 'application/epub+zip';
     if (format === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (format === 'pptx') return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    if (format === 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     if (format === 'html') return 'text/html;charset=utf-8';
     if (format === 'json') return 'application/json;charset=utf-8';
     if (format === 'csv') return 'text/csv;charset=utf-8';
     if (format === 'tsv') return 'text/tab-separated-values;charset=utf-8';
+    if (format === 'tex') return 'application/x-tex;charset=utf-8';
     return 'text/plain;charset=utf-8';
 }
 
@@ -175,7 +196,7 @@ export function parseDocument(fileName: string, content: string, options: ParseD
     if (!format) {
         throw new Error('暂不支持该文件格式，请选择 PDF、ePub、HTML、JSON、TXT、DOCX、Markdown 或字幕文件');
     }
-    if (format === 'pdf' || format === 'epub' || format === 'docx') {
+    if (format === 'pdf' || format === 'epub' || format === 'docx' || format === 'pptx' || format === 'xlsx') {
         throw new Error(`${getDocumentFormatLabel(format)}需要按二进制文件解析，请重新打开该文件`);
     }
 
@@ -190,6 +211,9 @@ export function parseDocument(fileName: string, content: string, options: ParseD
     }
     if (format === 'csv' || format === 'tsv') {
         return {fileName, format, label: getDocumentFormatLabel(format), ...parseDelimitedDocument(content, format === 'csv' ? ',' : '\t')};
+    }
+    if (format === 'tex') {
+        return {fileName, format, label: getDocumentFormatLabel(format), ...parseLatexDocument(content)};
     }
 
     const parsed = format === 'html'
@@ -216,7 +240,7 @@ function originalPartSource(part: SegmentPart): string {
 export function documentSegmentMarkupSources(document: ParsedDocument): Map<number, string> {
     const sources = new Map<number, string>();
     for (const part of document.parts) {
-        if (part.kind === 'segment' && (part.htmlTags || part.markdownTokens)) sources.set(part.segmentIndex, originalPartSource(part));
+        if (part.kind === 'segment' && (part.htmlTags || part.markdownTokens || part.latexTokens)) sources.set(part.segmentIndex, originalPartSource(part));
     }
     return sources;
 }
@@ -246,6 +270,15 @@ function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart,
     }
     if (document.format === 'markdown') {
         return `${part.prefix}${source}${part.suffix}\n> ${renderMarkdownTranslation(part, translation)}`;
+    }
+    if (document.format === 'tex') {
+        const rendered = renderLatexTranslation(part.latexTokens, translation);
+        if (part.latexBilingual === 'command') {
+            const safeSource = sanitizeLatexCommandText(source).replace(/\n+$/u, '');
+            const safeRendered = sanitizeLatexCommandText(rendered).replace(/^\n+/u, '');
+            return `${part.prefix}${safeSource}\n${safeRendered}${part.suffix}`;
+        }
+        return `${part.prefix}${source}\n\n${rendered}${part.suffix}`;
     }
     if (document.format === 'ass') {
         return `${part.prefix}${source}${part.suffix}\\N${formattedTranslation}`;
@@ -328,6 +361,12 @@ function renderParts(document: ParsedDocument, translations: readonly string[], 
         }
         if (document.format === 'html') {
             append(`${part.prefix}${renderHtmlTranslation(part, translation)}${part.suffix}`);
+            continue;
+        }
+        if (document.format === 'tex') {
+            const rendered = renderLatexTranslation(part.latexTokens, translation);
+            const safeRendered = part.latexBilingual === 'command' ? sanitizeLatexCommandText(rendered) : rendered;
+            append(`${part.prefix}${safeRendered}${part.suffix}`);
             continue;
         }
         const formattedTranslation = ['srt', 'vtt', 'ass'].includes(document.format)

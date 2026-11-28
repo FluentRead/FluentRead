@@ -211,7 +211,7 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
   })
   it('独立悬浮方案展示本身模型及默认服务，关闭默认开关不隐藏独立方案',async()=>{
     config.quickTranslationProfiles=[{id:'machine',enabled:true,action:'hover',hotkey:'Alt+J',service:'microsoft',model:'',targetLanguage:'',displayMode:'inherit',fullPageMode:'inherit'},
-      {id:'ai',enabled:true,action:'hover',hotkey:'Alt+K',service:'openai',model:'custom-model',targetLanguage:'',displayMode:'inherit',fullPageMode:'inherit'},
+      {id:'ai',enabled:true,action:'hover',hotkey:'Alt+U',service:'openai',model:'custom-model',targetLanguage:'',displayMode:'inherit',fullPageMode:'inherit'},
       {id:'default',enabled:true,action:'hover',hotkey:'Alt+L',service:'',model:'',targetLanguage:'',displayMode:'inherit',fullPageMode:'inherit'}]
     await mount();await openFeature('hover');const preview=document.querySelector('[data-testid="popup-quick-hover-profiles"]')!
     expect(preview.textContent).toContain('微软');expect(preview.textContent).toContain('custom-model');expect(preview.textContent).toContain('谷歌');expect(preview.querySelectorAll('kbd')).toHaveLength(3)

@@ -79,6 +79,8 @@
       <ToolbarClickSetting v-if="ToolbarClickSetting" :config="config" />
     </SettingsGroup>
     <FeatureServiceSettings id="feature-services" data-settings-anchor="services" :data-settings-anchor-label="t('featureServices.assignments')" :active="viewActive && props.activeSection === 'settings-general'" :config="config" :service-options="availableServiceOptions" @configure-service="openInputServiceSettings" />
+    <ScenarioPresetsSettings v-if="ScenarioPresetsSettings" :config="config" :active="viewActive && props.activeSection === 'settings-general'" />
+    <CommandPaletteSettings v-if="CommandPaletteSettings" :config="config" :active="viewActive && props.activeSection === 'settings-general'" />
   </section>
 
   <!-- 网站规则 -->
@@ -473,6 +475,7 @@
               </el-select>
             </SettingsItem>
             <VideoLocalModelSettings :config="config" :active="viewActive && props.activeSection === 'settings-video' && (!props.activePanel || props.activePanel === 'local')" :context="config" />
+            <LocalMediaTranscriptionPanel v-if="LocalMediaTranscriptionPanel" :config="config" :active="viewActive && props.activeSection === 'settings-video' && (!props.activePanel || props.activePanel === 'local')" />
           </SettingsGroup>
         </SettingsDisclosure>
       </SettingsPanel>
@@ -703,6 +706,9 @@ import {
 const ImageOcrSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/image-translation/ui/public').then(module => module.ImageOcrSettings));
 const MangaSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/image-translation/ui/public').then(module => module.MangaSettings));
 const VideoLocalModelSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoLocalModelSettings.vue'));
+const LocalMediaTranscriptionPanel = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/video-subtitle/local-media/public').then(module => module.LocalMediaTranscriptionPanel));
+const ScenarioPresetsSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./ScenarioPresetsSettings.vue'));
+const CommandPaletteSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./CommandPaletteSettings.vue'));
 const VideoSubtitleShortcutSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSubtitleShortcutSettings.vue'));
 const LocalTtsSettings = defineAsyncComponent(() => import('./LocalTtsSettings.vue'));
 const VideoSubtitleAppearanceSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSubtitleAppearanceSettings.vue'));

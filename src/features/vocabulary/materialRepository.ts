@@ -298,17 +298,17 @@ export class MaterialRepository {
         await this.migrate();
         return {format: 'fluentread-learning-materials', version: 1, exportedAt: now, materials: await this.db.materials.toArray()};
     }
-    async importData(input: unknown, now = Date.now(), guard?: MaterialOperationGuard): Promise<MaterialImportResult> {
+    async importData(input: unknown, now = Date.now(), guard?: MaterialOperationGuard, options?: {authoritative?: boolean}): Promise<MaterialImportResult> {
         if (!input || typeof input !== 'object' || Array.isArray(input)) throw new MaterialError('invalid-input', '材料备份无效');
         const value = input as Partial<MaterialBackup>;
         if (value.format !== 'fluentread-learning-materials' || value.version !== 1 || !Array.isArray(value.materials) || value.materials.length > 10000) throw new MaterialError('invalid-input', '不支持的材料备份格式或超过材料上限');
-        return this.importRecords(async apply => {for (const item of value.materials!) await apply(item);}, now, guard);
+        return this.importRecords(async apply => {for (const item of value.materials!) await apply(item);}, now, guard, options);
     }
     /**
      * 在同一事务内顺序应用材料记录。consume 只能等待同库操作，不能等待
      * 文件或跨进程消息；每次 apply 必须完成后才能提交下一条记录。
      */
-    async importRecords(consume: (apply: (item: unknown) => Promise<void>) => Promise<void>, now = Date.now(), guard?: MaterialOperationGuard): Promise<MaterialImportResult> {
+    async importRecords(consume: (apply: (item: unknown) => Promise<void>) => Promise<void>, now = Date.now(), guard?: MaterialOperationGuard, options?: {authoritative?: boolean}): Promise<MaterialImportResult> {
         if (guard !== undefined && (!guard || !Number.isSafeInteger(guard.generation) || guard.generation < 0 || !Number.isFinite(guard.capturedAt) || guard.capturedAt < 0 || guard.capturedAt > now + 60_000)) throw new MaterialError('invalid-input', '材料导入操作无效');
         const generation = guard?.generation ?? await this.generation();
         const result: MaterialImportResult = {inserted: 0, updated: 0, skipped: 0};
@@ -332,7 +332,7 @@ export class MaterialRepository {
                         const owner = await this.findIdentity(alias);
                         if (owner && owner.id !== previous?.id) {conflict = true; break;}
                     }
-                    if (conflict || (previous && previous.updatedAt >= record.updatedAt)) {result.skipped++; return;}
+                    if (conflict || (!options?.authoritative && previous && previous.updatedAt >= record.updatedAt)) {result.skipped++; return;}
                     if (previous) {
                         record.id = previous.id;
                         record.aliases = [...new Set([...(previous.aliases ?? []), previous.identityKey, ...record.aliases])].filter(key => key !== record.identityKey).slice(-100);

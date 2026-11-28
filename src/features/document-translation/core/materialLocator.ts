@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/materialLocator.ts
  * 文件职责：为文档校订恢复与材料学习入口提供无副作用的材料身份、原文位置契约。
- * 主要内容：以本地历史的文件内容摘要为材料身份，优先提取 PDF 页及首行、EPUB 章节、DOCX 段落等原生位置，只有结构化 JSON 才使用路径标签；使用 WeakMap 缓存解析快照的定位结果并按 format、segments 引用与长度及二进制结构引用校验失效，使滚动捕获与历史匹配中的重复查询保持 O(1)；引用保留创建时相同位置候选数，避免目标删除后误指向剩余重复句；原文逐字符一致是恢复的前提，重复片段仅接受双向唯一的位置或邻文证据，歧义位置不按出现次序猜测。
+ * 主要内容：以本地历史的文件内容摘要为材料身份，优先提取 PDF 页及首行、EPUB 章节、DOCX/PPTX 段落与 XLSX 单元格等原生位置，只有结构化 JSON/CSV/TSV 才使用路径标签；使用 WeakMap 缓存解析快照的定位结果并按 format、segments 引用与长度及二进制结构引用校验失效，使滚动捕获与历史匹配中的重复查询保持 O(1)；引用保留创建时相同位置候选数，避免目标删除后误指向剩余重复句；原文逐字符一致是恢复的前提，重复片段仅接受双向唯一的位置或邻文证据，歧义位置不按出现次序猜测。
  * 模块边界：只消费解析模型，不读取文件、配置、数据库或网络；引用包含原文，仅供本地使用，不含 URL、令牌或用户配置，调用方不得将其自动上传或写入日志。
  */
 import type {DocumentSegment, ParsedDocument} from './document';
@@ -134,6 +134,22 @@ export function documentSourceLocators(snapshot: SourceSnapshot): readonly (Docu
             for (const paragraph of part.paragraphSegments) {
                 if (!paragraph || !Number.isInteger(paragraph.paragraphIndex) || paragraph.paragraphIndex < 0) continue;
                 assign(paragraph.segmentIndex, `docx:${part.path}`, `paragraph:${paragraph.paragraphIndex}`);
+            }
+        }
+    } else if (binary?.kind === 'pptx' && Array.isArray(binary.parts)) {
+        for (const part of binary.parts) {
+            if (!part || typeof part.path !== 'string' || !Array.isArray(part.paragraphSegments)) continue;
+            for (const paragraph of part.paragraphSegments) {
+                if (!paragraph || !Number.isInteger(paragraph.paragraphIndex) || paragraph.paragraphIndex < 0) continue;
+                assign(paragraph.segmentIndex, `pptx:${part.path}`, `paragraph:${paragraph.paragraphIndex}`);
+            }
+        }
+    } else if (binary?.kind === 'xlsx' && Array.isArray(binary.sheets)) {
+        for (const sheet of binary.sheets) {
+            if (!sheet || typeof sheet.path !== 'string' || !Array.isArray(sheet.cellSegments)) continue;
+            for (const cell of sheet.cellSegments) {
+                if (!cell || typeof cell.cellRef !== 'string' || !cell.cellRef) continue;
+                assign(cell.segmentIndex, `xlsx:${sheet.path}`, `cell:${cell.cellRef}`);
             }
         }
     }

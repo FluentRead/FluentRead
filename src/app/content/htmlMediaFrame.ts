@@ -18,7 +18,7 @@ export async function startHtmlMediaFrameApp(ctx: ContentScriptContext): Promise
         || /(^|\.)(youtube\.com|x\.com|twitter\.com)$/i.test(window.location.hostname)
         || isExcludedHtmlMediaHost(window.location.hostname)
         || isExcludedHtmlMediaUrl(document.referrer)
-        || (platform && platform !== 'coursera')) return;
+        || (platform && platform !== 'coursera' && platform !== 'vimeo')) return;
     const lifetime = new AbortController();
     let disposed = false;
     let stop: (() => void) | undefined;

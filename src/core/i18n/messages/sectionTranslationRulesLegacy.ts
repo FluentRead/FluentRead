@@ -9,6 +9,11 @@ import type {RegisteredUiLanguage} from '../types';
 type SectionRuleLegacySource = '记住的翻译区域' | '提醒' | '· 已停用';
 
 export const sectionTranslationRulesLegacyText = {
+    'zh-TW': {
+        '记住的翻译区域': '記住的翻譯區域',
+        '提醒': '提醒',
+        '· 已停用': '· 已停用',
+    },
     'en-US': {
         '记住的翻译区域': 'Remembered translation areas',
         '提醒': 'Reminder',

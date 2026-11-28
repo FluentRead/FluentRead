@@ -6,20 +6,26 @@
  */
 import type {MarkdownTable} from '../markdownTable';
 import type {DelimitedColumn} from '../delimited';
+import type {LatexToken} from '../latex';
 
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 /** 带插图的论文与扫描件常超过 10 MB；PDF 按页解析、译文量只取决于文字，单独放宽上限。 */
 export const PDF_MAX_BYTES = 50 * 1024 * 1024;
+/** 演示文稿常包含高分辨率图片与媒体资源，单独放宽至与 PDF 相同的上限。 */
+export const PPTX_MAX_BYTES = 50 * 1024 * 1024;
 
 export const SUPPORTED_DOCUMENT_EXTENSIONS = [
     'pdf',
     'epub',
     'docx',
+    'pptx',
+    'xlsx',
     'html',
     'htm',
     'txt',
     'md',
     'markdown',
+    'tex',
     'srt',
     'vtt',
     'ass',
@@ -34,9 +40,12 @@ export type DocumentFormat =
     | 'pdf'
     | 'epub'
     | 'docx'
+    | 'pptx'
+    | 'xlsx'
     | 'html'
     | 'txt'
     | 'markdown'
+    | 'tex'
     | 'srt'
     | 'vtt'
     | 'ass'
@@ -168,10 +177,34 @@ export interface DocxDocumentPart {
     paragraphSegments: Array<{paragraphIndex: number; segmentIndex: number; table?: {table: number; row: number; cell: number}}>;
 }
 
+export interface PptxDocumentPart {
+    path: string;
+    source: string;
+    kind: 'slide' | 'notes';
+    slideNumber: number;
+    paragraphSegments: Array<{paragraphIndex: number; segmentIndex: number}>;
+}
+
+export interface XlsxSheetSegment {
+    cellRef: string;
+    kind: 'shared' | 'inline';
+    sharedIndex?: number;
+    segmentIndex: number;
+}
+
+export interface XlsxDocumentSheet {
+    name: string;
+    path: string;
+    source: string;
+    cellSegments: XlsxSheetSegment[];
+}
+
 export type BinaryDocumentData =
     | {kind: 'pdf'; bytes: Uint8Array; pages: PdfDocumentPage[]}
     | {kind: 'epub'; bytes: Uint8Array; chapters: EpubDocumentChapter[]}
-    | {kind: 'docx'; bytes: Uint8Array; parts: DocxDocumentPart[]; inlineFormatting?: true};
+    | {kind: 'docx'; bytes: Uint8Array; parts: DocxDocumentPart[]; inlineFormatting?: true}
+    | {kind: 'pptx'; bytes: Uint8Array; parts: PptxDocumentPart[]}
+    | {kind: 'xlsx'; bytes: Uint8Array; sheets: XlsxDocumentSheet[]; sharedStringsPath?: string; sharedStringsSource?: string};
 
 export interface LiteralPart {
     kind: 'literal';
@@ -198,6 +231,10 @@ export interface SegmentPart {
     markdownTokens?: Array<{open: string; close?: string}>;
     /** HTML 整句片段里行内标签的原文：送翻时写成编号占位符 `<gN>…</gN>`，渲染时按编号还原。 */
     htmlTags?: Array<{open: string; close: string}>;
+    /** LaTeX 片段中的行内公式、引用和格式化命令：以编号占位符保护，回填时还原。 */
+    latexTokens?: LatexToken[];
+    /** LaTeX 双语输出方式：命令参数单换行，正文与列表项空行分段。 */
+    latexBilingual?: 'paragraph' | 'command';
     /** 表格字段的 rawSource 包含原始引号与空白。 */
     delimitedCell?: {delimiter: ',' | '\t'; quoted: boolean};
 }

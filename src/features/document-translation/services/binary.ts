@@ -1,8 +1,8 @@
 /**
  * @file src/features/document-translation/services/binary.ts
- * 文件职责：作为 PDF、EPUB、DOCX 二进制文档与纯文本文件的统一导入导出门面，校验字节大小与编码并按格式分发到各独立子服务。
+ * 文件职责：作为 PDF、EPUB、DOCX、PPTX、XLSX 二进制文档与纯文本文件的统一导入导出门面，校验字节大小与编码并按格式分发到各独立子服务。
  * 主要内容：提供 parseBinaryDocument、parseDocumentFile 与 createDocumentDownload 公共入口，识别 UTF-8 与带 BOM 的 UTF-16 文本并统一导出 PDF、EPUB、DOCX 辅助函数与类型定义。
- * 模块边界：仅负责格式分发、编码解码与公共契约导出，具体二进制解析与导出实现分别归属 binaryShared、pdfParse、pdfExport、epubBinary 与 docxBinary。
+ * 模块边界：仅负责格式分发、编码解码与公共契约导出，具体二进制解析与导出实现分别归属 binaryShared、pdfParse、pdfExport、epubBinary、docxBinary 与 officeBinary。
  */
 import {
     createDocumentDownloadName,
@@ -65,6 +65,7 @@ import {
     renderDocx,
     renderDocxPart,
 } from './docxBinary';
+import {parsePptx, parseXlsx, renderPptx, renderXlsx} from './officeBinary';
 
 export {
     assertArchiveSafety,
@@ -114,15 +115,17 @@ export async function parseBinaryDocument(
     options.signal?.throwIfAborted();
     const format = getDocumentFormat(fileName);
     if (!format || !isBinaryDocumentFormat(format)) {
-        throw new Error('该文件不是 PDF、ePub 或 DOCX 二进制文档');
+        throw new Error('该文件不是 PDF、ePub、DOCX、PPTX 或 XLSX 二进制文档');
     }
     assertDocumentSize(input.byteLength, fileName);
     const bytes = toUint8Array(input);
-    const parsed = await (format === 'pdf'
-        ? parsePdf(fileName, bytes, options.signal, options.onPdfProgress)
-        : format === 'epub'
-            ? parseEpub(fileName, bytes, options.signal)
-            : parseDocx(fileName, bytes, options.signal));
+    const parsed = await (
+        format === 'pdf' ? parsePdf(fileName, bytes, options.signal, options.onPdfProgress)
+            : format === 'epub' ? parseEpub(fileName, bytes, options.signal)
+                : format === 'docx' ? parseDocx(fileName, bytes, options.signal)
+                    : format === 'pptx' ? parsePptx(fileName, bytes, options.signal)
+                        : parseXlsx(fileName, bytes, options.signal)
+    );
     options.signal?.throwIfAborted();
     return parsed;
 }
@@ -184,6 +187,10 @@ export async function createDocumentDownload(
         data = await renderEpub(document, resolved, mode, options);
     } else if (document.format === 'docx') {
         data = await renderDocx(document, resolved, mode, options);
+    } else if (document.format === 'pptx') {
+        data = await renderPptx(document, resolved, mode, options);
+    } else if (document.format === 'xlsx') {
+        data = await renderXlsx(document, resolved, mode, options);
     } else {
         data = renderDocument(document, resolved, mode);
     }

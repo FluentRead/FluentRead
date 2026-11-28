@@ -9,6 +9,7 @@ import type {UiLanguage} from '../types';
 /** 首启不等待完整资源包；独立维护现有品牌名，避免改变原中英文目录的展开顺序。 */
 export const onboardingProductNames = {
     'zh-CN': '流畅阅读',
+    'zh-TW': '流暢閱讀',
     'en-US': 'FluentRead',
     'ja-JP': 'FluentRead',
     'ko-KR': 'FluentRead',

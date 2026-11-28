@@ -32,6 +32,7 @@ import {translationStatsKoreanMessages} from './translationStats';
 import {localTranslationKoreanMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
+import {task7Messages, task7LegacyText} from './task7Features';
 
 import countForms from './count-forms.json';
 
@@ -46,6 +47,7 @@ export const koKRMessages = {
     "feedback.retryHint": "잠시 후 다시 시도하세요. 원문과 현재 선택 영역은 유지됩니다.",
     ...countForms['ko-KR'],
     ...personalCorrectionMessages['ko-KR'],
+    ...task7Messages['ko-KR'],
     "document.config.loadFailed": "설정을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.",
     "popup.compact.translate": "번역",
     "popup.compact.restore": "복원",
@@ -356,7 +358,15 @@ export const koKRMessages = {
     "writing.entry.chooseReference": "먼저 다른 대조 언어를 선택하세요.",
     "writing.entry.saveError": "저장하지 못했습니다. 다시 시도하세요.",
     "writing.entry.openError": "확장 메뉴에서 전체 설정을 여세요.",
-    "writing.experience.enableDescription": "GitHub와 Gmail에서 답장을 작성하고 다듬으세요. 확인 후 직접 보내세요.",
+    "writing.hotkey.label": "범용 단축키",
+    "writing.hotkey.description": "어느 웹사이트에서나 입력란이나 서식 편집기에 포커스를 둔 상태에서 단축키를 누르면 플로팅 버튼 없이 글쓰기 도우미를 바로 엽니다.",
+    "writing.hotkey.edit": "글쓰기 도우미 단축키 편집",
+    "writing.hotkey.disabled": "단축키 꺼짐",
+    "writing.hotkey.reset": "기본값 복원",
+    "writing.hotkey.requireModifier": "Ctrl, Alt 또는 Shift가 포함된 조합키를 선택하세요.",
+    "writing.hotkey.conflict": "이 단축키는 이미 {feature}에서 사용 중입니다. 다른 조합을 선택하세요.",
+    "writing.hotkey.entryHint": "어느 사이트에서나 입력란에 포커스를 두고 {shortcut} 키로 글쓰기 도우미를 열 수 있습니다.",
+    "writing.experience.enableDescription": "Gmail, GitHub, Outlook, X, Reddit, LinkedIn, Slack, Discord, Notion 및 모든 웹 입력란에서 답장을 작성하고 다듬으세요. 확인 후 직접 보내세요.",
     "writing.experience.disabled": "웹페이지 작성 버튼이 숨겨졌습니다. 설정은 유지됩니다.",
     "writing.experience.paused": "확장 프로그램을 시작하면 글쓰기 도우미를 사용할 수 있습니다.",
     "writing.experience.inheritModel": "서비스 모델 사용 · {model}",
@@ -2579,6 +2589,7 @@ const koKRLegacyTextBase: Readonly<Record<string, string>> = {
     'FluentRead 备份': '플루언트리드 백업',
     'FluentRead 翻译中心': '플루언트리드 번역 센터',
     ...mimoRetirementLegacyText['ko-KR'],
+    ...task7LegacyText['ko-KR'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'MiMo의 페이 페이 유 키는 보통 sk-로 시작합니다; 키가 API 키 페이지에서 가져오는지 꼭 확인해 주세요.',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'OCR 서비스 초기화가 실패했습니다. 설정 페이지를 다시 열고 다시 시도해 주세요.',
     'Offscreen 文档': '오프스크린 문서',

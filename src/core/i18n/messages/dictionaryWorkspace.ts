@@ -6,6 +6,7 @@
  */
 import type {UiLanguage} from '../types';
 import chinese from './dictionary-workspace/zh-CN.json';
+import traditionalChinese from './dictionary-workspace/zh-TW.json';
 import english from './dictionary-workspace/en-US.json';
 import japanese from './dictionary-workspace/ja-JP.json';
 import korean from './dictionary-workspace/ko-KR.json';
@@ -13,4 +14,4 @@ import french from './dictionary-workspace/fr-FR.json';
 import russian from './dictionary-workspace/ru-RU.json';
 import spanish from './dictionary-workspace/es-ES.json';
 export const dictionaryWorkspaceChineseMessages = chinese;
-export const dictionaryWorkspaceMessages: Readonly<Record<UiLanguage, Readonly<Record<string, string>>>> = {'zh-CN': chinese, 'en-US': english, 'ja-JP': japanese, 'ko-KR': korean, 'fr-FR': french, 'ru-RU': russian, 'es-ES': spanish};
+export const dictionaryWorkspaceMessages: Readonly<Record<UiLanguage, Readonly<Record<string, string>>>> = {'zh-CN': chinese, 'zh-TW': traditionalChinese, 'en-US': english, 'ja-JP': japanese, 'ko-KR': korean, 'fr-FR': french, 'ru-RU': russian, 'es-ES': spanish};

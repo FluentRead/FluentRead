@@ -6,7 +6,7 @@
  */
 import {z} from 'zod';
 import {isProtocolInputObject} from '@/src/core/messaging/validation';
-import {WRITING_ACTIONS, WRITING_LENGTHS, WRITING_STYLES, WRITING_ROLE_MAX_LENGTH, WRITING_TONE_MAX_LENGTH, isWritingLanguage, normalizeWritingLanguage, normalizeWritingLength} from '@/src/core/config/writing';
+import {WRITING_ACTIONS, WRITING_LENGTHS, WRITING_SITES, WRITING_STYLES, WRITING_ROLE_MAX_LENGTH, WRITING_TONE_MAX_LENGTH, isWritingLanguage, normalizeWritingLanguage, normalizeWritingLength} from '@/src/core/config/writing';
 import type {WritingRequest, WritingResponse, WritingProgress, WritingStreamMessage} from './types';
 
 export interface WritingSender {id?: string; url?: string; documentId?: string; tab?: {id?: number; url?: string; incognito?: boolean}; frameId?: number}
@@ -31,6 +31,7 @@ const requestSchema = z.strictObject({
     length: z.string().refine(value => value === 'auto' || WRITING_LENGTHS.some(item => item.value === value)).prefault('short').transform(normalizeWritingLength),
     style: z.string().refine(value => WRITING_STYLES.some(item => item.value === value)).prefault('auto'),
     role: boundedText(WRITING_ROLE_MAX_LENGTH).regex(/^[^\u0000-\u001f\u007f]*$/u).trim().min(1).prefault('auto'),
+    site: z.enum(WRITING_SITES).optional(),
     history: z.array(historyEntrySchema).max(4),
 });
 export const parseWritingRequest = (value: unknown): WritingRequest | null => {

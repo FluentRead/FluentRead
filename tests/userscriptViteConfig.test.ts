@@ -833,7 +833,7 @@ describe('userscript browser shim injection', () => {
             }
         }
     });
-    it.each(Object.keys(pinnedLanguageFiles) as Array<keyof typeof extensionBundles>)('keeps the published %s resource while deriving every current supported override', language => {
+    it.each(Object.keys(pinnedLanguageFiles) as Array<keyof typeof UI_LANGUAGE_BUNDLES>)('keeps the published %s resource while deriving every current supported override', language => {
         const original = extensionBundles[language], baseline = UI_LANGUAGE_BUNDLES[language];
         const before = JSON.stringify(baseline), originalBefore = JSON.stringify(original);
         const current = currentUserscriptLanguageBundle(language), update = createUserscriptLanguageUpdate(current, baseline);
@@ -975,7 +975,18 @@ describe('userscript browser shim injection', () => {
         }
         const extensionOnlyUndoKeys = ['learning.collection.undoExtensionNotice'];
         for (const key of extensionOnlyUndoKeys) expect(Object.hasOwn(projected,key)).toBe(false);
-        const retainedKeys = Object.keys(extension).filter(key => !extensionOnlyUndoKeys.includes(key) && !key.startsWith('informationHighlight.') && !key.startsWith('dictionary.')
+        const cloudUpgradeKeys = Object.keys(extension).filter(key => key.startsWith('settings.cloud.e2ee.')
+            || key.startsWith('settings.cloud.learning.')
+            || key.startsWith('settings.cloud.autoSync.')
+            || key.startsWith('video.localMedia.')
+            || key.startsWith('writing.hotkey.')
+            || key.startsWith('document.xlsx.'));
+        expect(cloudUpgradeKeys.length).toBeGreaterThan(0);
+        for (const key of cloudUpgradeKeys) {
+            expect(extension[key]).toBeTruthy();
+            expect(Object.hasOwn(projected, key)).toBe(false);
+        }
+        const retainedKeys = Object.keys(extension).filter(key => !extensionOnlyUndoKeys.includes(key) && !cloudUpgradeKeys.includes(key) && !key.startsWith('informationHighlight.') && !key.startsWith('dictionary.') && !key.startsWith('scenarioPresets.') && !key.startsWith('commandPalette.')
             && (!key.startsWith('learning.collection.speech') || key === 'learning.collection.speechFailed')
             && !noticeKeys.includes(key) && !learningKeys.includes(key) && !readingAnnotationKeys.includes(key) && !subtitleAppearanceKeys.includes(key) && !learningAppearanceKeys.includes(key) && !subtitleExportKeys.includes(key) && !videoAsrKeys.includes(key) && !subtitleModeShortcutKeys.includes(key) && !readerRecoveryKeys.includes(key)
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)

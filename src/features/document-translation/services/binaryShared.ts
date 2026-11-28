@@ -1,6 +1,6 @@
 /**
  * @file src/features/document-translation/services/binaryShared.ts
- * 文件职责：提供 PDF、EPUB 与 DOCX 二进制文档解析与导出共用的协议类型、文件大小与归档安全校验、流式解压读取及 XML/ZIP 路径工具函数。
+ * 文件职责：提供 PDF、EPUB、DOCX、PPTX 与 XLSX 二进制文档解析与导出共用的协议类型、文件大小与归档安全校验、流式解压读取及 XML/ZIP 路径工具函数。
  * 主要内容：定义二进制文档导入与 PDF 光栅/阅读导出接口；实现可取消的异步读取包装、防炸弹压缩项检查、XML 实体编解码与属性解析、ZIP 相对路径规范化及中位数计算。
  * 模块边界：仅提供二进制文档服务层共用的基础契约与纯工具函数，不加载 PDF.js/pdf-lib，也不承担具体文档格式的解析或导出编排。
  */
@@ -14,7 +14,7 @@ import {
     type PdfDocumentPage,
 } from '@/src/features/document-translation/core/document';
 
-const BINARY_DOCUMENT_FORMATS = new Set<DocumentFormat>(['pdf', 'epub', 'docx']);
+const BINARY_DOCUMENT_FORMATS = new Set<DocumentFormat>(['pdf', 'epub', 'docx', 'pptx', 'xlsx']);
 const ARCHIVE_ENTRY_LIMIT = 4_000;
 const ARCHIVE_ENTRY_BYTES_LIMIT = 24 * 1024 * 1024;
 const ARCHIVE_TOTAL_BYTES_LIMIT = 96 * 1024 * 1024;
@@ -233,7 +233,7 @@ export function readArchiveText(entry: JSZip.JSZipObject, signal?: AbortSignal):
     });
 }
 
-export function assertArchiveSafety(zip: JSZip, label: 'ePub' | 'DOCX'): void {
+export function assertArchiveSafety(zip: JSZip, label: 'ePub' | 'DOCX' | 'PPTX' | 'XLSX'): void {
     const entries = Object.values(zip.files);
     if (entries.length > ARCHIVE_ENTRY_LIMIT) {
         throw new Error(`${label} 文件包含过多压缩项，已停止解析`);

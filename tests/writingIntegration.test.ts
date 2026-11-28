@@ -42,7 +42,7 @@ describe('Writing mounting and background composition', () => {
     let resolve!: (value: any) => void; const late = {remove: vi.fn()}; m.shadow.mockImplementationOnce(() => new Promise(r => {resolve = r;})); const pending = mountWritingAssistant({} as any); unmountWritingAssistant(); resolve(late); await pending; expect(late.remove).toHaveBeenCalledOnce();
     const current = {remove: vi.fn()}; m.shadow.mockResolvedValue(current); await mountWritingAssistant({} as any); expect(isWritingAssistantMounted()).toBe(true); await mountWritingAssistant({} as any); expect(current.remove).toHaveBeenCalledOnce(); unmountWritingAssistant(); expect(current.remove).toHaveBeenCalledTimes(2);
   });
-  it('recognizes the current top-level GitHub route after same-document navigation without refresh', () => {
+  it('recognizes first-class and generic HTTP/HTTPS top-level routes after same-document navigation without refresh', () => {
     installWritingBackgroundRuntime();
     const {eligibility} = m.handlerFactory.mock.calls[0][0];
     for (const initialUrl of ['https://github.com/FluentRead/FluentRead', 'https://github.com/FluentRead/FluentRead/issues']) {
@@ -50,12 +50,15 @@ describe('Writing mounting and background composition', () => {
         expect(eligibility({frameId: 0, url: initialUrl, tab: {url: currentUrl}})).toBeUndefined();
       }
     }
+    for (const url of ['https://outlook.office.com/mail/', 'https://x.com/home', 'https://www.reddit.com/r/ts', 'https://www.linkedin.com/feed/', 'https://app.slack.com/client/T1/C1', 'https://discord.com/channels/1/2', 'https://www.notion.so/doc', 'https://example.com/blog', 'http://localhost:3000/editor']) {
+      expect(eligibility({frameId: 0, url, tab: {url}}), url).toBeUndefined();
+    }
   });
-  it('rejects unsupported, missing, malformed or cross-origin current top-level routes', () => {
+  it('rejects non-web, missing, malformed or cross-origin current top-level routes', () => {
     installWritingBackgroundRuntime();
     const {eligibility} = m.handlerFactory.mock.calls[0][0];
     const url = 'https://github.com/FluentRead/FluentRead/issues/1056';
-    for (const currentUrl of ['https://github.com/FluentRead/FluentRead', 'https://github.com/FluentRead/FluentRead/issues', 'https://github.com/FluentRead/FluentRead/issues/new/choose', 'https://github.com/FluentRead/FluentRead/discussions/1', 'https://mail.google.com/mail/u/0/', 'https://github.com.evil.test/FluentRead/FluentRead/issues/1056', 'http://github.com/FluentRead/FluentRead/issues/1056', '!', '']) {
+    for (const currentUrl of ['https://mail.google.com/mail/u/0/', 'https://github.com.evil.test/FluentRead/FluentRead/issues/1056', 'http://github.com/FluentRead/FluentRead/issues/1056', 'chrome://settings', 'file:///tmp/a.html', '!', '']) {
       expect(eligibility({frameId: 0, url, tab: {url: currentUrl}})).toContain('仅支持');
     }
     expect(eligibility({frameId: 0, url})).toContain('仅支持');
@@ -68,8 +71,11 @@ describe('Writing mounting and background composition', () => {
     const {eligibility} = m.handlerFactory.mock.calls[0][0];
     const url = 'https://github.com/FluentRead/FluentRead/issues/1056';
     for (const frameId of [1, undefined]) {
-      expect(eligibility({frameId, url: 'https://github.com/FluentRead/FluentRead/issues', tab: {url}})).toContain('仅支持');
-      expect(eligibility({frameId, url: 'https://example.com/', tab: {url}})).toContain('仅支持');
+      expect(eligibility({frameId, url: 'file:///tmp/frame.html', tab: {url}})).toContain('仅支持');
+      expect(eligibility({frameId, url: 'chrome-extension://ext/frame.html', tab: {url}})).toContain('仅支持');
+      expect(eligibility({frameId, url, tab: {url: 'file:///tmp/parent.html'}})).toContain('仅支持');
+      expect(eligibility({frameId, url, tab: {url: 'chrome://settings'}})).toContain('仅支持');
+      expect(eligibility({frameId, url: 'https://example.com/', tab: {url}})).toBeUndefined();
       expect(eligibility({frameId, url, tab: {url: 'https://example.com/'}})).toBeUndefined();
     }
   });
@@ -83,16 +89,17 @@ describe('Writing mounting and background composition', () => {
     m.config.writing.disabledDomains = ['github.com'];
     expect(eligibility(sender)).toContain('禁用');
   });
-  it('gates non-writing URLs and disabled sites, binds config and tab invalidation, and records a captured generation', async () => {
+  it('gates non-web URLs and disabled sites, binds config and tab invalidation, and records a captured generation', async () => {
     const run = vi.fn(async () => ({success: true})); m.runtimeFactory.mockReturnValue(run); const cancel = installWritingBackgroundRuntime();
     const deps = m.handlerFactory.mock.calls[0][0];
-    expect(deps.eligibility({})).toContain('仅支持'); expect(deps.eligibility({url:'https://example.com'})).toContain('仅支持');
+    expect(deps.eligibility({})).toContain('仅支持'); expect(deps.eligibility({url:'chrome://settings'})).toContain('仅支持');
+    expect(deps.eligibility({url:'https://example.com'})).toBeUndefined();
     const sender = {url:'https://github.com/a/b/issues/1',tab:{url:'https://github.com/a/b/issues/1'}};
     expect(deps.eligibility(sender)).toBeUndefined(); m.config.on = false; expect(deps.eligibility(sender)).toContain('停用'); m.config.on = true; m.config.writing.enabled = false; expect(deps.eligibility(sender)).toContain('停用'); m.config.writing.enabled = true;
     m.config.disabledExtensionDomains = ['github.com']; expect(deps.eligibility(sender)).toContain('禁用'); m.config.disabledExtensionDomains = ['example.com']; expect(deps.eligibility({...sender,tab:{url:'https://example.com'}})).toContain('禁用'); expect(deps.eligibility({url:sender.url})).toBeUndefined();
     m.config.writing.disabledDomains = ['github.com']; expect(deps.eligibility(sender)).toContain('禁用');
     m.config.writing.disabledDomains = ['google.com']; expect(deps.eligibility({...sender, tab: {url: 'https://mail.google.com/mail/u/0/'}})).toContain('禁用'); m.config.writing.disabledDomains = [];
-    const changed = m.subscribe.mock.calls[0][0]; changed(m.config); changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledOnce(); m.config.writing.referenceLanguage = 'es'; changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledOnce(); m.config.writing.tone = 'friendly'; changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledTimes(2); m.config.customOpenAIProviders = [{id: 'custom:test', name: 'Test', endpoint: 'https://example.test/v1', models: []}]; changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledTimes(2);
+    const changed = m.subscribe.mock.calls[0][0]; changed(m.config); changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledOnce(); m.config.writing.referenceLanguage = 'es'; changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledOnce(); m.config.writing.writingHotkey = 'Ctrl+Shift+U'; changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledOnce(); m.config.writing.tone = 'friendly'; changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledTimes(2); m.config.customOpenAIProviders = [{id: 'custom:test', name: 'Test', endpoint: 'https://example.test/v1', models: []}]; changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledTimes(2);
     m.config.writing.service = 'custom:test'; m.config.writing.model = 'custom-model'; changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledTimes(3);
     m.onConnect.mock.calls[0][0]('port'); expect(m.handler.connect).toHaveBeenCalledWith('port'); m.removed.mock.calls[0][0](2); m.updated.mock.calls[0][0](3,{status:'complete'}); m.updated.mock.calls[0][0](4,{url:sender.url}); m.updated.mock.calls[0][0](5,{status:'loading'}); expect(m.handler.cancelTab.mock.calls).toEqual([[2],[4],[5]]);
     await deps.run(request,new AbortController().signal,vi.fn(), sender); expect(m.runtimeFactory.mock.calls[0][0]()).toBe(m.config);

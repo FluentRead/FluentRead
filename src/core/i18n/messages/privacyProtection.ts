@@ -35,6 +35,36 @@ export const privacyProtectionChineseMessages = {
     "privacy.previewBlocked": "已阻止发送",
     "privacy.boundary": "规则无法识别所有个人信息；姓名、详细地址请添加自定义词。本开关不覆盖阅读助手、AI 写作、音频或云端 OCR。启用后，翻译请求上传原图会被阻止。"
 } as const;
+export const privacyProtectionTraditionalChineseMessages = {
+    "privacy.title": "翻譯隱私防護",
+    "privacy.enabled": "啟用隱私防護",
+    "privacy.scope": "保護網頁、劃詞、輸入框、文件和字幕的文字翻譯及其上下文。",
+    "privacy.mode": "處理方式",
+    "privacy.mask": "脫敏後傳送",
+    "privacy.block": "偵測後攔截",
+    "privacy.categories": "保護內容",
+    "privacy.category.email": "信箱",
+    "privacy.category.phone": "電話號碼",
+    "privacy.category.identity": "身份證件",
+    "privacy.category.payment": "銀行卡與 IBAN",
+    "privacy.category.secret": "密碼與金鑰",
+    "privacy.category.network": "IPv4 位址",
+    "privacy.category.custom": "自訂敏感詞",
+    "privacy.localPolicy": "不下載模型。開啟後略過翻譯快取讀寫；已有快取保留。標記異常時停止，不回覆傳送原文。",
+    "privacy.custom": "自訂敏感詞",
+    "privacy.customHelp": "姓名、位址和內部名稱",
+    "privacy.customLimits": "最多 {count} 條，每條 {length} 字元。",
+    "privacy.invalidTerms": "詞條過多或過長，請縮短後儲存。",
+    "privacy.preview": "脫敏預覽",
+    "privacy.modeHelp": "脫敏後傳送會在譯文返回後還原；偵測後攔截會阻止包含敏感資訊的請求。",
+    "privacy.customEditorHelp": "每行一個，區分大小寫。僅儲存在本機。",
+    "privacy.sampleText": "聯絡 demo@example.test，電話 13800138000",
+    "privacy.manage": "管理",
+    "privacy.customCount": "{count} 條",
+    "privacy.previewBlocked": "已阻止傳送",
+    "privacy.boundary": "規則無法辨識所有個人資訊；姓名、詳細位址請新增自訂詞。本開關不覆蓋閱讀助手、AI 寫作、音訊或雲端 OCR。啟用後，翻譯請求上傳原圖會被阻止。"
+} as const;
+
 export const privacyProtectionEnglishMessages = {
     "privacy.title": "Translation privacy",
     "privacy.enabled": "Enable privacy protection",
@@ -66,6 +96,35 @@ export const privacyProtectionEnglishMessages = {
 } as const;
 export const privacyProtectionMessages: Readonly<Record<UiLanguage, Readonly<Record<keyof typeof privacyProtectionChineseMessages, string>>>> = {
     "zh-CN": privacyProtectionChineseMessages,
+    "zh-TW": {
+    "privacy.title": "翻譯隱私防護",
+    "privacy.enabled": "啟用隱私防護",
+    "privacy.scope": "保護網頁、劃詞、輸入框、文件和字幕的文字翻譯及其上下文。",
+    "privacy.mode": "處理方式",
+    "privacy.mask": "脫敏後傳送",
+    "privacy.block": "偵測後攔截",
+    "privacy.categories": "保護內容",
+    "privacy.category.email": "信箱",
+    "privacy.category.phone": "電話號碼",
+    "privacy.category.identity": "身份證件",
+    "privacy.category.payment": "銀行卡與 IBAN",
+    "privacy.category.secret": "密碼與金鑰",
+    "privacy.category.network": "IPv4 位址",
+    "privacy.category.custom": "自訂敏感詞",
+    "privacy.localPolicy": "不下載模型。開啟後略過翻譯快取讀寫；已有快取保留。標記異常時停止，不回覆傳送原文。",
+    "privacy.custom": "自訂敏感詞",
+    "privacy.customHelp": "姓名、位址和內部名稱",
+    "privacy.customLimits": "最多 {count} 條，每條 {length} 字元。",
+    "privacy.invalidTerms": "詞條過多或過長，請縮短後儲存。",
+    "privacy.preview": "脫敏預覽",
+    "privacy.modeHelp": "脫敏後傳送會在譯文返回後還原；偵測後攔截會阻止包含敏感資訊的請求。",
+    "privacy.customEditorHelp": "每行一個，區分大小寫。僅儲存在本機。",
+    "privacy.sampleText": "聯絡 demo@example.test，電話 13800138000",
+    "privacy.manage": "管理",
+    "privacy.customCount": "{count} 條",
+    "privacy.previewBlocked": "已阻止傳送",
+    "privacy.boundary": "規則無法辨識所有個人資訊；姓名、詳細位址請新增自訂詞。本開關不覆蓋閱讀助手、AI 寫作、音訊或雲端 OCR。啟用後，翻譯請求上傳原圖會被阻止。"
+},
     "en-US": privacyProtectionEnglishMessages,
     "ja-JP": {
     "privacy.title": "翻訳のプライバシー保護",

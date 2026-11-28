@@ -25,7 +25,7 @@ export function collectUiSourceCopy(root) {
     }
     function script(source, file) {
         const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-        const locales = ['zh-CN', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'];
+        const locales = ['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'];
         const nonChineseLocales = new Set(['en-US', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES']);
         const typeModules = new Set(['src/core/i18n', 'src/core/i18n/language', 'src/core/i18n/types'].map(value => path.resolve(root, value)));
         const languageTypes = new Set();

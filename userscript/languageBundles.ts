@@ -24,7 +24,9 @@ export function userscriptMessages<T extends Record<string, string>>(messages: T
         && (!key.startsWith('learning.collection.speech') || key === 'learning.collection.speechFailed')
         && !key.startsWith('contextMenu.notice.') && !key.startsWith('video.learning.') && !key.startsWith('video.learningAppearance.')
         && !key.startsWith('video.readingAnnotation.')
-        && !key.startsWith('video.appearance.') && !key.startsWith('video.export') && !key.startsWith('video.ai') && !key.startsWith('video.model')
+        && !key.startsWith('video.appearance.') && !key.startsWith('video.export') && !key.startsWith('video.ai') && !key.startsWith('video.model') && !key.startsWith('video.localMedia.')
+        && !key.startsWith('writing.hotkey.')
+        && !key.startsWith('document.xlsx.')
         && (!key.startsWith('video.modeShortcut.') || key === 'video.modeShortcut.title')
         && key !== 'video.nativeFullscreenHint'
         && !key.startsWith('diagnostics.')
@@ -76,6 +78,19 @@ const nativeOnlyLegacySources = new Set([
     '本机学习数据已变化，请重新生成同步预览。',
     '本机学习数据写入和配置恢复失败，请重新打开设置检查；云端保留本次加密快照。',
     '合并后的单词本超出 5000 条上限，请清理后再同步',
+    // 扩展专用的写作助手通用网页与文档 PPTX/XLSX/LaTeX 运行期提示文案。
+    '写作助手仅支持常规网页（HTTP/HTTPS）',
+    '当前富文本编辑器由页面框架托管，请复制正文后自行粘贴。',
+    'PPTX 演示文稿',
+    'XLSX 电子表格',
+    'LaTeX 文档',
+    'PPTX 文件结构无效，文件可能已损坏或扩展名不正确',
+    'PPTX 中没有找到可翻译的幻灯片文字',
+    'XLSX 文件结构无效，文件可能已损坏或扩展名不正确',
+    'XLSX 中没有找到可翻译的单元格文字',
+    '该文件不是 PDF、ePub、DOCX、PPTX 或 XLSX 二进制文档',
+    'PPTX 文档状态无效，请重新打开文件',
+    'XLSX 文档状态无效，请重新打开文件',
 ]);
 
 // Userscript does not mount settings-video or its native ASR runtime. Keep config-diff

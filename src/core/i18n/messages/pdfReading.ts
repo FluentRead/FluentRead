@@ -291,6 +291,7 @@ export const pdfReadingTraditionalChineseMessages = {
     "document.delimited.column": "第 {column} 列",
     "document.delimited.cell": "單元格",
     "document.delimited.cells": "表格單元格翻譯",
+    "document.xlsx.sheets": "Excel 工作表",
     "document.translationProgress.count": "已翻譯 {completed}/{total} 個文本段落（{percent}%）",
     "document.translationProgress.waitingRetry": "等待自動重試",
     "document.translationProgress.finishing": "正在完成翻譯",

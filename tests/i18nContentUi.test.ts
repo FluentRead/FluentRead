@@ -92,6 +92,7 @@ describe('content UI localization boundaries', () => {
             '@/src/core/config/paragraphCopy': {resolveParagraphCopyHotkey: () => ''},
             '@/src/core/config/sectionTranslation': {resolveSectionTranslationHotkey: () => ''},
             '@/src/core/config/videoSubtitleShortcut': {resolveVideoSubtitleModeHotkey: () => ''},
+            '@/src/core/config/commandPalette': {resolveCommandPaletteHotkey: () => ''},
             '@/src/core/config/quickTranslation': {findEnabledQuickTranslationHotkeyConflict: () => undefined, inputBoxTranslationTriggerHotkey: () => '', quickTranslationActionKey: () => 'hover'},
             '@/src/core/config/serviceAvailability': {markDisabledTranslationServices},
             '@/src/core/config/writingReadiness': {resolveWritingReadiness: () => ({supported: true, message: '', issue: ''})},

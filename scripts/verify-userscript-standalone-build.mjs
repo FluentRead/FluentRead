@@ -60,6 +60,7 @@ const bytes = Buffer.byteLength(source);
 // 合入 #1443（方案 C 轻盈柔光语义令牌与分层对比度样式，含最新 main 增量）后 CI 实测为 3,752,118 字节，超出原上限 4,118 字节，无新增依赖或资源，Greasy Fork 与精简版上限不变，追加 5 kB。
 // 合入 #1440/#1441（视频字幕显示模式切换快捷键配置、冲突校验、配置差异/同步标签及七语文案）后 CI 实测为 3,756,047 字节，超出原上限 3,047 字节，无新增依赖或资源，Greasy Fork 与精简版上限不变，追加 4 kB。
 // 合入 Task 7（繁體中文 zh-TW 八语配置/提示词目录、全局命令面板快捷键配置与冲突校验）后实测为 3,768,601 字节，超出原上限 11,601 字节，无新增依赖或未隔离扩展组件，精简版上限不变，追加 13 kB。
-const maxBytes = 3_770_000;
+// 合入 Task 2/3/4/5/7 完整集成（新增写作助手通用快捷键配置与双向冲突校验、扩展站点配置及八语核心校验规则）后实测为 3,772,406 字节，无新增依赖或模型资源，精简版上限不变，追加 5 kB。
+const maxBytes = 3_775_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

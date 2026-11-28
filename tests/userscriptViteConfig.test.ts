@@ -975,7 +975,10 @@ describe('userscript browser shim injection', () => {
         for (const key of extensionOnlyUndoKeys) expect(Object.hasOwn(projected,key)).toBe(false);
         const cloudUpgradeKeys = Object.keys(extension).filter(key => key.startsWith('settings.cloud.e2ee.')
             || key.startsWith('settings.cloud.learning.')
-            || key.startsWith('settings.cloud.autoSync.'));
+            || key.startsWith('settings.cloud.autoSync.')
+            || key.startsWith('video.localMedia.')
+            || key.startsWith('writing.hotkey.')
+            || key.startsWith('document.xlsx.'));
         expect(cloudUpgradeKeys.length).toBeGreaterThan(0);
         for (const key of cloudUpgradeKeys) {
             expect(extension[key]).toBeTruthy();

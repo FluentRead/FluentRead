@@ -36,6 +36,19 @@ describe('B 站独立音轨读取', () => {
         expect(f.fetch.mock.calls.every(([, init]) => init?.redirect === 'error')).toBe(true);
         expect(f.decode).toHaveBeenCalledWith(new Uint8Array([1, 2]).buffer);
     });
+    it.each(['ep123', 'ss456'])('读取无 DRM 的 B 站番剧 %s 音轨，并拒绝受 DRM 保护的番剧流', async id => {
+        const f = fixture();
+        f.fetch.mockImplementation(async input => String(input).includes('api.bilibili.com')
+            ? new Response(JSON.stringify({code: 0, result: data()})) : new Response(new Uint8Array([1, 2])));
+        expect(await f.run(id)).toEqual(new Float32Array([.1, .2]));
+        const request = new URL(String(f.fetch.mock.calls[0][0]));
+        expect(request.pathname).toBe('/pgc/player/web/playurl');
+        expect(request.searchParams.get(id.startsWith('ep') ? 'ep_id' : 'season_id')).toBe(id.slice(2));
+        f.fetch.mockResolvedValueOnce(new Response(JSON.stringify({code: 0, result: {...data(), is_drm: true}})));
+        await expect(f.run(id)).rejects.toThrow('DRM');
+        f.fetch.mockResolvedValueOnce(new Response(JSON.stringify({code: 0, data: {...data(), drm_tech_type: 2}})));
+        await expect(f.run(id)).rejects.toThrow('DRM');
+    });
     it('在访问媒体前拒绝无效分 P、时长、CID、接口错误和过大的响应', async () => {
         const f = fixture();
         await expect(f.run('bad')).rejects.toThrow('分 P');

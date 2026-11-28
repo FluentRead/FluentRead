@@ -1,6 +1,6 @@
 # Video & meeting translation
 
-Read original captions and translations in YouTube, X, Bilibili, Udemy, edX, Disney+, and Google Meet, Teams, or Zoom web meetings. Bilibili and X also offer local AI transcription.
+Read original captions and translations in YouTube, X, Bilibili (regular videos, multi-P, and accessible Bangumi/PGC episodes), Udemy, edX, Coursera, Disney+, Netflix, Amazon Prime Video, TED, Vimeo, and Google Meet, Teams, or Zoom web meetings. You can also import local audio or video files in Video settings for offline AI transcription, bilingual playback, and sentence-by-sentence learning.
 
 <GuideVisual kind="video" en />
 
@@ -15,6 +15,26 @@ The service follows webpage translation by default; choose a separate one in **V
 To switch subtitle modes from the keyboard without clicking the player icon, enable **Subtitle mode shortcut** under **Video translation settings → General** (default `Alt+M` / `Option+M`, with presets and custom shortcut recording) and choose **Bilingual ↔ Original**, **Cycle (Bilingual → Translated → Original)**, or **Cycle all (including Off)**. The shortcut automatically yields while typing in input fields.
 
 Translation depends on the selected service's response. Opening a video or seeking to an untranslated section can cause a delay. Retry a failed translation without repeating transcription: recognized source captions and their timeline remain available.
+
+## Streaming platforms & Bilibili Bangumi/PGC
+
+- **Netflix** (`netflix.com`): Detects player containers (`.watch-video--player-view`, `.VideoContainer`) and timed-text captions (`.player-timedtext-text-container`, `.player-timedtext`), toggles native subtitle visibility safely, and mounts an isolated display-mode control in the player bar when available.
+- **Amazon Prime Video** (`primevideo.com`, and `/gp/video/` or `/detail/` pages on `amazon.com`, `amazon.co.jp`, `amazon.co.uk`, and `amazon.de`): Reads player captions (`.atvwebplayersdk-captions-text`, `.f35bt6a`) and anchors a safe mode switcher inside the player control bar.
+- **TED** (`ted.com`): Supports native caption overlays, HTML5 `<track>` cues, and active transcript cues on talk pages, with safe control-bar mode switching.
+- **Vimeo** (`vimeo.com`, `player.vimeo.com`): Reads `.vp-captions` / `.vp-telecine` captions and `<track>` cues with a control-bar toggle anchor.
+- **Bilibili Bangumi / PGC** (`bilibili.com/bangumi/play/...`): Recognizes `ep` and `ss` episode paths alongside normal/multi-P videos where captions or unencrypted AAC audio are accessible, without bypassing DRM or browser security boundaries.
+
+All platforms follow non-invasive DOM ownership and restore native captions and clean up listeners, observers, and mounted controls on mode off, disable, SPA navigation, or unload.
+
+## Local audio & video import with offline AI transcription
+
+Under **Video translation settings → Local AI subtitles**, the **Local audio & video transcription** studio lets you drag and drop or pick local files (`.mp4`, `.webm`, `.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`; up to **200 MB** and **20 minutes**):
+
+1. Files are validated and decoded locally via the Web Audio API into 16 kHz mono PCM — audio never leaves your device.
+2. Offline recognition reuses FluentRead's configured **Whisper in the browser** model or **Local Qwen3 ASR** protocol with full cancellation support.
+3. Recognized cues are translated via your configured FluentRead translation service (skipping cues already in the target language, with retry for failed items) and played back with synchronized **Bilingual / Translated only / Original only / Off** captions.
+4. Built-in **Sentence learning & loop** lets you jump by sentence, step previous/next, replay, **loop a single sentence**, or **pause at sentence end**.
+5. Export **SRT, WebVTT, or Markdown** in bilingual, original, or translated mode. Clearing, switching files, or closing the panel aborts active work and revokes temporary object URLs.
 
 ## Meeting captions and human subtitles
 

@@ -19,8 +19,12 @@ export function installBilibiliCaptionBridge(page: Window): () => void {
         try {
             const player = host.player as {getManifest?(): unknown} | undefined;
             const manifest = captionRecord(player?.getManifest?.());
-            const part = `${manifest.bvid}:${manifest.p}`, avPart = `av${manifest.aid}:${manifest.p}`;
-            if (![part, avPart].includes(data.part as string) || !Number.isSafeInteger(manifest.cid) || Number(manifest.cid) <= 0) return;
+            const candidates = [`${manifest.bvid}:${manifest.p}`, `av${manifest.aid}:${manifest.p}`];
+            const epId = Number(manifest.epId ?? manifest.epid);
+            if (Number.isSafeInteger(epId) && epId > 0) candidates.push(`ep${epId}`);
+            const seasonId = Number(manifest.seasonId ?? manifest.ssid);
+            if (Number.isSafeInteger(seasonId) && seasonId > 0) candidates.push(`ss${seasonId}`);
+            if (!candidates.includes(data.part as string) || !Number.isSafeInteger(manifest.cid) || Number(manifest.cid) <= 0) return;
             page.postMessage({type: RESPONSE, requestId: data.requestId, part: data.part, cid: manifest.cid}, page.location.origin);
         } catch { /* 播放器尚未就绪，客户端在自己的有界预算内重试。 */ }
     };

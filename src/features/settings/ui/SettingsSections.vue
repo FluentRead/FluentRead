@@ -293,6 +293,7 @@
           </el-select>
         </SettingsItem>
         <VideoLocalModelSettings :config="config" :active="viewActive && props.activeSection === 'settings-video' && (!props.activePanel || props.activePanel === 'local')" :context="config" />
+        <LocalMediaTranscriptionPanel v-if="LocalMediaTranscriptionPanel" :config="config" :active="viewActive && props.activeSection === 'settings-video' && (!props.activePanel || props.activePanel === 'local')" />
       </SettingsGroup>
 </SettingsPanel>
     </section>
@@ -716,6 +717,7 @@ import {
 const ImageOcrSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/image-translation/ui/public').then(module => module.ImageOcrSettings));
 const MangaSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/image-translation/ui/public').then(module => module.MangaSettings));
 const VideoLocalModelSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoLocalModelSettings.vue'));
+const LocalMediaTranscriptionPanel = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/video-subtitle/local-media/public').then(module => module.LocalMediaTranscriptionPanel));
 const VideoSubtitleShortcutSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSubtitleShortcutSettings.vue'));
 const LocalTtsSettings = defineAsyncComponent(() => import('./LocalTtsSettings.vue'));
 const VideoSubtitleAppearanceSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoSubtitleAppearanceSettings.vue'));

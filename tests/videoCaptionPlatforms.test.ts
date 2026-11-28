@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
-import {getCaptionPlatform, isMeetingCaptionPlatform, findCaptionEnableButton, findTeamsCaptionMenuStep, captionLanguageMatch, chooseTargetHumanCaptionTrack} from '@/src/features/video-subtitle/content/platforms';
+import {getCaptionPlatform, isMeetingCaptionPlatform, isStreamingCaptionPlatform, findCaptionEnableButton, findTeamsCaptionMenuStep, captionLanguageMatch, chooseTargetHumanCaptionTrack} from '@/src/features/video-subtitle/content/platforms';
 import {readVideoCaptionText} from '@/src/features/video-subtitle/content/subtitleTransport';
 import {parseYoutubeTimedTextResponse} from '@/src/features/video-subtitle/content/youtubeSubtitleData';
 import {YoutubeHumanCaptions} from '@/src/features/video-subtitle/content/youtubeHumanCaptions';
@@ -22,14 +22,43 @@ describe('视频与会议字幕平台边界', () => {
         ['https://coursera.org/learn/python/lecture/Ab12', 'coursera'], ['https://www.coursera.org/learn/python/', null],
         ['https://www.coursera.org.evil.test/learn/python/lecture/Ab12', null],
         ['https://www.bilibili.com.evil.test/video/1', null], ['https://manga.bilibili.com/', null], ['https://edx.org.evil.test/', null],
-        ['https://www.disneyplus.com/video/demo', 'disney'], ['https://zoom.us/pricing', null],
+        ['https://www.disneyplus.com/video/demo', 'disney'],
+        ['https://www.netflix.com/watch/80100172', 'netflix'],
+        ['https://netflix.com/watch/123', 'netflix'],
+        ['https://netflix.com.evil.test/watch/123', null],
+        ['https://www.primevideo.com/detail/0ABC123', 'primevideo'],
+        ['https://primevideo.com/region/eu/detail/0ABC123', 'primevideo'],
+        ['https://www.amazon.com/gp/video/detail/B08EXAMPLE', 'primevideo'],
+        ['https://amazon.co.jp/detail/B08EXAMPLE', 'primevideo'],
+        ['https://www.amazon.co.uk/gp/video/watch/B08EXAMPLE', 'primevideo'],
+        ['https://www.amazon.de/detail/B08EXAMPLE', 'primevideo'],
+        ['https://www.amazon.com/dp/B08EXAMPLE', null],
+        ['https://primevideo.com.evil.test/detail/1', null],
+        ['https://www.ted.com/talks/sample_talk', 'ted'],
+        ['https://ted.com/talks/sample_talk', 'ted'],
+        ['https://ted.com.evil.test/talks/sample', null],
+        ['https://vimeo.com/123456789', 'vimeo'],
+        ['https://www.vimeo.com/123456789', 'vimeo'],
+        ['https://player.vimeo.com/video/123456789', 'vimeo'],
+        ['https://vimeo.com.evil.test/123456789', null],
+        ['https://zoom.us/pricing', null],
         ['https://zoom.us/rec/play/1', null], ['https://meet.google.com.evil.test/demo', null],
         ['https://udemy.com.evil.test/demo', null], ['https://youtube.com/watch?v=1', null],
     ])('识别 %s', (url, expected) => expect(getCaptionPlatform(new URL(url))).toBe(expected));
 
-    it('只在三个会议平台自动开字幕', () => {
-        for (const platform of ['meet', 'teams', 'zoom'] as const) expect(isMeetingCaptionPlatform(platform)).toBe(true);
-        for (const platform of ['udemy', 'disney'] as const) expect(isMeetingCaptionPlatform(platform)).toBe(false);
+    it('只在三个会议平台自动开字幕，并准确区分流媒体平台', () => {
+        for (const platform of ['meet', 'teams', 'zoom'] as const) {
+            expect(isMeetingCaptionPlatform(platform)).toBe(true);
+            expect(isStreamingCaptionPlatform(platform)).toBe(false);
+        }
+        for (const platform of ['udemy', 'bilibili', 'edx', 'coursera'] as const) {
+            expect(isMeetingCaptionPlatform(platform)).toBe(false);
+            expect(isStreamingCaptionPlatform(platform)).toBe(false);
+        }
+        for (const platform of ['disney', 'netflix', 'primevideo', 'ted', 'vimeo'] as const) {
+            expect(isMeetingCaptionPlatform(platform)).toBe(false);
+            expect(isStreamingCaptionPlatform(platform)).toBe(true);
+        }
     });
 
     it('不触发转录、录制、已开启、不可见或禁用按钮', () => {

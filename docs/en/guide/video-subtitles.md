@@ -1,6 +1,6 @@
 # Video & meeting captions
 
-Watch videos, online courses, web meetings, and standard HTML media with bilingual captions—complete with mode shortcuts, timing sync, phonetic guides, sentence study, subtitle export, and local AI speech transcription when captions are missing.
+Watch videos (YouTube, X, Bilibili standard/multi-P/Bangumi, Netflix, Amazon Prime Video, TED, Vimeo, Disney+), online courses, web meetings, and standard HTML media with bilingual captions—complete with mode shortcuts, timing sync, phonetic guides, sentence study, subtitle export, and local AI speech transcription for captionless videos or local audio/video files.
 
 <GuideVisual kind="video" en />
 
@@ -22,11 +22,24 @@ Watch videos, online courses, web meetings, and standard HTML media with bilingu
 | Platform | Caption behavior & notes |
 | --- | --- |
 | **YouTube** | **Prefer human captions** (on by default) uses existing target-language human tracks directly; Original mode shows clean full-cue lines instead of word-by-word scrolling |
-| **Bilibili (Standard / Multi-P)** | Prefers uploader human captions, then platform AI captions (login required); supports local AI transcription when empty; manual start by default (configurable per site); bangumi excluded |
+| **Bilibili (Standard / Multi-P / Bangumi PGC)** | Prefers uploader human captions, then platform AI captions (login required); supports accessible Bangumi/PGC (`ep`/`ss`) paths without bypassing DRM; supports local AI transcription when empty; manual start by default |
+| **Netflix** | Detects player containers and timed-text captions, toggles native visibility cleanly, and mounts an isolated display-mode control when the player bar is present |
+| **Amazon Prime Video** | Supports `primevideo.com` and `/gp/video/` or `/detail/` pages on major Amazon domains with a safe control-bar switcher |
+| **TED / Vimeo** | TED supports native captions, HTML5 `<track>` cues, and active transcript cues; Vimeo supports `vimeo.com` and `player.vimeo.com` native captions and `<track>` cues |
 | **X (Twitter)** | Translates native captions; supports on-device Whisper or local Qwen3 ASR when captions are missing |
 | **Udemy / Udemy Business** | Prefers instructor original-language tracks; auto-starts by default and re-binds cleanly across lectures |
 | **edX / Coursera** | Supports HTML5 players with readable subtitle tracks, including sentence study and export (embedded YouTube players excluded) |
 | **Disney+** | Translates readable caption tracks subject to account, region, and player restrictions |
+
+## Local audio & video import with offline AI transcription {#local-audio-and-video}
+
+Under **Video translation → Local AI captions**, the **Local audio & video transcription** studio lets you drop or select local files (`.mp4`, `.webm`, `.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`; up to **200 MB** and **20 minutes**):
+
+1. Files are validated and decoded locally via the Web Audio API into 16 kHz mono PCM—audio never leaves your device.
+2. Offline recognition reuses FluentRead's configured **Whisper in the browser** model or **Local Qwen3 ASR** protocol with full cancellation support.
+3. Recognized cues are translated via your configured translation provider (skipping cues already in the target language, with retry for failed items) and played back with synchronized **Bilingual / Translated only / Original only / Off** captions.
+4. Built-in **Sentence learning & loop** lets you jump by sentence, step previous/next, replay, **loop a single sentence**, or **pause at sentence end**.
+5. Export **SRT, WebVTT, or Markdown** in bilingual, original, or translated mode. Clearing or switching files aborts active work and revokes temporary object URLs.
 
 ## Live web meeting captions {#meeting-and-human-captions}
 

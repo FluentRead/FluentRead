@@ -171,7 +171,7 @@ import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import UiSelect from '@/src/ui/components/UiSelect.vue';
 import {applyInterfaceTheme} from '@/src/ui/interfaceAppearance'
 import {useUiI18n} from '@/src/ui/i18n';
-import {ElOption} from 'element-plus';
+import {ElMessageBox, ElOption} from 'element-plus';
 
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, watch } from 'vue';
 import VocabularyStudy from './VocabularyStudy.vue';
@@ -179,7 +179,6 @@ import CollectionEntry from './CollectionEntry.vue';
 import VocabularySource from './VocabularySource.vue';
 import {vocabularySourceContext, vocabularySourceLink} from '../source';
 import {ReadingAnswer} from '@/src/features/reading-assistant/ui/answer/public';
-import {ElMessageBox} from 'element-plus';
 import browser from 'webextension-polyfill';
 import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';

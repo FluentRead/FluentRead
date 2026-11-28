@@ -231,7 +231,9 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
   const stopManga = () => {if (!mangaStopped) {mangaStopped = true; unsubscribeManga();}};
   unsubscribeMangaTranslation = stopManga;
   const mangaReadingState = reactive({open:false});
-  const stopReading = subscribeMangaReading(open => {mangaReadingState.open = open;});
+  const unsubscribeReading = subscribeMangaReading(open => {mangaReadingState.open = open;});
+  let readingStopped = false;
+  const stopReading = () => {if (!readingStopped) {readingStopped = true; unsubscribeReading();}};
   unsubscribeMangaReading = stopReading;
 
   unfinishedMounts += 1;
@@ -282,6 +284,8 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
   });} catch (error) {
     stopManga();
     if (unsubscribeMangaTranslation === stopManga) unsubscribeMangaTranslation = null;
+    stopReading();
+    if (unsubscribeMangaReading === stopReading) unsubscribeMangaReading = null;
     if (floatingBallPresentation === presentation) floatingBallPresentation = null;
     console.error('[FluentRead] 悬浮球挂载失败', error);
     finishMountAttempt();

@@ -514,13 +514,17 @@ describe('字体任务队列和不可协作端口', () => {
     await h.loader.load('system');expect(h.states.at(-1)?.status).toBe('system')
   })
   it('同时准备共享中文的两套缓存只调用一次中文解析注册', async () => {
-    const h = harness();await h.loader.load('inter');const reopened = createInterfaceFontLoader(h.deps)
+    const h = harness();await h.loader.load('inter');const digest = vi.spyOn(h.deps, 'digest');const reopened = createInterfaceFontLoader(h.deps)
     let release!: () => void;h.deps.install.mockClear();h.deps.install.mockImplementation(async asset => {
       if (asset.file === 'NotoSansSC.woff2') await new Promise<void>(resolve => {release = resolve})
     })
     const latin = reopened.loadCached('inter');const chinese = reopened.loadCached('noto-sans-sc')
-    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
-    await vi.waitFor(() => expect(h.deps.install).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => {
+      expect(release).toBeTypeOf('function')
+      expect(digest).toHaveBeenCalledTimes(3)
+      expect(h.deps.install).toHaveBeenCalledTimes(2)
+    })
+    await Promise.resolve();await Promise.resolve()
     release();expect(await latin).toBe(true);expect(await chinese).toBe(true)
     expect(h.deps.install.mock.calls.filter(([asset]) => asset.file === 'NotoSansSC.woff2')).toHaveLength(1)
   })

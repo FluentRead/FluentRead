@@ -265,10 +265,7 @@ export function createFreeFallbackRunner(maxConcurrency = 3, dependencies: FreeF
     }
 
     function permitRelease(): () => void {
-        let released = false;
         return () => {
-            if (released) return;
-            released = true;
             const next = queue.shift();
             if (next) next.wake();
             else active -= 1;
@@ -443,14 +440,16 @@ export function createFreeFallbackRunner(maxConcurrency = 3, dependencies: FreeF
                 let timer: ReturnType<typeof setTimeout> | undefined;
                 let ownsHedge = false;
                 let primary: ReturnType<typeof attempt>;
-                try { primary = attempt(candidate, controller.signal, release); } catch (error) {
+                // 必须在进入 attempt 前转移全局许可所有权；否则若内部 holdUntil 抛出，
+                // 既已启动的 settlement 与外层 finally 会重复提前归还容量。
+                const primaryPermit = release;
+                release = () => undefined;
+                ownsPermit = false;
+                try { primary = attempt(candidate, controller.signal, primaryPermit); } catch (error) {
                     controller.abort(error);
                     options.signal?.removeEventListener('abort', onAbort);
                     throw error;
                 }
-                // 全局许可转交真实 attempt；取消/超时结果交付后仍由 settlement 负责归还。
-                release = () => undefined;
-                ownsPermit = false;
                 let backup: ReturnType<typeof attempt> | undefined;
                 try {
                     const delay = getFreeHedgeDelayMs(getHealth(candidate.identity).performance);
@@ -467,9 +466,9 @@ export function createFreeFallbackRunner(maxConcurrency = 3, dependencies: FreeF
                         const hedgePermit = alternative ? tryAcquireHedge() : undefined;
                         if (alternative && hedgePermit) {
                             hedged = true;
-                            ownsHedge = hedgeActive = true;
                             hedgeCredit -= 1;
                             backup = attempt(alternative, controller.signal, hedgePermit);
+                            ownsHedge = hedgeActive = true;
                             const first = await Promise.race([
                                 primary.result.then(result => ({result, other: backup!.result})),
                                 backup.result.then(result => ({result, other: primary.result})),

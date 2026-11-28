@@ -29,7 +29,13 @@ export function captionRecord(value: unknown): Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+export function isBilibiliBangumiPart(part: string): boolean {
+    return /^(?:ep|ss)[1-9]\d*$/.test(part);
+}
+
 export function getBilibiliPart(url: URL): string {
+    const bangumi = url.pathname.match(/^\/(?:[A-Za-z-]+\/)?bangumi\/play\/((?:ep|ss)[1-9]\d*)\/?$/)?.[1];
+    if (bangumi) return bangumi;
     const id = url.pathname.startsWith('/list/') ? url.searchParams.get('bvid')
         : url.pathname.match(/^\/(?:[A-Za-z-]+\/)?video\/((?:BV[\dA-Za-z]{10}|av\d+))\/?$/)?.[1];
     if (!id || !/^(?:BV[\dA-Za-z]{10}|av\d+)$/.test(id)) return '';

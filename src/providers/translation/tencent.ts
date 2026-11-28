@@ -8,11 +8,11 @@
 
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import { method } from "@/src/core/config/constants";
-import {getTranslationProviderLanguages} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderLanguages, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import {createHttpStatusError, createProviderCodeError, readJsonResponse} from '@/src/platform/http/errors';
 import {cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
-import {requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderRequest} from '@/src/services/translation/types';
+import {hmacSha256, sha256Hex, toHex} from './cloud/signature';
 
 // 腾讯云机器翻译语言代码映射
 const languageMap: Record<string, string> = {
@@ -33,29 +33,6 @@ const languageMap: Record<string, string> = {
     'auto': 'auto'
 };
 
-// 生成HMAC签名 (返回二进制数据)
-async function generateHmacSignature(key: string | ArrayBuffer, message: string): Promise<ArrayBuffer> {
-    const encoder = new TextEncoder();
-    const keyData = typeof key === 'string' ? encoder.encode(key) : key;
-    
-    const cryptoKey = await crypto.subtle.importKey(
-        'raw',
-        keyData,
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-    );
-    
-    return await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(message));
-}
-
-// 将二进制数据转换为十六进制字符串
-function arrayBufferToHex(buffer: ArrayBuffer): string {
-    return Array.from(new Uint8Array(buffer))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-}
-
 // 生成腾讯云API签名
 async function createTencentSignature(requestPayload: string, timestamp: number, secretId: string, secretKey: string): Promise<string> {
     const date = new Date(timestamp * 1000).toISOString().substring(0, 10);
@@ -66,36 +43,23 @@ async function createTencentSignature(requestPayload: string, timestamp: number,
     const canonicalQueryString = "";
     const canonicalHeaders = `content-type:application/json; charset=utf-8\nhost:tmt.tencentcloudapi.com\n`;
     const signedHeaders = "content-type;host";
-    
-    const hashedRequestPayload = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(requestPayload));
-    const hashedPayloadHex = Array.from(new Uint8Array(hashedRequestPayload))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-    
+    const hashedPayloadHex = await sha256Hex(requestPayload);
     const canonicalRequest = `${httpRequestMethod}\n${canonicalUri}\n${canonicalQueryString}\n${canonicalHeaders}\n${signedHeaders}\n${hashedPayloadHex}`;
     
     // 步骤2：拼接待签名字符串
     const algorithm = "TC3-HMAC-SHA256";
     const credentialScope = `${date}/tmt/tc3_request`;
-    
-    const hashedCanonicalRequest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalRequest));
-    const hashedCanonicalRequestHex = Array.from(new Uint8Array(hashedCanonicalRequest))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-    
+    const hashedCanonicalRequestHex = await sha256Hex(canonicalRequest);
     const stringToSign = `${algorithm}\n${timestamp}\n${credentialScope}\n${hashedCanonicalRequestHex}`;
     
     // 步骤3：计算签名
-    const kDate = await generateHmacSignature(`TC3${secretKey}`, date);
-    const kService = await generateHmacSignature(kDate, "tmt");
-    const kSigning = await generateHmacSignature(kService, "tc3_request");
-    const signatureBuffer = await generateHmacSignature(kSigning, stringToSign);
-    const signature = arrayBufferToHex(signatureBuffer);
+    const kDate = await hmacSha256(`TC3${secretKey}`, date);
+    const kService = await hmacSha256(kDate, "tmt");
+    const kSigning = await hmacSha256(kService, "tc3_request");
+    const signature = toHex(await hmacSha256(kSigning, stringToSign));
     
     // 步骤4：拼接 Authorization
-    const authorization = `${algorithm} Credential=${secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-    
-    return authorization;
+    return `${algorithm} Credential=${secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 }
 
 async function tencent(message: TranslationProviderRequest<string>) {

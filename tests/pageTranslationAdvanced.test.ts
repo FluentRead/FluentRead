@@ -521,6 +521,7 @@ describe('不翻译标签与选择器配置归一化', () => {
         (document as unknown as {elementsFromPoint?: (x: number, y: number) => Element[]}).elementsFromPoint = () => [mark, mixed, document.body];
         expect(core.resolveAtPoint(document, 10, 10)).toBeNull();
         expect(core.shouldStayOriginal(document.body)).toBe(false);
+        expect(core.shouldStayOriginal(mark)).toBe(true);
 
         const allScopeCore = createTranslationCore({
             url,

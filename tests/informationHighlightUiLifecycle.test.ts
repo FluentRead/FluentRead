@@ -141,6 +141,11 @@ describe('信息高亮真实偏好组件', () => {
     expect(state.hotkeyConflict('Alt+P')).toBe('informationHighlight.hotkey.conflict')
     props.config.videoSubtitleModeHotkeyEnabled = true; props.config.videoSubtitleModeHotkey = 'custom'; props.config.customVideoSubtitleModeHotkey = 'Alt+M'
     expect(state.hotkeyConflict('Alt+M')).toBe('informationHighlight.hotkey.conflict')
+    props.config.sectionTranslationHotkeyEnabled = false
+    props.config.commandPaletteEnabled = false; props.config.commandPaletteHotkey = 'Alt+K'
+    expect(state.hotkeyConflict('Alt+K')).toBe('')
+    props.config.commandPaletteEnabled = true
+    expect(state.hotkeyConflict('Alt+K')).toBe('informationHighlight.hotkey.conflict')
   })
   it('偏好更换、视图关闭又重开和卸载时，缓存控件不能借用新配置', async () => {
     await mount('InformationHighlightPreferences'); const oldMode = state.actions.mode, oldClickToTranslate = state.actions.clickToTranslate, oldDensity = state.densityChoices[0].choose

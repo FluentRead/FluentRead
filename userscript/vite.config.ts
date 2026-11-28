@@ -678,6 +678,7 @@ export const userscriptAliases = [
     {find: '@/src/features/image-translation/public', replacement: resolve(root, 'userscript/unsupportedCapabilities.ts')},
     {find: '@/src/features/video-subtitle/public', replacement: resolve(root, 'userscript/unsupportedCapabilities.ts')},
     {find: '@/src/features/vocabulary/content/public', replacement: resolve(root, 'userscript/unsupportedCapabilities.ts')},
+    {find: '@/src/features/command-palette/public', replacement: resolve(root, 'userscript/unsupportedCapabilities.ts')},
     // 仅关闭没有材料后台的附加采集；material/text/public 原文投影仍由真实模块提供。
     {find: /^@\/src\/features\/vocabulary\/material\/public$/u, replacement: resolve(root, 'userscript/materialCapture.ts')},
     // 完整设置保留真实收藏组件；运行时材料门禁之外，构建也不携带未支持的材料 UI/客户端。

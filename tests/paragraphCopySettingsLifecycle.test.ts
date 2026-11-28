@@ -23,7 +23,7 @@ beforeEach(async () => {
     vi.clearAllMocks();feedback.warning.mockImplementation(feedback);
     props = runtime.reactive({active: true, config: Object.assign(new Config(), {paragraphCopyEnabled: true, paragraphCopyHotkey: 'Shift+D', customParagraphCopyHotkey: '',
         hotkey: 'Control', floatingBallHotkey: 'Alt+T', selectionTranslatorMode: 'disabled', inputBoxTranslationTrigger: 'none',
-        selectionAreaEnabled: false, sectionTranslationHotkeyEnabled: false, quickTranslationProfiles: []})});
+        selectionAreaEnabled: false, sectionTranslationHotkeyEnabled: false, commandPaletteEnabled: false, quickTranslationProfiles: []})});
     visible = runtime.ref(true);
     await mountEditor('ParagraphCopySettings');
 });
@@ -158,6 +158,7 @@ describe('圈选与局部翻译的真实草稿恢复链', () => {
             {hotkey:'custom',customHotkey:'F9'}, {floatingBallHotkey:'custom',customFloatingBallHotkey:'F9'},
             {selectionTranslatorMode:'bilingual',selectionTranslatorTrigger:'custom',customSelectionTranslatorHotkey:'F9'},
             {paragraphCopyEnabled:true,paragraphCopyHotkey:'custom',customParagraphCopyHotkey:'F9'},
+            {commandPaletteEnabled:true,commandPaletteHotkey:'custom',customCommandPaletteHotkey:'F9'},
             ...(editor.component==='SectionTranslationSettings'?[{selectionAreaEnabled:true,selectionAreaHotkey:'custom',customSelectionAreaHotkey:'F9'}]
                 :[{sectionTranslationHotkeyEnabled:true,sectionTranslationHotkey:'custom',customSectionTranslationHotkey:'F9'}]),
         ]) {const before={...props.config};Object.assign(props.config,patch);expect(state.findHotkeyConflict('F9')).toBeTruthy();Object.assign(props.config,before);}

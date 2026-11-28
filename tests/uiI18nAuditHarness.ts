@@ -93,7 +93,6 @@ export async function createLanguageHarness({parent = false, mount = true, ready
     '@/src/features/settings/ui/TranslationCacheSettings.vue',
     '@/src/features/settings/ui/ExcludedLanguageSettings.vue',
     '@/src/features/settings/ui/ExcludedTagSettings.vue',
-    '@/src/features/settings/ui/ReadingAssistanceSettings.vue',
     '@/src/features/settings/ui/ConfigManagement.vue',
     '@/src/features/settings/ui/QuickTranslationProfiles.vue',
     '@/src/features/settings/ui/ContextMenuSettings.vue',

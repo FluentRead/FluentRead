@@ -37,7 +37,7 @@ import type {ImageViewport} from '@/src/shared/image/types';
 import {fetchPageImageForOcr} from '@/src/features/image-translation/services/remoteImage';
 import {encodeImageCanvas} from '@/src/features/image-translation/services/imageEncoding';
 import {withImageSourceAuthorization} from './sourceAuthorization';
-import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSource, isImagePresentationOccluded, canShareImageOverflowClipping, type ImagePresentation} from './presentation';
+import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSource, isImagePresentationOccluded, resolveMangaPresentationBounds, canShareImageOverflowClipping, type ImagePresentation} from './presentation';
 import {isNativeModal, isOpenImageViewer, samePreviewImage, samePreviewResource, visibleImageViewers, type PreviewImageSource} from './imagePreview';
 import {createImageControls, IMAGE_CONTROLS_CSS, type ImageControlPhase, type ImageSettingsSection} from './controls';
 import {isImageHoverEligible} from './hoverEligibility';
@@ -469,40 +469,49 @@ function configurationIdentity(manga = false): string {
     ]);
 }
 
+function readTranslationConfigurationFingerprint(source = config): string {
+    const service = source.imageTranslationService || source.service;
+    const selectedModel = source.model?.[service];
+    const customModel = source.customModel?.[service];
+    return JSON.stringify([
+        service,
+        selectedModel,
+        customModel,
+        getCompositeTranslationConfigFingerprint(source, service),
+        source.from,
+        source.imageTranslationOcrEngine,
+        source.to,
+        source.useCache,
+        source.system_role?.[service],
+        source.user_role?.[service],
+        source.modelThinking?.[service]?.[selectedModel],
+        source.modelThinking?.[service]?.[customModel],
+        source.customBody?.[service],
+        source.proxy?.[service],
+        source.customOpenAIProviders?.find(provider => provider.id === service)?.endpoint,
+        source.enableAIContext,
+        source.custom,
+        source.newApiUrl,
+        source.deeplx,
+        source.azureOpenaiEndpoint,
+        source.deepseekApiType,
+        source.deepseekThinkingMode,
+        source.minimaxBillingPlan,
+        source.minimaxRegion,
+        source.mimoBillingPlan,
+        source.mimoRegion,
+        source.serviceRegion?.[service],
+    ]);
+}
+
 function watchTranslationConfiguration(): () => void {
-    return watch(() => {
-        const service = config.imageTranslationService || config.service;
-        const selectedModel = config.model?.[service];
-        const customModel = config.customModel?.[service];
-        // 组合按成员连接摘要建立依赖；缓存仅保存修订号，不保留原始凭据。
-        void getCompositeTranslationConfigFingerprint(config, service);
-        // 只建立响应式依赖，不序列化、不保留原始参数副本；结果仅保存单调递增修订号。
-        void config.from;
-        void config.imageTranslationOcrEngine;
-        void config.to;
-        void config.useCache;
-        void config.system_role?.[service];
-        void config.user_role?.[service];
-        void config.modelThinking?.[service]?.[selectedModel];
-        void config.modelThinking?.[service]?.[customModel];
-        void config.customBody?.[service];
-        void config.proxy?.[service];
-        void config.customOpenAIProviders?.find(provider => provider.id === service)?.endpoint;
-        void config.enableAIContext;
-        void config.custom;
-        void config.newApiUrl;
-        void config.deeplx;
-        void config.azureOpenaiEndpoint;
-        void config.deepseekApiType;
-        void config.deepseekThinkingMode;
-        void config.minimaxBillingPlan;
-        void config.minimaxRegion;
-        void config.mimoBillingPlan;
-        void config.mimoRegion;
-        void config.serviceRegion?.[service];
-        // 回调中的 UI 文案/动效读取不能反向成为翻译身份依赖。
-        return {};
-    }, () => {
+    // 生产环境 config 是普通对象（需 subscribeConfig），测试夹具可能使用 Vue reactive 代理（需 watch）；
+    // 两者共用指纹去重回调，确保任一路径变更都能立即失效缓存与在途任务且不重复触发。
+    let lastFingerprint = readTranslationConfigurationFingerprint(config);
+    const handleChange = (source = config) => {
+        const nextFingerprint = readTranslationConfigurationFingerprint(source);
+        if (nextFingerprint === lastFingerprint) return;
+        lastFingerprint = nextFingerprint;
         configurationRevision += 1;
         clearMangaCache();
         for (const state of activeStates) {
@@ -515,7 +524,13 @@ function watchTranslationConfiguration(): () => void {
             setButtonState(state, 'error', '翻译设置已更改，请重试');
         }
         mangaReader?.schedule();
-    }, {flush: 'sync', immediate: true});
+    };
+    const stopSubscription = subscribeConfig(handleChange);
+    const stopReactiveWatch = watch(() => readTranslationConfigurationFingerprint(config), () => handleChange(config), {flush: 'sync'});
+    return () => {
+        stopSubscription();
+        stopReactiveWatch();
+    };
 }
 
 function deleteCachedResult(image: HTMLImageElement): void {
@@ -1060,8 +1075,21 @@ function updateOverlayPosition(state: ImageTranslationState, scrollOnly = false)
         && style.visibility !== 'collapse' && style.display !== 'none' && opacity > 0;
     const visible = usable && right > left && bottom > top;
     const ignoreForeground = imagePreview?.state === state ? ignorePreviewInputLayer(imagePreview.viewer) : undefined;
-    const occluded = visible && isImagePresentationOccluded(surface, {left, top, right, bottom}, imageOverlayHost, state.image, null, ignoreForeground,
-        transformed && style.pointerEvents !== 'none');
+    let occluded = false;
+    let mangaEdgeClipped = false;
+    if (visible) {
+        if (state.manga) {
+            const adjusted = resolveMangaPresentationBounds(surface, {left, top, right, bottom}, imageOverlayHost, state.image);
+            if (adjusted) {
+                mangaEdgeClipped = adjusted.top !== top || adjusted.bottom !== bottom;
+                left = adjusted.left; top = adjusted.top; right = adjusted.right; bottom = adjusted.bottom;
+            }
+            else occluded = true;
+        } else {
+            occluded = isImagePresentationOccluded(surface, {left, top, right, bottom}, imageOverlayHost, state.image, null, ignoreForeground,
+                transformed && style.pointerEvents !== 'none');
+        }
+    }
     const bitmap = state.phase === 'translated' ? state.translatedImage : null;
     if (!visible || occluded) {
         // 非滚动帧仍复核离屏局部译图的盒子和样式。真正遮挡或失配时归还原图。
@@ -1134,7 +1162,8 @@ function updateOverlayPosition(state: ImageTranslationState, scrollOnly = false)
             return;
         }
     }
-    if (bitmap.isConnected && state.overlay.isConnected) hideOriginalImage(state);
+    if (!localBitmap && mangaEdgeClipped) restoreOriginalImage(state);
+    else if (bitmap.isConnected && state.overlay.isConnected) hideOriginalImage(state);
 }
 
 async function openImageTranslationSettings(section: ImageSettingsSection): Promise<void> {
@@ -2318,7 +2347,7 @@ export function mountImageTranslator(): void {
                     if(item!==surface){const x=/^(hidden|clip|auto|scroll)$/.test(style.overflowX),y=/^(hidden|clip|auto|scroll)$/.test(style.overflowY);
                         if(x||y){const clip=item.getBoundingClientRect();if(x){left=Math.max(left,clip.left);right=Math.min(right,clip.right);}if(y){top=Math.max(top,clip.top);bottom=Math.min(bottom,clip.bottom);}}}
                 }
-                return right>left&&bottom>top&&!isImagePresentationOccluded(surface,{left,top,right,bottom},imageOverlayHost,image,mangaReadingOverlay?.host);
+                return right>left&&bottom>top&&resolveMangaPresentationBounds(surface,{left,top,right,bottom},imageOverlayHost,image,mangaReadingOverlay?.host)!==null;
             },
             load: async (source,signal) => {
                 if(signal.aborted)return {status:'cancelled'};
@@ -2424,6 +2453,10 @@ export function readMangaReadingCandidate(token:object,signal:AbortSignal):Promi
 /** 读取成功后立即建立唯一观察；返回 undefined 表示目标已经失效。 */
 export function observeMangaReadingCandidate(token:object,onInvalid:()=>void):(()=>void)|undefined {
     return mangaReader?.observeReadingCandidate(token,onInvalid);
+}
+
+export function isImageTranslatorMounted(): boolean {
+    return mounted;
 }
 
 export function unmountImageTranslator(): void {

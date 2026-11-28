@@ -235,7 +235,7 @@ describe('localized Harness defaults', () => {
   it('retains original Chinese defaults and safely resolves unknown languages', () => {
     expect(getDefaultHarnessPrompt('system', undefined)).toBe(DEFAULT_HARNESS_SYSTEM_PROMPT)
     for (const {id} of HARNESS_ACTIONS) expect(getDefaultHarnessPrompt(id, 'unknown')).toBe(DEFAULT_HARNESS_ACTION_PROMPTS[id])
-    for (const kind of kinds) expect(new Set(UI_LANGUAGE_OPTIONS.map(({value}) => getDefaultHarnessPrompt(kind, value))).size).toBe(7)
+    for (const kind of kinds) expect(new Set(UI_LANGUAGE_OPTIONS.map(({value}) => getDefaultHarnessPrompt(kind, value))).size).toBe(8)
   })
 })
 

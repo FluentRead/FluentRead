@@ -15,6 +15,7 @@ import {defaultOption} from '../catalog/prompts';
 import type {MiniMaxBillingPlan, MiniMaxRegion, MiMoBillingPlan, MiMoRegion} from '../catalog/regions';
 import {services} from '../catalog/services';
 import {DEFAULT_CLICK_SELECTION_HOTKEY} from '../clickSelection';
+import {DEFAULT_COMMAND_PALETTE_ENABLED, DEFAULT_COMMAND_PALETTE_HOTKEY} from '../commandPalette';
 import type {CompositeTranslationProvider} from '../compositeTranslation';
 import {LEGACY_CUSTOM_OPENAI_PROVIDER_ID, type CustomOpenAIProvider} from '../customOpenAI';
 import {DEFAULT_DEEPL_API_PLAN, type DeepLApiPlan} from '../deepl';
@@ -204,6 +205,9 @@ export class Config {
     videoSubtitleModeHotkey: string; // 视频字幕模式切换快捷键；'custom' 表示使用自定义组合键
     customVideoSubtitleModeHotkey: string; // 自定义视频字幕模式切换快捷键
     videoSubtitleModeHotkeyAction: VideoSubtitleModeHotkeyAction; // 快捷键切换方式：双语↔原文或循环切换
+    commandPaletteEnabled: boolean; // 是否启用全局命令面板快捷键
+    commandPaletteHotkey: string; // 全局命令面板快捷键；默认 Alt+K，'custom' 表示使用自定义组合键
+    customCommandPaletteHotkey: string; // 自定义全局命令面板快捷键
     videoSubtitleFontSize: number; // 视频字幕字号百分比
     videoSubtitleOffsetMs: number; // 字幕时间偏移，正数延后、负数提前
     videoSubtitleAppearance: VideoSubtitleAppearance; // 视频字幕皮肤与布局参数
@@ -442,6 +446,9 @@ export class Config {
         this.videoSubtitleModeHotkey = DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY; // 默认 Alt+M，开启后才监听
         this.customVideoSubtitleModeHotkey = '';
         this.videoSubtitleModeHotkeyAction = DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY_ACTION; // 默认在双语和仅原文之间往返
+        this.commandPaletteEnabled = DEFAULT_COMMAND_PALETTE_ENABLED; // 默认开启全局命令面板
+        this.commandPaletteHotkey = DEFAULT_COMMAND_PALETTE_HOTKEY; // 默认 Alt+K，避免占用站点 Cmd/Ctrl+K
+        this.customCommandPaletteHotkey = '';
         this.videoSubtitleFontSize = DEFAULT_VIDEO_SUBTITLE_FONT_SIZE; // 默认字幕字号
         this.videoSubtitleOffsetMs = 0;
         this.videoSubtitleAppearance = normalizeVideoSubtitleAppearance(DEFAULT_VIDEO_SUBTITLE_APPEARANCE);

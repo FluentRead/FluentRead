@@ -83,10 +83,12 @@ import {
     DEFAULT_AREA_TRANSLATION_HOTKEY,
 } from '@/src/core/config/areaTranslation';
 import {canonicalizeHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
+import {resolveCommandPaletteHotkey} from '@/src/core/config/commandPalette';
 import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation';
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
 import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy';
 import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
+import {resolveWritingHotkey} from '@/src/core/config/writing';
 import {
     findEnabledQuickTranslationHotkeyConflict,
     quickTranslationActionKey,
@@ -152,7 +154,14 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
                 : '',
             feature: t('video.modeShortcut.title'),
         },
+        {
+            hotkey: props.config.commandPaletteEnabled
+                ? resolveCommandPaletteHotkey(props.config.commandPaletteHotkey, props.config.customCommandPaletteHotkey)
+                : '',
+            feature: translateLegacy('全局命令面板'),
+        },
         {hotkey: inputBoxTranslationTriggerHotkey(props.config.inputBoxTranslationTrigger, props.config.customInputBoxTranslationHotkey), feature: translateLegacy('输入框翻译')},
+        {hotkey: resolveWritingHotkey(props.config.writing), feature: translateLegacy('写作助手')},
     ];
 }
 

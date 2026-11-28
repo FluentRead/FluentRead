@@ -92,17 +92,18 @@ describe('hard-wrapped plain-text paragraphs', () => {
         expect(result[0]).toContain('buffer pixels: the outermost buffer pixel');
         expect(result[1]).toContain('`gdk_surface_set_opaque_rect()`, using the exact buffer to surface ratio.');
 
-        // 中文按固定宽度折行的多句段落也合并为一段。
+        // 中文按固定宽度折行的多句段落也合并为一段，包括句末标点恰好落在折行宽度附近的行。
         const cjkCommit = [
-            '合成器使用的不透明区域来源于渲染节点的矩形范围，并按整像素',
-            '边界向内收缩。当表面内容绘制到缩放后的缓冲区时，边缘可能落',
-            '在缓冲区像素内部。因此只排除无法证明完全不透明的边缘区域，',
-            '从而保留窗口的完整裁剪能力。',
+            '合成器使用的不透明区域来源于渲染节点的矩形范围，并按整像',
+            '素边界向内收缩，以便准确反映可绘制的表面内容区域范围。',
+            '当表面内容绘制到缩放后的缓冲区时，边缘可能落在缓冲区内',
+            '部，因此只排除无法证明完全不透明的区域以保留裁剪能力。',
         ].join('\n');
         expect(sources(cjkCommit)).toEqual([cjkCommit.replaceAll('\n', '')]);
     });
 
     it('does not merge lines that end a sentence, numbered items or anything in Markdown', () => {
+        expect(sources('MEETING NOTES FOR THE ORCHARD PROJECT AND ITS PARTNERS\nThe budget for the second quarter was approved without changes.')).toHaveLength(2);
         expect(sources('This line is long enough and ends its sentence here.\nThis one starts another sentence of similar length')).toHaveLength(2);
         expect(sources('The first numbered step is long enough to look wrapped\n2) the second step follows on the next line here')).toHaveLength(2);
         expect(sources('An introduction that is long enough to look like wrapped\n(a) but the next line is a lettered item in a list')).toHaveLength(2);

@@ -9,7 +9,7 @@ import type {BackgroundMessageHandler} from '@/src/services/messaging/background
 
 export const CONFIG_PERSIST_MESSAGE_TYPE = 'persistConfig' as const;
 /** 每次页面加载都会生成新 clientId；只保留最近的序号基线，避免长寿后台无限增长。 */
-export const CONFIG_PERSIST_CLIENT_SEQUENCE_LIMIT = 256;
+export const CONFIG_PERSIST_CLIENT_SEQUENCE_LIMIT = 512;
 export const CONFIG_PERSIST_BATCH_MESSAGE_TYPE = 'persistConfigBatch' as const;
 export type ConfigPersistenceMode = 'replace' | 'patch';
 
@@ -243,17 +243,17 @@ export function createConfigPersistenceHandler<TConfig>(
     const activeSequenceByClient = new Map<string, {sequence: number; result: Promise<number>}>();
     const localCoordinator = createConfigMutationCoordinator();
     const runMutation = dependencies.runMutation || localCoordinator.run;
-    // 刷新插入顺序后淘汰最久未用且没有在途请求的客户端，在途请求的序号判断不受影响。
-    const rememberSequence = (sequences: Map<string, number>, clientId: string, sequence: number) => {
-        sequences.delete(clientId);
-        sequences.set(clientId, sequence);
-        if (sequences.size <= CONFIG_PERSIST_CLIENT_SEQUENCE_LIMIT) return;
-        for (const candidate of sequences.keys()) {
-            if (candidate === clientId || activeSequenceByClient.has(candidate)) continue;
-            sequences.delete(candidate);
-            return;
+
+    function recordClientSequence(map: Map<string, number>, clientId: string, sequence: number): void {
+        map.delete(clientId);
+        map.set(clientId, sequence);
+        if (map.size <= CONFIG_PERSIST_CLIENT_SEQUENCE_LIMIT) return;
+        for (const existingClientId of map.keys()) {
+            if (existingClientId === clientId || activeSequenceByClient.has(existingClientId)) continue;
+            map.delete(existingClientId);
+            if (map.size <= CONFIG_PERSIST_CLIENT_SEQUENCE_LIMIT) break;
         }
-    };
+    }
 
     return {
         type: CONFIG_PERSIST_MESSAGE_TYPE,
@@ -274,7 +274,7 @@ export function createConfigPersistenceHandler<TConfig>(
                     return {success: true, revision: await active.result};
                 }
                 if (request.sequence > latestSequence) {
-                    rememberSequence(latestSequenceByClient, request.clientId, request.sequence);
+                    recordClientSequence(latestSequenceByClient, request.clientId, request.sequence);
                 }
             }
 
@@ -313,7 +313,7 @@ export function createConfigPersistenceHandler<TConfig>(
                         );
                     await dependencies.saveConfig(prepared, {recordHistory: true});
                     if (request.sequence) {
-                        rememberSequence(committedSequenceByClient, request.clientId, Math.max(
+                        recordClientSequence(committedSequenceByClient, request.clientId, Math.max(
                             committedSequenceByClient.get(request.clientId) || 0,
                             request.sequence,
                         ));

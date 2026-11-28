@@ -139,3 +139,9 @@ export function isRetryableTranslationError(error: unknown): boolean {
     : typeof error === 'string' ? error : '';
   return !message.toLowerCase().includes('extension context invalidated');
 }
+
+export function createTranslationAbortError(message = '翻译已取消'): Error {
+  const error = new Error(message);
+  error.name = 'AbortError';
+  return error;
+}

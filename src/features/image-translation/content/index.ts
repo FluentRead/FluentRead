@@ -11,6 +11,7 @@ export {
     toggleContextMenuImage,
     mountImageTranslator,
     unmountImageTranslator,
+    isImageTranslatorMounted,
     getMangaReadingCandidates,
     readMangaReadingCandidate,
     observeMangaReadingCandidate,

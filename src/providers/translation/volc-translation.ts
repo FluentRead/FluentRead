@@ -8,10 +8,9 @@
 
 import {resolveCloudRegion, services} from '@/src/core/config/catalog';
 import {method, VOLC_TRANSLATION_ENDPOINT} from '@/src/core/config/constants';
-import {getTranslationProviderLanguages} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderLanguages, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import {createHttpStatusError, createProviderCodeError, readJsonResponse} from '@/src/platform/http/errors';
 import {cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
-import {requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderRequest} from '@/src/services/translation/types';
 import {resolveCloudLanguages} from './cloud/languages';
 import {canonicalQueryString, hmacSha256, sha256Hex, toHex} from './cloud/signature';

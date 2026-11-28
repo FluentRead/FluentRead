@@ -69,6 +69,13 @@ describe('快捷键设置草稿生命周期', () => {
         state.handleHotkeyChange('Alt+Enter');expect(config.value.floatingBallHotkey).toBe('Alt+Q');
         expect(notices.message.warning).toHaveBeenCalled();
     });
+    it('启用全局命令面板时校验快捷键冲突，停用后释放组合键', () => {
+        const {state, config} = mount();
+        Object.assign(config.value, {commandPaletteEnabled: true, commandPaletteHotkey: 'Alt+K', customCommandPaletteHotkey: ''});
+        expect(state.quickTranslationConflictMessage('Alt+K')).toContain('commandPalette.title');
+        config.value.commandPaletteEnabled = false;
+        expect(state.quickTranslationConflictMessage('Alt+K')).toBe('');
+    });
     it.each(groups)('$name 快速改选不会让迟到弹窗重新打开或取消覆盖新选择', async group => {
         const {state, config} = mount();
         state[group.change]('custom'); state[group.change](group.replacement);

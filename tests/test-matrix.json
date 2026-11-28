@@ -50,6 +50,9 @@
       "tests/testConfiguration.test.ts"
     ],
     "unit": [
+      "tests/fullPageRuntimeHelpers.test.ts",
+      "tests/useServiceCatalogActions.test.ts",
+      "tests/videoRuntimeMenuControls.test.ts",
       "tests/userscriptBuildCache.test.ts",
       "tests/wrappedParagraphs.test.ts",
       "tests/downloadTextFile.test.ts",
@@ -394,6 +397,7 @@
       "tests/writingEntryPlacement.test.ts",
       "tests/writingReference.test.ts",
       "tests/writingEditors.test.ts",
+      "tests/writingSiteExpansion.test.ts",
       "tests/writingMarkdown.test.ts",
       "tests/translationToolbarStatus.test.ts",
       "tests/apiKeyRotation.test.ts",
@@ -429,7 +433,6 @@
       "tests/languageStatistical.test.ts",
       "tests/languageIdentification.test.ts",
       "tests/shareCardCore.test.ts",
-      "tests/shareCardExcerpt.test.ts",
       "tests/shareCardRender.test.ts",
       "tests/shareCardRuntime.test.ts",
       "tests/shareCardExport.test.ts",
@@ -537,6 +540,9 @@
       "tests/personalCorrectionMemory.test.ts",
       "tests/readingEvidence.test.ts",
       "tests/videoSentenceTimeline.test.ts",
+      "tests/videoStreamingPlatforms.test.ts",
+      "tests/videoLocalMediaTranscription.test.ts",
+      "tests/videoLocalMediaPanel.test.ts",
       "tests/videoSemanticLearningTimeline.test.ts",
       "tests/videoSemanticSegmentation.test.ts",
       "tests/vocabularyVideoSource.test.ts",
@@ -573,8 +579,6 @@
       "tests/imageMatteBoundary.test.ts",
       "tests/imageDetectionSnapshot.test.ts",
       "tests/imageMattePageOwnership.test.ts",
-      "tests/pdfSourceOcrSuggestion.test.ts",
-      "tests/pdfSourceRecoveryWorkflow.test.ts",
       "tests/videoCourseCaptions.test.ts",
       "tests/imageFlatTextRepair.test.ts",
       "tests/privacyProtection.test.ts",
@@ -646,6 +650,8 @@
       "tests/documentTranslationApi.test.ts",
       "tests/documentTranslationBinary.test.ts",
       "tests/documentTranslationBinaryEdge.test.ts",
+      "tests/documentLatex.test.ts",
+      "tests/documentOfficeFormats.test.ts",
       "tests/documentUserActions.test.ts",
       "tests/documentWorkflows.test.ts",
       "tests/webArticleWorkbench.test.ts",
@@ -668,6 +674,10 @@
       "tests/google.test.ts",
       "tests/googleBackoffIntegration.test.ts",
       "tests/googleDriveSync.test.ts",
+      "tests/cloudSyncE2eePassphrase.test.ts",
+      "tests/cloudLearningSync.test.ts",
+      "tests/cloudAutoSync.test.ts",
+      "tests/remoteConfigSyncUpgradeUi.test.ts",
       "tests/harnessConversationPersistence.test.ts",
       "tests/harnessSessionRepository.test.ts",
       "tests/imageAlphaProtection.test.ts",
@@ -992,7 +1002,9 @@
       "tests/dictionaryRuntime.test.ts",
       "tests/dictionaryUi.test.ts",
       "tests/dictionaryAdapters.test.ts",
-      "tests/dictionaryScriptInitialization.test.ts"
+      "tests/dictionaryScriptInitialization.test.ts",
+      "tests/scenarioPresets.test.ts",
+      "tests/commandPalette.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",
@@ -1052,7 +1064,8 @@
       "tests/facebookPublicPostReplySummary.test.ts",
       "tests/facebookPublicPostControls.test.ts",
       "tests/facebookPublicPostPreparation.test.ts",
-      "tests/facebookPublicPostHarness.test.ts"
+      "tests/facebookPublicPostHarness.test.ts",
+      "tests/auditBugfixRegressions.test.ts"
     ]
   }
 }

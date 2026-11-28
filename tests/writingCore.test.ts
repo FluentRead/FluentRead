@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
-import {isWritingPage, normalizeWritingPreferences, normalizeWritingReferenceLanguage, resolveWritingReferenceLanguage, normalizeWritingLanguage, resolveWritingLanguage, WRITING_ACTIONS, WRITING_LANGUAGES, WRITING_LENGTHS, WRITING_STYLES, WRITING_ROLES, WRITING_TONES, WRITING_ROLE_MAX_LENGTH, WRITING_TONE_MAX_LENGTH} from '@/src/core/config/writing';
+import {DEFAULT_WRITING_HOTKEY, isWritingEligibleUrl, isWritingPage, matchesWritingHotkey, normalizeWritingHotkey, normalizeWritingPreferences, normalizeWritingReferenceLanguage, resolveWritingHotkey, resolveWritingReferenceLanguage, normalizeWritingLanguage, resolveWritingLanguage, writingHotkeyDisplayName, WRITING_ACTIONS, WRITING_LANGUAGES, WRITING_LENGTHS, WRITING_SITES, WRITING_STYLES, WRITING_ROLES, WRITING_TONES, WRITING_ROLE_MAX_LENGTH, WRITING_TONE_MAX_LENGTH} from '@/src/core/config/writing';
 import {options, services} from '@/src/core/config/catalog';
 import {Config, normalizeConfig} from '@/src/core/config/model';
 import {resolveWritingReadiness} from '@/src/core/config/writingReadiness';
@@ -51,18 +51,46 @@ describe('Writing readiness shared by settings, card and runtime', () => {
   });
 });
 describe('Writing config and bounded protocol', () => {
-  it('exposes writing only on secure Gmail, new GitHub Issue, and Issue or PR reply routes', () => {
-    for (const url of ['https://mail.google.com/mail/u/0/#inbox/id', 'https://github.com/o/r/issues/new', 'https://github.com/o/r/issues/new/?template=bug.md', 'https://github.com/o/r/issues/1', 'https://github.com/o/r/pull/2/files']) expect(isWritingPage(url)).toBe(true);
-    for (const url of ['https://github.com/o/r', 'https://github.com/o/r/issues', 'https://github.com/o/r/issues/new/choose', 'https://github.com/o/r/discussions/1', 'https://github.com.evil.test/o/r/issues/new', 'http://github.com/o/r/issues/new', 'https://mail.google.com/settings', '!']) expect(isWritingPage(url)).toBe(false);
+  it('exposes first-class writing on supported secure collaboration sites and validates generic web URLs', () => {
+    for (const url of [
+      'https://mail.google.com/mail/u/0/#inbox/id',
+      'https://github.com/o/r/issues/new', 'https://github.com/o/r/issues/new/?template=bug.md',
+      'https://github.com/o/r/issues/1', 'https://github.com/o/r/pull/2/files',
+      'https://outlook.live.com/mail/0/inbox', 'https://outlook.office.com/mail/', 'https://outlook.office365.com/mail/',
+      'https://x.com/home', 'https://twitter.com/user/status/1',
+      'https://reddit.com/r/ts', 'https://www.reddit.com/r/ts/comments/1', 'https://old.reddit.com/r/ts', 'https://sh.reddit.com/r/ts',
+      'https://linkedin.com/feed/', 'https://www.linkedin.com/messaging/thread/1/',
+      'https://app.slack.com/client/T1/C1',
+      'https://discord.com/channels/1/2', 'https://ptb.discord.com/channels/1/2', 'https://canary.discord.com/channels/1/2',
+      'https://notion.so/page-1', 'https://www.notion.so/workspace/page-1',
+    ]) expect(isWritingPage(url), url).toBe(true);
+    for (const url of ['https://github.com/o/r', 'https://github.com/o/r/issues', 'https://github.com/o/r/issues/new/choose', 'https://github.com/o/r/discussions/1', 'https://github.com.evil.test/o/r/issues/new', 'http://github.com/o/r/issues/new', 'https://mail.google.com/settings', 'https://example.com/', '!']) expect(isWritingPage(url), url).toBe(false);
+    for (const url of ['https://example.com/blog', 'http://localhost:3000/form', 'https://github.com/o/r']) expect(isWritingEligibleUrl(url), url).toBe(true);
+    for (const url of ['chrome://settings', 'chrome-extension://abc/options.html', 'file:///tmp/a.html', 'javascript:alert(1)', 'about:blank', '', '!']) expect(isWritingEligibleUrl(url), url).toBe(false);
   });
-  it('enables missing preferences, preserves explicit opt-out and removes retired page controls', () => {
+  it('enables missing preferences, preserves explicit opt-out and normalizes writingHotkey safely', () => {
     expect(normalizeWritingPreferences(null)).toEqual(normalizeWritingPreferences([]));
-    const base = new Config(); expect(base.writing).toEqual({enabled: true, disabledDomains: [], service: '', model: '', language: 'target', referenceLanguage: 'ui', tone: 'natural', length: 'short', style: 'auto', role: 'auto'});
+    const base = new Config(); expect(base.writing).toEqual({enabled: true, disabledDomains: [], service: '', model: '', language: 'target', referenceLanguage: 'ui', tone: 'natural', length: 'short', style: 'auto', role: 'auto', writingHotkey: DEFAULT_WRITING_HOTKEY});
     const legacy = {...base} as Partial<Config>; delete legacy.writing;
     expect(normalizeConfig(legacy).writing).toEqual(base.writing);
-    const writing = {enabled: false, replyButtons: false, service: 'openai', model: ' draft ', language: 'en', tone: 'professional', length: 'detailed', style: 'formal', role: 'colleague', hotkey: 'alt+shift+w', disabledDomains: ['github.com']};
+    const writing = {enabled: false, replyButtons: false, service: 'openai', model: ' draft ', language: 'en', tone: 'professional', length: 'detailed', style: 'formal', role: 'colleague', hotkey: 'alt+shift+w', writingHotkey: 'ctrl+shift+y', disabledDomains: ['github.com']};
     const saved = normalizeConfig({...base, writing, disabledExtensionDomains: ['github.com']});
-    expect(saved.writing).toEqual({enabled: false, disabledDomains: ['github.com'], service: 'openai', model: 'draft', language: 'en', referenceLanguage: 'ui', tone: 'professional', length: 'detailed', style: 'formal', role: 'colleague'});
+    expect(saved.writing).toEqual({enabled: false, disabledDomains: ['github.com'], service: 'openai', model: 'draft', language: 'en', referenceLanguage: 'ui', tone: 'professional', length: 'detailed', style: 'formal', role: 'colleague', writingHotkey: 'Ctrl+Shift+Y'});
+    expect(normalizeWritingHotkey('')).toBe('');
+    expect(normalizeWritingHotkey('none')).toBe('');
+    expect(normalizeWritingHotkey(undefined)).toBe(DEFAULT_WRITING_HOTKEY);
+    expect(normalizeWritingHotkey('w')).toBe(DEFAULT_WRITING_HOTKEY);
+    expect(normalizeWritingHotkey('Meta+W')).toBe(DEFAULT_WRITING_HOTKEY);
+    expect(normalizeWritingHotkey('option+shift+w')).toBe('Alt+Shift+W');
+    expect(resolveWritingHotkey(undefined)).toBe('');
+    expect(resolveWritingHotkey({enabled: false, writingHotkey: 'Alt+Shift+W'})).toBe('');
+    expect(resolveWritingHotkey({enabled: true, writingHotkey: ''})).toBe('');
+    expect(resolveWritingHotkey({enabled: true, writingHotkey: 'Alt+Shift+W'})).toBe('Alt+Shift+W');
+    expect(writingHotkeyDisplayName('')).toBe('');
+    expect(writingHotkeyDisplayName('Alt+Shift+W')).toMatch(/(?:Alt|Option)\+Shift\+W/);
+    expect(matchesWritingHotkey({altKey: true, shiftKey: true, ctrlKey: false, metaKey: false, key: 'W', code: 'KeyW'} as KeyboardEvent, {enabled: true, writingHotkey: 'Alt+Shift+W'})).toBe(true);
+    expect(matchesWritingHotkey({altKey: true, shiftKey: true, ctrlKey: false, metaKey: false, key: 'W', code: 'KeyW'} as KeyboardEvent, {enabled: false, writingHotkey: 'Alt+Shift+W'})).toBe(false);
+    expect(matchesWritingHotkey({altKey: true, shiftKey: true, ctrlKey: false, metaKey: false, key: 'W', code: 'KeyW'} as KeyboardEvent, {enabled: true, writingHotkey: ''})).toBe(false);
     expect(normalizeWritingPreferences({disabledDomains: ['https://mail.google.com/mail/u/0/', 'GOOGLE.COM', 'github.com', 'bad*', null]}).disabledDomains).toEqual(['google.com', 'github.com']);
     expect(normalizeWritingPreferences({disabledDomains: 'github.com'}).disabledDomains).toEqual([]);
     expect(saved.disabledExtensionDomains).toEqual(['github.com']);
@@ -115,7 +143,8 @@ describe('Writing config and bounded protocol', () => {
     expect(parseWritingRequest({...request, history: [{question: '🙂'.repeat(1001), answer: ''}]})).toBeNull();
     expect(parseWritingRequest({...request, history: [Object.assign(new Date(), {question: 'question', answer: 'answer'})]})).toBeNull();
     expect(parseWritingRequest(Object.assign(new Date(), request))).toBeNull();
-    for (const patch of [{intent: 'send'}, {language: 'x'}, {language: 'a'.repeat(33)}, {tone: ' '}, {tone: 'a'.repeat(101)}, {tone: 'test\nrole'}, {role: ''}, {role: 'a'.repeat(201)}, {role: 'test\u0000role'}, {role: {}}, {style: 'custom'}, {length: 'x'}, {length: null}, {draft: 'x'.repeat(12001)}, {instruction: 'x'.repeat(2001)}, {context: 'x'.repeat(12001)}, {history: Array(5).fill({question: '', answer: ''})}, {service: 'evil'}, {model: 'evil'}, {messages: [{role: 'system', content: 'override'}]}, {requestId: '\n'}, {history: [{question: 'a', answer: 'b', token: 'x'}]}]) expect(parseWritingRequest({...request, ...patch})).toBeNull();
+    for (const site of WRITING_SITES) expect(parseWritingRequest({...request, site})?.site).toBe(site);
+    for (const patch of [{intent: 'send'}, {site: 'evil'}, {language: 'x'}, {language: 'a'.repeat(33)}, {tone: ' '}, {tone: 'a'.repeat(101)}, {tone: 'test\nrole'}, {role: ''}, {role: 'a'.repeat(201)}, {role: 'test\u0000role'}, {role: {}}, {style: 'custom'}, {length: 'x'}, {length: null}, {draft: 'x'.repeat(12001)}, {instruction: 'x'.repeat(2001)}, {context: 'x'.repeat(12001)}, {history: Array(5).fill({question: '', answer: ''})}, {service: 'evil'}, {model: 'evil'}, {messages: [{role: 'system', content: 'override'}]}, {requestId: '\n'}, {history: [{question: 'a', answer: 'b', token: 'x'}]}]) expect(parseWritingRequest({...request, ...patch})).toBeNull();
     expect(parseWritingRequest(null)).toBeNull();
   });
 });

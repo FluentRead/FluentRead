@@ -12,7 +12,6 @@ import {lookupSelectionDictionary, createDictionaryRuntimeHandler} from './dicti
 import {createSelectionPageZoomBrowserPort, createSelectionPageZoomHandler} from '@/src/features/selection-translation/background/pageZoomHandler';
 import {createSelectionTtsRuntimeHandlers} from './selectionTtsRuntime';
 import {vocabularyBook} from '@/src/features/vocabulary/repository';
-import {createBrowserMaterialHandler} from './handlers/vocabulary';
 import {clearTranslationCache, getTranslationCacheStats, translateWithCache} from '@/src/app/translation/runtime';
 import {serializeTranslationError} from '@/src/services/translation/errors';
 import {createBackgroundMessageRouter, createBackgroundRuntimeMessageListener, type BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
@@ -30,10 +29,11 @@ import {createFreeTranslationWeightsHandler} from './handlers/freeTranslationWei
 import {createPopupNavigationHandlers} from './popupNavigation';
 import {createDownloadProgressHandler, createDownloadProgressQueryHandler} from './handlers/downloadProgress';
 import {createUiLanguageBaseHandler} from './handlers/uiLanguageBase';
+import {createBrowserVideoSubtitleFrameExecutor, createVideoSubtitleFrameHandler} from './handlers/videoSubtitleFrame';
 import {createTranslationCancelHandler, createTranslationRequestFallback, createTranslationRequestRegistry} from './handlers/translation';
 import {createSelectionWordLookupHandler} from './handlers/selectionWordLookup';
 import {isBrowserTabId} from './tabTranslationState';
-import {createBrowserVocabularyBookChangedBroadcaster, createBrowserVocabularyUndoOptions, createVocabularyBackgroundHandlers} from './handlers/vocabulary';
+import {createBrowserMaterialHandler, createBrowserVocabularyBookChangedBroadcaster, createBrowserVocabularyUndoOptions, createVocabularyBackgroundHandlers} from './handlers/vocabulary';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {installExtensionPageMessageListener, type ExtensionPageMessageTarget} from '@/src/platform/offscreen/extensionPageMessaging';
 import {createCapabilityGatedBackgroundHandlers} from './capabilityRegistry';
@@ -122,6 +122,11 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             logOperationFailure: (error) => console.error('[FluentRead] vocabulary book operation failed:', error),
         }),
         ...createVideoSubtitleBackgroundRuntime(),
+        createVideoSubtitleFrameHandler({
+            runtimeId: browser.runtime.id,
+            isTabId: isBrowserTabId,
+            executeScript: createBrowserVideoSubtitleFrameExecutor(browser as unknown as Parameters<typeof createBrowserVideoSubtitleFrameExecutor>[0]),
+        }),
         ...createLocalModelMessageHandlers<BackgroundRuntimeContext>(),
         createDownloadProgressHandler({runtimeId: browser.runtime.id, offscreenUrl: browser.runtime.getURL('/offscreen.html'), storage: browser.storage.local}), createDownloadProgressQueryHandler({runtimeId: browser.runtime.id, storage: browser.storage.local}), createUiLanguageBaseHandler({runtimeId: browser.runtime.id}),
     ];

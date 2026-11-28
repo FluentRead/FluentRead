@@ -487,7 +487,7 @@ import { resolveTranslationRequestModel } from '@/src/core/config/requestModel'
 import { getServiceRequestLimitPreference } from '@/src/core/config/requestLimits'
 import { isValidCustomHeaders } from '@/src/core/config/customHeaders'
 import { createApiKeyCheckRevision } from '@/src/core/config/apiKeyCheckIdentity'
-import { normalizeFreeTranslationOrder, normalizeMyMemoryEmail } from '@/src/core/config/freeTranslation'
+import { FREE_TRANSLATION_PROVIDERS, normalizeFreeTranslationOrder, normalizeMyMemoryEmail } from '@/src/core/config/freeTranslation'
 import { isNativeBatchTranslationService, isNativeTranslationBatchEnabled } from '@/src/core/config/nativeBatch'
 import { requiresDeepLXToken } from '@/src/core/config/deeplx'
 import { getDeepLEndpoint } from '@/src/core/config/deepl'
@@ -529,7 +529,6 @@ import {createServiceRepairFocus} from './serviceRepairFocus'
 const ChatGPTPlanSettings = chatGPTPlanDevelopmentEnabled ? defineAsyncComponent(() => import('./ChatGPTPlanSettings.vue')) : null
 import { checkAllFreeTranslationProviders, type FreeTranslationChecks } from './freeTranslationChecks'
 import {readFreePoolAccess} from '@/src/platform/browser/freeProviderPermissions'
-import {FREE_TRANSLATION_PROVIDERS} from '@/src/core/config/freeTranslation'
 import { listPromptTemplateSyncTargets, syncPromptTemplates as applyPromptTemplateSync } from './promptTemplateSync'
 import {waitForSettingsTask} from '../../model/taskWait'
 import {useSettingsActionContext} from '../../model/useSettingsActionContext'
@@ -1406,127 +1405,4 @@ watch(() => pendingServiceAction.value && !isCurrentServiceAction(pendingService
 watch(serviceActionOpen, open => {if (!open) pendingServiceAction.value = null}, {flush: 'sync'})
 </script>
 
-<style scoped>
-.service-connection-section { container-type: inline-size; display: grid; gap: 0; color: var(--ink, #172033); }
-.connection-card { min-width: 0; border: 1px solid var(--line, #e4e7ef); border-radius: 14px; background: var(--surface, #fff); }
-.connection-card { padding: 20px; }
-.configuration-group-heading { margin-bottom: 8px; }
-.configuration-group-heading h5 { margin: 0; color: var(--ink); font-size: 14px; font-weight: 650; line-height: 1.5; }
-.configuration-group-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.connection-field { display: grid; grid-template-columns: var(--fr-service-label-width, 140px) minmax(0, 1fr); align-items: start; gap: var(--fr-service-column-gap, 16px); padding: var(--fr-settings-row-padding-block, 14px) 0; }
-.connection-field + .connection-field { border-top: 1px solid var(--line, #e4e7ef); }
-.connection-field-label { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; min-height: var(--fr-service-control-height, 40px); }
-.connection-field-label small { flex-basis: 100%; }
-.connection-field-label strong { color: var(--ink); font-size: 13px; font-weight: 550; line-height: 1.5; }
-.connection-field-label small, .provider-field-help, .custom-headers-help, .model-thinking-setting > small, .model-vision-setting > small { color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
-.connection-field-control { display: flex; flex-direction: column; align-items: stretch; justify-self: start; width: 100%; max-width: var(--fr-service-control-width, 640px); min-width: 0; }
-.connection-field-control :deep(.el-input), .connection-field-control :deep(.el-select), .connection-field-control :deep(.el-textarea) { width: 100% !important; max-width: 640px !important; }
-.connection-field-control :deep(.el-select) { max-width: 360px !important; }
-.service-connection-section :deep(.el-input__wrapper), .service-connection-section :deep(.el-select:not(.fluentread-select) .el-select__wrapper) { min-height: var(--fr-service-control-height, 40px); padding: 0 11px; border-radius: 8px; background: var(--surface, #fff); border-color: var(--line); }
-.service-connection-section :deep(.el-input__inner), .service-connection-section :deep(.el-select__selected-item) { font-size: 13px; }
-.service-connection-section :deep(.el-textarea__inner) { border-radius: 8px; background: var(--surface); font-size: 13px; padding: 10px 12px; }
-.service-connection-section :deep(.el-switch) { --el-switch-on-color: var(--brand, #ef4776); }
-.provider-field-help, .custom-headers-help { display: block; align-self: stretch; margin: 7px 0 0; }
-.provider-field-help code { font-size: 11px; }
-.credential-control { display: grid; justify-items: end; gap: 8px; }
-.api-key-requirement { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
-.model-vision-setting { gap: 6px; }
-.field-help-line { margin: 0; }
-.field-help-line + .field-help-line { margin-top: 6px; }
-.model-thinking-setting { justify-content: center; align-items: flex-start; min-height: 38px; }
-/* 开关自带 4px 的点击留白：向外抵消，让可见轨道与其他控件左对齐，并保持与输入框相同的行高。 */
-.model-thinking-setting :deep(.el-switch) { flex: none; margin: -3px 0 -3px -4px; }
-.service-settings-tabs { margin-top: 18px; min-width: 0; --el-color-primary: var(--brand-strong); }
-.service-settings-tabs.is-single-tab { margin-top: 20px; }
-.service-settings-tabs.is-single-tab :deep(.el-tabs__header) { display: none; }
-.service-settings-tabs.is-single-tab .service-settings-panel { padding-top: 0; }
-.single-request-settings { margin-bottom: 0; }
-.single-request-settings :deep(.settings-disclosure-body) { padding: 0 var(--fr-card-padding-inline, 20px) 4px; }
-.service-settings-tabs :deep(.el-tabs__header) { margin: 0; }
-.service-settings-tabs :deep(.el-tabs__item) { height: 44px; padding: 0 18px; color: var(--muted); font-size: 13px; font-weight: 550; }
-.service-settings-tabs :deep(.el-tabs__item.is-active) { color: var(--brand-strong); }
-.service-settings-tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; background: var(--line); }
-.service-settings-panel { min-width: 0; padding-top: 12px; }
-.configuration-scope { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.credential-usage { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.credential-usage-label { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.credential-modes { display: flex; flex-wrap: wrap; padding: 3px; gap: 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
-.credential-modes label { position: relative; display: inline-flex; align-items: center; min-height: 24px; padding: 2px 10px; border-radius: 7px; color: var(--muted); font-size: 11px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease; }
-.credential-modes label:not(.is-selected):hover { color: var(--ink); }
-.credential-modes label.is-selected { color: var(--brand-strong); background: var(--surface); box-shadow: 0 2px 7px rgba(31, 40, 61, .09); }
-.credential-modes input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.credential-modes label:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
-.credential-requirement { max-width: 360px; }
-.custom-template-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin: 2px 0 12px; }
-.custom-template-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-left: auto; }
-.prompt-sync-button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); font-size: 12px; font-weight: 550; cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
-.prompt-sync-button:hover:not(:disabled) { border-color: var(--brand-border, #f3c0ce); color: var(--brand-strong); background: var(--brand-soft); }
-.prompt-sync-button:disabled { opacity: .5; cursor: not-allowed; }
-.prompt-template-list { display: grid; gap: 14px; }
-.service-connection-section :deep(.request-limit-settings) { width: 100%; }
-/* 连接字段紧接服务标题或模型行，上方已有分隔线：首行不再重复画线。 */
-.connection-card > :deep(.api-key-list:first-child) { border-top: 0; }
-.connection-card > .configuration-scope { padding: 14px 0 6px; }
-.connection-test-inline { display: flex; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; margin: 14px 0; }
-.connection-test-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 0; max-width: 100%; min-height: 36px; padding: 7px 12px; border: 1px solid var(--brand-border, #f3c0ce); border-radius: 8px; color: var(--brand-strong, #bd2853); background: var(--brand-soft, #fff0f4); font-size: 12px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; cursor: pointer; }
-.connection-test-button:hover:not(:disabled) { border-color: var(--brand); }
-.connection-test-button.is-quiet { border-color: var(--line); color: var(--muted); background: var(--surface); }
-.connection-test-button.is-quiet:hover:not(:disabled) { border-color: var(--brand); color: var(--brand-strong); }
-.connection-test-button:disabled { cursor: wait; opacity: .65; }
-.connection-action-icon { flex: none; }
-.is-spinning { animation: connection-spin 1s linear infinite; }
-@keyframes connection-spin { to { transform: rotate(360deg); } }
-.service-connection-action { position: relative; display: flex; width: 100%; min-width: 0; }
-.service-connection-action .connection-test-button { width: 100%; white-space: normal; }
-.header-connection-status { position: absolute; top: calc(100% + 3px); right: 0; color: var(--muted); font-size: 11px; line-height: 17px; white-space: nowrap; }
-.header-connection-status.is-success { color: var(--el-color-success); }
-.header-connection-status.is-error { color: var(--el-color-danger); }
-.service-connection-action .connection-test-inline { width: 100%; margin: 0; align-items: stretch; }
-.connection-test-result { display: grid; gap: 4px; margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface-soft); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
-.chrome-preparation-status { padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
-.chrome-preparation-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
-.chrome-preparation-line strong { min-width: 0; font-weight: 650; }
-.chrome-preparation-badge { padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--surface); font-size: 12px; font-weight: 600; }
-.chrome-preparation-status.is-success .chrome-preparation-badge,
-.chrome-preparation-status[data-availability='available'] .chrome-preparation-badge { border-color: color-mix(in srgb, var(--fr-success, #147e5c) 26%, transparent); color: var(--fr-success, #147e5c); background: var(--fr-success-soft, #eaf7f3); }
-.chrome-preparation-status.is-error .chrome-preparation-badge,
-.chrome-preparation-status[data-availability='unavailable'] .chrome-preparation-badge { border-color: color-mix(in srgb, var(--fr-danger, #c62828) 26%, transparent); color: var(--fr-danger, #c62828); background: var(--fr-danger-soft, #fdecec); }
-.chrome-preparation-hint { color: var(--muted); font-size: 12px; }
-.chrome-preparation-status.is-error .chrome-preparation-hint { flex-basis: 100%; }
-.chrome-preparation-progress { max-width: 256px; margin-top: 6px; }
-.connection-test-result.is-success { border-color: var(--el-color-success-light-5); color: var(--el-color-success); background: var(--el-color-success-light-9); }
-.connection-test-result.is-error { border-color: var(--el-color-danger-light-5); color: var(--el-color-danger); background: var(--el-color-danger-light-9); }
-.connection-repair-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-.connection-repair-button { min-height: 32px; padding: 4px 10px; border: 1px solid currentColor; border-radius: 7px; color: inherit; background: transparent; font: inherit; cursor: pointer; }
-.connection-repair-button:hover:not(:disabled) { background: var(--surface); }
-.connection-repair-button:disabled { opacity: .6; cursor: default; }
-.field-warning, .error-text, .minimax-key-note.is-warning, .mimo-key-note.is-warning { color: var(--el-color-danger); font-size: 12px; line-height: 1.6; margin-top: 7px; }
-.minimax-key-note, .mimo-key-note { margin: 8px 0; }
-.minimax-endpoint code, .mimo-endpoint code { display: block; color: var(--muted); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
-.official-translation-help { margin: 12px 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.official-translation-help p { margin: 0 0 8px; }
-.official-translation-help a { color: var(--brand-strong); }
-.service-maintenance-actions { display: flex; justify-content: flex-end; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--line); }
-.delete-service-button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 5px 8px; border: 0; border-radius: 6px; color: var(--el-color-danger); background: transparent; font-size: 12px; cursor: pointer; }
-.delete-service-button:hover { background: var(--el-color-danger-light-9); }
-button:focus-visible, summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
-@container (max-width: 600px) {
-  .connection-card { padding: 16px; }
-  .connection-field { grid-template-columns: 1fr; gap: 8px; }
-  [data-configuration-group="translation"] .connection-field { grid-template-columns: minmax(0, 1fr); }
-  [data-configuration-group="translation"] .model-thinking-setting { justify-self: start; }
-  [data-configuration-group="translation"] .model-vision-setting { width: 100%; }
-  .connection-field-label { min-height: 24px; }
-  .connection-field-control { max-width: none; }
-  .custom-template-heading { flex-wrap: wrap; }
-}
-@media (prefers-reduced-motion: reduce) { .advanced-chevron { transition: none; } .is-spinning { animation: none; } }
-.endpoint-token-help { margin-top: 10px; font-size: 12px; color: var(--muted); }
-.endpoint-token-help summary { cursor: pointer; color: var(--brand-strong); }
-/* 详情本身就是主卡片，内部按用途分组，不再嵌套大容器。 */
-.connection-card { padding: 0; border: 0; border-radius: 0; }
-.configuration-group-heading { margin: 0 0 10px; }
-.configuration-group-heading h5 { font-size: 13px; font-weight: 650; }
-.provider-account-fields { min-width: 0; }
-@container (max-width: 520px) { .provider-account-fields { grid-template-columns: 1fr; gap: 8px; } }
-</style>
+<style scoped src="./service-configuration.css"></style>

@@ -56,7 +56,7 @@ export {
 export {
     toggleContextMenuImage,
     setMangaPeekOriginal,
-    isImageTranslatorNeeded, isMangaReaderPage, mountMangaEntry, unmountMangaEntry,
+    isImageTranslatorNeeded, isImageTranslatorMounted, isMangaReaderPage, mountMangaEntry, unmountMangaEntry,
     mountImageTranslator,
     unmountImageTranslator,
 } from '@/src/features/image-translation/public';
@@ -69,3 +69,4 @@ export {
 
 export {mountShareCard, unmountShareCard, isShareCardMounted} from '@/src/features/share-card/public';
 export {mountVocabularyReencounter, unmountVocabularyReencounter} from '@/src/features/vocabulary/content/public';
+export {mountCommandPalette, unmountCommandPalette, isCommandPaletteMounted} from '@/src/features/command-palette/public';

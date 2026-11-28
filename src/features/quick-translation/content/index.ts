@@ -86,12 +86,25 @@ function removeReleasedKey(
     return key;
 }
 
-function pressedKeysExactlyMatchHotkey(pressedKeys: ReadonlySet<string>, hotkey: string): boolean {
+const parsedHotkeyKeysCache = new Map<string, ReadonlySet<string> | null>();
+
+function getExpectedHotkeyKeys(hotkey: string): ReadonlySet<string> | null {
+    const cached = parsedHotkeyKeysCache.get(hotkey);
+    if (cached !== undefined) return cached;
     const parsed = parseHotkey(hotkey);
-    if (!parsed.isValid) return false;
-    const expectedKeys = new Set([...parsed.modifiers, parsed.key]);
-    return expectedKeys.size === pressedKeys.size
-        && [...expectedKeys].every((key) => pressedKeys.has(key));
+    const result = parsed.isValid ? new Set([...parsed.modifiers, parsed.key]) : null;
+    if (parsedHotkeyKeysCache.size >= 128) parsedHotkeyKeysCache.clear();
+    parsedHotkeyKeysCache.set(hotkey, result);
+    return result;
+}
+
+function pressedKeysExactlyMatchHotkey(pressedKeys: ReadonlySet<string>, hotkey: string): boolean {
+    const expectedKeys = getExpectedHotkeyKeys(hotkey);
+    if (!expectedKeys || expectedKeys.size !== pressedKeys.size) return false;
+    for (const key of expectedKeys) {
+        if (!pressedKeys.has(key)) return false;
+    }
+    return true;
 }
 
 function configuredSelectionModifier(
@@ -189,6 +202,10 @@ export function mountQuickTranslationContentFeature(
 
     const onKeydown = (event: KeyboardEvent) => {
         if (signal.aborted || !event.isTrusted) return;
+        if (event.isComposing || event.keyCode === 229) {
+            cancelGestureAndPressedKeys();
+            return;
+        }
         if (suppressedSelectionPrefixGesture) {
             deps.resetLegacyKeyboardGestures();
             claimKeyboardEvent(event);
@@ -219,7 +236,7 @@ export function mountQuickTranslationContentFeature(
             && (
             pressedKeysExactlyMatchHotkey(pressedKeys, candidate.hotkey)
             && matchesConfiguredHotkey(event, candidate.hotkey)
-            && (candidate.action !== 'section' || !deps.isEditing(event))
+            && ((candidate.action !== 'section' && candidate.action !== 'hover') || !deps.isEditing(event))
         ));
         if (!profile) return;
 
@@ -271,6 +288,10 @@ export function mountQuickTranslationContentFeature(
 
     const onKeyup = (event: KeyboardEvent) => {
         if (signal.aborted || !event.isTrusted) return;
+        if (event.isComposing || event.keyCode === 229) {
+            cancelGestureAndPressedKeys();
+            return;
+        }
         const releasedKey = removeReleasedKey(event, pressedKeys, pressedKeyByCode);
         if (suppressedSelectionPrefixGesture) {
             const selectionModifier = configuredSelectionModifier(
@@ -392,6 +413,11 @@ export function mountQuickTranslationContentFeature(
         cancelGesture();
     };
 
+    const onCompositionstart = () => {
+        if (signal.aborted) return;
+        cancelGestureAndPressedKeys();
+    };
+
     if (signal.aborted) {
         cancelGestureAndPressedKeys();
         return;
@@ -400,7 +426,8 @@ export function mountQuickTranslationContentFeature(
     deps.window.addEventListener('keydown', onKeydown, {capture: true, signal});
     deps.window.addEventListener('keyup', onKeyup, {capture: true, signal});
     deps.window.addEventListener('blur', onBlur, {signal});
-    deps.document.addEventListener('mousemove', onMousemove, {signal});
+    deps.document.addEventListener('compositionstart', onCompositionstart, {capture: true, signal});
+    deps.document.addEventListener('mousemove', onMousemove, {passive: true, signal});
     deps.document.addEventListener('selectionchange', onSelectionchange, {signal});
     deps.document.addEventListener('pointerdown', onPointerdown, {capture: true, signal});
     deps.document.addEventListener('fluentread-route-change', onRouteChange, {signal});

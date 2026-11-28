@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {MANGA_INPAINT_ASSET, MANGA_OCR_ASSETS, MANGA_OCR_CACHE, MANGA_OCR_MODEL_BYTES,MANGA_TEXT_SEGMENTATION_ASSET,
-    assertMangaOcrActive, loadMangaInpaintAsset, loadMangaOcrAssets, mangaOcrModelStatus, removeMangaOcrAssets, importMangaModel,loadMangaTextSegmentationAsset,withMangaModelAdmission,withMangaModelRemoval} from '@/src/features/image-translation/services/mangaOcrAssets';
+import {MANGA_INPAINT_ASSET, MANGA_OCR_ASSETS, MANGA_OCR_CACHE, MANGA_OCR_MODEL_BYTES,MANGA_TEXT_SEGMENTATION_ASSET, MangaModelAssetError,
+    assertMangaOcrActive, loadMangaInpaintAsset, loadMangaOcrAssets, mangaOcrModelStatus, removeMangaOcrAssets, importMangaModel,loadMangaTextSegmentationAsset,subscribeMangaDownloadState,withMangaModelAdmission,withMangaModelRemoval} from '@/src/features/image-translation/services/mangaOcrAssets';
 import {createVirtualModelResponsePort, virtualModelBuffer} from './helpers/virtualModelResponse';
 // 资源生命周期使用显式虚拟容量，不伪装为真实 ONNX；实际 wire 与固定配方由独立测试及外部字节 replay 验证。
 const shapes=vi.hoisted(()=>({optimize:vi.fn()}));
@@ -158,7 +158,7 @@ describe('漫画模型固定版本和完整性',()=>{
     it('下载固定来源、校验哈希和尺寸、按文件报告进度，不上传图像',async()=>{
         const progress=vi.fn(),abort=new AbortController();const model=await loadMangaOcrAssets(abort.signal,progress);
         expect(Object.keys(model)).toEqual(['detection','recognition','charactersDictionary']);expect(caches.open).toHaveBeenCalledWith(MANGA_OCR_CACHE);
-        expect(fetch).toHaveBeenCalledTimes(3);expect(cache.put).toHaveBeenCalledTimes(3);expect(progress.mock.calls.map(c=>c[0])).toEqual([31,99,100]);
+        expect(fetch).toHaveBeenCalledTimes(3);expect(cache.put).toHaveBeenCalledTimes(3);expect(progress.mock.calls.map(c=>c[0])).toEqual([0,31,99,100]);
         for(const [url,options] of vi.mocked(fetch).mock.calls) {expect(url).toContain('/resolve/bf1d5edb0335d3262be7caf13f766ba274b4cadd/');expect(options).toEqual({signal:expect.any(AbortSignal),credentials:'omit',referrerPolicy:'no-referrer'});}
     });
     it('完整缓存不请求网络，并发读取并校验三份模型，取消后的任务不继续执行',async()=>{
@@ -314,5 +314,35 @@ describe('可选离线 CTD 模型',()=>{
         if(stage==='hashed')vi.mocked(crypto.subtle.digest).mockImplementationOnce(async()=>{abort.abort();return digest(asset.bytes);});
         await expect(loadMangaTextSegmentationAsset(abort.signal)).rejects.toMatchObject({name:'AbortError'});
         expect(fetch).not.toHaveBeenCalled();expect(cache.delete).not.toHaveBeenCalled();expect(cache.put).not.toHaveBeenCalled();
+    });
+    it('下载状态订阅同步实时进度、错误与退订，并合并清理外部 Worker 过期状态',async()=>{
+        const events:Array<string|undefined>=[];
+        const stop=subscribeMangaDownloadState(state=>events.push(state?.phase));
+        await loadMangaInpaintAsset();
+        expect(events).toEqual(['downloading','verifying',undefined]);
+        vi.mocked(fetch).mockRejectedValue(new Error('offline'));
+        await expect(loadMangaInpaintAsset()).rejects.toBeInstanceOf(MangaModelAssetError);
+        expect(events.at(-1)).toBe('error');
+        stop();
+        const beforeCount=events.length;
+        await removeMangaOcrAssets();
+        expect(events).toHaveLength(beforeCount);
+        const external={phase:'error' as const,file:'lama-manga-dynamic.onnx',loaded:10,total:MANGA_INPAINT_ASSET.bytes,source:'huggingface.co'};
+        expect((await mangaOcrModelStatus(external)).download).toEqual(external);
+        cache.match.mockImplementation(async(url:string)=>url===MANGA_INPAINT_ASSET.url?response(1):undefined);
+        expect((await mangaOcrModelStatus(external)).download).toBeUndefined();
+        // 旧下载在新下载接管后被取消时，不发布 paused 覆盖新下载状态。
+        cache.match.mockResolvedValue(undefined);
+        const oldAbort=new AbortController(),oldGate=deferred<Response>(),newGate=deferred<Response>();
+        vi.mocked(fetch).mockReset().mockImplementationOnce(()=>oldGate.promise).mockImplementationOnce(()=>newGate.promise);
+        const oldTask=loadMangaInpaintAsset(oldAbort.signal);
+        await Promise.resolve();await Promise.resolve();
+        const newTask=loadMangaInpaintAsset();
+        await Promise.resolve();await Promise.resolve();
+        oldAbort.abort();oldGate.reject(new Error('aborted'));
+        await expect(oldTask).rejects.toMatchObject({name:'AbortError'});
+        expect((await mangaOcrModelStatus()).download?.phase).toBe('downloading');
+        newGate.resolve(response(MANGA_INPAINT_ASSET.bytes));
+        await newTask;
     });
 });

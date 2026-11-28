@@ -11,7 +11,7 @@ import {services} from "@/src/core/config/catalog";
 import {DEFAULT_DEEPLX_ENDPOINT, getDeepLXEndpoints, parseDeepLXEndpoints} from "@/src/core/config/deeplx";
 import {translate, MAX_FREE_TEXT_LENGTH, type SourceLanguage, type TargetLanguage} from '@deeplx/core';
 import {translateFreeTextChunks} from './freeTextChunks';
-import {getTranslationProviderLanguages} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderLanguages, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import type {TranslationLanguageOverride} from '@/src/core/translation/languages';
 import {createHttpStatusError, createProviderCodeError} from '@/src/platform/http/errors';
 import {
@@ -20,7 +20,6 @@ import {
     cancelUnreadResponseBody,
     runtimeFetch,
 } from '@/src/platform/http/runtime';
-import {requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderRequest, TranslationProviderRequestContext} from '@/src/services/translation/types';
 
 const DEEPLX_TOTAL_TIMEOUT_MS = 20_000;

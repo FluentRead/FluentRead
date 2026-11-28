@@ -5,8 +5,13 @@
  * 模块边界：仅装配浏览器能力；凭据与设置目标校验属于各 feature，不将悬浮球的默认 popup 请求导航到完整设置页。
  */
 import {createFloatingPopupHandlers} from '@/src/features/floating-ball/background/popupHandler';
+import {createCommandPaletteNavigationHandlers} from './commandPaletteNavigation';
 import {createOpenOptionsPageHandler} from './handlers/openOptions';
 export type {PopupContext} from '@/src/features/floating-ball/background/popupHandler';
+
+type NativeSidepanelHost = typeof globalThis & {
+    chrome?: {sidePanel?: {open?: (options: {tabId: number} | {windowId: number}) => Promise<void>}};
+};
 
 export function createPopupNavigationHandlers() {
     const manifest = browser.runtime.getManifest();
@@ -26,6 +31,35 @@ export function createPopupNavigationHandlers() {
             const encoded = params.toString();
             const query = encoded ? `?${encoded}` : '';
             await browser.tabs.create({url: `${browser.runtime.getURL('/options.html')}${query}#${section}`});
+        },
+    }), ...createCommandPaletteNavigationHandlers({
+        extensionId: browser.runtime.id,
+        openDocumentWorkspace: async (windowId) => {
+            await browser.tabs.create({
+                url: browser.runtime.getURL('/document.html'),
+                ...(windowId === undefined ? {} : {windowId}),
+            });
+        },
+        openSidepanel: async (tabId, windowId) => {
+            const chromeSidePanel = (globalThis as NativeSidepanelHost).chrome?.sidePanel;
+            if (typeof chromeSidePanel?.open === 'function') {
+                if (typeof tabId === 'number') {
+                    await chromeSidePanel.open({tabId});
+                    return true;
+                }
+                if (typeof windowId === 'number') {
+                    await chromeSidePanel.open({windowId});
+                    return true;
+                }
+            }
+            if (typeof browser.sidebarAction?.open === 'function') {
+                await browser.sidebarAction.open();
+                return true;
+            }
+            return false;
+        },
+        openTranslationCenterFallback: async () => {
+            await browser.tabs.create({url: `${browser.runtime.getURL('/options.html')}#settings-translation-center`});
         },
     })] as const;
 }

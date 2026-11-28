@@ -6,6 +6,7 @@
  */
 import {createLearningContentFeatures} from './learningFeatures';
 import {createReaderContentFeatures} from './readerFeatures';
+import {createCommandPaletteContentFeature} from './commandPaletteFeature';
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
 import {createShadowRootUi} from 'wxt/utils/content-script-ui/shadow-root';
 import {constants} from '@/src/core/config/constants';
@@ -55,6 +56,8 @@ import {createPageTranslationFontRuntime} from './pageTranslationFont';
 import {consumeArxivPaperReading, mountPaperReading, waitForPaperReadingDom} from './paperReading';
 import {translate} from '@/src/core/i18n';
 import {showPageNotice} from '@/src/features/page-notice/public';
+import {isWritingAssistantMounted, mountWritingAssistant, unmountWritingAssistant} from '@/src/features/writing-assistant/public';
+import {mountWritingShortcut} from '@/src/features/writing-assistant/shortcutRuntime';
 export async function startContentApp(ctx: ContentScriptContext,
     capabilities: BrowserCapabilities = browserCapabilities): Promise<void> {
     if (isRawXmlContentDocument(document) || ctx.isInvalid) return;
@@ -179,10 +182,11 @@ export async function startContentApp(ctx: ContentScriptContext,
         const resetFullPageKeyboardGesture = hotkeys.installFloatingBallHotkey(activationController.signal);
         mountConfiguredQuickTranslation(config, hotkeys, () => currentPageSiteDisabled, activationController.signal,
             () => { resetHoverKeyboardGesture(); resetFullPageKeyboardGesture(); }, mailFullPageToggle);
+        if (import.meta.env.BROWSER !== 'userscript' && capabilities.browser !== 'userscript') mountWritingShortcut(activationController.signal, {isSiteDisabled: () => currentPageSiteDisabled, mount: () => mountWritingAssistant(ctx), unmount: unmountWritingAssistant, isMounted: isWritingAssistantMounted});
         activePageFeatureRegistry = createContentFeatureRegistry([
             ...createLearningContentFeatures(ctx, config, capabilities),
             ...createReaderContentFeatures(ctx, config),
-            ...(import.meta.env.BROWSER === 'userscript' ? [] : [informationHighlight!.feature]),
+            ...(import.meta.env.BROWSER === 'userscript' ? [] : [informationHighlight!.feature, createCommandPaletteContentFeature(ctx, config, capabilities, informationHighlight)]),
         ], {capabilities,
             onError: (featureId, phase, error) => {
                 console.error(`[FluentRead] 内容功能 ${featureId} ${phase} 失败:`, error);

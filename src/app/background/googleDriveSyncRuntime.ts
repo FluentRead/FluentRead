@@ -1,8 +1,8 @@
 /**
  * @file src/app/background/googleDriveSyncRuntime.ts
- * 文件职责：为后台加密同步服务连接现有完整配置与原生 Chrome 身份端口。
- * 主要内容：浏览器低熵品牌信息、完整凭据读写、密文基线、设置页校验，以及由后台处理所属页签关闭或重新加载。
- * 模块边界：仅装配依赖；配置写入复用现有持久化与修改队列，不向内容脚本公开密文基线。
+ * 文件职责：为后台加密同步服务连接现有完整配置、学习数据仓库、端到端口令仓库与原生 Chrome 身份端口。
+ * 主要内容：浏览器低熵品牌信息、完整凭据读写、密文基线、可选学习资产同步、端到端口令隔离存储、设置页校验，以及由后台处理所属页签关闭或重新加载。
+ * 模块边界：仅装配依赖；配置写入复用现有持久化与修改队列，不向内容脚本公开密文基线或口令。
  */
 import {config, configReady, prepareHydratedConfigForExport, saveConfig} from '@/src/services/config/store';
 import {prepareConfigForImport} from '@/src/core/config/transfer';
@@ -10,13 +10,29 @@ import {createDriveAuth, type DriveBrowserData, type DriveIdentity} from '@/src/
 import {createDriveApi} from '@/src/platform/google-drive/api';
 import {GOOGLE_DRIVE_SYNC_STATE_KEY} from '@/src/platform/google-drive/constants';
 import {configStorage} from '@/src/platform/storage/configStorageRuntime';
+import {PersonalCorrectionRepository} from '@/src/platform/storage/personalCorrectionRepository';
+import {vocabularyBook} from '@/src/features/vocabulary/repository';
+import {MaterialRepository} from '@/src/features/vocabulary/materialRepository';
 import {createGoogleDriveSync} from '@/src/services/config/googleDriveSync';
+import {createLearningCloudSync} from '@/src/services/config/learningCloudSync';
+import {createCloudPassphraseStore, type CloudPassphraseSessionStorage} from '@/src/services/config/cloudPassphraseStore';
 import {createGoogleDriveSyncHandler} from './handlers/googleDriveSync';
 import {isTrustedSettingsSender} from './handlers/trustedSettingsSender';
 import type {ConfigMutationCoordinator} from './handlers/configPersistence';
 
 export function createGoogleDriveSyncRuntime(mutations: ConfigMutationCoordinator) {
     const nativeChrome = (globalThis as unknown as {chrome?: {identity?: DriveIdentity}}).chrome;
+    const sessionStorage = (browser.storage as unknown as {session?: CloudPassphraseSessionStorage}).session;
+    const passphrases = createCloudPassphraseStore({
+        provider: 'google-drive',
+        deviceStorage: configStorage,
+        sessionStorage,
+    });
+    const learning = createLearningCloudSync({
+        vocabulary: vocabularyBook,
+        personalCorrections: new PersonalCorrectionRepository(configStorage),
+        materials: new MaterialRepository(),
+    });
     const service = createGoogleDriveSync({
         auth: createDriveAuth({
             userAgent: () => navigator.userAgent,
@@ -35,8 +51,13 @@ export function createGoogleDriveSyncRuntime(mutations: ConfigMutationCoordinato
         async readState() {await configReady; return configStorage.getItem(GOOGLE_DRIVE_SYNC_STATE_KEY);},
         writeState: state => configStorage.setItem(GOOGLE_DRIVE_SYNC_STATE_KEY, state),
         now: Date.now,
+        learning,
     });
     browser.tabs.onRemoved.addListener((tabId: number) => {void service.cancelTab(tabId).catch(() => undefined);});
     browser.tabs.onUpdated.addListener((tabId: number, change: {status?: string}) => {if (change.status === 'loading') void service.cancelTab(tabId).catch(() => undefined);});
-    return createGoogleDriveSyncHandler({...service, commit: (...args) => mutations.run(() => service.commit(...args))}, sender => isTrustedSettingsSender(sender, browser.runtime.id, browser.runtime.getURL('options.html')));
+    return createGoogleDriveSyncHandler(
+        {...service, commit: (...args) => mutations.run(() => service.commit(...args))},
+        sender => isTrustedSettingsSender(sender, browser.runtime.id, browser.runtime.getURL('options.html')),
+        {passphrases},
+    );
 }

@@ -4,7 +4,6 @@
  * 文件职责：实现扩展自有的翻译结果缓存，统一键规范化、确定超限写入的早拒绝、TTL、可配置双容量限制、内存热层和 Dexie 持久层。
  * 主要内容：定义缓存 identity/record、canonicalize 与 buildTranslationCacheKey，维护 FluentReadCacheDatabase 与事务内增量用量汇总，并通过 translationCache 提供读取、写入、按短窗口合批写回的持久化 LRU、过期清理、阈值设置和用量统计；缓存读写故障降级，管理故障向 UI 如实报告。 可核对的公开符号包括 TRANSLATION_CACHE_VERSION、TRANSLATION_CACHE_TTL_MS、TRANSLATION_CACHE_MAX_ENTRY_BYTES、TRANSLATION_CACHE_MEMORY_ENTRIES、TranslationCacheIdentity、TranslationCacheRecord。
  * 模块边界：本文件位于翻译 application service 层，负责用例编排和端口契约；不挂载页面 UI，且不应把某家供应商的网络细节扩散到 feature，具体 HTTP 协议由 providers/platform 实现。
- * 读一致性：冷读与其他写入并发时仍返回已提交快照，仅跳过热层回填与访问时间写回。
  */
 
 import {sha256Hex} from '@/src/shared/function/sha256';
@@ -134,6 +133,21 @@ class TranslationCache {
   private limits = normalizeTranslationCacheLimits(undefined);
   private clearEpoch = 0;
   private contentRevision = 0;
+  private pruneRevision = 0;
+  private readonly keyRevisions = new Map<string, number>();
+
+  private bumpKeyRevision(key: string): void {
+    this.keyRevisions.delete(key);
+    this.keyRevisions.set(key, this.contentRevision);
+    if (this.keyRevisions.size > 512) {
+      this.keyRevisions.clear();
+      this.pruneRevision += 1;
+    }
+  }
+
+  private getKeyRevision(key: string): number {
+    return this.keyRevisions.get(key) ?? 0;
+  }
 
   private remember(record: TranslationCacheRecord): void {
     this.memory.delete(record.key);
@@ -160,6 +174,7 @@ class TranslationCache {
     if (keys.length === 0) return;
     await translationCacheDb.entries.bulkDelete(keys);
     this.contentRevision += 1;
+    this.pruneRevision += 1;
     keys.forEach((key) => this.memory.delete(key));
     totals.entries -= keys.length;
   }
@@ -252,7 +267,8 @@ class TranslationCache {
 
   async get(key: string, now = Date.now()): Promise<string | null> {
     const epoch = this.clearEpoch;
-    const revision = this.contentRevision;
+    const pruneRevision = this.pruneRevision;
+    const keyRevision = this.getKeyRevision(key);
     const memoryRecord = this.memory.get(key);
     if (memoryRecord) {
       if (isExpired(memoryRecord, now)) {
@@ -268,13 +284,13 @@ class TranslationCache {
 
     try {
       const record = await translationCacheDb.entries.get(key);
-      if (epoch !== this.clearEpoch || !record) return null;
+      if (epoch !== this.clearEpoch || pruneRevision !== this.pruneRevision
+        || this.getKeyRevision(key) !== keyRevision || !record) return null;
       if (isExpired(record, now)) {
         await this.removeExpired(key, now, epoch);
         return null;
       }
-      // 读事务返回已提交快照；期间有其他写入时照常返回，只是不回填热层或写回访问时间，避免复活已淘汰记录。
-      if (revision === this.contentRevision) this.touch(record, now);
+      this.touch(record, now);
       return record.translation;
     } catch (error) {
       console.warn('[FluentRead] translation cache read failed:', error);
@@ -305,6 +321,7 @@ class TranslationCache {
         if (!previous) totals.entries += 1;
         await translationCacheDb.entries.put(record);
         this.contentRevision += 1;
+        this.bumpKeyRevision(key);
         // 新值提交后若被其他写入推进修订号而跳过晋升，也不能留下同 key 的旧热值。
         this.memory.delete(key);
         const removed = await this.prune(totals, now);
@@ -344,7 +361,7 @@ class TranslationCache {
   async getMany(keys: readonly string[], now = Date.now()): Promise<Array<string | null>> {
     if (keys.length === 0) return [];
     const epoch = this.clearEpoch;
-    const revision = this.contentRevision;
+    const pruneRevision = this.pruneRevision;
     const results = new Array<string | null>(keys.length).fill(null);
     const missedByKey = new Map<string, number[]>();
     const expiredMemoryKeys: string[] = [];
@@ -379,19 +396,21 @@ class TranslationCache {
 
     try {
       const missedKeys = [...missedByKey.keys()];
+      const keyRevisions = missedKeys.map((key) => this.getKeyRevision(key));
       const records = await translationCacheDb.entries.bulkGet(missedKeys);
-      if (epoch !== this.clearEpoch) return results;
-      const stale = revision !== this.contentRevision;
+      if (epoch !== this.clearEpoch || pruneRevision !== this.pruneRevision) return results;
       const expiredDbKeys: string[] = [];
       for (let index = 0; index < missedKeys.length; index += 1) {
+        const key = missedKeys[index]!;
+        if (this.getKeyRevision(key) !== keyRevisions[index]) continue;
         const record = records[index];
         if (!record) continue;
         if (isExpired(record, now)) {
           expiredDbKeys.push(record.key);
           continue;
         }
-        if (!stale) this.touch(record, now);
-        for (const slot of missedByKey.get(missedKeys[index]!)!) {
+        this.touch(record, now);
+        for (const slot of missedByKey.get(key)!) {
           results[slot] = record.translation;
         }
       }
@@ -447,7 +466,10 @@ class TranslationCache {
         }
         await translationCacheDb.entries.bulkPut(records);
         this.contentRevision += 1;
-        for (const key of keys) this.memory.delete(key);
+        for (const key of keys) {
+          this.bumpKeyRevision(key);
+          this.memory.delete(key);
+        }
         const removed = await this.prune(totals, now);
         await translationCacheDb.totals.put(totals);
         persistedRecords = records.filter((record) => !removed.has(record.key));
@@ -483,6 +505,8 @@ class TranslationCache {
   async clear(): Promise<void> {
     this.clearEpoch += 1;
     this.contentRevision += 1;
+    this.pruneRevision += 1;
+    this.keyRevisions.clear();
     this.memory.clear();
     this.pendingTouches.clear();
     clearTimeout(this.touchFlushTimer);

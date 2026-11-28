@@ -11,9 +11,11 @@ import {translationProviderRegistry} from './registry';
 import {preparePrivacyRequest} from '@/src/services/translation/privacyProtection';
 import {resolveConfiguredModel, services, servicesType} from '@/src/core/config/catalog';
 import {getCompositeTranslationProvider, isCompositeTranslationProviderId} from '@/src/core/config/compositeTranslation';
+import {isTranslationServiceDisabled} from '@/src/core/config/serviceAvailability';
 import {resolveTranslationRequestModel} from '@/src/core/config/requestModel';
 import {createCompositeTranslationRoutingState} from '@/src/services/translation/compositeRouting';
 import {formatServiceError} from '@/src/services/translation/serviceErrors';
+import {createTranslationAbortError} from '@/src/services/translation/errors';
 import {isCustomOpenAIProviderId, LEGACY_CUSTOM_OPENAI_PROVIDER_ID} from '@/src/core/config/customOpenAI';
 import {attachTranslationModelUsageObserver, attachTranslationProviderConfig, attachTranslationRequestScheduler} from '@/src/services/translation/requestSnapshot';
 import type {TranslationRequestScheduler} from '@/src/services/translation/requestScheduler';
@@ -240,9 +242,7 @@ export async function runTranslationServiceConnectionTest(
 }
 
 function connectionTestAbortError(): Error {
-    const error = new Error('翻译请求已取消');
-    error.name = 'AbortError';
-    return error;
+    return createTranslationAbortError('翻译请求已取消');
 }
 
 function normalizeConnectionTestTimeout(value: number | undefined, fallback: number, maximum = fallback): number {
@@ -261,11 +261,14 @@ async function runCompositeConnectionTest(service: string, options: ConnectionTe
     const profile = getCompositeTranslationProvider(snapshot.compositeTranslationProviders, service);
     if (!profile) throw new Error('组合翻译服务已被删除，请重新选择');
     if (profile.services.length === 0) throw new Error('组合翻译尚未添加成员服务');
+    const enabledMembers = profile.services.filter((member) => !isTranslationServiceDisabled(snapshot.disabledTranslationServices, member));
+    if (enabledMembers.length === 0) throw new Error('组合翻译的所有成员都已关闭，请重新启用至少一个服务');
+    const activeProfile = enabledMembers.length === profile.services.length ? profile : {...profile, services: enabledMembers};
     const now = options.now ?? Date.now;
     const startedAt = now();
     const deadlineAt = startedAt + normalizeConnectionTestTimeout(options.requestTimeoutMs, COMPOSITE_CONNECTION_TEST_TIMEOUT_MS);
     let lastError: unknown;
-    for (const member of compositeRouting.order(profile)) {
+    for (const member of compositeRouting.order(activeProfile)) {
         if (options.signal?.aborted) throw connectionTestAbortError();
         // 受信旧快照也不能让组合引用自己或递归嵌套。
         if (isCompositeTranslationProviderId(member)) continue;

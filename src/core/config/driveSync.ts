@@ -12,6 +12,7 @@ import {isConfiguredCustomOpenAIProvider, isCustomOpenAIProviderId, normalizeCus
 import {isCompositeTranslationProviderId, isConfiguredCompositeTranslationProvider, normalizeCompositeTranslationProviders} from './compositeTranslation';
 import {isConfigImportValid, prepareConfigForExport} from './transfer';
 import {configDiffFieldLabel} from './diff';
+import {hasLearningBundleContent, validateLearningSyncBundle, type LearningSyncBundle} from './learningSync';
 export class DriveConfigError extends Error {}
 
 export type DriveSyncConfig = Record<string, unknown>;
@@ -73,10 +74,11 @@ export function toDriveSyncConfig(value: unknown): DriveSyncConfig {
     return result;
 }
 
-export interface DriveSyncSnapshot {config: DriveSyncConfig; includesSensitive: boolean}
+export interface DriveSyncSnapshot {config: DriveSyncConfig; includesSensitive: boolean; learning?: LearningSyncBundle}
 
 /** v2 普通快照不经过完整配置补默认值，避免把未备份连接解释为明确删除。 */
 export function parseDriveSyncSnapshot(value: unknown): DriveSyncSnapshot {
+    const learning = record(value) && value.learning !== undefined ? validateLearningSyncBundle(value.learning) : undefined;
     if (record(value) && value.format === 'fluentread-complete-config' && value.version === 2 && value.scope === 'settings'
         && record(value.config) && typeof value.config.on === 'boolean'
         && (value.config.display === 0 || value.config.display === 1)
@@ -85,9 +87,9 @@ export function parseDriveSyncSnapshot(value: unknown): DriveSyncSnapshot {
         validateTree(value.config);
         const config = projectDriveSyncConfig(value.config);
         if (!driveValuesEqual(config, value.config)) throw new DriveConfigError('普通云备份包含不属于此范围的字段，请重新生成备份。');
-        return {config, includesSensitive: false};
+        return {config, includesSensitive: false, ...(learning ? {learning} : {})};
     }
-    return {config: parseCompleteDriveSyncPayload(value), includesSensitive: true};
+    return {config: parseCompleteDriveSyncPayload(value), includesSensitive: true, ...(learning ? {learning} : {})};
 }
 
 /** 保留纯编解码器的完整 v1 读取契约；恢复范围由事务中的本次确认决定。 */
@@ -123,11 +125,12 @@ function parseCompleteDriveSyncPayload(value: unknown): DriveSyncConfig {
     return toDriveSyncConfig({...value.config, videoServiceDefaultMigrated: true});
 }
 
-export function driveSyncPayload(config: DriveSyncConfig, includeSensitive = false): unknown {
+export function driveSyncPayload(config: DriveSyncConfig, includeSensitive = false, learning?: LearningSyncBundle | null): unknown {
     validateDriveSyncConsent(includeSensitive);
+    const validLearning = hasLearningBundleContent(learning) ? validateLearningSyncBundle(learning) : undefined;
     return includeSensitive
-        ? {format: 'fluentread-complete-config', version: 1, config}
-        : {format: 'fluentread-complete-config', version: 2, scope: 'settings', config: projectDriveSyncConfig(config)};
+        ? {format: 'fluentread-complete-config', version: 1, config, ...(validLearning ? {learning: validLearning} : {})}
+        : {format: 'fluentread-complete-config', version: 2, scope: 'settings', config: projectDriveSyncConfig(config), ...(validLearning ? {learning: validLearning} : {})};
 }
 
 const SERVICE_FIELDS = ['service', 'hoverTranslationService', 'selectionTranslationService', 'imageTranslationService', 'documentService', 'videoService', 'areaTranslationService', 'inputBoxTranslationService'];
@@ -148,6 +151,9 @@ const VISIBLE_FIELDS: Record<string, string> = {
     videoSubtitleModeHotkey: '视频字幕模式切换组合键',
     customVideoSubtitleModeHotkey: '自定义视频字幕模式快捷键',
     videoSubtitleModeHotkeyAction: '视频字幕快捷键切换方式',
+    commandPaletteEnabled: '全局命令面板',
+    commandPaletteHotkey: '全局命令面板快捷键',
+    customCommandPaletteHotkey: '全局命令面板自定义快捷键',
     videoSubtitleFontSize: '视频字幕字号',
     videoSubtitleOffsetMs: '字幕时间偏移',
     translationCacheMaxBytes: '翻译缓存容量上限',

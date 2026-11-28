@@ -9,8 +9,16 @@ import {isVideoTranscriptionInput, isVideoPreparationResult, isVideoTranscriptio
 import {isReadingAnnotationRequest, isReadingAnnotationCancellation, isReadingAnnotationResponse, type ReadingAnnotationRequest, type ReadingAnnotationCancellation, type ReadingAnnotationResponse} from './readingAnnotation';
 export type {InferenceBackend, InferenceFailure, InferenceSuccess, InferenceResponse} from './inference';
 export type {VideoTranscriptionModel, VideoTranscriptionCancelReason, VideoRecognitionMetadata, VideoTranscriptionSegment, VideoTranscriptionResult, VideoPreparationResult, VideoTranscriptionInput, VideoPrepareInput, VideoBackgroundInput, VideoBackgroundRequestMap, VideoBackgroundResponseMap, VideoBackgroundRequestType, VideoBackgroundRequest} from './video';
-export {isVideoPreparationResult, isVideoTranscriptionResult, isVideoBackgroundInput, parseVideoBackgroundResponse} from './video';
-import {isLocalTranslationModel, normalizeLocalTranslationDownloadSnapshot, type LocalTranslationModelId, type LocalTranslationDownloadSnapshot, type LocalTranslationDownloadState} from '@/src/core/config/localTranslation';
+export {isVideoPreparationResult, isVideoTranscriptionResult} from './video';
+import {
+    isLocalTranslationModel,
+    normalizeLocalTranslationDownloadSnapshot,
+    normalizeLocalTranslationMirrorUrl,
+    type LocalTranslationDownloadSnapshot,
+    type LocalTranslationDownloadSourcePreference,
+    type LocalTranslationDownloadState,
+    type LocalTranslationModelId,
+} from '@/src/core/config/localTranslation';
 import {parseSpeechCues, type SpeechCue} from '@/src/core/tts/speechProgress';
 import {arrayOf, isBoolean, isFiniteNumber, isMessageRecord, isNonEmptyString, isString, oneOf, optional, parseMessage, shape, type Validator} from './validation';
 
@@ -29,7 +37,7 @@ export interface OffscreenRequestMap {
     VIDEO_AI_REMOVE_MODEL: {model?: VideoTranscriptionModel};
     VIDEO_AI_SHARE_MODEL: {model?: VideoTranscriptionModel};
     LOCAL_TRANSLATION_TRANSLATE: LocalTranslationInput & {requestId: string};
-    LOCAL_TRANSLATION_PREPARE: {model: LocalTranslationModelId; keepWarm?: boolean};
+    LOCAL_TRANSLATION_PREPARE: {model: LocalTranslationModelId; keepWarm?: boolean; preference?: LocalTranslationDownloadSourcePreference; mirrorUrl?: string};
     LOCAL_TRANSLATION_STATUS: object;
     LOCAL_TRANSLATION_PAUSE: {model: LocalTranslationModelId};
     LOCAL_TRANSLATION_REMOVE_MODEL: {model: LocalTranslationModelId};
@@ -99,7 +107,12 @@ const requests: {[K in OffscreenRequestType]: Validator<OffscreenRequestMap[K]>}
     VIDEO_AI_REMOVE_MODEL: shape<OffscreenRequestMap['VIDEO_AI_REMOVE_MODEL']>({model: optional(videoModel)}),
     VIDEO_AI_SHARE_MODEL: shape<OffscreenRequestMap['VIDEO_AI_SHARE_MODEL']>({model: optional(videoModel)}),
     LOCAL_TRANSLATION_TRANSLATE: shape<OffscreenRequestMap['LOCAL_TRANSLATION_TRANSLATE']>({requestId, model: isLocalTranslationModel, text: isNonEmptyString, sourceLanguage: isNonEmptyString, targetLanguage: isNonEmptyString, sourceLanguageDetectionText: optional(isString)}),
-    LOCAL_TRANSLATION_PREPARE: shape<OffscreenRequestMap['LOCAL_TRANSLATION_PREPARE']>({model: isLocalTranslationModel, keepWarm: optional(isBoolean)}),
+    LOCAL_TRANSLATION_PREPARE: shape<OffscreenRequestMap['LOCAL_TRANSLATION_PREPARE']>({
+        model: isLocalTranslationModel,
+        keepWarm: optional(isBoolean),
+        preference: optional(oneOf('auto', 'mirror', 'official')),
+        mirrorUrl: optional((value): value is string => isString(value) && normalizeLocalTranslationMirrorUrl(value) !== undefined),
+    }),
     LOCAL_TRANSLATION_STATUS: noFields, LOCAL_TRANSLATION_PAUSE: shape<OffscreenRequestMap['LOCAL_TRANSLATION_PAUSE']>({model: isLocalTranslationModel}), LOCAL_TRANSLATION_REMOVE_MODEL: shape<OffscreenRequestMap['LOCAL_TRANSLATION_REMOVE_MODEL']>({model: isLocalTranslationModel}),
     CANCEL_LOCAL_TRANSLATION_OFFSCREEN: shape<OffscreenRequestMap['CANCEL_LOCAL_TRANSLATION_OFFSCREEN']>({requestId}),
     LOCAL_TTS_SYNTHESIZE: shape<OffscreenRequestMap['LOCAL_TTS_SYNTHESIZE']>({requestId, text: isNonEmptyString, language: isNonEmptyString, voice: isNonEmptyString, speed: optional(isFiniteNumber)}),

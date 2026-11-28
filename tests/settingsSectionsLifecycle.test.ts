@@ -81,7 +81,7 @@ function configureSectionPorts(data: Record<string, any>, {template = false, req
         '@/src/features/settings/ui/SectionTranslationSettings.vue', '@/src/features/settings/ui/ParagraphHandlingSettings.vue',
         '@/src/features/settings/ui/TranslationCacheSettings.vue', '@/src/features/settings/ui/ExcludedLanguageSettings.vue',
         '@/src/features/settings/ui/ExcludedTagSettings.vue',
-        '@/src/features/settings/ui/ReadingAssistanceSettings.vue', '@/src/features/settings/ui/ConfigManagement.vue',
+        '@/src/features/settings/ui/ConfigManagement.vue',
         '@/src/features/settings/ui/QuickTranslationProfiles.vue', '@/src/features/settings/ui/ContextMenuSettings.vue',
         '@/src/features/settings/ui/components/FieldHelp.vue',
     ]) componentPort(path);
@@ -132,7 +132,6 @@ function configureSectionPorts(data: Record<string, any>, {template = false, req
             writing: '@/src/features/settings/ui/WritingSettings.vue',
             selection: '@/src/features/settings/ui/SelectionSettings.vue',
             adaptation: '@/src/features/settings/ui/SiteAdaptationSettings.vue',
-            reading: '@/src/features/settings/ui/ReadingAssistanceSettings.vue',
             profiles: '@/src/features/settings/ui/QuickTranslationProfiles.vue',
             excluded: '@/src/features/settings/ui/ExcludedLanguageSettings.vue',
             excludedTags: '@/src/features/settings/ui/ExcludedTagSettings.vue',

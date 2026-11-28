@@ -1,6 +1,6 @@
 # Document translation
 
-Import PDF, EPUB, Word, Markdown, spreadsheets, and subtitle files directly in your browser to read side-by-side translations, edit results, annotate PDFs, and export formatted bilingual or translated files.
+Import PDF, EPUB, Word, PowerPoint, Excel, LaTeX, Markdown, spreadsheets, and subtitle files (17 formats) directly in your browser to read side-by-side translations, edit results, annotate PDFs, and export formatted bilingual or translated files.
 
 <GuideVisual kind="document" en />
 
@@ -13,8 +13,8 @@ Open **Document translation** from the extension menu, then drop a file or pick 
 | Category | Formats | Limits & notes |
 | --- | --- | --- |
 | **PDF papers & books** | `.pdf` | Up to **50 MB**; open online PDFs via **Open PDF reader** in the menu or paste a public PDF URL (download login-walled PDFs first) |
-| **eBooks & Office** | `.epub`, `.docx` | Up to **10 MB**; save legacy `.doc` files as `.docx` first |
-| **Web & plain text** | `.html`, `.md`, `.txt` | Up to **10 MB**; supports UTF-8 and UTF-16 with BOM (exported as UTF-8) |
+| **eBooks & Office** | `.epub`, `.docx`, `.pptx`, `.xlsx` | Up to **50 MB** for PPTX, **10 MB** for others; convert legacy `.doc`, `.ppt`, `.xls` files to `.docx`, `.pptx`, `.xlsx` first |
+| **Academic & plain text** | `.tex`, `.html`, `.md`, `.txt` | Up to **10 MB**; supports UTF-8 and UTF-16 with BOM (exported as UTF-8) |
 | **Structured tables** | `.json`, `.csv`, `.tsv` | Up to **10 MB**; choose specific columns to translate in CSV/TSV |
 | **Subtitle files** | `.srt`, `.vtt`, `.ass`, `.ssa`, `.lrc` | Up to **10 MB**; preserves timestamps and styling tags |
 
@@ -92,6 +92,9 @@ Scanned PDFs or mixed scanned pages are handled automatically:
 | **PDF** | Choose **Original layout** (side-by-side pages, overflow continuation pages with jump-back footers, translated bookmarks) or **Reflow layout** (fixed-size flowing pages; caches a ~5 MB open-license font on first use) |
 | **EPUB** | Preserves chapters, images, links, and styles, and syncs translated/edited chapter titles into the reader TOC |
 | **DOCX (Word)** | Preserves links, bold/italic styles, and tables in normal paragraphs; keep `<g1>…</g1>` format tags when editing |
+| **PPTX (PowerPoint)** | Extracts slide text and speaker notes in numeric order while preserving shapes, tables, images, animations, and run styles; appends bilingual paragraphs or replaces text in place |
+| **XLSX (Excel)** | Reads multiple worksheets in workbook order (shared and inline strings), strictly preserving formulas, numbers, dates, and styles; bilingual exports separate lines inside each cell |
+| **LaTeX (`.tex`)** | Preserves preamble, comments, math, and `verbatim`/`lstlisting`/`minted`/`tikzpicture` environments with numbered inline-command markers so exported source stays compilable |
 | **Markdown / HTML** | Preserves GFM tables, links, and code blocks; merges soft line wraps before translating |
 | **Subtitles / CSV / JSON** | Keeps cue numbers and timestamps; writes back chosen CSV/TSV columns; preserves JSON structure (up to 1,000 levels deep) |
 

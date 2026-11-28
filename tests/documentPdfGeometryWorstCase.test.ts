@@ -26,10 +26,27 @@ function worstCaseChild(kind: string) {
     const sourcePath = process.env.FLUENTREAD_PDF_BINARY_SOURCE ?? fileURLToPath(new URL('../src/features/document-translation/services/binary.ts', import.meta.url));
     const typescriptPath = createRequire(import.meta.url).resolve('typescript');
     const program = `
-const fs = require('node:fs'), crypto = require('node:crypto'), ts = require(${JSON.stringify(typescriptPath)});
-const source = fs.readFileSync(${JSON.stringify(sourcePath)}, 'utf8');
-const exportsPort = {};
-new Function('require', 'exports', ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText)(() => ({}), exportsPort);
+const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), ts = require(${JSON.stringify(typescriptPath)});
+const sourcePath = ${JSON.stringify(sourcePath)};
+const source = fs.readFileSync(sourcePath, 'utf8');
+const moduleCache = new Map();
+function loadLocalTs(filePath) {
+    const resolved = path.resolve(filePath);
+    if (moduleCache.has(resolved)) return moduleCache.get(resolved);
+    const modExports = {};
+    moduleCache.set(resolved, modExports);
+    const code = fs.readFileSync(resolved, 'utf8');
+    const localRequire = (specifier) => {
+        if (specifier.startsWith('.')) {
+            const candidate = path.resolve(path.dirname(resolved), specifier.endsWith('.ts') ? specifier : specifier + '.ts');
+            if (fs.existsSync(candidate)) return loadLocalTs(candidate);
+        }
+        return {};
+    };
+    new Function('require', 'exports', ts.transpileModule(code, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText)(localRequire, modExports);
+    return modExports;
+}
+const exportsPort = loadLocalTs(sourcePath);
 console.log('loaded-before-call:' + JSON.stringify({sha256: crypto.createHash('sha256').update(source).digest('hex'), publicFunctions: ['pdfTextBlocks','pdfTextLines','pdfTextAtoms'].map(name => [name, typeof exportsPort[name]])}));
 const kind = ${JSON.stringify(kind)};
 const hugeRow = kind === 'huge-row', hugeBlock = kind === 'huge-block';

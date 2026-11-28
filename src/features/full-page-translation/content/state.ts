@@ -495,6 +495,10 @@ function forEachActiveNode(callback: (node: HTMLElement, state: TranslationState
     }
 }
 
+export function hasActiveTranslations(): boolean {
+    return activeNodeRefs.size > 0;
+}
+
 function trackActiveNode(node: HTMLElement): WeakRef<HTMLElement> {
     const existing = activeRefsByNode.get(node);
     if (existing) return existing;
@@ -1313,16 +1317,23 @@ function semanticStructureClasses(value: string | null): string {
     ].filter((name) => names.has(name)).join(' ');
 }
 
+const semanticVisibilityProbes = new WeakMap<Document, HTMLSpanElement>();
+
 function semanticVisibilityStyle(element: Element, value: string | null): string {
     const {display, visibility} = semanticVisibilityStyleValues(element, value);
-    return JSON.stringify([display, visibility]);
+    return `${display}\0${visibility}`;
 }
 
 function semanticVisibilityStyleValues(
     element: Element,
     value: string | null,
 ): {display: string; visibility: string} {
-    const probe = element.ownerDocument.createElement('span');
+    const ownerDocument = element.ownerDocument;
+    let probe = semanticVisibilityProbes.get(ownerDocument);
+    if (!probe) {
+        probe = ownerDocument.createElement('span');
+        semanticVisibilityProbes.set(ownerDocument, probe);
+    }
     probe.setAttribute('style', value ?? '');
     return {display: probe.style.display, visibility: probe.style.visibility};
 }

@@ -1,7 +1,7 @@
 <!--
  * @file src/features/share-card/ui/ShareCardStudio.vue
  * 文件职责：提供划词翻译结果的双语卡片编辑预览与图片导出。
- * 主要内容：让多语言导出操作完整换行，原生模态对话框、品牌色分段选择与开关、八套图片风格、双语编辑及 PNG 复制、保存；固定底栏提供醒目的成功、错误和忙碌反馈，外观等待配置水合并跟随外部更新，排队写回共享配置；署名按当前界面语言渲染，同语言资源到达后复用既有重绘与取消机制。
+ * 主要内容：让多语言导出操作完整换行，原生模态对话框、品牌色分段选择与开关、八套图片风格、双语编辑及 PNG 复制、保存；固定底栏以等高常驻状态槽和原位忙碌指示呈现本地说明、成功、错误和忙碌反馈，避免点击复制或保存时引发弹窗跳动；外观等待配置水合并跟随外部更新，排队写回共享配置；署名按当前界面语言渲染，同语言资源到达后复用既有重绘与取消机制。
  * 模块边界：组件位于封闭 Shadow UI，不读取网页正文、不调用翻译服务；渲染与导出委托独立适配器，关闭时取消渲染、释放位图与 Blob URL，并使迟到回调失效。
  -->
 <template>
@@ -79,16 +79,21 @@
           </aside>
         </div>
         <footer class="fr-card-footer">
-          <div class="fr-card-feedback-region" aria-live="polite" aria-atomic="true">
-            <p v-if="status || renderError || rendering" :key="feedbackSequence" class="fr-card-feedback" :class="{'is-error': renderError || statusError, 'is-success': status && !statusError && !renderError, 'is-pending': !status && !renderError}">
-              <svg v-if="status || renderError" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/><path v-if="statusError || renderError" d="M10 5v6m0 3v.2"/><path v-else d="m6 10 3 3 5-6"/></svg>
-              <span v-else class="fr-card-spinner" aria-hidden="true" />
-              <span>{{ renderError || status || t('shareCard.rendering') }}</span>
+          <div class="fr-card-status-slot">
+            <p class="fr-card-local-note" :class="{'is-hidden': hasFeedback}" :aria-hidden="hasFeedback">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 4.5 5v4.6c0 3.7 2.4 6.8 5.5 7.9 3.1-1.1 5.5-4.2 5.5-7.9V5L10 2.5Z" /><path d="m7.5 10.2 1.7 1.7 3.5-3.8" /></svg>
+              <span>{{ t('shareCard.local') }}</span>
             </p>
+            <div class="fr-card-feedback-region" aria-live="polite" aria-atomic="true">
+              <p v-if="hasFeedback" :key="feedbackSequence" class="fr-card-feedback" :class="{'is-error': renderError || statusError, 'is-success': status && !statusError && !renderError, 'is-pending': !status && !renderError}">
+                <svg v-if="status || renderError" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/><path v-if="statusError || renderError" d="M10 5v6m0 3v.2"/><path v-else d="m6 10 3 3 5-6"/></svg>
+                <span v-else class="fr-card-spinner" aria-hidden="true" />
+                <span>{{ renderError || status || t('shareCard.rendering') }}</span>
+              </p>
+            </div>
           </div>
-          <span class="fr-card-local-note">{{ t('shareCard.local') }}</span>
           <div class="fr-card-export-actions">
-            <button type="button" data-action="copy" :disabled="!ready || busy || !copyAvailable" :aria-busy="activeAction === 'copy'" :title="copyAvailable ? t('shareCard.copy') : t('shareCard.copyUnavailable')" @click="copyImage"><span v-if="activeAction === 'copy'" class="fr-card-spinner" aria-hidden="true" />{{ t('shareCard.copy') }}</button>
+            <button type="button" data-action="copy" :class="{'is-busy': activeAction === 'copy'}" :disabled="!ready || busy || !copyAvailable" :aria-busy="activeAction === 'copy'" :title="copyAvailable ? t('shareCard.copy') : t('shareCard.copyUnavailable')" @click="copyImage"><span class="fr-card-btn-label">{{ t('shareCard.copy') }}</span><span v-if="activeAction === 'copy'" class="fr-card-spinner fr-card-btn-spinner" aria-hidden="true" /></button>
             <button class="fr-card-primary" type="button" :disabled="!ready || busy" @click="saveImage">{{ t('shareCard.save') }}</button>
           </div>
           <p v-if="!copyAvailable" class="fr-card-fallback">{{ t('shareCard.copyUnavailable') }}</p>
@@ -130,6 +135,7 @@ const copyAvailable = canCopyCardImage();
 const isDarkTheme = computed(() => config.theme === 'dark'
     || (config.theme === 'auto' && typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-color-scheme: dark)')?.matches)));
 const ready = computed(() => Boolean(result.value && !renderError.value && !rendering.value));
+const hasFeedback = computed(() => Boolean(status.value || renderError.value || rendering.value));
 let generation = 0;
 let openGeneration = 0;
 let renderTimer: ReturnType<typeof setTimeout> | undefined;
@@ -221,7 +227,7 @@ function saveImage(): void {
     const current = openGeneration; busy.value = true;
     let link: HTMLAnchorElement | undefined;
     try {
-        link = document.createElement('a'); link.href = imageUrl.value; link.download = shareCardFilename();
+        link = document.createElement('a'); link.href = imageUrl.value; link.download = shareCardFilename(); link.hidden = true;
         dialog.value.append(link); link.click();
         if (!disposed && opened.value && current === openGeneration) showFeedback('shareCard.saved');
     } catch { if (!disposed && opened.value && current === openGeneration) showFeedback('shareCard.saveFailed', true); }
@@ -238,7 +244,7 @@ function saveImage(): void {
 async function copyImage(): Promise<void> {
     if (!ready.value || !result.value || busy.value) return;
     const current = openGeneration;
-    busy.value = true; activeAction.value = 'copy'; status.value = ''; statusError.value = false;
+    busy.value = true; activeAction.value = 'copy';
     try {
         // PNG 已在预览时生成；可信点击内立即调用，避免异步渲染耗掉瞬时用户激活。
         await copyCardImage(result.value.blob);
@@ -428,21 +434,26 @@ input[type=checkbox]:checked::before { transform: translateX(13px); }
 .fr-card-edit p { color: var(--fr-sc-muted); font-size: 11px; margin: 4px 0; }
 .fr-card-edit label { margin-top: 6px; }
 textarea { resize: vertical; min-height: 48px; line-height: 1.5; }
-.fr-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 7px 12px 8px; border-top: 1px solid var(--fr-sc-line); background: var(--fr-sc-soft); flex-shrink: 0; }
-.fr-card-feedback-region { width: 100%; } .fr-card-feedback-region:empty { display: none; }
-.fr-card-feedback { display: flex; align-items: center; gap: 6px; margin: 0; width: 100%; padding: 6px 9px; border: 1px solid rgba(37, 99, 166, .22); border-radius: 7px; background: #edf4ff; color: #2563a6; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.fr-card-footer { display: flex; align-items: center; justify-content: flex-end; gap: 7px 8px; flex-wrap: wrap; padding: 8px 12px; border-top: 1px solid var(--fr-sc-line); background: var(--fr-sc-soft); flex-shrink: 0; }
+.fr-card-status-slot { width: 100%; display: grid; align-items: center; }
+.fr-card-status-slot > * { grid-area: 1 / 1; min-width: 0; }
+.fr-card-feedback-region { width: 100%; min-height: 30px; display: flex; align-items: center; pointer-events: none; }
+.fr-card-feedback { display: flex; align-items: center; gap: 6px; margin: 0; width: 100%; min-height: 30px; padding: 6px 9px; border: 1px solid rgba(37, 99, 166, .22); border-radius: 7px; background: #edf4ff; color: #2563a6; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; pointer-events: auto; }
 .fr-card-feedback.is-success { background: #eaf7f3; border-color: rgba(20, 126, 92, .24); color: #147e5c; }
 .fr-card-feedback.is-error { background: #fff0f3; border-color: rgba(180, 35, 72, .22); color: #b42348; }
 .fr-card-root--dark .fr-card-feedback { background: #1f3045; border-color: rgba(155, 197, 242, .24); color: #9bc5f2; }
 .fr-card-root--dark .fr-card-feedback.is-success { background: #19322b; border-color: rgba(140, 224, 196, .24); color: #8ce0c4; }
 .fr-card-root--dark .fr-card-feedback.is-error { background: #3b2029; border-color: rgba(245, 163, 184, .24); color: #f5a3b8; }
-.fr-card-feedback svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.fr-card-feedback svg, .fr-card-local-note svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .fr-card-export-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; max-width: 100%; }
-.fr-card-export-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 28px; padding: 0 11px; border-radius: 7px; font-size: 11.5px; font-weight: 500; }
+.fr-card-export-actions button { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 28px; padding: 0 11px; border-radius: 7px; font-size: 11.5px; font-weight: 500; }
+.fr-card-export-actions button.is-busy .fr-card-btn-label { visibility: hidden; }
+.fr-card-btn-spinner { position: absolute; inset: 0; margin: auto; }
 .fr-card-primary { border-color: #eb3a70; background: linear-gradient(135deg, #f45686, #e53268); color: #ffffff; font-weight: 600; box-shadow: 0 4px 12px rgba(233, 50, 103, .20); }
 .fr-card-primary:hover:not(:disabled) { border-color: #dc2d63; background: linear-gradient(135deg, #eb4677, #d6265c); color: #ffffff; }
 .fr-card-root--dark .fr-card-primary { border-color: #e6376b; background: linear-gradient(135deg, #f35484, #df2e63); }
-.fr-card-local-note { color: var(--fr-sc-muted); font-size: 11px; }
+.fr-card-local-note { display: flex; align-items: center; gap: 6px; margin: 0; width: 100%; min-height: 30px; padding: 6px 9px; border: 1px solid var(--fr-sc-line); border-radius: 7px; background: var(--fr-sc-bg); color: var(--fr-sc-muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.fr-card-local-note.is-hidden { visibility: hidden; }
 .fr-card-fallback { flex-basis: 100%; margin: 0; font-size: 11px; color: var(--fr-sc-muted); }
 .fr-card-spinner { display: inline-block; width: 14px; height: 14px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: fr-card-spin .8s linear infinite; }
 @keyframes fr-card-spin { to { transform: rotate(360deg); } }

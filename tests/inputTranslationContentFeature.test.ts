@@ -1018,6 +1018,7 @@ describe('input translation content feature', () => {
         // 不匹配的按键和组合输入期间不触发
         await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', code: 'Enter'}));
         await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', code: 'Enter', altKey: true, isComposing: true}));
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', code: 'Enter', altKey: true, keyCode: 229}));
         await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', code: 'Enter', altKey: true, repeat: true}));
         expect(harness.sendMessage).not.toHaveBeenCalled();
 
@@ -2262,5 +2263,249 @@ describe('input translation content feature', () => {
             harness.controller.abort();
             await vi.runAllTimersAsync();
         }
+    });
+
+    it.each([
+        ['triple_equal', 'Equal', '=', '原文='],
+        ['triple_equal', 'Equal', '＝', '原文＝'],
+        ['triple_dash', 'Minus', '-', '原文-'],
+        ['triple_dash', 'Minus', '－', '原文－'],
+    ] as const)('中文输入法空闲下 %s (%s -> %s) 走 Process/229 直出路径可正常触发并只清理三次插入符号', async (trigger, code, inserted, initial) => {
+        const harness = mountHarness({
+            config: {inputBoxTranslationTrigger: trigger},
+            sendMessage: async () => ({success: true, translatedText: 'Translated'}),
+        });
+        const textarea = fakeElement('textarea');
+        textarea.value = initial;
+        textarea.selectionStart = textarea.selectionEnd = initial.length;
+        harness.fakeDocument.activeElement = textarea;
+
+        for (let i = 0; i < 3; i += 1) {
+            const down = trustedKey({key: 'Process', code, keyCode: 229, isComposing: false});
+            await harness.fakeDocument.emit('keydown', down);
+            expect(down.preventDefault).not.toHaveBeenCalled();
+            textarea.value += inserted;
+            textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+            await harness.fakeDocument.emit('input', {target: textarea});
+        }
+
+        expect(harness.sendMessage).toHaveBeenCalledOnce();
+        expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({text: initial}));
+        expect(textarea.value).toBe('Translated');
+        harness.controller.abort();
+    });
+
+    it.each(['chrome', 'firefox'] as const)('中文输入法单符号组合提交（%s 事件顺序）在原生控件和富文本中都能触发并清理三个触发符', async browserOrder => {
+        for (const kind of ['control', 'editable'] as const) {
+            const harness = mountHarness({
+                config: {inputBoxTranslationTrigger: 'triple_equal', inputBoxTranslationOutputMode: 'append'},
+                sendMessage: async () => ({success: true, translatedText: 'Translated'}),
+            });
+            const el = kind === 'control' ? fakeElement('textarea') : fakeElement('div', {contenteditable: 'true'});
+            el.value = el.innerText = '中文原文';
+            el.selectionStart = el.selectionEnd = 4;
+            let caret = {text: '中文原文', caret: 4};
+            editable.readEditableCaretState.mockImplementation(() => caret);
+            harness.fakeDocument.activeElement = el;
+
+            for (let i = 0; i < 3; i += 1) {
+                const down = trustedKey({key: 'Process', code: 'Equal', keyCode: 229, isComposing: false});
+                await harness.fakeDocument.emit('keydown', down);
+                expect(down.preventDefault).not.toHaveBeenCalled();
+                await harness.fakeDocument.emit('compositionstart', {target: el});
+                await harness.fakeDocument.emit('selectionchange', {});
+                if (browserOrder === 'chrome') {
+                    el.value += '＝';
+                    el.innerText += '＝';
+                    el.selectionStart = el.selectionEnd = el.value.length;
+                    caret = {text: el.innerText, caret: el.innerText.length};
+                    await harness.fakeDocument.emit('input', {target: el, isComposing: true});
+                    await harness.fakeDocument.emit('compositionend', {target: el});
+                } else {
+                    await harness.fakeDocument.emit('compositionend', {target: el});
+                    el.value += '＝';
+                    el.innerText += '＝';
+                    el.selectionStart = el.selectionEnd = el.value.length;
+                    caret = {text: el.innerText, caret: el.innerText.length};
+                    await harness.fakeDocument.emit('input', {target: el, isComposing: false});
+                }
+            }
+
+            expect(harness.sendMessage).toHaveBeenCalledOnce();
+            expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({text: '中文原文'}));
+            if (kind === 'control') {
+                expect(el.value).toBe('中文原文\nTranslated');
+            } else {
+                expect(editable.replaceEditableText).toHaveBeenNthCalledWith(
+                    1,
+                    el,
+                    '',
+                    expect.any(Function),
+                    'trigger',
+                    '＝＝＝',
+                    expect.any(AbortSignal),
+                );
+                expect(editable.replaceEditableText).toHaveBeenNthCalledWith(
+                    2,
+                    el,
+                    '\nTranslated',
+                    expect.any(Function),
+                    'end',
+                    '',
+                    expect.any(AbortSignal),
+                );
+            }
+            harness.controller.abort();
+            editable.replaceEditableText.mockClear();
+        }
+    });
+
+    it('中文输入法正在拼音组字时连按 = 或 - 翻页不会触发翻译，结束组字后恢复可用', async () => {
+        const harness = mountHarness({
+            config: {inputBoxTranslationTrigger: 'triple_equal'},
+            sendMessage: async () => ({success: true, translatedText: 'Translated'}),
+        });
+        const input = fakeElement('textarea');
+        input.value = '你好';
+        input.selectionStart = input.selectionEnd = 2;
+        harness.fakeDocument.activeElement = input;
+
+        // 先进入拼音组字
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'KeyN', keyCode: 229}));
+        await harness.fakeDocument.emit('compositionstart', {target: input});
+        // 组字期间用 = 翻页 3 次（即使某些浏览器 isComposing 为 false，也由 composingElement 拦截）
+        for (let i = 0; i < 3; i += 1) {
+            const pageKey = trustedKey({key: 'Process', code: 'Equal', keyCode: 229, isComposing: i === 0});
+            await harness.fakeDocument.emit('keydown', pageKey);
+            expect(pageKey.preventDefault).not.toHaveBeenCalled();
+        }
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        // 组字结束上屏汉字
+        input.value = '你好世界';
+        input.selectionStart = input.selectionEnd = 4;
+        await harness.fakeDocument.emit('input', {target: input, isComposing: true});
+        await harness.fakeDocument.emit('compositionend', {target: input});
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        // 空闲后连按三次 =（空 code 的虚拟键盘/IME 过程键也可识别）
+        for (let i = 0; i < 3; i += 1) {
+            await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: '', keyCode: 229}));
+            input.value += '=';
+            input.selectionStart = input.selectionEnd = input.value.length;
+            await harness.fakeDocument.emit('input', {target: input});
+        }
+        expect(harness.sendMessage).toHaveBeenCalledOnce();
+        expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({text: '你好世界'}));
+        harness.controller.abort();
+    });
+
+    it('IME 过程键未落地触发符、选区偏离、中途禁用或转入多键组字时会安全重置序列', async () => {
+        let siteDisabled = false;
+        const harness = mountHarness({
+            config: {inputBoxTranslationTrigger: 'triple_dash'},
+            isSiteDisabled: () => siteDisabled,
+        });
+        const input = fakeElement('textarea');
+        input.value = '原文';
+        input.selectionStart = input.selectionEnd = 2;
+        harness.fakeDocument.activeElement = input;
+
+        // 1) selectionchange 在 pending 期间：未变化和恰好插入单符号都保留，选区跳走则重置
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+        await harness.fakeDocument.emit('selectionchange', {});
+        input.value = '原文-';
+        input.selectionStart = input.selectionEnd = 3;
+        await harness.fakeDocument.emit('selectionchange', {});
+        await harness.fakeDocument.emit('input', {target: input});
+
+        // 切换目标或触发符不匹配时重置旧序列
+        const other = fakeElement('textarea');
+        other.value = '另一框';
+        other.selectionStart = other.selectionEnd = 3;
+        harness.fakeDocument.activeElement = other;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+        other.selectionStart = other.selectionEnd = 0;
+        await harness.fakeDocument.emit('selectionchange', {});
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        // 2) IME 提交了非触发符（例如 Shift+- 之外的破折号或汉字）时重置
+        harness.fakeDocument.activeElement = input;
+        input.value = '原文';
+        input.selectionStart = input.selectionEnd = 2;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+        input.value = '原文——';
+        input.selectionStart = input.selectionEnd = 4;
+        await harness.fakeDocument.emit('input', {target: input});
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        // 3) 站点在 keydown 与 input 之间被禁用时丢弃 pending
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+        siteDisabled = true;
+        input.value += '-';
+        input.selectionStart = input.selectionEnd = input.value.length;
+        await harness.fakeDocument.emit('input', {target: input});
+        siteDisabled = false;
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        // 4) 选区不可用 / 编辑宿主光标不可用时忽略 IME 过程键
+        const noSel = fakeElement('input');
+        noSel.value = 'abc';
+        noSel.selectionStart = null;
+        noSel.selectionEnd = null;
+        harness.fakeDocument.activeElement = noSel;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+
+        const rich = fakeElement('div', {contenteditable: 'true'});
+        rich.innerText = '富文本';
+        harness.fakeDocument.activeElement = rich;
+        editable.readEditableCaretState.mockReturnValue(null);
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+
+        // 5) 编辑宿主 pending 期间 selectionchange 覆盖未变与已插入状态
+        let caret = {text: '富文本', caret: 3};
+        editable.readEditableCaretState.mockImplementation(() => caret);
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+        await harness.fakeDocument.emit('selectionchange', {});
+        caret = {text: '富文本-', caret: 4};
+        await harness.fakeDocument.emit('selectionchange', {});
+        await harness.fakeDocument.emit('input', {target: rich});
+
+        // 6) pending 进入组合后收到非触发键或第二个触发键时，转入 composingElement 直到 compositionend
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+        await harness.fakeDocument.emit('compositionstart', {target: rich});
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'KeyA', keyCode: 229}));
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+        await harness.fakeDocument.emit('compositionend', {target: rich});
+
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+        await harness.fakeDocument.emit('compositionstart', {target: rich});
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Process', code: 'Minus', keyCode: 229}));
+        await harness.fakeDocument.emit('compositionend', {target: rich});
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        // 7) 直接非 IME 全角输入混合半角触发（如 ＝ + =）也能正确清理
+        harness.config.inputBoxTranslationTrigger = 'triple_equal';
+        rich.innerText = '混合';
+        caret = {text: '混合', caret: 2};
+        await harness.fakeDocument.emit('keydown', trustedKey({key: '＝', code: 'Equal'}));
+        rich.innerText = '混合＝';
+        caret = {text: '混合＝', caret: 3};
+        await harness.fakeDocument.emit('input', {target: rich});
+        await harness.fakeDocument.emit('keydown', trustedKey({key: '=', code: 'Equal'}));
+        rich.innerText = '混合＝=';
+        caret = {text: '混合＝=', caret: 4};
+        await harness.fakeDocument.emit('input', {target: rich});
+        await harness.fakeDocument.emit('keydown', trustedKey({key: '=', code: 'Equal'}));
+        expect(editable.replaceEditableText).toHaveBeenCalledWith(
+            rich,
+            '',
+            expect.any(Function),
+            'trigger',
+            '＝=',
+            expect.any(AbortSignal),
+        );
+        expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({text: '混合'}));
+        harness.controller.abort();
     });
 });

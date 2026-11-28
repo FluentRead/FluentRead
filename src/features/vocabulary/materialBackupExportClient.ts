@@ -81,8 +81,3 @@ export function startMaterialBackupExport(port:MaterialReadPort, onChunk:(chunk:
     });
     return {result,assertOpen:receiver.assertOpen};
 }
-
-/** 保留既有异步接口：初始化错误也以 Promise 拒绝报告。 */
-export async function receiveMaterialBackupExport(port:MaterialReadPort, onChunk:(chunk:Uint8Array)=>Promise<void>, options:{signal?:AbortSignal;idleTimeoutMs?:number}={}):Promise<MaterialBackupExportStatistics> {
-    return startMaterialBackupExport(port,onChunk,options).result;
-}

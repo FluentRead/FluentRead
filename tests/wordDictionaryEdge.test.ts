@@ -12,7 +12,6 @@ import {
     createWordDictionaryLookup,
     lookupWord,
     mergeWordCardData,
-    normalizeEnglishWord,
     parseDatamuseWord,
     parseEcdictEntry,
     parseFreeDictionaryEntry,
@@ -23,6 +22,7 @@ import {
     type WordDictionaryProvider,
     type WordDictionaryProviderId,
 } from '@/src/features/selection-translation/services/wordDictionary';
+import {normalizeEnglishWord} from '@/src/features/selection-translation/services/wordNormalization';
 
 function response(payload: unknown, ok = true, status = ok ? 200 : 503): Response {
     return {ok, status, json: async () => payload} as Response;
@@ -856,4 +856,19 @@ it('removes an oversized cached dictionary without waiting for a late failing ca
     fail(new Error('late cache stream cancellation failure'));await read;
     expect(promptly).toBe(true);expect(remove).toHaveBeenCalledOnce();expect(body.locked).toBe(false);
     await new Promise(resolve=>setTimeout(resolve,0));
+});
+
+it('recovers optional ECDICT index loading after a transient cache rejection', async () => {
+    const {cache} = optionalDictionaryCache();
+    vi.stubGlobal('browser', {runtime: {getURL: () => 'moz-extension://fixture/'}});
+    vi.spyOn(cache, 'match')
+        .mockResolvedValueOnce(new Response(fullEcdictBytes()))
+        .mockResolvedValueOnce(new Response(fullEcdictBytes()));
+    vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
+        throw new SyntaxError('transient decode failure');
+    });
+    const localProvider = provider(createDefaultWordDictionaryProviders(), 'ecdict-local');
+    expect(await localProvider.lookup('puma')).toBeNull();
+    const recovered = await localProvider.lookup('puma');
+    expect(recovered?.sources.some(source => source.id === 'ecdict-local')).toBe(true);
 });

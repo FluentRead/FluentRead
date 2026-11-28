@@ -6,7 +6,7 @@
  */
 import {findTextPointAtPoint} from '@/src/core/translation/dom';
 import {alignBilingualSentences, type SentenceSpan} from '@/src/core/translation/sentenceAlignment';
-import {getTranslationState} from './state';
+import {getTranslationState, hasActiveTranslations} from './state';
 
 export const BILINGUAL_HIGHLIGHT_NAME = 'fluentread-bilingual-sentence';
 const formulaAttribute = 'data-fr-bilingual-sentence-formula';
@@ -286,6 +286,7 @@ export function installBilingualSentenceHighlight(document: Document): () => voi
         }
     };
     const move = (event: PointerEvent): void => {
+        if (!owner && !hasActiveTranslations()) return;
         // composedPath 在事件派发后会清空，必须在当前事件内保留真实目标。
         const target = event.composedPath().find(node => node instanceof view.Element) as Element | undefined;
         pending = {event, target: target ?? null};

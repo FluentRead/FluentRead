@@ -1,12 +1,12 @@
 <!--
  * @file src/features/writing-assistant/ui/WritingSurface.vue
- * 文件职责：在隔离层中为 Gmail 与 GitHub 回复编辑器定位写作入口，维护当前编辑器的写作会话。
- * 主要内容：在原生操作行内隔离写作按钮与三点设置入口，点击面板外仅收起并保留当前会话，再次打开恢复草稿和结果；管理本次关闭、网站禁用和永久关闭，观察整页 body 替换、入口被网页移除和编辑器更新，卸载后拒绝迟到保存与观察回调重建入口。
+ * 文件职责：在隔离层中为一等写作网站定位原生入口，并承接全网页快捷键按需呼出的写作会话。
+ * 主要内容：在一等协作网站原生操作行内隔离写作按钮与三点设置入口，非一等网站不主动注入浮动按钮而是通过快捷键聚焦编辑框按需打开；点击面板外仅收起并保留当前会话，管理本次关闭、网站禁用和永久关闭，观察整页 body 替换、入口被网页移除和编辑器更新，卸载后拒绝迟到保存与观察回调重建入口。
  * 模块边界：只拥有网页 DOM、编辑器快照与入口交互；配置持久化交由共享服务，不执行模型和自动发送操作。
  -->
 <template>
-  <WritingPanel ref="panel" :active="opened" :anchor="anchor" :initial-draft="draft" :initial-context="context" :initial-intent="intent" :session-key="sessionKey" :plain-text-output="snapshot?.site === 'gmail'" :apply-draft="canInsert ? fillDraft : undefined" @close="close" />
-  <WritingEntrySettings :active="menuOpened" :anchor="menuAnchor" :dark="dark" :saving="saving" :error="menuError" @close="closeMenu" @save="saveEntrySetting" @settings="openSettings" />
+  <WritingPanel ref="panel" :active="opened" :anchor="anchor" :initial-draft="draft" :initial-context="context" :initial-intent="intent" :session-key="sessionKey" :plain-text-output="plainTextOutput" :apply-draft="canInsert ? fillDraft : undefined" @close="close" />
+  <WritingEntrySettings :active="menuOpened" :anchor="menuAnchor" :dark="dark" :saving="saving" :error="menuError" :hotkey="hotkeyDisplay" @close="closeMenu" @save="saveEntrySetting" @settings="openSettings" />
 </template>
 <script setup lang="ts">
 import {computed, onBeforeUnmount, onMounted, ref, shallowRef, watch} from 'vue';
@@ -14,12 +14,17 @@ import browser from 'webextension-polyfill';
 import {config as initialConfig, subscribeConfig, requestConfigPatch} from '@/src/services/config/store';
 import {getSiteBaseDomain, isExtensionDisabledOnSite} from '@/src/core/site-rules/domain';
 import {useUiI18n} from '@/src/ui/i18n';
-import {isWritingPage, type WritingIntent} from '@/src/core/config/writing';
-import {applyWritingDraft, captureEditor, collectReplyContext, editorText, findReplyEditors, findReplyActionAnchor, isWritingEditor, writingSite, type EditorSnapshot} from '../editors';
+import {isWritingEligibleUrl, isWritingPage, writingHotkeyDisplayName, type WritingIntent} from '@/src/core/config/writing';
+import {
+  applyWritingDraft, captureEditor, collectReplyContext, editorText, findReplyEditors, findReplyActionAnchor,
+  hasComplexRichEditorStructure, isPlainTextWritingSite, isWritingEditor, resolveInitialWritingIntent,
+  resolveWritingSite, writingSite, type EditorSnapshot,
+} from '../editors';
 import {placeWritingEntry, prepareWritingEntryHost} from '../entryPlacement';
 import WritingPanel from './WritingPanel.vue';
 import WritingEntrySettings from './WritingEntrySettings.vue';
 import {dismissWritingForVisit, isWritingDismissedForVisit, writingEntrySaveFailure} from '../entrySession';
+import {registerWritingOpenHandler} from '../shortcutRuntime';
 const config = shallowRef(initialConfig);
 const {t, translateLegacy, language: uiLanguage, bundleRevision} = useUiI18n();
 const unsubscribeConfig = subscribeConfig(value => { config.value = value; });
@@ -28,7 +33,9 @@ const iconUrl = browser.runtime.getURL('/icon/128.png');
 const opened = ref(false); const draft = ref(''); const context = ref(''); const intent = ref<WritingIntent>('reply'); const sessionKey = ref(0);
 const panel = shallowRef<InstanceType<typeof WritingPanel>>();
 const anchor = shallowRef<HTMLElement>(); const snapshot = shallowRef<EditorSnapshot>();
-const canInsert = computed(() => Boolean(snapshot.value && !snapshot.value.element.querySelector('a, img, video, audio, table, [contenteditable="false"]')));
+const canInsert = computed(() => Boolean(snapshot.value && !hasComplexRichEditorStructure(snapshot.value.element)));
+const plainTextOutput = computed(() => isPlainTextWritingSite(snapshot.value?.site));
+const hotkeyDisplay = computed(() => writingHotkeyDisplayName(config.value.writing.writingHotkey));
 const menuOpened = ref(false); const menuAnchor = shallowRef<HTMLElement>(); const saving = ref(false); const menuError = ref('');
 type Entry = {host: HTMLElement; button: HTMLButtonElement; menu: HTMLButtonElement; action: HTMLElement; abort: AbortController};
 const entries = new Map<HTMLElement, Entry>();
@@ -36,7 +43,8 @@ const abort = new AbortController(); let observer: MutationObserver; let timer: 
 let currentUrl = location.href;
 let disposed = false;
 const dark = computed(() => config.value.theme === 'dark' || (config.value.theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches));
-const allowed = () => !isWritingDismissedForVisit() && config.value.on && config.value.writing.enabled && isWritingPage(location.href) && !isExtensionDisabledOnSite(location.href, [...config.value.disabledExtensionDomains, ...config.value.writing.disabledDomains]);
+const pageAllowed = () => config.value.on && config.value.writing.enabled && isWritingEligibleUrl(location.href) && !isExtensionDisabledOnSite(location.href, [...config.value.disabledExtensionDomains, ...config.value.writing.disabledDomains]);
+const allowed = () => !isWritingDismissedForVisit() && pageAllowed() && isWritingPage(location.href);
 function closeMenu(restoreFocus = true) { const wasOpened = menuOpened.value; menuOpened.value = false; if (wasOpened && restoreFocus) menuAnchor.value?.shadowRoot?.querySelector<HTMLButtonElement>('[data-writing-entry-menu]')?.focus({preventScroll: true}); }
 function openMenu(host: HTMLElement) { const same = menuOpened.value && menuAnchor.value === host; close(false); closeMenu(false); if (same) return; menuAnchor.value = host; menuError.value = ''; menuOpened.value = true; }
 async function saveEntrySetting(scope: 'visit' | 'site' | 'forever') {
@@ -70,15 +78,20 @@ function scan() {
   clearTimeout(timer); timer = undefined;
   if (disposed) return;
   if (currentUrl !== location.href) { currentUrl = location.href; close(false); closeMenu(false); snapshot.value = undefined; sessionKey.value++; }
-  if (!allowed()) { close(false); snapshot.value = undefined; if (!saving.value) { closeMenu(false); clearEntries(); } return; }
-  // allowed 已验证 HTTPS Gmail/GitHub 路由；同步扫描期间站点身份不会改变。
+  if (!pageAllowed()) { close(false); snapshot.value = undefined; if (!saving.value) { closeMenu(false); clearEntries(); } return; }
+  if (!allowed()) {
+    closeMenu(false); clearEntries();
+    if (opened.value && (!snapshot.value?.element.isConnected || !isWritingEditor(snapshot.value.element, snapshot.value.site) || !visible(snapshot.value.element))) close(false);
+    return;
+  }
+  // allowed 已验证一等写作网站路由；同步扫描期间站点身份不会改变。
   const site = writingSite(location.href)!;
   const editors = findReplyEditors(document, site, location.href).filter(element => {
     const rect = element.getBoundingClientRect();
     return visible(element) && rect.width >= 120 && rect.height >= 20 && Boolean(findReplyActionAnchor(element, site));
   });
   for (const [editor, entry] of entries) if (!editors.includes(editor) || !entry.host.isConnected) { entry.abort.abort(); entry.host.remove(); entries.delete(editor); }
-  if (opened.value && (!snapshot.value?.element.isConnected || !entries.has(snapshot.value.element))) close(false);
+  if (opened.value && (!snapshot.value?.element.isConnected || !isWritingEditor(snapshot.value.element, snapshot.value.site) || !visible(snapshot.value.element) || (!entries.has(snapshot.value.element) && anchor.value !== snapshot.value.element))) close(false);
   if (menuOpened.value && ![...entries.values()].some(entry => entry.host === menuAnchor.value)) closeMenu(false);
   for (const editor of editors) {
     const action = findReplyActionAnchor(editor, site)!;
@@ -98,7 +111,7 @@ function scan() {
       root.append(style, button, menu); entry = {host, button, menu, action, abort: entryAbort}; entries.set(editor, entry);
     }
     entry.action = action;
-    placeWritingEntry(entry.action, entry.host, site);
+    placeWritingEntry(entry.action, entry.host, site as Exclude<typeof site, 'generic'>);
     entry.host.dataset.theme = dark.value ? 'dark' : 'light';
     const label = translateLegacy('写作助手');
     const node = entry.button.querySelector('span')!; if (node.textContent !== label) node.textContent = label;
@@ -112,25 +125,29 @@ function scan() {
   if (writingEntrySaveFailure.value && entries.size && !saving.value) { openMenu(entries.values().next().value!.host); menuError.value = t('writing.entry.saveError'); writingEntrySaveFailure.value = false; }
 }
 function schedule() { if (!disposed && timer === undefined) timer = setTimeout(scan, 80); }
-function open(element: HTMLElement) {
+function open(element: HTMLElement, fromShortcut = false) {
   const entry = entries.get(element);
-  if (!allowed() || !isWritingEditor(element, writingSite(location.href)) || !visible(element) || !entry?.host.isConnected || !visible(entry.action)) return;
-  anchor.value = entry.host;
+  const site = fromShortcut ? resolveWritingSite(location.href) : writingSite(location.href);
+  if (fromShortcut) {
+    if (!pageAllowed() || !isWritingEditor(element, site) || !visible(element)) return;
+    anchor.value = entry?.host.isConnected && visible(entry.action) ? entry.host : element;
+  } else {
+    if (!allowed() || !isWritingEditor(element, site) || !visible(element) || !entry?.host.isConnected || !visible(entry.action)) return;
+    anchor.value = entry.host;
+  }
   closeMenu(false);
-  const next = captureEditor(element, location.href);
+  const next = captureEditor(element, location.href, site);
   if (snapshot.value?.element !== element || snapshot.value.signature !== next.signature || snapshot.value.url !== next.url) {
     snapshot.value = next; draft.value = editorText(element).slice(0, 12000);
-    context.value = collectReplyContext(document, writingSite(location.href), element, location.href);
-    const hasReply = next.site === 'gmail' ? /(?:^|\n\n)当前邮件：/.test(context.value)
-      : !/^\/[^/]+\/[^/]+\/issues\/new\/?$/.test(new URL(next.url).pathname) && Boolean(context.value.trim());
-    intent.value = draft.value.trim() ? 'polish' : hasReply ? 'reply' : 'draft'; sessionKey.value++;
+    context.value = collectReplyContext(document, site, element, location.href);
+    intent.value = resolveInitialWritingIntent(next.site, next.url, draft.value, context.value); sessionKey.value++;
   }
   opened.value = true;
 }
 function fillDraft(text: string): string | undefined {
-  if (!allowed() || !snapshot.value) return '当前页面已禁用写作助手。';
+  if (!pageAllowed() || !snapshot.value) return '当前页面已禁用写作助手。';
   const failure = applyWritingDraft(snapshot.value, text, location.href);
-  if (!failure) { snapshot.value = captureEditor(snapshot.value.element, location.href); close(); }
+  if (!failure) { snapshot.value = captureEditor(snapshot.value.element, location.href, snapshot.value.site); close(); }
   return failure;
 }
 watch(() => JSON.stringify([config.value.on, config.value.writing.enabled, config.value.writing.disabledDomains, config.value.disabledExtensionDomains, uiLanguage.value, bundleRevision.value, dark.value]), scan);
@@ -138,7 +155,9 @@ watch(menuOpened, () => { for (const entry of entries.values()) entry.menu.setAt
 watch(writingEntrySaveFailure, scan);
 watch(opened, () => { for (const [editor, entry] of entries) entry.button.setAttribute('aria-expanded', String(opened.value && snapshot.value?.element === editor)); });
 onMounted(() => {
-  scan(); observer = new MutationObserver(records => {
+  scan();
+  registerWritingOpenHandler(element => open(element, true));
+  observer = new MutationObserver(records => {
     // 网页框架可只移除扩展入口；跳过自身 UI 更新时仍须恢复已脱离文档的入口。
     const entryRemoved = records.some(record => record.type === 'childList' && record.removedNodes.length > 0)
       && [...entries.values()].some(entry => !entry.host.isConnected);
@@ -161,5 +180,5 @@ onMounted(() => {
   window.addEventListener('hashchange', scan, {signal: abort.signal});
   window.addEventListener('pagehide', () => { close(false); closeMenu(false); }, {signal: abort.signal});
 });
-onBeforeUnmount(() => { disposed = true; abort.abort(); observer?.disconnect(); clearTimeout(timer); clearEntries(); });
+onBeforeUnmount(() => { disposed = true; registerWritingOpenHandler(null); abort.abort(); observer?.disconnect(); clearTimeout(timer); clearEntries(); });
 </script>

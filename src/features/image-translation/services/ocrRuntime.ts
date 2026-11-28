@@ -23,7 +23,7 @@ import type {DownloadProgress} from '@/src/core/download/progress';
 import {removeOcrModelFiles} from './ocrModelCache';
 import {prefetchOcrModelFiles} from './ocrModelDownload';
 import { createOcrWorkerRuntime, type OcrWorkerPort } from './ocrWorkerRuntime';
-import {createSharedOcrTasks} from './sharedOcrTasks';
+import {createOcrAbortError as abortRecognition, createSharedOcrTasks} from './sharedOcrTasks';
 import {encodeImageCanvas} from './imageEncoding';
 import {flattenOcrAlpha} from './ocrPixels';
 import {numericEvidenceKey} from './mangaNumeric';
@@ -163,12 +163,6 @@ async function readDocumentLines(image: string, result: TesseractRecognitionResu
 }
 let cachedRecognitionBytes = 0;
 let uncachedRecognitionSequence = 0;
-
-function abortRecognition(): Error {
-    const error = new Error('图片 OCR 请求已取消');
-    error.name = 'AbortError';
-    return error;
-}
 
 function copyOcrLines(lines: NumericEvidenceOcrLine[], includeEvidence = true): NumericEvidenceOcrLine[] {
     return lines.map(({numericConfidence, ...line}) => ({...line, bbox: {...line.bbox},

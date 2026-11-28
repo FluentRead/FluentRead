@@ -16,6 +16,9 @@ export function unmountImageTranslator(): void {}
 /** 再次遇见只在扩展中挂载，油猴构建不包含扫描器和浮层。 */
 export function mountVocabularyReencounter(): void {}
 export function unmountVocabularyReencounter(): void {}
+export function mountCommandPalette(): void {}
+export function unmountCommandPalette(): void {}
+export function isCommandPaletteMounted(): boolean { return false; }
 
 /** 个人校订需要扩展后台串行写入；复用空适配器以隔离管理面板与内容监听器。 */
 export {
@@ -62,6 +65,7 @@ export function openMangaReading(_event: MouseEvent): boolean { return false; }
 export function subscribeMangaReading(listener:(open:boolean)=>void):()=>void {listener(false);return ()=>undefined;}
 export function isMangaReaderPage(): boolean { return false; }
 export function isImageTranslatorNeeded(): boolean { return false; }
+export function isImageTranslatorMounted(): boolean { return false; }
 export async function mountMangaEntry(): Promise<void> {}
 export function unmountMangaEntry(): void {}
 export function subscribeMangaTranslation(listener: (status: {available: boolean; active: boolean; pending: boolean; errors: number}) => void): () => void {

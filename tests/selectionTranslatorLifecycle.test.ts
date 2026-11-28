@@ -1025,8 +1025,9 @@ describe('selection card language configuration and quick header switch', () => 
 
     it('keeps the selection card header single-row without native select and supports keyboard navigation in the custom language popover', async () => {
         const source = readFileSync('src/features/selection-translation/ui/SelectionTranslator.vue', 'utf8');
-        expect(source).toMatch(/\.fr-study-navigation \{[^}]*flex-wrap:\s*nowrap;/);
-        expect(source).toMatch(/\.fr-study-toolbar \{[^}]*flex-wrap:\s*nowrap;/);
+        const styles = readFileSync('src/features/selection-translation/ui/selection-translator.css', 'utf8');
+        expect(styles).toMatch(/\.fr-study-navigation \{[^}]*flex-wrap:\s*nowrap;/);
+        expect(styles).toMatch(/\.fr-study-toolbar \{[^}]*flex-wrap:\s*nowrap;/);
         expect(source).not.toContain('<select');
 
         const fixture = mountSelection(false, undefined, {}, true);
@@ -3967,9 +3968,10 @@ describe('selection card bounded layout work', () => {
 
     it('paints the move cursor only where the card can actually be dragged', () => {
         const source = readFileSync('src/features/selection-translation/ui/SelectionTranslator.vue', 'utf8');
-        expect(source).toMatch(/\.fr-study-navigation \{[^}]*cursor: move;/);
-        expect(source).toMatch(/\.fr-study-reading-tools \{[^}]*cursor: default;/);
-        expect(source).not.toContain('.fr-translation-tooltip > .fr-study-navigation { cursor: move; }');
+        const styles = readFileSync('src/features/selection-translation/ui/selection-translator.css', 'utf8');
+        expect(styles).toMatch(/\.fr-study-navigation \{[^}]*cursor: move;/);
+        expect(styles).toMatch(/\.fr-study-reading-tools \{[^}]*cursor: default;/);
+        expect(styles).not.toContain('.fr-translation-tooltip > .fr-study-navigation { cursor: move; }');
         expect(source).toContain("!target.closest('.fr-study-navigation') && !blank");
     });
 

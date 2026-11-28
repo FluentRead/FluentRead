@@ -127,4 +127,29 @@ describe('制作卡片操作反馈与生命周期', () => {
         resolve(); await old; expect(f.state.status).toBe('');
         await f.state.copyImage(); expect(f.state.status).toBe('shareCard.copied');
     });
+    it('连续复制或保存后再次复制不清空既有反馈，下载锚点保持隐藏且底栏状态槽不塌陷', async () => {
+        const f = fixture(); await f.open();
+        const createdLinks: Array<{hidden?: boolean}> = [];
+        const createSpy = vi.spyOn(document, 'createElement').mockImplementation(() => {
+            const node = {click: f.click, remove: f.remove, hidden: false};
+            createdLinks.push(node);
+            return node as any;
+        });
+        f.state.saveImage();
+        expect(createdLinks[0]?.hidden).toBe(true);
+        expect(f.state.status).toBe('shareCard.saved');
+        await vi.advanceTimersByTimeAsync(401);
+        let resolveCopy!: () => void;
+        f.copy.mockReturnValueOnce(new Promise<void>(yes => {resolveCopy = yes;}));
+        const copyTask = f.state.copyImage();
+        expect(f.state.status).toBe('shareCard.saved');
+        expect(f.state.hasFeedback).toBe(true);
+        resolveCopy(); await copyTask;
+        expect(f.state.status).toBe('shareCard.copied');
+        const source = readFileSync(resolve('src/features/share-card/ui/ShareCardStudio.vue'), 'utf8');
+        expect(source).not.toContain('.fr-card-feedback-region:empty');
+        expect(source).toContain('.fr-card-status-slot > * { grid-area: 1 / 1;');
+        expect(source).toContain('.fr-card-btn-spinner { position: absolute;');
+        createSpy.mockRestore();
+    });
 });

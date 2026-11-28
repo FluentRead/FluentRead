@@ -100,7 +100,7 @@ describe('material staging transaction boundaries',()=>{
     const x=make(),controller=new AbortController(),{cap,total}=await uploadMaterial(x);
     const frames=x.db.table('stageFrames');let reads=0,intercepted=false;
     const onRead=(row:Frame|undefined)=>{
-      if(row&&++reads===total+1) {
+      if(row&&++reads===total) {
         const transaction=Dexie.currentTransaction;
         if(!transaction)throw Error('missing transaction');
         const abort=vi.spyOn(Object.getPrototypeOf(transaction),'abort').mockImplementation(()=>{intercepted=true;throw Error('transaction abort failed');});

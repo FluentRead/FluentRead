@@ -21,6 +21,7 @@ vi.mock('@/src/services/config/store', () => ({config: mockConfig}));
 
 import claude from '@/src/providers/translation/claude';
 import {attachTranslationModelUsageObserver} from '@/src/services/translation/requestSnapshot';
+import {TRANSLATION_COMPACT_BATCH} from '@/src/services/translation/types';
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -62,6 +63,28 @@ describe('Claude Thinking 响应', () => {
         fetchMock.mockResolvedValue(response([{type: 'thinking', thinking: 'private reasoning'}]));
 
         await expect(claude(withProviderSnapshot({origin: 'hello'}, mockConfig))).rejects.toThrow('Claude 返回数据格式异常：缺少文本内容');
+    });
+
+    it('compactBatch 遇到 max_tokens 截断时返回 AI_MULTI_SEGMENT_RESPONSE_INVALID 并提升输出上限', async () => {
+        fetchMock.mockResolvedValue(new Response(JSON.stringify({
+            model: 'claude-haiku-5-5',
+            stop_reason: 'max_tokens',
+            content: [{type: 'text', text: '[[0,"部分'}],
+            usage: {input_tokens: 10, output_tokens: 8192},
+        }), {status: 200, headers: {'content-type': 'application/json'}}));
+        const message = withProviderSnapshot({origin: '["Hello"]'}, mockConfig);
+        const sym = Object.getOwnPropertySymbols(message)[0]!;
+        Object.defineProperty(message, sym, {
+            value: Object.freeze({...(message as any)[sym], [TRANSLATION_COMPACT_BATCH]: true as const}),
+        });
+        await expect(claude(message)).rejects.toMatchObject({code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID'});
+        const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+        expect(body.max_tokens).toBe(8192);
+
+        fetchMock.mockResolvedValueOnce(response([{type: 'text', text: '长文本译文'}]));
+        await expect(claude(withProviderSnapshot({origin: 'a'.repeat(2001)}, mockConfig))).resolves.toBe('长文本译文');
+        const longBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+        expect(longBody.max_tokens).toBe(8192);
     });
 });
 

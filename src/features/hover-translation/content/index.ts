@@ -444,23 +444,43 @@ export function mountHoverTranslationContentFeature(
 
     rootDocument.addEventListener('touchstart', event => {
         if (!event.isTrusted) return;
-        if (discardUnavailableHoverGesture()) return;
-        let coordinate;
-        switch (deps.config.hotkey) {
-            case deps.constants.TwoFinger:
-                coordinate = deps.getCenterPoint(event.touches, 2);
-                break;
-            case deps.constants.ThreeFinger:
-                coordinate = deps.getCenterPoint(event.touches, 3);
-                break;
-            case deps.constants.FourFinger:
-                coordinate = deps.getCenterPoint(event.touches, 4);
-                break;
-            default:
-                return;
+        const hotkey = deps.config.hotkey || '';
+        const unavailable = discardUnavailableHoverGesture();
+        if (!unavailable) {
+            let coordinate;
+            switch (hotkey) {
+                case deps.constants.TwoFinger:
+                    coordinate = deps.getCenterPoint(event.touches, 2);
+                    break;
+                case deps.constants.ThreeFinger:
+                    coordinate = deps.getCenterPoint(event.touches, 3);
+                    break;
+                case deps.constants.FourFinger:
+                    coordinate = deps.getCenterPoint(event.touches, 4);
+                    break;
+                default:
+                    break;
+            }
+            if (coordinate) invokeTranslation(coordinate.x, coordinate.y);
         }
+        if (unavailable ||
+            ![deps.constants.DoubleClickScreen, deps.constants.TripleClickScreen].includes(hotkey) ||
+            event.touches.length !== 1) {
+            resetTouchGesture();
+            return;
+        }
+        if (touchGestureHotkey !== hotkey) resetTouchGesture();
+        touchGestureHotkey = hotkey;
 
-        if (coordinate) invokeTranslation(coordinate.x, coordinate.y);
+        const requiredTouches = deps.config.hotkey === deps.constants.DoubleClickScreen ? 2 : 3;
+        touchCount += 1;
+
+        if (touchCount === 1) {
+            touchTimer = setTimeout(resetTouchGesture, 500);
+        } else if (touchCount === requiredTouches) {
+            resetTouchGesture();
+            invokeTranslation(event.touches[0].clientX, event.touches[0].clientY);
+        }
     }, { signal, capture: true, passive: true });
 
     rootDocument.addEventListener('dblclick', event => {
@@ -489,39 +509,10 @@ export function mountHoverTranslationContentFeature(
                     invokeTranslation(event.clientX, event.clientY);
                 }
             }, 500);
-        }
-    }, { signal });
-
-    rootDocument.addEventListener('mousedown', event => {
-        if (!event.isTrusted) return;
-        if (discardUnavailableHoverGesture()) return;
-        if (deps.config.hotkey === deps.constants.MiddleClick && deps.config.on && event.button === 1) {
+        } else if (deps.config.hotkey === deps.constants.MiddleClick && deps.config.on && event.button === 1) {
             invokeTranslation(event.clientX, event.clientY);
         }
     }, { signal });
-
-    rootDocument.addEventListener('touchstart', event => {
-        if (!event.isTrusted) return;
-        const hotkey = deps.config.hotkey || '';
-        if (discardUnavailableHoverGesture() ||
-            ![deps.constants.DoubleClickScreen, deps.constants.TripleClickScreen].includes(hotkey) ||
-            event.touches.length !== 1) {
-            resetTouchGesture();
-            return;
-        }
-        if (touchGestureHotkey !== hotkey) resetTouchGesture();
-        touchGestureHotkey = hotkey;
-
-        const requiredTouches = deps.config.hotkey === deps.constants.DoubleClickScreen ? 2 : 3;
-        touchCount += 1;
-
-        if (touchCount === 1) {
-            touchTimer = setTimeout(resetTouchGesture, 500);
-        } else if (touchCount === requiredTouches) {
-            resetTouchGesture();
-            invokeTranslation(event.touches[0].clientX, event.touches[0].clientY);
-        }
-    }, { signal, passive: true });
 
     const getGestureConfig = () => [deps.config.on, deps.config.hotkey, deps.config.customHotkey,
         deps.config.mouseHoverTranslationDelay, deps.isSiteDisabled()] as const;

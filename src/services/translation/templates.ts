@@ -379,7 +379,7 @@ export function claudeMsgTemplate(request: TranslationTemplateRequest) {
 
     const payload: Record<string, unknown> = {
         model: model,
-        max_tokens: 4096,
+        max_tokens: current[TRANSLATION_COMPACT_BATCH] === true || request.origin.length > 2000 ? 8192 : 4096,
         stream: false,
         system: system,
         messages: [

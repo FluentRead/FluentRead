@@ -155,11 +155,13 @@ import { getMissingCredentialMessage } from '@/src/core/config/validation'
 import type { Config } from '@/src/core/config/model'
 import { getCustomOpenAIProviderModels, isCustomOpenAIProviderId } from '@/src/core/config/customOpenAI'
 import { resolveAreaTranslationHotkey } from '@/src/core/config/areaTranslation'
+import { resolveCommandPaletteHotkey } from '@/src/core/config/commandPalette'
 import { resolveReservedClickSelectionHotkey } from '@/src/core/config/clickSelection'
 import { resolveParagraphCopyHotkey } from '@/src/core/config/paragraphCopy'
 import { findEnabledQuickTranslationHotkeyConflict, quickTranslationActionKey } from '@/src/core/config/quickTranslation'
 import { resolveSectionTranslationHotkey } from '@/src/core/config/sectionTranslation'
 import { canonicalizeHotkey, resolveConfiguredHotkey } from '@/src/core/hotkey'
+import { resolveWritingHotkey } from '@/src/core/config/writing'
 import {
   DEFAULT_INPUT_BOX_TRANSLATION_INTERVAL,
   DEFAULT_INPUT_BOX_TRANSLATION_PROMPT,
@@ -329,6 +331,13 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
         ? props.config.informationHighlight.hotkey ?? ''
         : '',
       feature: translateLegacy('智能高亮'),
+    },
+    {hotkey: resolveWritingHotkey(props.config.writing), feature: translateLegacy('写作助手')},
+    {
+      hotkey: props.config.commandPaletteEnabled
+        ? resolveCommandPaletteHotkey(props.config.commandPaletteHotkey, props.config.customCommandPaletteHotkey)
+        : '',
+      feature: translateLegacy('全局命令面板'),
     },
   ]
 }

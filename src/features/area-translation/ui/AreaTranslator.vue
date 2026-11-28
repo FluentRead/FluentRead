@@ -363,9 +363,14 @@ async function openSettings(): Promise<void> {
   }
 }
 function handleViewportChange(event: Event): void {
+  if (phase.value === 'idle') return;
   // 卡片自己的滚动不触发重排；截图前的页面滚动/缩放会使旧选区坐标失效。
   if (isInsideExtensionUi(event.target)) return;
-  viewport.value = {width: window.innerWidth, height: window.innerHeight};
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  if (viewport.value.width !== width || viewport.value.height !== height) {
+    viewport.value = {width, height};
+  }
   // 选区模式还没有截图，页面自身的动画或懒加载滚动不能把用户刚打开的选区关掉；
   // 只重置进行中的拖拽，避免起点停留在已经滚走的位置。
   if (isSelecting.value) {

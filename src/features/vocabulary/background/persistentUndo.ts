@@ -9,7 +9,7 @@ import {type VocabularyUndoRecord, type VocabularyUndoTicket} from '../learningM
 
 export const VOCABULARY_UNDO_TTL_MS = 24 * 60 * 60 * 1000;
 export const VOCABULARY_UNDO_MAX_PENDING = 20;
-export const VOCABULARY_UNDO_MAX_BYTES = 8 * 1024 * 1024;
+const VOCABULARY_UNDO_MAX_BYTES = 8 * 1024 * 1024;
 
 export class VocabularyPersistentUndo {
   constructor(private readonly db: FluentReadVocabularyBookDatabase) {}

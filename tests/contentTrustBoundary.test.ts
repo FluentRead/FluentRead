@@ -38,7 +38,10 @@ describe('host-page trust boundary', () => {
     ].join('\n');
     const area = source('src/features/area-translation/ui/AreaTranslator.vue');
     const selection = source('src/features/selection-translation/ui/SelectionTranslator.vue');
-    const video = source('src/features/video-subtitle/content/runtime.ts');
+    const video = [
+      source('src/features/video-subtitle/content/runtime.ts'),
+      source('src/features/video-subtitle/content/runtimeMenuControls.ts'),
+    ].join('\n');
 
     expect(content.match(/if \(!event\.isTrusted\) return;/g)?.length).toBeGreaterThanOrEqual(10);
     for (const handler of ['handleKeydown', 'handlePointerdown', 'handlePointermove', 'handlePointerup', 'handlePointercancel']) {
@@ -51,13 +54,20 @@ describe('host-page trust boundary', () => {
   it('keeps privileged controls and translated bitmaps out of page-visible shadow roots', () => {
     expect(source('src/features/floating-ball/content/runtime.ts')).toContain("mode: 'closed'");
     expect(source('src/features/selection-translation/content/runtime.ts')).toContain("mode: 'closed'");
-    expect(source('src/features/input-translation/content/index.ts')).toContain("mode: 'closed'");
+    expect(
+      source('src/features/input-translation/content/index.ts')
+      + '\n'
+      + source('src/features/input-translation/content/tooltipUi.ts'),
+    ).toContain("mode: 'closed'");
     expect(source('src/features/area-translation/content/runtime.ts')).toContain("mode: 'closed'");
     expect(source('src/features/image-translation/content/runtime.ts')).toContain("attachShadow({ mode: 'closed' })");
   });
 
   it('keeps the section picker behind trusted input and a closed shadow root', () => {
-    const picker = source('src/features/section-translation/content/picker.ts');
+    const picker = [
+      source('src/features/section-translation/content/picker.ts'),
+      source('src/features/section-translation/content/pickerOverlay.ts'),
+    ].join('\n');
     const entry = source('src/features/section-translation/content/index.ts');
 
     // 网页脚本不能伪造点击或按键替用户选择区域并发起翻译，也不能读取选择浮层。

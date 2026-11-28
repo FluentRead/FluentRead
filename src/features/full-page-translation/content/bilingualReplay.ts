@@ -45,7 +45,7 @@ export function refreshBilingualTranslationSkeleton(
 
     const core = getCurrentTranslationCore(state.scope);
     const boundary = state.syntheticSegment ? node : undefined;
-    const options = protectionOptions(node, state);
+    const options = core.textOptions(protectionOptions(node, state));
     const snapshot = createTranslationSourceSnapshot(
         node,
         core.shouldStayOriginal,

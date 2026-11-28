@@ -62,7 +62,7 @@ describe('界面语言注册表', () => {
         const files = bundles.createUiLanguageBundleFiles();
         expect(files.map(({relativeDest}) => relativeDest).sort()).toEqual([
             'i18n/en-US.json', 'i18n/es-ES.json', 'i18n/fr-FR.json',
-            'i18n/ja-JP.json', 'i18n/ko-KR.json', 'i18n/ru-RU.json',
+            'i18n/ja-JP.json', 'i18n/ko-KR.json', 'i18n/ru-RU.json', 'i18n/zh-TW.json',
         ]);
         for (const {relativeDest, contents} of files) {
             const language = relativeDest.slice('i18n/'.length, -'.json'.length) as keyof typeof bundles.UI_LANGUAGE_BUNDLES;
@@ -88,10 +88,10 @@ describe('界面语言注册表', () => {
         expect(files.map(({relativeDest}) => relativeDest).sort()).toEqual([
             '_locales/en/messages.json', '_locales/es/messages.json', '_locales/fr/messages.json',
             '_locales/ja/messages.json', '_locales/ko/messages.json', '_locales/ru/messages.json',
-            '_locales/zh_CN/messages.json',
+            '_locales/zh_CN/messages.json', '_locales/zh_TW/messages.json',
         ]);
         const languageByLocale = {
-            zh_CN: 'zh-CN', en: 'en-US', ja: 'ja-JP', ko: 'ko-KR',
+            zh_CN: 'zh-CN', zh_TW: 'zh-TW', en: 'en-US', ja: 'ja-JP', ko: 'ko-KR',
             fr: 'fr-FR', ru: 'ru-RU', es: 'es-ES',
         } as const;
         bundles.registerAllUiLanguageBundles();
@@ -100,9 +100,10 @@ describe('界面语言注册表', () => {
             const message = JSON.parse(contents);
             expect(Object.keys(message).sort()).toEqual(['extensionDescription', 'extensionName', 'extensionToolbarTitle']);
             expect(message.extensionName).toEqual({message: i18n.translate('common.brand', languageByLocale[locale])});
-            expect(message.extensionName.message).toBe(locale === 'zh_CN' ? '流畅阅读' : 'FluentRead');
+            expect(message.extensionName.message).toBe(locale === 'zh_CN' ? '流畅阅读' : locale === 'zh_TW' ? '流暢閱讀' : 'FluentRead');
             expect(message.extensionToolbarTitle.message).toContain(`${message.extensionName.message} · `);
             if (locale === 'zh_CN') expect(message.extensionToolbarTitle.message).toBe('流畅阅读 · 网页翻译、划词翻译');
+            if (locale === 'zh_TW') expect(message.extensionToolbarTitle.message).toBe('流暢閱讀 · 網頁翻譯、劃詞翻譯');
             if (locale === 'en') expect(message.extensionToolbarTitle.message).toBe('FluentRead · Translate pages and selected text');
             expect(contents).not.toContain('\n');
         }
@@ -159,6 +160,7 @@ describe('界面语言注册表', () => {
         expect(corrections.personalCorrectionMessages['zh-CN']).toBe(corrections.personalCorrectionChineseMessages);
         const languages = [
             ['zh-CN', pdf.pdfReadingChineseMessages, highlight.informationHighlightChineseMessages],
+            ['zh-TW', pdf.pdfReadingTraditionalChineseMessages, highlight.informationHighlightTraditionalChineseMessages],
             ['en-US', pdf.pdfReadingEnglishMessages, highlight.informationHighlightEnglishMessages],
             ['ja-JP', pdf.pdfReadingJapaneseMessages, highlight.informationHighlightJapaneseMessages],
             ['ko-KR', pdf.pdfReadingKoreanMessages, highlight.informationHighlightKoreanMessages],

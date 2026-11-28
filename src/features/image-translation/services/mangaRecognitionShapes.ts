@@ -7,8 +7,6 @@
  */
 import {rewriteMangaOnnxFields,type MangaOnnxFieldRecipe} from './mangaOnnxFields';
 export const MANGA_RECOGNITION_SOURCE_SHA='5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634';
-export const MANGA_RECOGNITION_SHAPES_VERSION='ppocrv6-shapes-ab-clean-v1';
-export const MANGA_RECOGNITION_DERIVED_SHA='74e090ae2d77172c1b763dde792a4c4a611bdf8b6049789c003fc9dda0ff525f';
 const SOURCE_BYTES=21159378;
 function hex(value:string):Uint8Array {return Uint8Array.from({length:value.length/2},(_,index)=>parseInt(value.slice(index*2,index*2+2),16));}
 // 配方只含形状节点/标量的原字段，不含任何特征权重；精确字段顺序和属性也必须匹配。

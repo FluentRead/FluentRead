@@ -59,7 +59,7 @@ vi.mock('@/src/services/config/store', () => ({get config() {return config;}, co
 vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({language, bundleRevision,
   t: (key: string, params?: Parameters<typeof translate>[2]) => translate(key, language.value, params),
   translateLegacy: (text: string) => translateLegacyText(text, language.value)})}));
-vi.mock('@/src/ui/interfaceAppearance', () => ({applyInterfaceFont() {}, applyInterfaceSkin() {}}));
+vi.mock('@/src/ui/interfaceAppearance', () => ({applyInterfaceFont() {}, applyInterfaceSkin() {}, persistPopupStartupAppearance() {}}));
 vi.mock('@/src/platform/browser/capabilities', () => ({browserCapabilities: {browser: 'chrome', areaTranslation: true, imageTranslation: true}}));
 vi.mock('@element-plus/icons-vue', () => ({Setting: {render: () => null}}));
 vi.mock('element-plus/es/components/tooltip/index', () => ({ElTooltip: {inheritAttrs: false,

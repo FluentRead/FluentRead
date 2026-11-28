@@ -28,6 +28,7 @@ import {translationStatsChineseMessages} from './translationStats';
 import {localTranslationChineseMessages} from './localTranslation';
 
 import {personalCorrectionChineseMessages} from './personalCorrections';
+import {task7ChineseMessages} from './task7Features';
 
 import countForms from './count-forms.json';
 
@@ -42,6 +43,7 @@ export const zhCNMessages = {
     "feedback.retryHint": "稍后重试，原文和当前选区会继续保留。",
     ...countForms['zh-CN'],
     ...personalCorrectionChineseMessages,
+    ...task7ChineseMessages,
     "document.config.loadFailed": "设置未能读取，请重新加载后再试。",
     "popup.compact.translate": "翻译",
     "popup.compact.restore": "还原",
@@ -166,8 +168,6 @@ export const zhCNMessages = {
     "sentenceHighlight.title": "逐句高亮样式",
     "sentenceHighlight.description": "选择原文与译文对应句子的高亮样式，便于对照阅读",
     "sentenceHighlight.tryHint": "移到一句话上，原文与译文会同步高亮",
-    "sentenceHighlight.offHint": "开启双语逐句高亮，即可在这里体验句子对应",
-    "sentenceHighlight.openStyles": "调整逐句高亮样式",
     "sentenceHighlight.enableHint": "选择样式即可开启；选择“无”关闭高亮，并保留上次的外观设置",
     "sentenceHighlight.noneDescription": "关闭逐句高亮，保留当前样式与自定义外观",
     "sentenceHighlight.sample": "让阅读轻松自然",
@@ -354,7 +354,15 @@ export const zhCNMessages = {
     "writing.entry.chooseReference": "请先选择不同的对照语言。",
     "writing.entry.saveError": "保存失败，请重试。",
     "writing.entry.openError": "请从扩展菜单打开完整设置。",
-    "writing.experience.enableDescription": "在 GitHub 和 Gmail 编辑区起草回复、完善草稿，检查后由你发送",
+    "writing.hotkey.label": "通用网页呼出快捷键",
+    "writing.hotkey.description": "在任意网页聚焦输入框或富文本编辑区时按下快捷键即可打开写作助手，不会主动注入悬浮按钮",
+    "writing.hotkey.edit": "编辑写作助手快捷键",
+    "writing.hotkey.disabled": "已关闭快捷键",
+    "writing.hotkey.reset": "恢复默认",
+    "writing.hotkey.requireModifier": "请选择带 Ctrl、Alt 或 Shift 的组合键",
+    "writing.hotkey.conflict": "此快捷键已用于 {feature}，请更换组合键",
+    "writing.hotkey.entryHint": "任意网页聚焦编辑框按 {shortcut} 也可呼出写作助手",
+    "writing.experience.enableDescription": "在 Gmail、GitHub、Outlook、X、Reddit、LinkedIn、Slack、Discord、Notion 及任意网页编辑区起草回复或完善草稿，检查后由你发送",
     "writing.experience.disabled": "已关闭网页写作入口，下面的偏好仍会保留",
     "writing.experience.paused": "插件已关闭，启动插件后即可使用写作助手",
     "writing.experience.inheritModel": "跟随服务模型 · {model}",
@@ -1709,6 +1717,19 @@ export const zhCNMessages = {
     'settings.interface.popupQuickFeatures.modules.video.description': "打开视频字幕翻译设置",
     'settings.interface.popupQuickFeatures.modules.document.label': '文档翻译',
     'settings.interface.popupQuickFeatures.modules.document.description': "打开文档翻译入口",
+    'settings.interface.skinStudio.description': '仅作用于浏览器弹窗，悬停卡片可实时预演，不影响设置页外观',
+    'settings.interface.skinStudio.resetDefault': '恢复默认',
+    'settings.interface.skinStudio.allCollections': '全部',
+    'settings.interface.skinStudio.appliedAnnouncement': '已应用弹窗皮肤：{name}',
+    'settings.interface.skinStudio.previewing': '预演中',
+    'settings.interface.skinStudio.applied': '当前使用',
+    'settings.interface.skinStudio.previewTheme': '预览明暗主题',
+    'settings.interface.skinStudio.darkOnlyHint': '此皮肤仅支持深色模式',
+    'settings.interface.skinStudio.themeAuto': '跟随系统',
+    'settings.interface.skinStudio.themeLight': '浅色预览',
+    'settings.interface.skinStudio.themeDark': '深色预览',
+    'settings.interface.skinStudio.darkOnly': '仅深色',
+    'settings.interface.skinStudio.adaptiveTheme': '浅/深自适应',
     'settings.translation.hover': '鼠标悬浮翻译',
     'settings.translation.selection': '划词翻译',
     'settings.translation.input': '输入框翻译',

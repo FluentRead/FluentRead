@@ -28,11 +28,12 @@ function deferred<T>() {
   const promise = new Promise<T>((yes, no) => {resolve = yes; reject = no;});
   return {promise, resolve, reject};
 }
-async function mountEntry(toolsDisplay?: 'hover' | 'always') {
+async function mountEntry(toolsDisplay?: 'hover' | 'always', dockPosition?: {side: 'left' | 'right'; verticalPosition: number | null}) {
   const props = runtime.reactive({
     status:{available:true, active:false, pending:false, errors:0} as MangaTranslationStatus,
     page:{site:'fixture', route:'/chapter/1'},
     settings:{sourceLanguage:undefined as string | undefined, promptEnabled:true, floatingBallVisible:false, downloadConfirmed:false, animations:true, ...(toolsDisplay === undefined ? {} : {toolsDisplay})},
+    dockPosition,
     toggle:vi.fn(), inspectResources:vi.fn(async () => false), persist:vi.fn(async (_patch: Record<string, unknown>) => undefined), openSettings:vi.fn(),
     startAreaTranslation:vi.fn(async () => true), onPeekOriginal:undefined as ((peeking:boolean)=>void) | undefined, readManga:undefined as ((event:MouseEvent)=>void) | undefined, readingOpen:false,readingState:undefined as {open:boolean} | undefined,readingChanged:vi.fn(),
     reading:undefined as {list:()=>MangaReadingList;read:(token:object,signal:AbortSignal)=>Promise<MangaReadingResult>;observe:(token:object,invalid:()=>void)=>(()=>void)|undefined;copy:(text:string)=>Promise<void>;theme:'light'|'dark'|'auto'}|undefined,
@@ -510,5 +511,120 @@ describe('manga entry telemetry, hold-to-peek original, and theme propagation', 
     // Closing synchronously before nextTick does not focus stale dialog
     await panel.start(); panel.close(); await tick(); await tick();
     expect(focusSpy).not.toHaveBeenCalled();
+  });
+
+  it('supports dragging the standalone dock to left/right edge, persists clamped vertical position, suppresses click, and handles cancel/blur/prop sync', async () => {
+    const listeners = new Map<string, Set<EventListener>>();
+    const win = {
+      innerWidth: 1000,
+      innerHeight: 800,
+      matchMedia: () => ({matches: false}),
+      addEventListener: vi.fn((type: string, fn: EventListener) => {
+        if (!listeners.has(type)) listeners.set(type, new Set());
+        listeners.get(type)!.add(fn);
+      }),
+      removeEventListener: vi.fn((type: string, fn: EventListener) => {
+        listeners.get(type)?.delete(fn);
+      }),
+    };
+    const emitWin = (type: string, event: any) => {
+      for (const fn of Array.from(listeners.get(type) ?? [])) fn(event);
+    };
+    vi.stubGlobal('window', win);
+
+    const {panel, props, tick, find} = await mountEntry('hover', {side: 'left', verticalPosition: 0.25});
+    const dockNode = () => find(value => value.props.class?.includes('fr-manga-dock'))!;
+    const launcherNode = () => find(value => value.props.class?.split(/\s+/).includes('fr-manga-launcher'))!;
+    expect(dockNode().props['data-position']).toBe('left');
+    expect(dockNode().props.style).toEqual({top: '25.0%'});
+
+    // External dockPosition sync (right, null, invalid undefined)
+    props.dockPosition!.side = 'right';
+    props.dockPosition!.verticalPosition = null;
+    await tick();
+    expect(dockNode().props['data-position']).toBe('right');
+    expect(dockNode().props.style).toBeUndefined();
+    props.dockPosition = undefined;
+    await tick();
+
+    // Missing getBoundingClientRect guard
+    launcherNode().props.onPointerdown({pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 1, clientX: 980, clientY: 400});
+    expect(win.addEventListener).not.toHaveBeenCalled();
+
+    // Invalid button / non-primary / non-finite coordinates ignored
+    let captured = false;
+    let rect = {left: 960, top: 380, width: 40, height: 40};
+    Object.assign(panel.launcher, {
+      getBoundingClientRect: () => rect,
+      setPointerCapture: vi.fn(() => {captured = true;}),
+      hasPointerCapture: vi.fn(() => captured),
+      releasePointerCapture: vi.fn(() => {captured = false;}),
+    });
+    for (const bad of [
+      {pointerType: 'mouse', button: 2, isPrimary: true, pointerId: 1, clientX: 980, clientY: 400},
+      {pointerType: 'touch', button: 0, isPrimary: false, pointerId: 1, clientX: 980, clientY: 400},
+      {pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 1, clientX: NaN, clientY: 400},
+      {pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 1, clientX: 980, clientY: Infinity},
+    ]) {
+      launcherNode().props.onPointerdown(bad);
+    }
+    expect(win.addEventListener).not.toHaveBeenCalled();
+
+    // Full drag to left edge + suppress subsequent click + persist rejection swallowed
+    props.persist.mockRejectedValueOnce(new Error('storage busy'));
+    launcherNode().props.onPointerdown({pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 7, clientX: 980, clientY: 400});
+    // Overlapping pointerdown while dragging is ignored
+    launcherNode().props.onPointerdown({pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 8, clientX: 980, clientY: 400});
+    // Wrong pointerId move & within threshold move ignored
+    emitWin('pointermove', {pointerId: 99, clientX: 100, clientY: 100});
+    emitWin('pointermove', {pointerId: 7, clientX: 982, clientY: 402});
+    await tick();
+    expect(dockNode().props.class).not.toContain('is-dragging');
+    // Move past threshold starts drag
+    emitWin('pointermove', {pointerId: 7, clientX: 120, clientY: 200});
+    await tick();
+    expect(dockNode().props.class).toContain('is-dragging');
+    expect(dockNode().props.style).toMatchObject({right: 'auto', transform: 'none'});
+    expect(panel.launcher.setPointerCapture).toHaveBeenCalledWith(7);
+    // Second move while already dragging updates coordinates
+    emitWin('pointermove', {pointerId: 7, clientX: 80, clientY: 160});
+    // Wrong pointerId pointerup ignored
+    emitWin('pointerup', {pointerId: 99, clientX: 80, clientY: 160});
+    emitWin('pointerup', {pointerId: 7, clientX: 80, clientY: 160});
+    await tick();
+    expect(dockNode().props['data-position']).toBe('left');
+    expect(props.persist).toHaveBeenCalledWith({floatingBallPosition: 'left', floatingBallVerticalPosition: expect.any(Number)});
+    expect(panel.launcher.releasePointerCapture).toHaveBeenCalledWith(7);
+    // Post-drag click is suppressed once, then normal click works
+    launcherNode().props.onClick({detail: 1});
+    expect(props.inspectResources).not.toHaveBeenCalled();
+
+    // Jump release (>6px without pointermove) snaps to right edge & handles zero-size rect fallback (36x36)
+    rect = {left: 0, top: 100, width: 0, height: 0};
+    launcherNode().props.onPointerdown({pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 11, clientX: 10, clientY: 110});
+    emitWin('pointerup', {pointerId: 11, clientX: 920, clientY: 790});
+    await tick();
+    expect(dockNode().props['data-position']).toBe('right');
+    expect(dockNode().props.style).toEqual({top: '94.0%'});
+    // Clear suppressed click
+    launcherNode().props.onClick({detail: 1});
+
+    // Short tap (<6px) does not persist and allows click
+    props.persist.mockClear();
+    launcherNode().props.onPointerdown({pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 12, clientX: 970, clientY: 400});
+    emitWin('pointerup', {pointerId: 12, clientX: 971, clientY: 401});
+    await tick();
+    expect(props.persist).not.toHaveBeenCalled();
+
+    // pointercancel (wrong id ignored, matching id cancels), lostpointercapture (no event / matching id), and window blur cancel
+    launcherNode().props.onLostpointercapture();
+    launcherNode().props.onPointerdown({pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 13, clientX: 970, clientY: 400});
+    emitWin('pointercancel', {pointerId: 99});
+    emitWin('pointercancel', {pointerId: 13});
+    launcherNode().props.onPointerdown({pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 14, clientX: 970, clientY: 400});
+    emitWin('blur', {});
+    launcherNode().props.onPointerdown({pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 15, clientX: 970, clientY: 400});
+    launcherNode().props.onLostpointercapture();
+    expect(listeners.get('pointermove')?.size ?? 0).toBe(0);
   });
 });

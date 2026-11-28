@@ -5,7 +5,7 @@
  * 模块边界：本文件不创建 DOM、不解析文件也不调用翻译；它只消费 core 模型并返回 UI 可直接使用的值，实际预览 HTML 归 core/preview，PDF 位图和导出分别归 pdfPreview 与 binary。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
-import {renderDocument, resolveDocumentTranslation, type DocumentFormat, type DocumentRenderMode, type ParsedDocument} from '@/src/features/document-translation/core/document';
+import {getDocxPartLabel, renderDocument, resolveDocumentTranslation, type DocumentFormat, type DocumentRenderMode, type ParsedDocument} from '@/src/features/document-translation/core/document';
 import {stripDocumentInlineMarkers} from '@/src/core/translation/documentInlineMarkers';
 
 /** 小型本地范例只走正常导入流程，不预填译文或自动发起翻译。 */
@@ -34,7 +34,7 @@ export function getDocumentExportPreview(document: ParsedDocument, translations:
 }
 
 const SUBTITLE_FORMATS = new Set<DocumentFormat>(['srt', 'vtt', 'ass', 'lrc']);
-const RICH_FORMATS = new Set<DocumentFormat>(['epub', 'html', 'markdown', 'txt']);
+const RICH_FORMATS = new Set<DocumentFormat>(['epub', 'html', 'markdown', 'txt', 'tex']);
 
 export function isSubtitleDocumentFormat(format?: DocumentFormat): boolean {
     return format !== undefined && SUBTITLE_FORMATS.has(format);
@@ -57,14 +57,7 @@ export function getDocumentEmptyReaderHint(document: ParsedDocument | null): str
     return '点击“开始翻译”，译文会按当前文档的阅读结构显示。';
 }
 
-export function getDocxPartLabel(path: string): string {
-    if (path === 'word/document.xml') return '正文';
-    if (/header/iu.test(path)) return '页眉';
-    if (/footer/iu.test(path)) return '页脚';
-    if (/footnotes/iu.test(path)) return '脚注';
-    if (/endnotes/iu.test(path)) return '尾注';
-    return '文档内容';
-}
+export {getDocxPartLabel};
 
 /** 只本地化有解析结构证明的位置，不能根据中文形状猜测或改写用户章节、JSON 路径和历史标题。 */
 export function getDocumentGeneratedPositionLabels(
@@ -102,7 +95,7 @@ export function hasDocumentPlaceholder(value: string | undefined): boolean {
 }
 
 export function formatDocumentReaderText(format: DocumentFormat | undefined, value: string, docxInline?: true): string {
-    if (docxInline) return stripDocumentInlineMarkers(value).trim();
+    if (docxInline || format === 'tex') return stripDocumentInlineMarkers(value).trim();
     if (format === 'html' || format === 'epub') return value.replace(/<[^>]+>/gu, '').trim();
     if (format === 'markdown') {
         return value

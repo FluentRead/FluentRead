@@ -1,244 +1,92 @@
 /**
  * @file src/features/document-translation/core/document.ts
- * 文件职责：定义文档翻译的纯领域模型，并负责把多种文本格式解析为可翻译片段，再按双语或纯译文模式无损还原原格式结构。
- * 主要内容：覆盖文本格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体或括号的字幕样式标签按真实闭合名还原（包含 VTT 样式类）、纯文本里按固定宽度折行的段落（含 LF、CRLF、CR）合成一个片段并按完整 Unicode 码点判断中日韩边界、Markdown 可选地把一行或一个普通折行段落作为一个片段整句翻译并以成对占位符保护强调和链接，恢复强调时把服务正文边缘的 CommonMark 空白移到分隔符外而保留内部间隔，仅在标点/符号或 underscore 词内边界要求时补外侧分隔空格，以单占位符保护行内代码与网址、Markdown 标题、列表、容器指令与独立 HTML 标记保留，以及围栏、受控缩进代码与行内位置保护、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
- * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX 二进制，也不发起翻译请求；文件 I/O 与压缩包处理归 services/binary，批处理归 services/translation，展示归 preview/presentation。
- * GFM 表格和 CSV/TSV 在单元格内回填译文，字幕导出保护 cue 边界。
+ * 文件职责：作为文档翻译核心领域模型的统一入口，提供格式识别、MIME 与大小上限元数据、多格式文本解析分发（含 LaTeX `.tex`）及双语/纯译文无损渲染，并承载 PDF/EPUB/DOCX/PPTX/XLSX 二进制文档的类型契约。
+ * 主要内容：聚合导出核心数据结构与辅助方法，协调 Markdown/TXT、HTML、LaTeX、字幕、JSON 与 CSV/TSV 格式解析子模块，并实现按列筛选、有界长度渲染与下载文件命名。
+ * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX/PPTX/XLSX 二进制，也不发起翻译请求；具体格式解析下沉至 ./formats/* 与 ./latex 子模块，文件 I/O 归 services/binary。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
-import {decodeTextareaHtml} from '@/src/shared/text/htmlEntities';
-// 归一规则与服务候选验证共用，避免导出与免费线路接受不同的编号标签写法。
-import {normalizeDocumentInlineMarkers} from '@/src/core/translation/public';
-import {escapeMarkdownTableTranslation, markdownTableAlignments, splitMarkdownTableRow, type MarkdownTable} from './markdownTable';
-import {encodeDelimitedCell, isSpreadsheetFormula, isTranslatableDelimitedCell, readDelimitedCells, type DelimitedColumn} from './delimited';
+import {escapeMarkdownTableTranslation} from './markdownTable';
+import {encodeDelimitedCell, isSpreadsheetFormula} from './delimited';
+import {parseLatexDocument, renderLatexTranslation, sanitizeLatexCommandText} from './latex';
+import {
+    DOCUMENT_MAX_BYTES,
+    PDF_MAX_BYTES,
+    PPTX_MAX_BYTES,
+    SUPPORTED_DOCUMENT_EXTENSIONS,
+    type BinaryDocumentData,
+    type DocumentFormat,
+    type DocumentHtmlOutput,
+    type DocumentPart,
+    type DocumentRenderMode,
+    type DocumentSegment,
+    type DocxDocumentPart,
+    type EpubDocumentChapter,
+    type JsonSegmentEntry,
+    type MarkdownCodeBlock,
+    type ParseDocumentOptions,
+    type ParsedDocument,
+    type PdfDocumentBlock,
+    type PdfDocumentLine,
+    type PdfDocumentPage,
+    type PdfDocumentRun,
+    type PdfPreservedRegion,
+    type PptxDocumentPart,
+    type SegmentPart,
+    type XlsxDocumentSheet,
+    type XlsxSheetSegment,
+} from './formats/shared';
+import {
+    inspectMarkdownLine,
+    parseTextDocument,
+    renderMarkdownTranslation,
+    unwrapDocumentSoftLines,
+} from './formats/markdown';
+import {parseHtmlDocument, renderHtmlTranslation} from './formats/html';
+import {
+    formatSubtitleExport,
+    parseAssDocument,
+    parseLrcDocument,
+    parseTimedSubtitleDocument,
+    restoreSubtitleTags,
+} from './formats/subtitle';
+import {
+    cloneJsonValue,
+    formatJsonPath,
+    getAtPath,
+    parseDelimitedDocument,
+    parseJsonDocument,
+    setAtPath,
+} from './formats/jsonAndDelimited';
+
 export type {DelimitedColumn} from './delimited';
-export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
-/** 带插图的论文与扫描件常超过 10 MB；PDF 按页解析、译文量只取决于文字，单独放宽上限。 */
-export const PDF_MAX_BYTES = 50 * 1024 * 1024;
-
-export const SUPPORTED_DOCUMENT_EXTENSIONS = [
-    'pdf',
-    'epub',
-    'docx',
-    'html',
-    'htm',
-    'txt',
-    'md',
-    'markdown',
-    'srt',
-    'vtt',
-    'ass',
-    'ssa',
-    'lrc',
-    'json',
-    'csv',
-    'tsv',
-] as const;
-
-export type DocumentFormat =
-    | 'pdf'
-    | 'epub'
-    | 'docx'
-    | 'html'
-    | 'txt'
-    | 'markdown'
-    | 'srt'
-    | 'vtt'
-    | 'ass'
-    | 'lrc'
-    | 'json'
-    | 'csv'
-    | 'tsv';
-
-export type DocumentRenderMode = 'bilingual' | 'translated';
-
-export interface DocumentSegment {
-    id: number;
-    source: string;
-    /** 可选的阅读上下文，例如 PDF 页码或 ePub 章节。 */
-    contextLabel?: string;
-    /** 字幕原生时间轴元数据。 */
-    timeStart?: string;
-    timeEnd?: string;
-    /** 结构化文档中的原生位置，例如 `$.items[0].label`。 */
-    pathLabel?: string;
-    /** 页面或文章预览使用的原生文档角色。 */
-    role?: 'title' | 'heading' | 'paragraph' | 'list-item' | 'header' | 'footer' | 'note';
-    /** Markdown 片段是否从原始行首开始；false 表示链接/代码后的行内文本，不能剥离列表等前缀。 */
-    markdownLineStart?: boolean;
-    /** Word 正文中具有需要回填的生成标记，字面标签不使用此标志。 */
-    docxInline?: true;
-    /** 零基源表格行列号，列选择与历史定位使用同一坐标。 */
-    delimitedCell?: {row: number; column: number};
-}
-
-export interface PdfDocumentRun {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    text: string;
-    baseline?: number;
-    fontSize?: number;
-    fontFamily?: string;
-}
-
-export interface PdfDocumentLine extends PdfDocumentRun {
-    runs?: PdfDocumentRun[];
-}
-
-export interface PdfPreservedRegion {
-    id: string;
-    kind: 'figure' | 'table' | 'formula';
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    source?: string;
-}
-
-export interface PdfDocumentBlock {
-    segmentIndex: number;
-    /** 不进入翻译分段的原文（作者、页眉、公式等）仍供重排阅读和文本导出保全。 */
-    source?: string;
-    /** 从原文字形单独识别的列表前缀；不送去翻译，重排文字保留其列表语义。 */
-    listMarker?: string;
-    /** 列表前缀的原始位置，供扫描页的透明选择层保留圆点及其与正文的顺序。 */
-    listMarkerRun?: PdfDocumentRun;
-    /** PDF 在缩放比例 1、页面旋转 0 下的左上角内容坐标；页面展示旋转由 PdfDocumentPage.rotation 决定。 */
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    fontSize: number;
-    /** 以 PDF 视口单位表示的源文本行高中位数。 */
-    lineHeight: number;
-    /** 此段落块包含的源文本行数。 */
-    lineCount: number;
-    fontFamily: string;
-    fontWeight: 400 | 600 | 700;
-    textAlign: 'left' | 'center' | 'right';
-    kind?: 'text' | 'heading' | 'caption' | 'metadata' | 'formula' | 'table' | 'figure-label' | 'footer';
-    column?: number;
-    readingOrder?: number;
-    preserveSource?: boolean;
-    /** 表格单元格的原始边界，供译文拟合与文字擦除使用；原字形矩形仍保留在 lines 中。 */
-    cellBounds?: Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>;
-    /** 图文卡片底框约束译文和遮罩范围；原文字形位置仍来自 lines。 */
-    panelBounds?: Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>;
-    lines?: PdfDocumentLine[];
-    /** 用户逐行核对后的原文；备份最近一次未校订的识别文字、行位置及核对框，供显式撤销。 */
-    sourceCorrection?: {source: string; lines: PdfDocumentLine[]; reviewRegions: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>};
-}
-
-export interface PdfDocumentPage {
-    pageNumber: number;
-    /** 保留 PDF 页面的实际展示方向；旧模型与未旋转页面可以省略。 */
-    rotation?: 0 | 90 | 180 | 270;
-    /** 已按展示方向解析的旋转原生页或扫描识别页：版面块不再带 rotation；记录原页旋转角供导出摆正嵌入的原页。 */
-    sourceRotation?: 90 | 180 | 270;
-    /** 展示方向的尺寸；90/270 度时，内容坐标系的宽高与这里交换。 */
-    width: number;
-    height: number;
-    segmentIndexes: number[];
-    blocks: PdfDocumentBlock[];
-    preservedRegions?: PdfPreservedRegion[];
-    /** 细分隔线只限制原位译文的可用空白，不作为重排阅读的图形区域。 */
-    layoutBoundaries?: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>;
-    /** 整页是一张图像且没有任何文字（扫描页），等待文字识别；成功识别后取消标记，空结果和失败仍保留以便重试。 */
-    scanned?: boolean;
-    /** 文字与版面来自扫描识别；用于原文选择和显式重新识别，原始 PDF bytes 仍保持不变。 */
-    ocrRecognized?: boolean;
-    /** 需要核对的脚标、低分数字或表格原图区域，使用页面展示坐标，供阅读时定位核对。 */
-    ocrReviewRegions?: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>;
-}
-
-export interface EpubDocumentChapter {
-    path: string;
-    source: string;
-    segmentOffset: number;
-    segmentCount: number;
-    title: string;
-    /** OPF content type; older saved chapters may not have this field. */
-    mediaType?: string;
-}
-
-export interface DocxDocumentPart {
-    path: string;
-    source: string;
-    /** table：段落位于表格里时，它所在的表格、行与单元格序号（从 0 开始），供阅读视图按表格排版；旧模型没有这项。 */
-    paragraphSegments: Array<{paragraphIndex: number; segmentIndex: number; table?: {table: number; row: number; cell: number}}>;
-}
-
-export type BinaryDocumentData =
-    | {kind: 'pdf'; bytes: Uint8Array; pages: PdfDocumentPage[]}
-    | {kind: 'epub'; bytes: Uint8Array; chapters: EpubDocumentChapter[]}
-    | {kind: 'docx'; bytes: Uint8Array; parts: DocxDocumentPart[]; inlineFormatting?: true};
-
-interface LiteralPart {
-    kind: 'literal';
-    value: string;
-    /** Markdown 源行分组，用于让受保护的行内语法保持原位。 */
-    bilingualGroup?: number;
-}
-
-interface SegmentPart {
-    kind: 'segment';
-    segmentIndex: number;
-    source: string;
-    /** 双语显示源文时使用的原始编码 HTML 文本。 */
-    rawSource?: string;
-    prefix: string;
-    suffix: string;
-    /** 双语行需要第二个提示时重复使用的结构前缀。 */
-    bilingualPrefix?: string;
-    /** Markdown 源行分组，用于渲染一条结构完整的双语行。 */
-    bilingualGroup?: number;
-    /** 表格单元格的译文回填在当前列内。 */
-    markdownTableCell?: 'withoutLeadingPipe' | 'delimited';
-    /** Markdown 整行片段里行内语法的原文：链接是成对的占位符（有 close），代码、网址等是单个占位符。 */
-    markdownTokens?: Array<{open: string; close?: string}>;
-    /** HTML 整句片段里行内标签的原文：送翻时写成编号占位符 `<gN>…</gN>`，渲染时按编号还原。 */
-    htmlTags?: Array<{open: string; close: string}>;
-    /** 表格字段的 rawSource 包含原始引号与空白。 */
-    delimitedCell?: {delimiter: ',' | '\t'; quoted: boolean};
-}
-
-type DocumentPart = LiteralPart | SegmentPart;
-
-export interface JsonSegmentEntry {
-    path: Array<string | number>;
-    segmentIndex: number;
-    prefix: string;
-    suffix: string;
-}
-
-export interface MarkdownCodeBlock {
-    /** 零基源行范围，左闭右开；围栏块包含围栏，缩进块只包含代码及内部空行。 */
-    startLine: number;
-    endLine: number;
-    /** 开启围栏后未经解释的信息字符串。 */
-    info: string;
-    closed: boolean;
-    /** 仅供展示：剥除开启容器和围栏缩进，保留代码自身的符号及额外缩进。 */
-    contentLines: readonly string[];
-}
-
-export interface ParsedDocument {
-    fileName: string;
-    format: DocumentFormat;
-    label: string;
-    parts: readonly DocumentPart[];
-    segments: readonly DocumentSegment[];
-    jsonValue?: unknown;
-    jsonEntries?: readonly JsonSegmentEntry[];
-    /** Markdown 围栏与受控缩进代码由解析器统一判定，预览无需复制容器状态机。 */
-    markdownCodeBlocks?: readonly MarkdownCodeBlock[];
-    /** 旧解析快照没有表格范围，刷新时会从原文件补齐。 */
-    markdownTables?: readonly MarkdownTable[];
-    delimitedColumns?: readonly DelimitedColumn[];
-    binary?: BinaryDocumentData;
-}
+export {
+    DOCUMENT_MAX_BYTES,
+    PDF_MAX_BYTES,
+    PPTX_MAX_BYTES,
+    SUPPORTED_DOCUMENT_EXTENSIONS,
+    formatJsonPath,
+    inspectMarkdownLine,
+    restoreSubtitleTags,
+    unwrapDocumentSoftLines,
+    type BinaryDocumentData,
+    type DocumentFormat,
+    type DocumentRenderMode,
+    type DocumentSegment,
+    type DocxDocumentPart,
+    type EpubDocumentChapter,
+    type JsonSegmentEntry,
+    type MarkdownCodeBlock,
+    type ParseDocumentOptions,
+    type ParsedDocument,
+    type PdfDocumentBlock,
+    type PdfDocumentLine,
+    type PdfDocumentPage,
+    type PdfDocumentRun,
+    type PdfPreservedRegion,
+    type PptxDocumentPart,
+    type XlsxDocumentSheet,
+    type XlsxSheetSegment,
+};
 
 /** 列号取自源文件，非法或过期的存储项不会影响其它格式，也不会留下空选择。 */
 export function normalizeDelimitedColumns(document: ParsedDocument, input: unknown): number[] | undefined {
@@ -264,9 +112,12 @@ const FORMAT_LABELS: Record<DocumentFormat, string> = {
     pdf: 'PDF 文件',
     epub: 'ePub 电子书',
     docx: 'DOCX 文档',
+    pptx: 'PPTX 演示文稿',
+    xlsx: 'XLSX 电子表格',
     html: 'HTML 文件',
     txt: 'TXT 文件',
     markdown: 'Markdown 文件',
+    tex: 'LaTeX 文档',
     srt: 'SRT 字幕',
     vtt: 'VTT 字幕',
     ass: 'ASS 字幕',
@@ -275,11 +126,6 @@ const FORMAT_LABELS: Record<DocumentFormat, string> = {
     csv: 'CSV',
     tsv: 'TSV',
 };
-
-const PROTECTED_HTML_TAGS = new Set(['head', 'script', 'style', 'pre', 'code', 'textarea']);
-const MARKDOWN_PROTECTED_PATTERN = /(`{1,3}[^`]+`{1,3}|<https?:\/\/[^>]+>|https?:\/\/[^\s)]+|\$[^$\r\n]+\$|%%[^%\r\n]+%%|(?:^|\s)#[\p{L}\p{N}_/-]+)/gu;
-const TIMED_SUBTITLE_PATTERN = /^\s*(?:\d{1,3}:)?\d{2}:\d{2}[,.]\d{3}\s*-->\s*(?:\d{1,3}:)?\d{2}:\d{2}[,.]\d{3}(?:\s+.*)?$/u;
-const LRC_TIME_PATTERN = /^(\s*(?:\[[^\]\r\n]+\])+)/u;
 
 function extensionOf(fileName: string): string {
     const match = fileName.toLowerCase().match(/\.([a-z0-9]+)$/u);
@@ -291,9 +137,12 @@ export function getDocumentFormat(fileName: string): DocumentFormat | null {
     if (extension === 'pdf') return 'pdf';
     if (extension === 'epub') return 'epub';
     if (extension === 'docx') return 'docx';
+    if (extension === 'pptx') return 'pptx';
+    if (extension === 'xlsx') return 'xlsx';
     if (extension === 'html' || extension === 'htm') return 'html';
     if (extension === 'txt') return 'txt';
     if (extension === 'md' || extension === 'markdown') return 'markdown';
+    if (extension === 'tex') return 'tex';
     if (extension === 'srt') return 'srt';
     if (extension === 'vtt') return 'vtt';
     if (extension === 'ass' || extension === 'ssa') return 'ass';
@@ -303,9 +152,12 @@ export function getDocumentFormat(fileName: string): DocumentFormat | null {
     return null;
 }
 
-/** 一个文件允许的最大字节数：PDF 使用更宽的上限，其余格式沿用通用上限。 */
+/** 一个文件允许的最大字节数：PDF 与 PPTX 使用更宽的上限，其余格式沿用通用上限。 */
 export function getDocumentMaxBytes(fileName: string): number {
-    return getDocumentFormat(fileName) === 'pdf' ? PDF_MAX_BYTES : DOCUMENT_MAX_BYTES;
+    const format = getDocumentFormat(fileName);
+    if (format === 'pdf') return PDF_MAX_BYTES;
+    if (format === 'pptx') return PPTX_MAX_BYTES;
+    return DOCUMENT_MAX_BYTES;
 }
 
 export function getDocumentAcceptAttribute(): string {
@@ -316,1069 +168,27 @@ export function getDocumentFormatLabel(format: DocumentFormat): string {
     return FORMAT_LABELS[format];
 }
 
+export function getDocxPartLabel(path: string): string {
+    if (path === 'word/document.xml') return '正文';
+    if (/header/iu.test(path)) return '页眉';
+    if (/footer/iu.test(path)) return '页脚';
+    if (/footnotes/iu.test(path)) return '脚注';
+    if (/endnotes/iu.test(path)) return '尾注';
+    return '文档内容';
+}
+
 export function getDocumentMimeType(format: DocumentFormat): string {
     if (format === 'pdf') return 'application/pdf';
     if (format === 'epub') return 'application/epub+zip';
     if (format === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (format === 'pptx') return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    if (format === 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     if (format === 'html') return 'text/html;charset=utf-8';
     if (format === 'json') return 'application/json;charset=utf-8';
     if (format === 'csv') return 'text/csv;charset=utf-8';
     if (format === 'tsv') return 'text/tab-separated-values;charset=utf-8';
+    if (format === 'tex') return 'application/x-tex;charset=utf-8';
     return 'text/plain;charset=utf-8';
-}
-
-function trimSource(value: string): {prefix: string; source: string; suffix: string} | null {
-    const source = value.trim();
-    if (!source) return null;
-    const start = value.length - value.trimStart().length;
-    return {prefix: value.slice(0, start), source, suffix: value.slice(start + source.length)};
-}
-
-type SegmentOptions = Pick<SegmentPart, 'bilingualPrefix' | 'bilingualGroup' | 'markdownTableCell'>
-    & Omit<Partial<DocumentSegment>, 'id' | 'source'>;
-
-function addLiteral(parts: DocumentPart[], value: string, bilingualGroup?: number): void {
-    if (!value) return;
-    const last = parts[parts.length - 1];
-    if (last?.kind === 'literal' && last.bilingualGroup === bilingualGroup) {
-        last.value += value;
-        return;
-    }
-    parts.push({kind: 'literal', value, bilingualGroup});
-}
-
-function addSegment(
-    parts: DocumentPart[],
-    segments: DocumentSegment[],
-    value: string,
-    options: SegmentOptions = {},
-    transformSource?: (source: string) => string,
-): void {
-    const trimmed = trimSource(value);
-    if (!trimmed) {
-        addLiteral(parts, value, options.bilingualGroup);
-        return;
-    }
-
-    const segmentIndex = segments.length;
-    const {bilingualPrefix, bilingualGroup, markdownTableCell, ...segmentOptions} = options;
-    const source = transformSource ? transformSource(trimmed.source) : trimmed.source;
-    segments.push({id: segmentIndex, source, ...segmentOptions});
-    parts.push({
-        kind: 'segment',
-        segmentIndex,
-        source,
-        ...(source === trimmed.source ? {} : {rawSource: trimmed.source}),
-        prefix: trimmed.prefix,
-        suffix: trimmed.suffix,
-        bilingualPrefix,
-        bilingualGroup,
-        ...(markdownTableCell ? {markdownTableCell} : {}),
-    });
-}
-
-/** 链接的闭合位置只扫描一次，避免重复未闭合 `[` 的正则回溯；URL 括号按配对保护。 */
-function markdownLinkRanges(value: string): Array<{start: number; end: number}> {
-    const ranges: Array<{start: number; end: number}> = [];
-    let bracketClose = value.indexOf(']');
-    if (bracketClose < 0 || !value.includes('[')) return ranges;
-    const roundCloses = new Map<number, number>();
-    const stack: number[] = [];
-    for (let index = 0; index < value.length; index += 1) {
-        if (value[index] === '\\') {index += 1; continue;}
-        if (value[index] === '(') stack.push(index);
-        else if (value[index] === ')' && stack.length) roundCloses.set(stack.pop()!, index);
-    }
-    for (let index = 0; index < value.length; index += 1) {
-        const open = value[index] === '!' && value[index + 1] === '[' ? index + 1 : index;
-        if (value[open] !== '[') continue;
-        while (bracketClose >= 0 && bracketClose <= open) bracketClose = value.indexOf(']', bracketClose + 1);
-        if (bracketClose < 0) break;
-        let end = 0;
-        if (value[open + 1] === '[' && bracketClose > open + 2 && value[bracketClose + 1] === ']') {
-            end = bracketClose + 2;
-        } else if (value[bracketClose + 1] === '(') {
-            const close = roundCloses.get(bracketClose + 1);
-            if (close !== undefined) end = close + 1;
-        }
-        if (end) {
-            ranges.push({start: index, end});
-            index = end - 1;
-        }
-    }
-    return ranges;
-}
-
-function addMarkdownProtectedText(
-    parts: DocumentPart[],
-    segments: DocumentSegment[],
-    value: string,
-    bilingualGroup: number,
-): void {
-    const pattern = MARKDOWN_PROTECTED_PATTERN;
-    pattern.lastIndex = 0;
-    let cursor = 0;
-    const atPosition = (offset: number): SegmentOptions => ({bilingualGroup, markdownLineStart: offset === 0});
-    const links = markdownLinkRanges(value);
-    let linkIndex = 0;
-    let match = pattern.exec(value);
-    while (match || linkIndex < links.length) {
-        const link = links[linkIndex];
-        const useLink = link && (!match || link.start <= match.index);
-        const start = useLink ? link.start : match!.index;
-        const end = useLink ? link.end : match!.index + match![0].length;
-        if (useLink) linkIndex += 1;
-        else match = pattern.exec(value);
-        // 链接中的 URL 或代码中的链接由更早开始的外层语法整体保护。
-        if (start < cursor) continue;
-        addSegment(parts, segments, value.slice(cursor, start), atPosition(cursor));
-        addLiteral(parts, value.slice(start, end), bilingualGroup);
-        cursor = end;
-    }
-    addSegment(parts, segments, value.slice(cursor), atPosition(cursor));
-}
-
-/**
- * 一行或一个折行段落作为一个片段翻译：链接写成成对的编号占位符（链接文字仍然翻译，地址原样保留），
- * 行内代码、网址、公式与标签写成单个占位符。这样句子不会被行内语法拆散，受保护的内容也不会被改写。
- * 仅在调用方启用整句方式时使用；默认仍按受保护内容把一行切成多段。
- */
-function addMarkdownSentence(
-    parts: DocumentPart[],
-    segments: DocumentSegment[],
-    value: string,
-    bilingualGroup?: number,
-    {rawValue = value, markdownTableCell}: {rawValue?: string; markdownTableCell?: SegmentPart['markdownTableCell']} = {},
-): void {
-    // 行首容器和标题语法留在本地：服务可能把 "# Heading" 改成 "#标题"，或擅自改动列表编号。
-    const container = inspectMarkdownLine(value);
-    const heading = container.content.match(/^#{1,6}[\t ]+/u)?.[0] ?? '';
-    const checkbox = container.listIndent ? container.content.match(/^\[[ xX]\][\t ]+/u)?.[0] ?? '' : '';
-    const prefixLength = markdownTableCell ? 0 : value.length - container.content.length + heading.length + checkbox.length;
-    if (prefixLength) {
-        addLiteral(parts, value.slice(0, prefixLength), bilingualGroup);
-        value = value.slice(prefixLength);
-        rawValue = rawValue.slice(prefixLength);
-    }
-    const pattern = MARKDOWN_PROTECTED_PATTERN;
-    pattern.lastIndex = 0;
-    let cursor = 0;
-    const tokens: Array<{open: string; close?: string}> = [];
-    let source = '';
-    // 常见强调使用与链接相同的成对占位符，文字仍参与整句翻译；避免机器服务直接删掉 ** 或 _。
-    // 两种分支各自止于下一个同类标记，不对未闭合的长行做跨标记回溯；代码与 URL 已由外层保护。
-    const emphasis = (plain: string) => plain.replace(/(?<![\\*])(\*\*|\*)(?![\s*])([^*\n]*?\S)\1(?!\*)|(?<![\\\p{L}\p{N}])(__|_)(?![\s_])([^_\n]*?\S)\3(?![\p{L}\p{N}_])/gu,
-        (_match, stars: string | undefined, starText: string | undefined, underscores: string | undefined, underscoreText: string | undefined) => {
-            const marker = stars || underscores!;
-            tokens.push({open: marker, close: marker});
-            return `<g${tokens.length}>${starText ?? underscoreText}</g${tokens.length}>`;
-        });
-    const links = markdownLinkRanges(value);
-    let linkIndex = 0;
-    let match = pattern.exec(value);
-    while (match || linkIndex < links.length) {
-        const link = links[linkIndex];
-        const useLink = link && (!match || link.start <= match.index);
-        const start = useLink ? link.start : match!.index;
-        const end = useLink ? link.end : match!.index + match![0].length;
-        if (useLink) linkIndex += 1;
-        else match = pattern.exec(value);
-        // 链接中的 URL 或代码中的链接由更早开始的外层语法整体保护。
-        if (start < cursor) continue;
-        source += emphasis(value.slice(cursor, start));
-        const raw = value.slice(start, end);
-        // 只有“[文字](地址)”形式的链接文字参与翻译；图片与 [[双链]] 整体保护。
-        const text = useLink && !raw.startsWith('!') && !raw.startsWith('[[') ? raw.slice(1, raw.indexOf('](')) : '';
-        if (text.trim() && !MARKDOWN_PLACEHOLDER.test(text)) {
-            tokens.push({open: '[', close: raw.slice(1 + text.length)});
-            source += `<g${tokens.length}>${text}</g${tokens.length}>`;
-        } else {
-            tokens.push({open: raw});
-            source += `<g${tokens.length}/>`;
-        }
-        cursor = end;
-    }
-    source += emphasis(value.slice(cursor));
-    const options: SegmentOptions = {bilingualGroup, markdownLineStart: !markdownTableCell, markdownTableCell};
-    // 没有行内语法，或文字本身含有占位符写法（无法区分真假占位符）时，整行按普通文字处理。
-    if (!tokens.length || MARKDOWN_PLACEHOLDER.test(value)) {
-        addSegment(parts, segments, rawValue, options, () => value.trim());
-        return;
-    }
-    const trimmed = trimSource(rawValue)!;
-    // 一行里只有受保护的内容（单独一个网址、一段行内代码）：没有可翻译的文字。
-    if (!source.replace(/<g\d+\/>/gu, '').trim()) {addLiteral(parts, rawValue, bilingualGroup); return;}
-    const segmentIndex = segments.length;
-    const text = source.trim();
-    segments.push({id: segmentIndex, source: text, markdownLineStart: !markdownTableCell});
-    parts.push({kind: 'segment', segmentIndex, source: text, rawSource: trimmed.source, prefix: trimmed.prefix, suffix: trimmed.suffix,
-        bilingualGroup, markdownTokens: tokens, ...(markdownTableCell ? {markdownTableCell} : {})});
-}
-
-const MARKDOWN_PLACEHOLDER = /<\s*\/?\s*g\s*\d+\s*\/?\s*>/iu;
-
-/**
- * 把整句译文里的占位符还原成 Markdown 行内语法。每个占位符必须恰好出现一次、成对标记的开闭顺序正确；已知强调节点仅将 Unicode Zs 与 tab/LF/FF/CR 边缘空白移到分隔符之外，并按 CommonMark 的标点/符号和 underscore 词内边界补必要的外侧空格；空正文、链接和代码保持原样。
- * 翻译服务弄丢或弄乱占位符时，去掉全部占位符并把没能放回句中的代码、网址等原样补在句末，内容一个不少。
- */
-function renderMarkdownTranslation(part: SegmentPart, translation: string): string {
-    const tokens = part.markdownTokens;
-    if (!tokens) return translation;
-    const normalized = normalizeDocumentInlineMarkers(translation);
-    const pieces = normalized.split(/(<\s*\/?\s*g\s*\d+\s*\/?\s*>)/iu);
-    const marker = (piece: string) => /^<\s*(\/?)\s*g\s*(\d+)\s*(\/?)\s*>$/iu.exec(piece);
-    const seen = new Set<number>();
-    const open: number[] = [];
-    let valid = true;
-    const renderPieces = [...pieces], output: string[] = [], blankEmphasis = new Set<number>();
-    // 缺少相邻字符按空白处理；Unicode P/S 包括括号、数学符号和 emoji，不按 UTF-16 半个代理对判断。
-    const firstCharacter = (value: string) => /^./su.exec(value)?.[0] ?? '';
-    const lastCharacter = (value: string) => /.$/su.exec(value)?.[0] ?? '';
-    const emphasisGap = (outside: string, inside: string, delimiter: string) => outside && !/[\p{Zs}\t\n\f\r\p{P}\p{S}]/u.test(outside)
-        && (delimiter.startsWith('_') || /[\p{P}\p{S}]/u.test(inside)) ? ' ' : '';
-    for (let index = 0; index < renderPieces.length; index += 1) {
-        const piece = renderPieces[index]!, found = marker(piece);
-        if (!found) {output.push(piece); continue;}
-        const id = Number(found[2]), token = tokens[id - 1];
-        if (!token) {valid = false; output.push(''); continue;}
-        if (token.close === undefined) {
-            // 单个占位符：有的服务会写成一对空标签，闭合的那一半直接忽略。
-            if (found[1]) continue;
-            if (seen.has(id)) valid = false;
-            seen.add(id);
-            output.push(token.open);
-            continue;
-        }
-        const emphasis = /^(?:\*{1,2}|_{1,2})$/u.test(token.open) && token.close === token.open;
-        if (!found[1]) {
-            if (seen.has(id) || found[3]) valid = false;
-            seen.add(id); open.push(id);
-            // 不去掉词间空白或只含空白的正文；CommonMark 的边界空白不包括任意控制字符。
-            const next = renderPieces[index + 1]!, closing = marker(renderPieces[index + 2] ?? '');
-            if (emphasis && /^[\p{Zs}\t\n\f\r]*$/u.test(next) && closing?.[1] && Number(closing[2]) === id) blankEmphasis.add(id);
-            const whitespace = emphasis && !blankEmphasis.has(id) ? next.match(/^[\p{Zs}\t\n\f\r]+/u)?.[0] ?? '' : '';
-            renderPieces[index + 1] = next.slice(whitespace.length);
-            let before = output.length - 1;
-            while (before >= 0 && !output[before]) before -= 1;
-            const gap = emphasis && !blankEmphasis.has(id) ? emphasisGap(lastCharacter(output[before] ?? ''), firstCharacter(renderPieces[index + 1]!), token.open) : '';
-            output.push((whitespace || gap) + token.open);
-            continue;
-        }
-        if (open.pop() !== id) valid = false;
-        // split 始终先产生普通字符串（可为空），首轮已 push；后续只追加或覆盖，不会移除最后一项。
-        const previous = output.at(-1)!;
-        const whitespace = emphasis && !blankEmphasis.has(id) ? previous.match(/[\p{Zs}\t\n\f\r]+$/u)?.[0] ?? '' : '';
-        if (whitespace) output[output.length - 1] = previous.slice(0, -whitespace.length);
-        const nextMarker = marker(renderPieces[index + 2] ?? '');
-        const next = renderPieces[index + 1] || (nextMarker ? tokens[Number(nextMarker[2]) - 1]?.[nextMarker[1] ? 'close' : 'open'] : '') || '';
-        const gap = emphasis && !blankEmphasis.has(id) ? emphasisGap(firstCharacter(next), lastCharacter(output.at(-1)!), token.open) : '';
-        output.push(token.close + (whitespace || gap));
-    }
-    if (valid && !open.length && seen.size === tokens.length) return output.join('');
-    const plain = pieces.filter(piece => !marker(piece)).join('').replace(/[ \t]{2,}/gu, ' ').trim();
-    const kept = tokens.filter(token => token.close === undefined && !plain.includes(token.open.trim())).map(token => token.open.trim());
-    return [plain, ...kept].join(' ');
-}
-
-/** 只识别容器前缀，不改源行；解析代码时，达到容器内四列便停止解释代码自身的引用/列表符号。 */
-export function inspectMarkdownLine(
-    line: string,
-    codeContainer?: {quoteDepth: number; listIndent: number},
-): {content: string; quoteDepth: number; indent: number; listIndent: number; codeBaseIndent: number} {
-    let cursor = 0;
-    let quoteDepth = 0;
-    let indent = 0;
-    let listIndent = 0;
-    let quoteIndent = 0;
-    let checkedThematicBreak = false;
-    while (cursor < line.length) {
-        while (line[cursor] === ' ' || line[cursor] === '\t') {
-            indent += line[cursor] === '\t' ? 4 - indent % 4 : 1;
-            cursor += 1;
-        }
-        const codeBaseIndent = Math.max(quoteIndent, listIndent,
-            codeContainer?.quoteDepth === quoteDepth ? codeContainer.listIndent : 0);
-        if (codeContainer && indent >= codeBaseIndent + 4) break;
-        if (line[cursor] === '>') {
-            quoteDepth += 1;
-            quoteIndent = indent;
-            cursor += 1;
-            if (line[cursor] === ' ' || line[cursor] === '\t') cursor += 1;
-            continue;
-        }
-        if (!checkedThematicBreak) {
-            checkedThematicBreak = true;
-            if (/^(?:[-*_][ \t]*){3,}$/u.test(line.slice(cursor))) break;
-        }
-        const marker = line.slice(cursor).match(/^(?:[-*+]|\d{1,9}[.)])[ \t]+/u)?.[0];
-        if (!marker) break;
-        for (const character of marker) indent += character === '\t' ? 4 - indent % 4 : 1;
-        cursor += marker.length;
-        listIndent = indent;
-    }
-    return {content: line.slice(cursor), quoteDepth, indent, listIndent,
-        codeBaseIndent: Math.max(quoteIndent, listIndent,
-            codeContainer?.quoteDepth === quoteDepth ? codeContainer.listIndent : 0)};
-}
-
-function splitWithEndings(value: string): Array<{start: number; end: number; textEnd: number; text: string}> {
-    const lines: Array<{start: number; end: number; textEnd: number; text: string}> = [];
-    const pattern = /[^\r\n]*(?:\r\n|\n|\r|$)/gu;
-    let match = pattern.exec(value);
-    while (match) {
-        if (match[0] === '' && match.index === value.length) break;
-        const raw = match[0];
-        const endingLength = raw.endsWith('\r\n') ? 2 : raw.endsWith('\n') || raw.endsWith('\r') ? 1 : 0;
-        const start = match.index;
-        const end = start + raw.length;
-        lines.push({
-            start,
-            end,
-            textEnd: end - endingLength,
-            text: raw.slice(0, raw.length - endingLength),
-        });
-        match = pattern.exec(value);
-    }
-    return lines;
-}
-
-function stripMarkdownCodeContainer(line: string, quoteDepth: number, indent: number): string {
-    let cursor = 0;
-    let quotes = 0;
-    let columns = 0;
-    while (cursor < line.length && (quotes < quoteDepth || columns < indent)) {
-        if (line[cursor] === ' ' || line[cursor] === '\t') {
-            const width = line[cursor] === '\t' ? 4 - columns % 4 : 1;
-            if (quotes >= quoteDepth && columns + width > indent) {
-                // 部分 tab 被围栏缩进消耗，剩余列仍属于代码自身的缩进。
-                return ' '.repeat(columns + width - indent) + line.slice(cursor + 1);
-            }
-            columns += width;
-            cursor += 1;
-        } else if (line[cursor] === '>' && quotes < quoteDepth) {
-            quotes += 1;
-            cursor += 1;
-            if (line[cursor] === ' ' || line[cursor] === '\t') cursor += 1;
-        } else break;
-    }
-    return line.slice(cursor);
-}
-
-const UNSPACED_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}，。、；：！？（）《》“”‘’]/u;
-const UNSPACED_WRAP_END = new RegExp(`${UNSPACED_SCRIPT.source}$`, 'u');
-const UNSPACED_WRAP_START = new RegExp(`^${UNSPACED_SCRIPT.source}`, 'u');
-const maxMarkdownParagraphLength = 3_500;
-
-/** 折行只在发给服务和阅读预览时展开，Markdown 受保护文本的末尾保留分隔，导出原文保留输入换行。 */
-export function unwrapDocumentSoftLines(source: string, format?: DocumentFormat): string {
-    const protectedEnds = new Set<number>();
-    const codeBreaks = new Set<number>();
-    if (format === 'markdown') {
-        for (const mark of source.matchAll(new RegExp(MARKDOWN_PROTECTED_PATTERN))) {
-            protectedEnds.add(mark.index + mark[0].length);
-            if (!mark[0].startsWith('`')) continue;
-            for (const lineBreak of mark[0].matchAll(/\r\n?|\n/gu)) codeBreaks.add(mark.index + lineBreak.index);
-        }
-    }
-    return source.replace(/(?<![^\S\r\n])[^\S\r\n]*(?:\r\n?|\n)[^\S\r\n]*/gu, (wrap: string, offset: number, text: string) => {
-        // CommonMark 只替换行内代码的行尾，保留行尾两侧已有空格。
-        if (codeBreaks.size && codeBreaks.has(offset + wrap.search(/[\r\n]/u))) return wrap.replace(/\r\n?|\n/u, ' ');
-        return !protectedEnds.has(offset) && UNSPACED_WRAP_END.test(text.slice(Math.max(0, offset - 2), offset))
-            && UNSPACED_WRAP_START.test(text.slice(offset + wrap.length, offset + wrap.length + 2)) ? '' : ' ';
-    });
-}
-
-function isMarkdownSoftParagraphLine(line: string): boolean {
-    // shortcut: 只合并顶层正文；需要合并列表、表格或引用时，先支持容器内的双语导出。
-    const blockStart = /^(?:#{1,6}(?:[ \t]|$)|(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)|`{3,}|~{3,}|[><]|:{3,}|\$\$|\[[^\]]+\]:|(?:[-*_][ \t]*){3,}$|(?:=+|-+)$)/u;
-    const text = line.trimEnd();
-    return /^ {0,3}\S/u.test(text) && !blockStart.test(text.trimStart()) && !text.includes('|')
-        && !text.endsWith('\\') && !line.slice(text.length).includes('  ');
-}
-
-/**
- * 纯文本里按固定宽度折行的段落：哪些行在下一行接着写。只在把握较大时才认定——这一行接近全文的折行宽度、
- * 没有以句末标点结束、不是全大写的标题；下一行缩进相同、不是列表项或编号。认不出来时各行照旧单独翻译。
- */
-function wrappedTextLines(lines: readonly string[]): boolean[] {
-    const lengths = lines.map(line => line.trimEnd().length).filter(Boolean).sort((left, right) => left - right);
-    // 取九成位的行长当作折行宽度，个别没有折行的超长行不影响判断。
-    const width = lengths[Math.floor((lengths.length - 1) * 0.9)] ?? 0;
-    const indent = (line: string) => line.length - line.trimStart().length;
-    const nextBlocked = (next: string) => /^(?:[-*+•·▪◦]|\(?\w{1,3}[.)）]|（\w{1,3}）|[=_~#>|]|-{3,})(?:\s|$)/u.test(next);
-    const eligible = lines.map((line, index) => {
-        const text = line.trim(), next = lines[index + 1]?.trim();
-        const wide = UNSPACED_SCRIPT.test(text);
-        if (!next || text.length < Math.max(wide ? 16 : 40, width * 0.7)) return false;
-        if (/\p{Lu}/u.test(text) && !/\p{Ll}/u.test(text)) return false;
-        return indent(line) === indent(lines[index + 1]) && !nextBlocked(next);
-    });
-    const joined = eligible.map((ok, index) => ok && !/[.!?:;。！？：；…][)\]"'’”）】》]*$/u.test(lines[index].trim()));
-    // 同一连续折行段中若已有明确的句中折行，则在折行宽度附近且下一词放不下的句末/冒号行也属于同一段。
-    for (let start = 0; start < lines.length; start += 1) {
-        if (!lines[start].trim()) continue;
-        let end = start;
-        while (end + 1 < lines.length && lines[end + 1].trim() && indent(lines[end + 1]) === indent(lines[start])) end += 1;
-        if (joined.slice(start, end).some(Boolean)) {
-            for (let index = start; index < end; index += 1) {
-                if (joined[index] || !eligible[index]) continue;
-                const next = lines[index + 1].trim();
-                const firstWordLength = UNSPACED_WRAP_START.test(next) ? 1 : next.match(/^\S+/u)![0].length;
-                if (lines[index].trim().length + 1 + firstWordLength > width) joined[index] = true;
-            }
-        }
-        start = end;
-    }
-    return joined;
-}
-
-function addMarkdownTableRow(parts: DocumentPart[], segments: DocumentSegment[], line: string, body: string, columnCount: number): void {
-    const offset = line.length - body.length;
-    let cursor = 0;
-    for (const {start, end} of splitMarkdownTableRow(body).cells.slice(0, columnCount)) {
-        addLiteral(parts, line.slice(cursor, offset + start));
-        const cell = body.slice(start, end);
-        if (/\p{L}/u.test(cell)) addMarkdownSentence(parts, segments, cell, undefined, {markdownTableCell: start === 0 ? 'withoutLeadingPipe' : 'delimited'});
-        else addLiteral(parts, cell);
-        cursor = offset + end;
-    }
-    addLiteral(parts, line.slice(cursor));
-}
-
-function parseTextDocument(content: string, format: 'txt' | 'markdown', sentences = false): Pick<ParsedDocument, 'parts' | 'segments' | 'markdownCodeBlocks' | 'markdownTables'> {
-    const parts: DocumentPart[] = [];
-    const segments: DocumentSegment[] = [];
-    const lines = splitWithEndings(content);
-    type CodeBlock = MarkdownCodeBlock & {contentLines: string[]};
-    const markdownCodeBlocks: CodeBlock[] = [];
-    type Container = {quoteDepth: number; listIndent: number};
-    let fence: (Container & {marker: string; length: number; indent: number; block: CodeBlock}) | null = null;
-    let math: Container | null = null;
-    let list: Container | null = null;
-    let indented: (Container & {indent: number; block: CodeBlock}) | null = null;
-    let paragraph: Container | null = null;
-    let table: (Container & {range: MarkdownTable}) | undefined;
-    const markdownTables: MarkdownTable[] = [];
-    let inFrontmatter = format === 'markdown' && /^\uFEFF?---\s*$/u.test(lines[0]?.text ?? '');
-    const wrapped = format === 'txt' ? wrappedTextLines(lines.map(line => line.text)) : undefined;
-    let wrapStart: number | undefined;
-    let joinedThrough = -1;
-    let unjoinedThrough = -1;
-
-    lines.forEach((line, lineIndex) => {
-        if (lineIndex <= joinedThrough) return;
-        if (inFrontmatter) {
-            addLiteral(parts, content.slice(line.start, line.end));
-            if (lineIndex > 0 && /^(?:---|\.\.\.)\s*$/u.test(line.text)) inFrontmatter = false;
-            return;
-        }
-        if (format === 'markdown') {
-            const info = inspectMarkdownLine(line.text, indented ?? list ?? {quoteDepth: 0, listIndent: 0});
-            // 容器内至少四列的块级缩进不能打断普通段落或列表正文续行。
-            // 复用同一容器剥离和代码块元数据，导出仍由 literal 保持原字节与换行。
-            if (indented) {
-                if (info.quoteDepth === indented.quoteDepth && (!info.content || info.indent >= indented.indent)) {
-                    if (info.content) {
-                        for (let blank = indented.block.endLine; blank < lineIndex; blank += 1) indented.block.contentLines.push('');
-                        indented.block.contentLines.push(stripMarkdownCodeContainer(line.text, indented.quoteDepth, indented.indent));
-                        indented.block.endLine = lineIndex + 1;
-                    }
-                    addLiteral(parts, content.slice(line.start, line.end));
-                    return;
-                }
-                indented = null;
-            }
-            if (!info.content || paragraph && (info.quoteDepth !== paragraph.quoteDepth || info.indent < paragraph.listIndent)) paragraph = null;
-            if (!fence && !math && info.content && info.indent >= info.codeBaseIndent + 4 && !paragraph) {
-                table = undefined;
-                const indent = info.codeBaseIndent + 4;
-                const block: CodeBlock = {
-                    startLine: lineIndex, endLine: lineIndex + 1, info: '', closed: true,
-                    contentLines: [stripMarkdownCodeContainer(line.text, info.quoteDepth, indent)],
-                };
-                markdownCodeBlocks.push(block);
-                indented = {quoteDepth: info.quoteDepth, listIndent: list?.quoteDepth === info.quoteDepth ? list.listIndent : 0, indent, block};
-                addLiteral(parts, content.slice(line.start, line.end));
-                return;
-            }
-            const leaves = (container: Container) => info.quoteDepth < container.quoteDepth || (
-                !!info.content && (info.indent < container.listIndent || (
-                    container.listIndent > 0 && info.listIndent > 0 && info.listIndent <= container.listIndent
-                ))
-            );
-            if (fence && leaves(fence)) {
-                fence.block.endLine = lineIndex;
-                fence = null;
-            }
-            if (math && leaves(math)) math = null;
-            if (fence || math) {
-                const container = fence ?? math!;
-                const atContainer = info.quoteDepth === container.quoteDepth && info.listIndent === 0;
-                if (fence && atContainer && info.indent <= fence.listIndent + 3) {
-                    const close = info.content.match(/^(`{3,}|~{3,})\s*$/u)?.[1];
-                    if (close && close[0] === fence.marker && close.length >= fence.length) {
-                        fence.block.closed = true;
-                        fence.block.endLine = lineIndex + 1;
-                        fence = null;
-                    } else {
-                        fence.block.contentLines.push(stripMarkdownCodeContainer(line.text, fence.quoteDepth, fence.indent));
-                    }
-                } else if (fence) {
-                    fence.block.contentLines.push(stripMarkdownCodeContainer(line.text, fence.quoteDepth, fence.indent));
-                } else if (math && atContainer && /^\$\$\s*$/u.test(info.content)) math = null;
-                addLiteral(parts, content.slice(line.start, line.end));
-                return;
-            }
-            if (list && info.content && (info.quoteDepth !== list.quoteDepth || info.indent < list.listIndent)) list = null;
-            if (info.listIndent) list = {quoteDepth: info.quoteDepth, listIndent: info.listIndent};
-            const container = {quoteDepth: info.quoteDepth, listIndent: list?.listIndent ?? 0};
-            const marker = info.indent <= container.listIndent + 3
-                ? info.content.match(/^(`{3,}|~{3,})(.*)$/u)?.[1] : undefined;
-            const isMathLine = /^\$\$\s*$/u.test(info.content);
-            const horizontalRule = /^(?:[-*_]\s*){3,}$/u.test(info.content);
-            const calloutHeader = info.quoteDepth > 0 && /^\[![^\]]+\]/u.test(info.content);
-            // Markdown 扩展容器的类型、参数与闭合标记属于语法；双语下载不能复制一份译后的 ::: 开头。
-            const directive = /^:{3,}(?:\s*[a-zA-Z][\w-]*(?:\s.*)?|\s*)$/u.test(info.content);
-            // 单独成行的 HTML/组件标签也只负责结构，带引号的属性仍按 HTML 扫描器识别。
-            const html = findNextHtmlToken(info.content, 0);
-            const htmlOnly = html?.index === 0 && html.value.length === info.content.length;
-            const structure = marker || isMathLine || horizontalRule || calloutHeader || directive || htmlOnly;
-            const newBlock = /^(?:#{1,6}(?:\s|$)|\[[^\]]+\]:)/u.test(info.content);
-            if (table && lineIndex === table.range.startLine + 1) {
-                addLiteral(parts, content.slice(line.start, line.end));
-                return;
-            }
-            if (table && info.content && !structure && !newBlock && !info.listIndent
-                && info.quoteDepth === table.quoteDepth && info.indent >= table.listIndent) {
-                addMarkdownTableRow(parts, segments, line.text, info.content, table.range.alignments.length);
-                addLiteral(parts, content.slice(line.textEnd, line.end));
-                table.range.endLine = lineIndex + 1;
-                return;
-            }
-            table = undefined;
-            if (structure) {
-                paragraph = null;
-                if (marker) {
-                    const block: CodeBlock = {
-                        startLine: lineIndex, endLine: lines.length, info: info.content.slice(marker.length),
-                        closed: false, contentLines: [],
-                    };
-                    markdownCodeBlocks.push(block);
-                    fence = {...container, marker: marker[0], length: marker.length, indent: info.indent, block};
-                }
-                else if (isMathLine) math = container;
-                addLiteral(parts, content.slice(line.start, line.end));
-                return;
-            }
-            if (!info.content) {
-                addLiteral(parts, content.slice(line.start, line.end));
-                return;
-            }
-            if (!newBlock && info.content.includes('|') && lineIndex + 1 < lines.length) {
-                const delimiter = inspectMarkdownLine(lines[lineIndex + 1].text);
-                const alignments = delimiter.quoteDepth === info.quoteDepth && delimiter.indent === info.indent
-                    ? markdownTableAlignments(info.content, delimiter.content) : undefined;
-                if (alignments) {
-                    const range = {startLine: lineIndex, endLine: lineIndex + 2, alignments};
-                    table = {...container, range};
-                    markdownTables.push(range);
-                    paragraph = null;
-                    addMarkdownTableRow(parts, segments, line.text, info.content, alignments.length);
-                    addLiteral(parts, content.slice(line.textEnd, line.end));
-                    return;
-                }
-            }
-            if (sentences && lineIndex > unjoinedThrough && !container.quoteDepth && !container.listIndent
-                && isMarkdownSoftParagraphLine(line.text)) {
-                let end = lineIndex;
-                while (end + 1 < lines.length && isMarkdownSoftParagraphLine(lines[end + 1].text)) end += 1;
-                const last = lines[end];
-                if (last.textEnd - line.start > maxMarkdownParagraphLength
-                    || /^ {0,3}(?:=+|-+)[ \t]*$/u.test(lines[end + 1]?.text ?? '')) {
-                    unjoinedThrough = end;
-                } else if (end > lineIndex) {
-                    const raw = content.slice(line.start, last.textEnd);
-                    addMarkdownSentence(parts, segments, unwrapDocumentSoftLines(raw, 'markdown'), lineIndex, {rawValue: raw});
-                    addLiteral(parts, content.slice(last.textEnd, last.end));
-                    joinedThrough = end;
-                    paragraph = container;
-                    return;
-                }
-            }
-            (sentences ? addMarkdownSentence : addMarkdownProtectedText)(parts, segments, line.text, lineIndex);
-            if (info.content) paragraph = /^#{1,6}\s/u.test(info.content) ? null : container;
-        } else if (wrapped?.[lineIndex]) {
-            // 这一行在下一行接着写：攒起来，到段落的最后一行再一起处理。
-            wrapStart ??= lineIndex;
-            return;
-        } else if (wrapStart !== undefined) {
-            // 按固定宽度折行的一段话作为一个片段翻译；折行处在送翻的原文里是空格（中日韩文字之间不留空格）。
-            // 相邻两个 UTF-16 单元足以容纳完整码点；锚定边缘，不能误用更前或更后的中日韩文字。
-            addSegment(parts, segments, content.slice(lines[wrapStart].start, line.textEnd), {}, unwrapDocumentSoftLines);
-            wrapStart = undefined;
-        } else {
-            addSegment(parts, segments, line.text);
-        }
-        addLiteral(parts, content.slice(line.textEnd, line.end));
-    });
-
-    return {parts, segments, ...(format === 'markdown' ? {markdownCodeBlocks, markdownTables} : {})};
-}
-
-const HTML_ENTITY_FALLBACKS: Record<string, string> = {
-    amp: '&',
-    apos: "'",
-    bull: '•',
-    cent: '¢',
-    copy: '©',
-    emsp: ' ',
-    ensp: ' ',
-    euro: '€',
-    gt: '>',
-    hellip: '…',
-    laquo: '«',
-    ldquo: '“',
-    lsquo: '‘',
-    lt: '<',
-    mdash: '—',
-    middot: '·',
-    ndash: '–',
-    nbsp: ' ',
-    pound: '£',
-    quot: '"',
-    raquo: '»',
-    rdquo: '”',
-    reg: '®',
-    rsquo: '’',
-    thinsp: ' ',
-    trade: '™',
-    yen: '¥',
-};
-
-function decodeHtmlEntities(value: string): string {
-    if (!value.includes('&')) return value;
-    if (typeof globalThis.document !== 'undefined') {
-        return decodeTextareaHtml(value);
-    }
-
-    return value.replace(/&(?:#x([0-9a-f]+)|#([0-9]+)|([a-z][a-z0-9]+));/giu, (entity, hex, decimal, name) => {
-        if (name) return HTML_ENTITY_FALLBACKS[String(name).toLowerCase()] ?? entity;
-        const codePoint = Number.parseInt(hex || decimal, hex ? 16 : 10);
-        return Number.isInteger(codePoint) && codePoint > 0 && codePoint <= 0x10ffff
-            ? String.fromCodePoint(codePoint)
-            : '�';
-    });
-}
-
-interface HtmlToken {
-    index: number;
-    value: string;
-}
-
-/** 查找下一个 HTML token，带引号属性中的 `>` 不应被误判为标签边界。 */
-function findNextHtmlToken(content: string, from: number): HtmlToken | null {
-    let index = content.indexOf('<', from);
-    while (index >= 0) {
-        const next = content[index + 1];
-        if (next && (next === '!' || next === '?' || next === '/' || /[a-z]/iu.test(next))) {
-            if (content.startsWith('<!--', index)) {
-                const commentEnd = content.indexOf('-->', index + 4);
-                const end = commentEnd >= 0 ? commentEnd + 3 : content.length;
-                return {index, value: content.slice(index, end)};
-            }
-
-            let quote = '';
-            for (let cursor = index + 1; cursor < content.length; cursor += 1) {
-                const character = content[cursor];
-                if (quote) {
-                    if (character === quote) quote = '';
-                    continue;
-                }
-                if (character === '"' || character === "'") {
-                    quote = character;
-                    continue;
-                }
-                if (character === '>') {
-                    return {index, value: content.slice(index, cursor + 1)};
-                }
-            }
-            return null;
-        }
-        index = content.indexOf('<', index + 1);
-    }
-    return null;
-}
-
-/** 不打断句子的行内标签：它们两侧的文字属于同一句话，应当作为一个片段整体翻译。 */
-const INLINE_HTML_TAGS = new Set(['a', 'abbr', 'b', 'bdi', 'bdo', 'cite', 'del', 'dfn', 'em', 'font', 'i', 'ins', 'kbd', 'mark', 'q', 's', 'samp', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'time', 'u', 'var']);
-const HTML_PLACEHOLDER = /<\s*(\/?)\s*g\s*(\d+)\s*>/giu;
-/** atom：句子里的行内代码，整个元素原样保留；它的文字写进占位符之间给翻译服务当上下文，还原时一律换回原来的元素。 */
-type HtmlRunToken = {tag?: string; name?: string; closing?: boolean; text?: string; atom?: string};
-
-/**
- * 处理一段只被行内标签隔开的连续文字。句子内部的行内标签（链接、强调）换成编号占位符后整句送翻；
- * 包在整段文字外面的标签、无法配对的标签，或文字本身就含有占位符写法时，退回逐段文字翻译。
- */
-function addHtmlRun(parts: DocumentPart[], segments: DocumentSegment[], run: HtmlRunToken[]): void {
-    const literal = (token: HtmlRunToken) => addLiteral(parts, token.atom ?? token.tag ?? token.text!);
-    const blank = (token: HtmlRunToken) => token.atom === undefined && (token.tag !== undefined || !token.text!.trim());
-    let start = 0, end = run.length;
-    while (start < end && blank(run[start])) start += 1;
-    while (end > start && blank(run[end - 1])) end -= 1;
-    const core = run.slice(start, end);
-    const plain = (token: HtmlRunToken) => token.tag === undefined && token.atom === undefined;
-    const separately = () => run.forEach(token => plain(token) ? addSegment(parts, segments, token.text!, {}, decodeHtmlEntities) : literal(token));
-    // 没有行内标签，或除了行内代码之外没有别的文字时，不需要合并。
-    if (core.every(plain) || !core.some(token => plain(token) && token.text!.trim())) {separately(); return;}
-    // 按开闭顺序给行内标签配对编号；出现无法配对的标签就不合并。
-    const tags: Array<{open: string; close: string}> = [];
-    const open: Array<{name: string; id: number}> = [];
-    let source = '';
-    for (const token of core) {
-        if (token.atom !== undefined) {
-            tags.push({open: token.atom, close: ''});
-            source += `<g${tags.length}>${decodeHtmlEntities(token.text!)}</g${tags.length}>`;
-            continue;
-        }
-        if (token.tag === undefined) {source += decodeHtmlEntities(token.text!); continue;}
-        if (!token.closing) {
-            tags.push({open: token.tag, close: ''});
-            open.push({name: token.name!, id: tags.length});
-            source += `<g${tags.length}>`;
-            continue;
-        }
-        const last = open.pop();
-        if (!last || last.name !== token.name) {separately(); return;}
-        tags[last.id - 1].close = token.tag;
-        source += `</g${last.id}>`;
-    }
-    if (open.length || core.some(token => token.tag === undefined && HTML_PLACEHOLDER.test(decodeHtmlEntities(token.text!)))) {HTML_PLACEHOLDER.lastIndex = 0; separately(); return;}
-    HTML_PLACEHOLDER.lastIndex = 0;
-    run.slice(0, start).forEach(literal);
-    // 句首或句末是行内代码时，句子两端没有需要留在外面的空白。
-    const first = core[0].atom === undefined ? core[0].text! : '', last = core.at(-1)!.atom === undefined ? core.at(-1)!.text! : '';
-    const prefix = first.slice(0, first.length - first.trimStart().length), suffix = last.slice(last.trimEnd().length);
-    const raw = core.map(token => token.atom ?? token.tag ?? token.text!).join('');
-    const segmentIndex = segments.length;
-    const trimmed = source.trim();
-    segments.push({id: segmentIndex, source: trimmed});
-    parts.push({kind: 'segment', segmentIndex, source: trimmed, rawSource: raw.slice(prefix.length, raw.length - suffix.length), prefix, suffix, htmlTags: tags});
-    run.slice(end).forEach(literal);
-}
-
-function parseHtmlDocument(content: string): Pick<ParsedDocument, 'parts' | 'segments'> {
-    const parts: DocumentPart[] = [];
-    const segments: DocumentSegment[] = [];
-    let cursor = 0;
-    let protectedTag = '';
-    let run: HtmlRunToken[] = [];
-    const flush = () => {if (run.length) addHtmlRun(parts, segments, run); run = [];};
-
-    let match = findNextHtmlToken(content, 0);
-    while (match) {
-        const tag = match.value;
-        const text = content.slice(cursor, match.index);
-        if (protectedTag) addLiteral(parts, text);
-        else if (text) run.push({text});
-
-        const closing = tag.match(/^<\s*\/\s*([a-z0-9-]+)/iu)?.[1]?.toLowerCase();
-        const opening = closing ? undefined : tag.match(/^<\s*([a-z0-9-]+)/iu)?.[1]?.toLowerCase();
-        const name = closing ?? opening;
-        // 行内标签留在当前这句话里；其余标签（块级、换行、图片、注释）结束这句话。
-        // 句子里的行内代码（不在 pre 里的 code）整个留在这句话里，文字不翻译。
-        const codeEnd = !protectedTag && opening === 'code' && !/\/\s*>$/u.test(tag) ? /<\s*\/\s*code\s*>/iu.exec(content.slice(match.index + tag.length)) : null;
-        if (codeEnd) {
-            const inner = content.slice(match.index + tag.length, match.index + tag.length + codeEnd.index);
-            const whole = tag + inner + codeEnd[0];
-            run.push({atom: whole, text: inner.replace(/<[^>]*>/gu, '')});
-            cursor = match.index + whole.length;
-            match = findNextHtmlToken(content, cursor);
-            continue;
-        }
-        if (!protectedTag && name && INLINE_HTML_TAGS.has(name) && !/\/\s*>$/u.test(tag)) run.push({tag, name, closing: Boolean(closing)});
-        else {
-            flush();
-            addLiteral(parts, tag);
-            if (closing && closing === protectedTag) protectedTag = '';
-            else if (opening && !protectedTag && PROTECTED_HTML_TAGS.has(opening) && !/\/\s*>$/u.test(tag)) protectedTag = opening;
-        }
-
-        cursor = match.index + tag.length;
-        match = findNextHtmlToken(content, cursor);
-    }
-
-    if (cursor < content.length) {
-        if (protectedTag) addLiteral(parts, content.slice(cursor));
-        else run.push({text: content.slice(cursor)});
-    }
-    flush();
-    return {parts, segments};
-}
-
-/**
- * 把整句译文里的编号占位符还原成原来的行内标签。占位符必须每个恰好开闭一次且嵌套正确；
- * 翻译服务弄丢或弄乱占位符时去掉全部占位符，输出不带行内标签的整句译文，文字一个不少。
- */
-function renderHtmlTranslation(part: SegmentPart, translation: string): string {
-    const tags = part.htmlTags;
-    if (!tags) return escapeHtml(translation);
-    // 有的翻译服务会把占位符的尖括号转成实体（&lt;g1&gt;）、全角尖括号或括号（（g1）、(g1)）再返回，先还原成占位符。
-    const pieces = normalizeDocumentInlineMarkers(translation).split(/(<\s*\/?\s*g\s*\d+\s*>)/iu);
-    const stack: number[] = [];
-    const seen = new Set<number>();
-    let valid = true;
-    // 行内代码（close 为空）：占位符之间无论服务返回了什么，都换回原来的整个元素。
-    const atom = () => stack.length > 0 && tags[stack.at(-1)! - 1].close === '';
-    const output = pieces.map(piece => {
-        const marker = /^<\s*(\/?)\s*g\s*(\d+)\s*>$/iu.exec(piece);
-        if (!marker) return atom() ? '' : escapeHtml(piece);
-        const id = Number(marker[2]);
-        if (!tags[id - 1]) {valid = false; return '';}
-        if (!marker[1]) {
-            if (seen.has(id) || atom()) valid = false;
-            seen.add(id); stack.push(id);
-            return tags[id - 1].open;
-        }
-        if (stack.pop() !== id) valid = false;
-        return tags[id - 1].close;
-    });
-    if (valid && !stack.length && seen.size === tags.length) return output.join('');
-    // 退回纯文字时，行内代码的文字以原文补在句末，避免留下被服务改写过的命令。
-    const code = tags.filter(tag => tag.close === '').map(tag => tag.open).join(' ');
-    const text = escapeHtml(pieces.filter(piece => !/^<\s*\/?\s*g\s*\d+\s*>$/iu.test(piece)).join(''));
-    return code ? `${text} ${code}` : text;
-}
-
-function parseTimedSubtitleDocument(content: string, format: 'srt' | 'vtt'): Pick<ParsedDocument, 'parts' | 'segments'> {
-    const parts: DocumentPart[] = [];
-    const segments: DocumentSegment[] = [];
-    const lines = splitWithEndings(content);
-    let cursorLine = 0;
-
-    while (cursorLine < lines.length) {
-        const timestampLine = lines[cursorLine];
-        if (format === 'vtt' && /^NOTE(?:[ \t].*)?$/u.test(timestampLine.text)) {
-            const start = timestampLine.start;
-            while (cursorLine < lines.length && lines[cursorLine].text.trim()) cursorLine += 1;
-            addLiteral(parts, content.slice(start, lines[cursorLine - 1].end));
-            continue;
-        }
-        if (!timestampLine || !TIMED_SUBTITLE_PATTERN.test(timestampLine.text)) {
-            addLiteral(parts, content.slice(timestampLine.start, timestampLine.end));
-            cursorLine += 1;
-            continue;
-        }
-
-        const timeMatch = timestampLine.text.match(/^\s*((?:\d{1,3}:)?\d{2}:\d{2}[,.]\d{3})\s*-->\s*((?:\d{1,3}:)?\d{2}:\d{2}[,.]\d{3})/u);
-        addLiteral(parts, content.slice(timestampLine.start, timestampLine.end));
-        cursorLine += 1;
-        const textStartLine = cursorLine;
-        while (cursorLine < lines.length && lines[cursorLine].text.trim() && !TIMED_SUBTITLE_PATTERN.test(lines[cursorLine].text)) {
-            const nextLineStartsCue = format === 'srt'
-                && /^\s*\d+\s*$/u.test(lines[cursorLine].text)
-                && TIMED_SUBTITLE_PATTERN.test(lines[cursorLine + 1]?.text || '');
-            if (nextLineStartsCue) break;
-            cursorLine += 1;
-        }
-
-        if (cursorLine === textStartLine) continue;
-        const textStart = lines[textStartLine].start;
-        const textEnd = lines[cursorLine - 1].textEnd;
-        const source = content.slice(textStart, textEnd);
-        // 将完整字幕提示作为一个翻译单元，使服务能保留 `<i>...</i>` 等行内标签或 ASS
-        // 覆盖代码，同时不把时间戳和提示边界发送给翻译请求。
-        addSegment(parts, segments, source, {
-            timeStart: timeMatch?.[1],
-            timeEnd: timeMatch?.[2],
-        });
-
-        if (cursorLine < lines.length) {
-            addLiteral(parts, content.slice(textEnd, lines[cursorLine].start));
-        } else {
-            addLiteral(parts, content.slice(textEnd));
-        }
-    }
-
-    return {parts, segments};
-}
-
-function parseAssDocument(content: string): Pick<ParsedDocument, 'parts' | 'segments'> {
-    const parts: DocumentPart[] = [];
-    const segments: DocumentSegment[] = [];
-    const lines = splitWithEndings(content);
-
-    lines.forEach((line) => {
-        if (!/^\s*Dialogue\s*:/iu.test(line.text)) {
-            addLiteral(parts, content.slice(line.start, line.end));
-            return;
-        }
-
-        const colon = line.text.indexOf(':');
-        const prefix = line.text.slice(0, colon + 1);
-        const dialogue = line.text.slice(colon + 1);
-        let commaCount = 0;
-        let textStart = -1;
-        for (let index = 0; index < dialogue.length; index += 1) {
-            if (dialogue[index] !== ',') continue;
-            commaCount += 1;
-            if (commaCount === 9) {
-                textStart = index + 1;
-                break;
-            }
-        }
-
-        if (textStart < 0) {
-            addLiteral(parts, content.slice(line.start, line.end));
-            return;
-        }
-
-        const fields = dialogue.slice(0, textStart - 1).split(',');
-        addLiteral(parts, prefix + dialogue.slice(0, textStart));
-        addSegment(parts, segments, dialogue.slice(textStart), {
-            timeStart: fields[1]?.trim(),
-            timeEnd: fields[2]?.trim(),
-        });
-        addLiteral(parts, content.slice(line.textEnd, line.end));
-    });
-
-    return {parts, segments};
-}
-
-function parseLrcDocument(content: string): Pick<ParsedDocument, 'parts' | 'segments'> {
-    const parts: DocumentPart[] = [];
-    const segments: DocumentSegment[] = [];
-    const lines = splitWithEndings(content);
-
-    lines.forEach((line) => {
-        const match = line.text.match(LRC_TIME_PATTERN);
-        if (!match) {
-            addLiteral(parts, content.slice(line.start, line.end));
-            return;
-        }
-
-        const prefix = match[1];
-        addLiteral(parts, prefix);
-        const firstTimestamp = prefix.match(/\[((?:\d{1,3}:)?\d{2}(?:\.\d{1,3})?)\]/u)?.[1];
-        addSegment(parts, segments, line.text.slice(prefix.length), {
-            bilingualPrefix: prefix,
-            timeStart: firstTimestamp,
-        });
-        addLiteral(parts, content.slice(line.textEnd, line.end));
-    });
-
-    return {parts, segments};
-}
-
-const MAX_JSON_DEPTH = 1_000;
-
-function cloneJsonValue(value: unknown): unknown {
-    if (!value || typeof value !== 'object') return value;
-    const output: Record<string, unknown> | unknown[] = Array.isArray(value) ? new Array(value.length) : {};
-    const copies = new WeakMap<object, Record<string, unknown> | unknown[]>([[value, output]]);
-    const stack = [{source: value, target: output, depth: 0}];
-    while (stack.length) {
-        const {source, target, depth} = stack.pop()!;
-        if (depth > MAX_JSON_DEPTH) throw new Error('JSON 文件嵌套过深，请拆分后重试');
-        for (const [key, item] of Object.entries(source)) {
-            let copy = item;
-            if (item && typeof item === 'object') {
-                copy = copies.get(item);
-                if (!copy) {
-                    copy = Array.isArray(item) ? new Array(item.length) : {};
-                    copies.set(item, copy);
-                    stack.push({source: item, target: copy, depth: depth + 1});
-                }
-            }
-            // JSON 的 __proto__ 是普通键；不能通过赋值触发对象原型 setter。
-            Object.defineProperty(target, key, {value: copy, enumerable: true, writable: true, configurable: true});
-        }
-    }
-    return output;
-}
-
-/**
- * JSON 里给程序看的字符串不送去翻译，原样留在文件里：没有任何文字的值（版本号、日期、数字）、网址与邮箱链接、
- * 十六进制颜色，以及不含空格却带数字的标识符（ID、哈希、带编号的键名）。单个普通单词仍然翻译。
- */
-function jsonMachineValue(value: string): boolean {
-    return !/\p{L}/u.test(value)
-        || /^(?:https?:\/\/|mailto:|www\.)\S+$/iu.test(value)
-        || /^#[0-9a-f]{3,8}$/iu.test(value)
-        || (/\d/u.test(value) && /^[\w.\-:/+]+$/u.test(value));
-}
-
-function parseJsonDocument(content: string): Pick<ParsedDocument, 'segments' | 'jsonValue' | 'jsonEntries'> {
-    let jsonValue: unknown;
-    try {
-        jsonValue = JSON.parse(content);
-    } catch (error) {
-        // JSON.parse 按规范只会抛 SyntaxError；统一字符串化后移除类型前缀，避免不可达的错误类型分支。
-        const message = String(error).replace(/^SyntaxError:\s*/u, '');
-        throw new Error(`JSON 文件格式无效：${message}`);
-    }
-
-    const segments: DocumentSegment[] = [];
-    const jsonEntries: JsonSegmentEntry[] = [];
-    // 只把字符串叶节点送去翻译（给程序看的值除外），并记录路径与首尾空白；渲染时在深拷贝上回填，原对象始终不变。
-    const stack: Array<{value: unknown; path: Array<string | number>}> = [{value: jsonValue, path: []}];
-    while (stack.length) {
-        const {value, path} = stack.pop()!;
-        if (path.length > MAX_JSON_DEPTH) throw new Error('JSON 文件嵌套过深，请拆分后重试');
-        if (typeof value === 'string') {
-            const trimmed = trimSource(value);
-            if (!trimmed || jsonMachineValue(trimmed.source)) continue;
-            const segmentIndex = segments.length;
-            const pathLabel = formatJsonPath(path);
-            segments.push({id: segmentIndex, source: trimmed.source, pathLabel});
-            jsonEntries.push({path: [...path], segmentIndex, prefix: trimmed.prefix, suffix: trimmed.suffix});
-            continue;
-        }
-        if (value && typeof value === 'object') {
-            const entries = Object.entries(value);
-            for (let index = entries.length - 1; index >= 0; index -= 1) {
-                const [key, item] = entries[index];
-                stack.push({value: item, path: [...path, Array.isArray(value) ? Number(key) : key]});
-            }
-        }
-    }
-    return {segments, jsonValue, jsonEntries};
-}
-
-export function formatJsonPath(path: Array<string | number>): string {
-    return path.reduce<string>((value, part) => {
-        if (typeof part === 'number') return `${value}[${part}]`;
-        return /^[A-Za-z_$][\w$]*$/u.test(part)
-            ? `${value}.${part}`
-            : `${value}[${JSON.stringify(part)}]`;
-    }, '$');
-}
-
-export interface ParseDocumentOptions {
-    /** Markdown 的一行作为一个片段整句翻译（链接、行内代码等写成占位符）；默认按受保护内容把一行切成多段。 */
-    markdownSentences?: boolean;
-}
-
-function parseDelimitedDocument(content: string, delimiter: ',' | '\t'): Pick<ParsedDocument, 'parts' | 'segments' | 'delimitedColumns'> {
-    const parts: DocumentPart[] = [];
-    const segments: DocumentSegment[] = [];
-    const labels = new Map<number, string>();
-    const columns = new Set<number>();
-    let last = 0;
-    for (const cell of readDelimitedCells(content, delimiter)) {
-        const trimmed = trimSource(cell.value);
-        if (cell.row === 0 && trimmed) labels.set(cell.column, trimmed.source.replace(/\s+/gu, ' ').slice(0, 80));
-        if (!trimmed || !isTranslatableDelimitedCell(trimmed.source)) continue;
-        addLiteral(parts, content.slice(last, cell.start));
-        last = cell.end;
-        const id = segments.length;
-        segments.push({id, source: trimmed.source, pathLabel: `R${cell.row + 1}C${cell.column + 1}`, delimitedCell: {row: cell.row, column: cell.column}});
-        parts.push({kind: 'segment', segmentIndex: id, ...trimmed, rawSource: content.slice(cell.start, cell.end),
-            delimitedCell: {delimiter, quoted: cell.quoted}});
-        columns.add(cell.column);
-    }
-    addLiteral(parts, content.slice(last));
-    const delimitedColumns = [...columns].sort((left, right) => left - right).map(index => ({index, label: labels.get(index) ?? ''}));
-    return {parts, segments, delimitedColumns};
 }
 
 export function parseDocument(fileName: string, content: string, options: ParseDocumentOptions = {}): ParsedDocument {
@@ -1386,7 +196,7 @@ export function parseDocument(fileName: string, content: string, options: ParseD
     if (!format) {
         throw new Error('暂不支持该文件格式，请选择 PDF、ePub、HTML、JSON、TXT、DOCX、Markdown 或字幕文件');
     }
-    if (format === 'pdf' || format === 'epub' || format === 'docx') {
+    if (format === 'pdf' || format === 'epub' || format === 'docx' || format === 'pptx' || format === 'xlsx') {
         throw new Error(`${getDocumentFormatLabel(format)}需要按二进制文件解析，请重新打开该文件`);
     }
 
@@ -1402,6 +212,9 @@ export function parseDocument(fileName: string, content: string, options: ParseD
     if (format === 'csv' || format === 'tsv') {
         return {fileName, format, label: getDocumentFormatLabel(format), ...parseDelimitedDocument(content, format === 'csv' ? ',' : '\t')};
     }
+    if (format === 'tex') {
+        return {fileName, format, label: getDocumentFormatLabel(format), ...parseLatexDocument(content)};
+    }
 
     const parsed = format === 'html'
         ? parseHtmlDocument(content)
@@ -1416,86 +229,6 @@ export function parseDocument(fileName: string, content: string, options: ParseD
     return {fileName, format, label: getDocumentFormatLabel(format), ...parsed};
 }
 
-function escapeHtml(value: string): string {
-    return value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-/**
- * 原文用 \N 硬换行分成几行、而翻译服务把换行丢掉时，按同样的行数把译文重新断开：优先断在标点或空格之后，
- * 中日韩文字之间在词的边界也可以断；不在样式代码 {…} 里面断，也不拆开一个拉丁单词。找不到合适的位置就保持一行。
- */
-function restoreSubtitleBreaks(source: string, translation: string): string {
-    const breaks = source.split('\\N').length - 1;
-    if (!breaks || /\\[Nn]/u.test(translation)) return translation;
-    const wide = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
-    // 中日韩文字之间只在词的边界断开；环境不提供分词时退回任意两个字之间。
-    const words = typeof Intl.Segmenter === 'function' ? new Set(Array.from(new Intl.Segmenter(undefined, {granularity: 'word'}).segment(translation), entry => entry.index)) : undefined;
-    // 候选断点：断在这个下标之前；值越小越好（标点后 0，空格处 1，中日韩文字之间 2）。
-    const candidates: Array<{index: number; cost: number}> = [];
-    let depth = 0;
-    for (let index = 1; index < translation.length; index += 1) {
-        const previous = translation[index - 1], current = translation[index];
-        if (previous === '{') depth += 1;
-        if (previous === '}') depth = Math.max(0, depth - 1);
-        if (depth || current === '{' && translation.indexOf('}', index) < 0) continue;
-        if (/[，。！？；、,.!?;:：]/u.test(previous) && !/[\s，。！？；、,.!?;:：]/u.test(current)) candidates.push({index, cost: 0});
-        else if (/\s/u.test(previous) && !/\s/u.test(current)) candidates.push({index, cost: 1});
-        else if (wide.test(previous) && wide.test(current) && (words?.has(index) ?? true)) candidates.push({index, cost: 2});
-    }
-    const chosen: number[] = [];
-    for (let line = 1; line <= breaks; line += 1) {
-        const target = translation.length * line / (breaks + 1), floor = chosen.at(-1) ?? 0;
-        // 偏离理想位置越远越差；标点和空格可以多偏离几个字。
-        const best = candidates.filter(candidate => candidate.index > floor)
-            .sort((left, right) => Math.abs(left.index - target) + left.cost * 2 - (Math.abs(right.index - target) + right.cost * 2))[0];
-        if (!best) return translation;
-        chosen.push(best.index);
-    }
-    return chosen.reduceRight((text, index) => `${text.slice(0, index).trimEnd()}\\N${text.slice(index)}`, translation);
-}
-
-/**
- * 有的翻译服务把字幕里的样式标签改写后再返回：转成实体（&lt;i&gt; … &lt;/i&gt;），或换成括号（(i) … (/i)、（i）…（/i））。
- * 原文里确实有同名标签时还原成标签，并去掉服务加在标签内侧的空格；括号写法还要求译文里同时有它的闭合形式，
- * 原文没有的写法不动，避免把正文里的“&lt;”或“(a)”误当成标签。
- */
-export function restoreSubtitleTags(source: string, translation: string): string {
-    if (!/&lt;|[(（＜]\s*\/?\s*[a-z]/iu.test(translation)) return translation;
-    const names = new Set(Array.from(source.matchAll(/<\s*\/?\s*([a-z][\w.]*)/giu), match => match[1].toLowerCase()));
-    const closed = new Set(Array.from(translation.matchAll(/[(（＜]\s*[/／]\s*([a-z][\w.]*)\s*[)）＞]/giu), match => match[1].toLowerCase()));
-    return translation.replace(/(\s?)(&lt;|[(（＜])\s*([\/／]?)\s*([a-z][\w.]*)([^&<>()（）＜＞]*?)\s*(?:&gt;|[)）＞])(\s?)/giu,
-        (whole, before: string, open: string, slash: string, name: string, rest: string, after: string) =>
-            names.has(name.toLowerCase()) && (open === '&lt;' || closed.has(name.toLowerCase().split('.')[0])) ? `${slash ? '' : before}<${slash ? '/' : ''}${name}${rest}>${slash ? after : ''}` : whole);
-}
-
-function preserveSubtitleMarkup(source: string, received: string): string {
-    const translation = restoreSubtitleTags(source, received);
-    const assPrefix = source.match(/^(?:\{[^}]*\})+/u)?.[0];
-    if (assPrefix && !translation.startsWith(assPrefix)) return restoreSubtitleBreaks(source, `${assPrefix}${translation}`);
-
-    const htmlOpen = source.match(/^(?:<([a-z][a-z0-9-]*)\b[^>]*>)+/iu)?.[0];
-    const htmlClose = source.match(/(?:<\/([a-z][a-z0-9-]*)>)+(?=\s|$)/iu)?.[0];
-    if (htmlOpen && htmlClose && !translation.includes(htmlOpen)) {
-        return `${htmlOpen}${translation}${htmlClose}`;
-    }
-    return restoreSubtitleBreaks(source, translation);
-}
-
-function formatSubtitleExport(format: DocumentFormat, source: string, received: string): string {
-    const styled = preserveSubtitleMarkup(source, received);
-    if (format === 'ass') return styled.replace(/\r\n?|\n/gu, '\\N');
-    // 空行会结束 SRT/VTT cue；WebVTT 也禁止时间箭头出现在任何 cue 文本行内。
-    return styled.split(/\r\n?|\n/u).filter(line => line.trim()).map(line => {
-        if (format === 'vtt') return line.replaceAll('-->', '--&gt;');
-        return TIMED_SUBTITLE_PATTERN.test(line) ? line.replace('-->', '→') : line;
-    }).join('\n');
-}
-
 function originalPartSource(part: SegmentPart): string {
     return part.rawSource ?? part.source;
 }
@@ -1507,7 +240,7 @@ function originalPartSource(part: SegmentPart): string {
 export function documentSegmentMarkupSources(document: ParsedDocument): Map<number, string> {
     const sources = new Map<number, string>();
     for (const part of document.parts) {
-        if (part.kind === 'segment' && (part.htmlTags || part.markdownTokens)) sources.set(part.segmentIndex, originalPartSource(part));
+        if (part.kind === 'segment' && (part.htmlTags || part.markdownTokens || part.latexTokens)) sources.set(part.segmentIndex, originalPartSource(part));
     }
     return sources;
 }
@@ -1526,9 +259,6 @@ export function resolveDocumentTranslation(source: string, translation: string |
     return hasDistinctTranslation(source, translation) ? translation! : source;
 }
 
-/** EPUB 2 使用 XHTML 1.1，只允许标准属性标记译文。 */
-type DocumentHtmlOutput = boolean | 'epub2';
-
 function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart, translation: string, xhtml: DocumentHtmlOutput): string {
     const source = originalPartSource(part);
     const formattedTranslation = ['srt', 'vtt', 'ass'].includes(document.format)
@@ -1540,6 +270,15 @@ function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart,
     }
     if (document.format === 'markdown') {
         return `${part.prefix}${source}${part.suffix}\n> ${renderMarkdownTranslation(part, translation)}`;
+    }
+    if (document.format === 'tex') {
+        const rendered = renderLatexTranslation(part.latexTokens, translation);
+        if (part.latexBilingual === 'command') {
+            const safeSource = sanitizeLatexCommandText(source).replace(/\n+$/u, '');
+            const safeRendered = sanitizeLatexCommandText(rendered).replace(/^\n+/u, '');
+            return `${part.prefix}${safeSource}\n${safeRendered}${part.suffix}`;
+        }
+        return `${part.prefix}${source}\n\n${rendered}${part.suffix}`;
     }
     if (document.format === 'ass') {
         return `${part.prefix}${source}${part.suffix}\\N${formattedTranslation}`;
@@ -1624,31 +363,18 @@ function renderParts(document: ParsedDocument, translations: readonly string[], 
             append(`${part.prefix}${renderHtmlTranslation(part, translation)}${part.suffix}`);
             continue;
         }
+        if (document.format === 'tex') {
+            const rendered = renderLatexTranslation(part.latexTokens, translation);
+            const safeRendered = part.latexBilingual === 'command' ? sanitizeLatexCommandText(rendered) : rendered;
+            append(`${part.prefix}${safeRendered}${part.suffix}`);
+            continue;
+        }
         const formattedTranslation = ['srt', 'vtt', 'ass'].includes(document.format)
             ? formatSubtitleExport(document.format, part.source, translation)
             : renderMarkdownTranslation(part, translation);
         append(`${part.prefix}${formattedTranslation}${part.suffix}`);
     }
     return output.join('');
-}
-
-function getAtPath(value: unknown, path: Array<string | number>): unknown {
-    let current = value;
-    for (const key of path) {
-        if (!current || typeof current !== 'object') return undefined;
-        current = (current as Record<string | number, unknown>)[key];
-    }
-    return current;
-}
-
-function setAtPath(root: unknown, path: Array<string | number>, value: unknown): unknown {
-    if (path.length === 0) return value;
-    let current = root as Record<string | number, unknown>;
-    path.slice(0, -1).forEach((key) => {
-        current = current[key] as Record<string | number, unknown>;
-    });
-    current[path[path.length - 1]] = value;
-    return root;
 }
 
 export function renderDocument(

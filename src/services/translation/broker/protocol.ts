@@ -18,6 +18,7 @@ import {
     isImageTextBatch,
 } from '../requestSnapshot';
 import {normalizeDeadlineTimeoutMs, TranslationProviderDeadlineError} from '../requestDeadline';
+import {createTranslationAbortError} from '../errors';
 import type {TranslationRequestIdentityContext} from '../requestIdentity';
 import {isGlossaryOnlyResult, shouldKeepCommonWebTermLabel} from '../glossaryProtection';
 import {parseTranslationSlots, serializeTranslationSlots} from '@/src/core/translation/slotProtocol';
@@ -123,9 +124,7 @@ export class GlossaryRevisionChangedError extends Error {
 }
 
 export function requestAbortError(): Error {
-    const error = new Error('翻译请求已取消');
-    error.name = 'AbortError';
-    return error;
+    return createTranslationAbortError('翻译请求已取消');
 }
 
 export function throwIfRequestAborted(signal?: AbortSignal): void {

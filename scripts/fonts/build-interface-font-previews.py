@@ -25,7 +25,7 @@ from fontTools.varLib.instancer import instantiateVariableFont
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_DIR = ROOT / 'assets/interface-fonts'
 TARGET_DIR = ROOT / 'assets/interface-font-previews'
-LANGUAGES = ('zh-CN', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'es-ES', 'ru-RU')
+LANGUAGES = ('zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'es-ES', 'ru-RU')
 SAMPLE_LATIN = 'Aa Bb Cc · 0123456789'
 # The CSS alias identifies the option, while the internal names identify a
 # modified font. Avoid the Reserved Font Names Source and Plex internally.
@@ -385,7 +385,7 @@ The generator verifies every source's existing SHA-256 before processing it.
 No network download is used during regeneration.
 
 Each weight-700 face contains only the source glyphs needed by that font option's
-own title in zh-CN, en-US, ja-JP, ko-KR, fr-FR, es-ES and ru-RU. Each weight-400
+own title in zh-CN, zh-TW, en-US, ja-JP, ko-KR, fr-FR, es-ES and ru-RU. Each weight-400
 face contains its own descriptions, the localized bottom preview and
 `Aa Bb Cc · 0123456789`. Noto Sans SC additionally supplies source-supported
 characters missing from the other fonts' titles/descriptions at the same weight.

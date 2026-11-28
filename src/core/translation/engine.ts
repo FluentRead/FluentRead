@@ -2,27 +2,22 @@
  * @file src/core/translation/engine.ts
  *
  * 文件职责：实现 DOM 节点到 TranslationCandidate 的核心解析引擎，协调安全守卫、站点适配器、布局边界和文本有效性；为显式非原子行内容器保留直属正文与独立子段落的一致发现和悬浮边界，并支持内联容器显式换行拆分与通用层旧式双 br 多段正文拆分。
- * 主要内容：按正文/全部节点范围协调候选，统一发现、悬浮与请求取词的精确禁译覆盖；定义 TranslationCandidateCore、候选优选与键值函数，提供同步只读祖先 miss 缓存作用域（退出或显式失效后立即释放），记录发现步骤和原因，按站点规则把显式换行（含内联正文容器如 font）拆为两种入口一致的内联候选，并在通用层对含至少三段连续双 br 的块级或透明内联包装容器（font/span）自动拆分分段，处理编辑器坐标命中屏障、hover 屏障、适配优先级、快照省略、缓存及坐标命中；局部脏内联子树仅在完整保护检查通过后回到最近显式非原子祖先重扫，不把每个正文子节点重定向成重复整段请求；发现强制目标时仅在当前 enter 的同步检查中复用既有决策和祖先选择器 miss，不跨生成器让出缓存；同步只读批量解析复用全部范围及无站点适配/应用外壳例外的普通正文祖先守卫和文本保护，涉及显式外壳权限或站点重定向目标时独立解析；无元素子节点的非文档表面不重复探测不可能成立的内联分段，仍由完整候选分类复验文本和保护；悬浮命中独立后代的包裹层时禁止回退吞并整个容器，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
+ * 主要内容：按正文/全部节点范围协调候选，统一发现、悬浮与请求取词的精确禁译覆盖；定义 TranslationCandidateCore、候选优选与键值函数，结合 engineAncestry 与 engineDiscovery 复用祖先守卫缓存、处理帧预算增量后序发现与坐标命中解析。可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
  * 模块边界：本文件属于可独立测试的 core 候选领域；内置站点提供的应用外壳正文入口仍须经过显式目标、局部保护与去重检查，不改变通用发现守卫；可以读取传入 DOM 以计算结果，坐标命中栈与祖先守卫只在单次同步解析中复用，不跨手势缓存；不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
-import {isTranslationTooltip} from './dom';
 import {
     composedAncestors,
     evaluateElementHardGuard,
     evaluateHardGuard,
-    findElementsAtPoint,
-    findNodeAtPoint,
     getComposedParent,
-    getTranslatableControlValueAttribute,
     isDocumentSurface,
-    isExtensionElementSelf,
     isTopLevelApplicationShell,
+    isTranslationTooltip,
     maxComposedAncestorDepth,
     safeMatches,
 } from './dom';
-import type {HardGuardResult} from './dom';
-import type {TranslationTextProtectionOptions} from './dom';
+import type {HardGuardResult, TranslationTextProtectionOptions} from './dom';
 import {
     classifyGenericCandidate,
     collectDoubleBrParagraphBarriers,
@@ -51,118 +46,31 @@ import type {
     TranslationSiteAdapter,
     TranslationScope,
 } from './types';
-import {
-    findAdapterPrunedAncestor,
-    inheritCachedFlag,
-} from './internal';
+import {findAdapterPrunedAncestor} from './internal';
 import {resolveVisualTranslationRange} from './visual';
+import {
+    type AdapterDecisionResult,
+    type AdapterPrunedAncestor,
+    asHTMLElement,
+    createResolutionEvaluationContext,
+    currentURL,
+    getCombinedExcludedSelector,
+    type InlineRunResolution,
+    isElementNode,
+    isExtensionElementForResolution,
+    isStructuralContainerForResolution,
+    primeResolutionAncestry,
+    type ResolutionEvaluationContext,
+} from './engineAncestry';
+import {
+    createDiscoveryFrame,
+    type DiscoveryFrame,
+    resolveCandidateAtPoint,
+    resolveDiscoveryRoots,
+} from './engineDiscovery';
 import {normalizeExcludedTags} from '@/src/core/config/pageTranslation';
 
-const combinedExcludedSelectorsByDocument = new WeakMap<Document, Map<string, string | null>>();
-
-function getCombinedExcludedSelector(element: Element, selectors: readonly string[]): string | null {
-    const document = element.ownerDocument;
-    if (!document) return null;
-    const cacheKey = selectors.join('\u0000');
-    let documentCache = combinedExcludedSelectorsByDocument.get(document);
-    if (!documentCache) {
-        documentCache = new Map();
-        combinedExcludedSelectorsByDocument.set(document, documentCache);
-    }
-    if (documentCache.has(cacheKey)) return documentCache.get(cacheKey) ?? null;
-
-    const probe = document.createElement('div');
-    const valid = selectors.filter((selector) => {
-        try {
-            probe.matches(selector);
-            return true;
-        } catch {
-            return false;
-        }
-    });
-    const combined = valid.length > 0 ? valid.join(',') : null;
-    documentCache.set(cacheKey, combined);
-    return combined;
-}
-
 const maxHoverBarrierDiscoverySteps = 256;
-/**
- * Shadow DOM 的坐标命中 API 属于宿主页面实现，异常组件可能把同一个 host
- * 再次返回给嵌套 root。坐标解析必须有独立于祖先扫描的深度上限，避免递归耗尽
- * content script 的调用栈并让页面看起来失去响应。
- */
-const maxPointResolutionDepth = 64;
-
-interface AdapterDecisionResult {
-    decision: AdapterDecision;
-    adapterId?: string;
-}
-
-interface InlineRunResolution {
-    candidate: TranslationCandidate | null;
-    /** 已有独立后代或探测预算耗尽时，不能再把当前容器整体当作回退候选。 */
-    blocksWholeCandidate: boolean;
-}
-
-interface InlineRunSummary {
-    candidates: TranslationCandidate[];
-    blocksWholeCandidate: boolean;
-}
-
-interface AdapterPrunedAncestor {
-    reason: string;
-    adapterId?: string;
-}
-
-/** 仅在一次同步悬浮或检查调用内有效的缓存集合。 */
-interface ResolutionEvaluationContext {
-    textProtectionCache: TranslationTextProtectionCache;
-    textProtectionOptions?: TranslationTextProtectionOptions;
-    topLevelApplicationShellBypassed: boolean;
-    hardGuards: WeakMap<Element, HardGuardResult>;
-    adapterDecisions: WeakMap<Element, AdapterDecisionResult>;
-    adapterContext?: AdapterContext;
-    adapterPrunedAncestors: WeakMap<Element, AdapterPrunedAncestor | null>;
-    extensionElements: WeakMap<Element, boolean>;
-    structuralContainers: WeakMap<Element, boolean>;
-    structuralAncestors: WeakMap<Element, boolean>;
-    inlineRuns: WeakMap<Element, InlineRunSummary>;
-}
-
-function createResolutionEvaluationContext(
-    textProtectionOptions?: TranslationTextProtectionOptions,
-): ResolutionEvaluationContext {
-    return {
-        textProtectionCache: createTranslationTextProtectionCache(),
-        textProtectionOptions,
-        topLevelApplicationShellBypassed: false,
-        hardGuards: new WeakMap(),
-        adapterDecisions: new WeakMap(),
-        adapterPrunedAncestors: new WeakMap(),
-        extensionElements: new WeakMap(),
-        structuralContainers: new WeakMap(),
-        structuralAncestors: new WeakMap(),
-        inlineRuns: new WeakMap(),
-    };
-}
-
-function isElementNode(node: Node | null | undefined): node is Element {
-    return Boolean(node && node.nodeType === 1 && typeof (node as Element).matches === 'function');
-}
-
-function asHTMLElement(element: Element | null | undefined): HTMLElement | null {
-    if (!element || element.nodeType !== 1) return null;
-    return element as HTMLElement;
-}
-
-function currentURL(): URL {
-    const href = globalThis.location?.href ?? 'https://invalid.local/';
-    try {
-        return new URL(href);
-    } catch {
-        return new URL('https://invalid.local/');
-    }
-}
 
 export interface TranslationCoreInspection {
     candidate: TranslationCandidate | null;
@@ -172,24 +80,6 @@ export interface TranslationDiscoveryStep {
     element: Element;
     phase: 'enter' | 'exit';
     candidate?: TranslationCandidate;
-}
-
-interface DiscoveryFrame {
-    element: Element;
-    phase: 'enter' | 'children' | 'exit';
-    lightIndex: number;
-    shadowIndex: number;
-    shadowRoot: ShadowRoot | null;
-    descendantHasCandidate: boolean;
-    candidateChildBarriers: Set<Element>;
-    ownAdapter?: ReturnType<TranslationCandidateCore['adapterDecision']>;
-    forcedCandidate?: TranslationCandidate;
-    forcedAtomic?: boolean;
-    exitCandidates?: TranslationCandidate[];
-    exitIndex: number;
-    checkAncestors: boolean;
-    insideStructural: boolean;
-    pruned: boolean;
 }
 
 export function getTranslationCandidateKey(candidate: TranslationCandidate): Node {
@@ -223,6 +113,10 @@ export class TranslationCandidateCore {
     readonly excludedSelectors: readonly string[];
     readonly adapters: readonly TranslationSiteAdapter[];
     private readonly context: AdapterContext;
+    private readonly hasForceTranslateAdapters: boolean;
+    private readonly hasExcludedSelectors: boolean;
+    private readonly defaultTextProtectionOptions: TranslationTextProtectionOptions | undefined;
+    private readonly cachedStructuralRegionOptions: StructuralRegionOptions | undefined;
     private readOnlyEpoch: SynchronousReadOnlyEpoch | null = null;
     private readonly discoveredCandidateChildBarriers = new WeakMap<Element, ReadonlySet<Element>>();
 
@@ -247,17 +141,24 @@ export class TranslationCandidateCore {
                 (right.adapter.priority ?? 0) - (left.adapter.priority ?? 0) || left.index - right.index)
             .map(({adapter}) => adapter);
         this.context = {url: this.url};
+        this.hasForceTranslateAdapters = this.adapters.some(adapter => adapter.forceTranslate?.length);
+        this.hasExcludedSelectors = this.excludedSelectors.length > 0;
+        this.defaultTextProtectionOptions = this.hasForceTranslateAdapters || this.hasExcludedSelectors
+            ? {
+                ...(this.hasForceTranslateAdapters ? {allowNoTranslate: this.allowNoTranslate} : {}),
+                ...(this.hasExcludedSelectors ? {isExcludedElement: this.matchesExcludedSelector} : {}),
+            }
+            : undefined;
+        this.cachedStructuralRegionOptions = this.includeSidebarRegions ? {includeSidebarRegions: true} : undefined;
     }
 
     /** 候选发现、请求取词及状态复验使用同一份禁译覆盖与排除标签；无规则时保持原参数。 */
     textOptions(options?: TranslationTextProtectionOptions): TranslationTextProtectionOptions | undefined {
-        const hasForceTranslate = this.adapters.some(adapter => adapter.forceTranslate?.length);
-        const hasExcludedSelectors = this.excludedSelectors.length > 0;
-        if (!hasForceTranslate && !hasExcludedSelectors) return options;
+        if (!this.defaultTextProtectionOptions) return options;
+        if (!options) return this.defaultTextProtectionOptions;
         return {
             ...options,
-            ...(hasForceTranslate ? {allowNoTranslate: this.allowNoTranslate} : {}),
-            ...(hasExcludedSelectors ? {isExcludedElement: this.matchesExcludedSelector} : {}),
+            ...this.defaultTextProtectionOptions,
         };
     }
 
@@ -275,7 +176,7 @@ export class TranslationCandidateCore {
     }
 
     private structuralRegionOptions(): StructuralRegionOptions | undefined {
-        return this.includeSidebarRegions ? {includeSidebarRegions: true} : undefined;
+        return this.cachedStructuralRegionOptions;
     }
 
     /**
@@ -413,115 +314,20 @@ export class TranslationCandidateCore {
         return null;
     }
 
-    private evaluateResolutionElementHardGuard(
-        element: Element,
-        evaluationContext: ResolutionEvaluationContext,
-    ): HardGuardResult {
-        const guard = evaluateElementHardGuard(element, evaluationContext.textProtectionOptions);
-        const protectionOptions = evaluationContext.textProtectionOptions;
-        if (guard.reason === 'inherited-no-translate' &&
-            protectionOptions?.allowTopLevelApplicationShell === true &&
-            element !== protectionOptions.protectedElement &&
-            isTopLevelApplicationShell(element)) {
-            evaluationContext.topLevelApplicationShellBypassed = true;
-            return {prune: false};
-        }
-        return guard;
-    }
-
-    private primeResolutionAncestry(
-        element: Element,
-        evaluationContext: ResolutionEvaluationContext,
-    ): void {
-        if (evaluationContext.hardGuards.has(element) &&
-            evaluationContext.structuralAncestors.has(element)) return;
-
-        // 先收集完整 composed 祖先链，再自根向命中节点回填继承守卫和结构缓存，避免逐层重复上溯。
-        const chain: Element[] = [];
-        let current: Element | null = element;
-        while (current && chain.length < maxComposedAncestorDepth) {
-            chain.push(current);
-            current = getComposedParent(current);
-        }
-        // 祖先链过深时直接缓存保守裁剪，不评估或缓存不完整的链前缀，也不再进入
-        // 后续适配器祖先扫描。
-        if (current) {
-            evaluationContext.hardGuards.set(element, {
-                prune: true,
-                reason: 'ancestor-depth-limit',
-            });
-            return;
-        }
-
-        const ownGuards = chain.map((item) =>
-            evaluationContext.hardGuards.get(item) ?? this.evaluateResolutionElementHardGuard(item, evaluationContext));
-        let inheritedGuard: HardGuardResult = {prune: false};
-        for (let index = chain.length - 1; index >= 0; index -= 1) {
-            const item = chain[index]!;
-            const ownGuard = ownGuards[index]!;
-            inheritedGuard = ownGuard.prune ? ownGuard : inheritedGuard;
-            evaluationContext.hardGuards.set(item, inheritedGuard);
-
-            // 全部节点范围不使用正文结构祖先；完整硬守卫仍由上方祖先链评估。
-            const parent = this.scope === 'all' ? null : getComposedParent(item);
-            const hasStructuralAncestor = Boolean(parent && !isDocumentSurface(parent) && (
-                !isIncludedSidebarRegion(item, this.structuralRegionOptions()) &&
-                !isIncludedSidebarRegion(parent, this.structuralRegionOptions()) &&
-                (this.isStructuralContainerForResolution(parent, evaluationContext) ||
-                    evaluationContext.structuralAncestors.get(parent) === true)
-            ));
-            evaluationContext.structuralAncestors.set(item, hasStructuralAncestor);
-        }
-    }
-
     private hardGuard(
         element: Element,
         evaluationContext: ResolutionEvaluationContext,
     ): HardGuardResult {
-        this.primeResolutionAncestry(element, evaluationContext);
+        primeResolutionAncestry(element, evaluationContext, this.scope, this.structuralRegionOptions());
         // primeResolutionAncestry 的正常、缓存命中与超深路径都会为命中元素写入结果。
         return evaluationContext.hardGuards.get(element)!;
-    }
-
-    private isExtensionElementForResolution(
-        element: Element,
-        evaluationContext: ResolutionEvaluationContext,
-    ): boolean {
-        if (evaluationContext.extensionElements.has(element)) {
-            return evaluationContext.extensionElements.get(element) === true;
-        }
-        const chain: Element[] = [];
-        let current: Element | null = element;
-        while (current && !evaluationContext.extensionElements.has(current)) {
-            chain.push(current);
-            // 旧实现使用的 Element.closest() 不会跨越 ShadowRoot，这里保留相同的所有权边界。
-            current = current.parentElement;
-        }
-        let inherited = inheritCachedFlag(current, evaluationContext.extensionElements);
-        for (let index = chain.length - 1; index >= 0; index -= 1) {
-            inherited = inherited || isExtensionElementSelf(chain[index]!);
-            evaluationContext.extensionElements.set(chain[index]!, inherited);
-        }
-        return evaluationContext.extensionElements.get(element) === true;
-    }
-
-    private isStructuralContainerForResolution(
-        element: Element,
-        evaluationContext: ResolutionEvaluationContext,
-    ): boolean {
-        if (this.scope === 'all') return false;
-        const cached = evaluationContext.structuralContainers.get(element);
-        if (cached !== undefined) return cached;
-        const result = isStructuralContainer(element, this.structuralRegionOptions());
-        evaluationContext.structuralContainers.set(element, result);
-        return result;
     }
 
     private hasStructuralAncestorForResolution(
         element: Element,
         evaluationContext: ResolutionEvaluationContext,
     ): boolean {
-        this.primeResolutionAncestry(element, evaluationContext);
+        primeResolutionAncestry(element, evaluationContext, this.scope, this.structuralRegionOptions());
         // 调用者已通过硬守卫；prime 已完整写入当前节点的结构祖先结果。
         return evaluationContext.structuralAncestors.get(element) === true;
     }
@@ -555,19 +361,12 @@ export class TranslationCandidateCore {
             ? (item: Element) => this.shouldStayOriginalWithContext(item, adapterContext)
             : this.shouldStayOriginal;
         const hardGuard = this.hardGuard(element, evaluationContext);
-        if (hardGuard.prune) {
-            return {candidate: null};
-        }
+        if (hardGuard.prune) return {candidate: null};
 
-        const pruned = this.hasAdapterPrunedAncestor(element, evaluationContext);
-        if (pruned) {
-            return {candidate: null};
-        }
+        if (this.hasAdapterPrunedAncestor(element, evaluationContext)) return {candidate: null};
 
         const {decision, adapterId} = this.adapterDecision(element, evaluationContext);
-        if (decision.kind === 'skip-self') {
-            return {candidate: null};
-        }
+        if (decision.kind === 'skip-self') return {candidate: null};
         if (decision.kind === 'force-target') {
             const target = asHTMLElement(decision.target ?? element);
             if (!target || !hasMeaningfulTranslationTextInNodes(
@@ -579,19 +378,18 @@ export class TranslationCandidateCore {
                 this.hardGuard(target, evaluationContext).prune) {
                 return {candidate: null};
             }
-            const candidate: TranslationCandidate = {
-                element: target,
-                kind: decision.candidateKind ?? (findTranslationControlOwner(target) ? 'control' : 'content'),
-                reason: decision.reason,
-                adapterId,
-                ...this.candidateResolutionMetadata(evaluationContext),
+            return {
+                candidate: {
+                    element: target,
+                    kind: decision.candidateKind ?? (findTranslationControlOwner(target) ? 'control' : 'content'),
+                    reason: decision.reason,
+                    adapterId,
+                    ...this.candidateResolutionMetadata(evaluationContext),
+                },
             };
-            return {candidate};
         }
 
-        if (!this.allowsGenericCandidates()) {
-            return {candidate: null};
-        }
+        if (!this.allowsGenericCandidates()) return {candidate: null};
 
         if (this.scope === 'content' && evaluationContext &&
             this.hasStructuralAncestorForResolution(element, evaluationContext) &&
@@ -607,16 +405,15 @@ export class TranslationCandidateCore {
             this.scope,
             this.structuralRegionOptions(),
         );
-        if (!classification) {
-            return {candidate: null};
-        }
-        const candidate: TranslationCandidate = {
-            element: element as HTMLElement,
-            kind: classification.kind,
-            reason: classification.reason,
-            ...this.candidateResolutionMetadata(evaluationContext),
+        if (!classification) return {candidate: null};
+        return {
+            candidate: {
+                element: element as HTMLElement,
+                kind: classification.kind,
+                reason: classification.reason,
+                ...this.candidateResolutionMetadata(evaluationContext),
+            },
         };
-        return {candidate};
     }
 
     /** 显式站点换行规则与普通内联 run 共用边界和预算，宿主 br 始终留在原位。 */
@@ -750,7 +547,7 @@ export class TranslationCandidateCore {
         const explicitContainer = decision.kind === 'force-target' && decision.atomic === false &&
             (decision.target ?? element) === element;
         if (this.scope === 'content' && (isDocumentSurface(element) || (!explicitContainer && (
-            this.isStructuralContainerForResolution(element, evaluationContext) ||
+            isStructuralContainerForResolution(element, evaluationContext, this.scope, this.structuralRegionOptions()) ||
             this.hasStructuralAncestorForResolution(element, evaluationContext))))) {
             return null;
         }
@@ -900,7 +697,7 @@ export class TranslationCandidateCore {
                 current = current.parentElement;
                 continue;
             }
-            if (this.isExtensionElementForResolution(current, evaluationContext)) {
+            if (isExtensionElementForResolution(current, evaluationContext)) {
                 current = getComposedParent(current);
                 continue;
             }
@@ -953,7 +750,7 @@ export class TranslationCandidateCore {
                 evaluationContext,
             );
             if (inspection.candidate) return inspection.candidate;
-            if (this.isStructuralContainerForResolution(current, evaluationContext)) return null;
+            if (isStructuralContainerForResolution(current, evaluationContext, this.scope, this.structuralRegionOptions())) return null;
             current = getComposedParent(current);
         }
         return null;
@@ -1008,65 +805,152 @@ export class TranslationCandidateCore {
         }
     }
 
+    private enterDiscoveryFrame(
+        frame: DiscoveryFrame,
+        textProtectionCache: TranslationTextProtectionCache,
+        initialAdapter: AdapterDecisionResult | undefined,
+    ): void {
+        isTranslationTextElementProtected(
+            frame.element,
+            this.shouldStayOriginal,
+            textProtectionCache,
+            this.textOptions(),
+        );
+        const hardGuard = frame.checkAncestors
+            ? evaluateHardGuard(frame.element, this.textOptions())
+            : evaluateElementHardGuard(frame.element, this.textOptions());
+        // 入口探测与第一 enter 之间没有 yield；复用刚读取的自有决策后立即
+        // 释放，后续节点或下一次扫描不会继承这次初始结果。
+        const ownAdapter = initialAdapter ?? this.adapterDecision(frame.element);
+        frame.ownAdapter = ownAdapter;
+        frame.shadowRoot = frame.element.shadowRoot;
+        frame.pruned = hardGuard.prune || ownAdapter.decision.kind === 'prune-subtree';
+        frame.phase = frame.pruned ? 'exit' : 'children';
+
+        if (ownAdapter.decision.kind === 'force-target' && !hardGuard.prune) {
+            // 本段检查在 enter 的 yield 之前完成；不把缓存放入 frame，
+            // 后续节点仍读取让出后可能变化的宿主属性和站点决策。
+            const forceContext = this.readOnlyEpoch?.defaultInspectionContext ?? this.newContext();
+            if (!this.readOnlyEpoch) {
+                forceContext.adapterContext = {...this.context, closestSelectorMisses: new WeakMap()};
+            }
+            forceContext.adapterDecisions.set(frame.element, ownAdapter);
+            frame.forcedCandidate = this.inspectWithTextProtectionCache(
+                frame.element,
+                textProtectionCache,
+                forceContext,
+            ).candidate ?? undefined;
+            frame.forcedAtomic = ownAdapter.decision.atomic !== false;
+            if (frame.forcedCandidate && ownAdapter.decision.atomic !== false) frame.phase = 'exit';
+        }
+    }
+
+    private computeDiscoveryExitCandidates(
+        frame: DiscoveryFrame,
+        textProtectionCache: TranslationTextProtectionCache,
+    ): TranslationCandidate[] {
+        const decision = frame.ownAdapter!.decision;
+        const explicitContainer = decision.kind === 'force-target' && decision.atomic === false &&
+            (decision.target ?? frame.element) === frame.element;
+        if (frame.forcedCandidate) {
+            return frame.forcedAtomic === false && frame.descendantHasCandidate
+                ? this.inlineRunCandidates(
+                    frame.element,
+                    true,
+                    textProtectionCache,
+                    explicitContainer,
+                    frame.candidateChildBarriers,
+                )
+                : this.splitForcedCandidate(frame.forcedCandidate, decision, textProtectionCache);
+        }
+        if (decision.kind === 'skip-self' || decision.kind === 'prune-subtree' || frame.pruned) {
+            return [];
+        }
+        if (frame.descendantHasCandidate) {
+            return frame.insideStructural
+                ? []
+                : this.inlineRunCandidates(
+                    frame.element,
+                    true,
+                    textProtectionCache,
+                    explicitContainer,
+                    frame.candidateChildBarriers,
+                    undefined,
+                    this.genericDoubleBrBarriers(frame.element, textProtectionCache),
+                );
+        }
+        const doubleBrBarriers = frame.insideStructural
+            ? null
+            : this.genericDoubleBrBarriers(frame.element, textProtectionCache);
+        if (doubleBrBarriers) {
+            return this.inlineRunCandidates(
+                frame.element,
+                true,
+                textProtectionCache,
+                explicitContainer,
+                frame.candidateChildBarriers,
+                undefined,
+                doubleBrBarriers,
+            );
+        }
+        const candidate = this.genericCandidateForDiscovery(
+            frame.element,
+            frame.insideStructural,
+            textProtectionCache,
+        );
+        return candidate ? [candidate] : this.scope === 'all'
+            ? this.inlineRunCandidates(
+                frame.element, true, textProtectionCache, explicitContainer, frame.candidateChildBarriers,
+            )
+            : [];
+    }
+
+    private pushNextDiscoveryChild(frame: DiscoveryFrame, stack: DiscoveryFrame[]): boolean {
+        const child = frame.element.children.item(frame.lightIndex);
+        if (child) {
+            frame.lightIndex += 1;
+            const insideStructural = this.scope === 'content' &&
+                !isIncludedSidebarRegion(child, this.structuralRegionOptions()) &&
+                (frame.insideStructural || isStructuralContainer(frame.element, this.structuralRegionOptions()));
+            stack.push(createDiscoveryFrame(child, false, insideStructural));
+            return true;
+        }
+
+        const shadowChild = frame.shadowRoot?.children.item(frame.shadowIndex) ?? null;
+        if (shadowChild) {
+            frame.shadowIndex += 1;
+            const insideStructural = this.scope === 'content' &&
+                !isIncludedSidebarRegion(shadowChild, this.structuralRegionOptions()) &&
+                (frame.insideStructural || isStructuralContainer(frame.element, this.structuralRegionOptions()));
+            stack.push(createDiscoveryFrame(shadowChild, false, insideStructural));
+            return true;
+        }
+        return false;
+    }
+
     private *walkDiscoverySteps(root: Node, promoteExplicitOwner: boolean): Generator<TranslationDiscoveryStep> {
         const visited = new Set<Element>();
         const textProtectionCache = createTranslationTextProtectionCache();
-        const roots: Element[] = [];
-        let initialAdapter: AdapterDecisionResult | undefined;
-        if (isElementNode(root)) {
-            // 动态控件可能先只有图标，再把文字写入内层 flex 标签。该标签本身不再是
-            // 正文候选，因此局部重扫应回到同一控件边界；被明确保护的脏子树不能提升。
-            const controlOwner = findTranslationControlOwner(root);
-            let scanRoot = controlOwner && controlOwner !== root &&
-                !evaluateHardGuard(root, this.textOptions()).prune && !this.hasAdapterPrunedAncestor(root)
-                ? controlOwner : root;
-            if (promoteExplicitOwner && scanRoot === root && !controlOwner && this.scope === 'content' && this.adapters.length > 0) {
-                initialAdapter = this.adapterDecision(root);
-                if (initialAdapter.decision.kind === 'pass' &&
-                    !evaluateHardGuard(root, this.textOptions()).prune && !this.hasAdapterPrunedAncestor(root) &&
-                    !isTranslationTextElementProtected(root, this.shouldStayOriginal, textProtectionCache, this.textOptions())) {
-                    // 硬守卫已验证整条 composed 祖先链不超过预算。这里只走 light DOM，
-                    // 不跨 ShadowRoot；遇到最近显式决策即停止，不越过原子目标或重定向。
-                    // 仅入口提升扫描根，完整遍历的子 frame 仍以自身决定边界和首段 run。
-                    let ancestor = root.parentElement;
-                    while (ancestor && !isDocumentSurface(ancestor)) {
-                        const ownAdapter = this.adapterDecision(ancestor);
-                        const decision = ownAdapter.decision;
-                        if (decision.kind !== 'pass') {
-                            if (decision.kind === 'force-target' && decision.atomic === false &&
-                                (decision.target ?? ancestor) === ancestor) {
-                                scanRoot = ancestor;
-                                initialAdapter = ownAdapter;
-                            }
-                            break;
-                        }
-                        ancestor = ancestor.parentElement;
-                    }
-                }
-            }
-            roots.push(scanRoot);
-        } else if ('children' in root) {
-            const children = (root as Document | ShadowRoot).children;
-            for (let index = 0; index < children.length; index += 1) {
-                const child = children.item(index);
-                if (child) roots.push(child);
-            }
-        }
+        const {roots, initialAdapter: resolvedInitialAdapter} = resolveDiscoveryRoots(
+            root,
+            promoteExplicitOwner,
+            textProtectionCache,
+            {
+                scope: this.scope,
+                hasAdapters: this.adapters.length > 0,
+                textOptions: () => this.textOptions(),
+                shouldStayOriginal: this.shouldStayOriginal,
+                adapterDecision: (element) => this.adapterDecision(element),
+                hasAdapterPrunedAncestor: (element) => this.hasAdapterPrunedAncestor(element),
+            },
+        );
+        let initialAdapter = resolvedInitialAdapter;
         for (const rootElement of roots) {
-            const stack: DiscoveryFrame[] = [{
-                element: rootElement,
-                phase: 'enter',
-                lightIndex: 0,
-                shadowIndex: 0,
-                shadowRoot: null,
-                descendantHasCandidate: false,
-                candidateChildBarriers: new Set(),
-                exitIndex: 0,
-                checkAncestors: true,
-                insideStructural: this.scope === 'content' &&
-                    hasStructuralAncestor(rootElement, this.structuralRegionOptions()),
-                pruned: false,
-            }];
+            const stack: DiscoveryFrame[] = [createDiscoveryFrame(
+                rootElement,
+                true,
+                this.scope === 'content' && hasStructuralAncestor(rootElement, this.structuralRegionOptions()),
+            )];
 
             while (stack.length > 0) {
                 const frame = stack[stack.length - 1]!;
@@ -1077,161 +961,25 @@ export class TranslationCandidateCore {
                         continue;
                     }
                     visited.add(frame.element);
-                    isTranslationTextElementProtected(
-                        frame.element,
-                        this.shouldStayOriginal,
-                        textProtectionCache,
-                        this.textOptions(),
-                    );
-                    const hardGuard = frame.checkAncestors
-                        ? evaluateHardGuard(frame.element, this.textOptions())
-                        : evaluateElementHardGuard(frame.element, this.textOptions());
-                    // 入口探测与第一 enter 之间没有 yield；复用刚读取的自有决策后立即
-                    // 释放，后续节点或下一次扫描不会继承这次初始结果。
-                    const ownAdapter = initialAdapter ?? this.adapterDecision(frame.element);
+                    this.enterDiscoveryFrame(frame, textProtectionCache, initialAdapter);
                     initialAdapter = undefined;
-                    frame.ownAdapter = ownAdapter;
-                    frame.shadowRoot = frame.element.shadowRoot;
-                    frame.pruned = hardGuard.prune || ownAdapter.decision.kind === 'prune-subtree';
-                    frame.phase = frame.pruned
-                        ? 'exit'
-                        : 'children';
-
-                    if (ownAdapter.decision.kind === 'force-target' && !hardGuard.prune) {
-                        // 本段检查在 enter 的 yield 之前完成；不把缓存放入 frame，
-                        // 后续节点仍读取让出后可能变化的宿主属性和站点决策。
-                        const forceContext = this.readOnlyEpoch?.defaultInspectionContext ?? this.newContext();
-                        if (!this.readOnlyEpoch) {
-                            forceContext.adapterContext = {...this.context, closestSelectorMisses: new WeakMap()};
-                        }
-                        forceContext.adapterDecisions.set(frame.element, ownAdapter);
-                        frame.forcedCandidate = this.inspectWithTextProtectionCache(
-                            frame.element,
-                            textProtectionCache,
-                            forceContext,
-                        ).candidate ?? undefined;
-                        frame.forcedAtomic = ownAdapter.decision.atomic !== false;
-                        if (frame.forcedCandidate && ownAdapter.decision.atomic !== false) frame.phase = 'exit';
-                    }
                     yield {element: frame.element, phase: 'enter'};
                     continue;
                 }
 
                 if (frame.phase === 'children') {
-                    const child = frame.element.children.item(frame.lightIndex);
-                    if (child) {
-                        frame.lightIndex += 1;
-                        stack.push({
-                            element: child,
-                            phase: 'enter',
-                            lightIndex: 0,
-                            shadowIndex: 0,
-                            shadowRoot: null,
-                            descendantHasCandidate: false,
-                            candidateChildBarriers: new Set(),
-                            exitIndex: 0,
-                            checkAncestors: false,
-                            insideStructural: this.scope === 'content' &&
-                                !isIncludedSidebarRegion(child, this.structuralRegionOptions()) &&
-                                (frame.insideStructural ||
-                                    isStructuralContainer(frame.element, this.structuralRegionOptions())),
-                            pruned: false,
-                        });
-                        continue;
-                    }
-
-                    const shadowRoot = frame.shadowRoot;
-                    const shadowChild = shadowRoot?.children.item(frame.shadowIndex) ?? null;
-                    if (shadowChild) {
-                        frame.shadowIndex += 1;
-                        stack.push({
-                            element: shadowChild,
-                            phase: 'enter',
-                            lightIndex: 0,
-                            shadowIndex: 0,
-                            shadowRoot: null,
-                            descendantHasCandidate: false,
-                            candidateChildBarriers: new Set(),
-                            exitIndex: 0,
-                            checkAncestors: false,
-                            insideStructural: this.scope === 'content' &&
-                                !isIncludedSidebarRegion(shadowChild, this.structuralRegionOptions()) &&
-                                (frame.insideStructural ||
-                                    isStructuralContainer(frame.element, this.structuralRegionOptions())),
-                            pruned: false,
-                        });
-                        continue;
-                    }
+                    if (this.pushNextDiscoveryChild(frame, stack)) continue;
                     frame.phase = 'exit';
                 }
 
                 if (!frame.exitCandidates) {
-                    const decision = frame.ownAdapter!.decision;
-                    const explicitContainer = decision.kind === 'force-target' && decision.atomic === false &&
-                        (decision.target ?? frame.element) === frame.element;
-                    if (frame.forcedCandidate) {
-                        frame.exitCandidates = frame.forcedAtomic === false && frame.descendantHasCandidate
-                            ? this.inlineRunCandidates(
-                                frame.element,
-                                true,
-                                textProtectionCache,
-                                explicitContainer,
-                                frame.candidateChildBarriers,
-                            )
-                            : this.splitForcedCandidate(frame.forcedCandidate, frame.ownAdapter!.decision, textProtectionCache);
-                    } else if (frame.ownAdapter?.decision.kind === 'skip-self' ||
-                        frame.ownAdapter?.decision.kind === 'prune-subtree' ||
-                        frame.pruned) {
-                        frame.exitCandidates = [];
-                    } else if (frame.descendantHasCandidate) {
-                        frame.exitCandidates = frame.insideStructural
-                            ? []
-                            : this.inlineRunCandidates(
-                                frame.element,
-                                true,
-                                textProtectionCache,
-                                explicitContainer,
-                                frame.candidateChildBarriers,
-                                undefined,
-                                this.genericDoubleBrBarriers(frame.element, textProtectionCache),
-                            );
-                    } else {
-                        const doubleBrBarriers = frame.insideStructural
-                            ? null
-                            : this.genericDoubleBrBarriers(frame.element, textProtectionCache);
-                        if (doubleBrBarriers) {
-                            frame.exitCandidates = this.inlineRunCandidates(
-                                frame.element,
-                                true,
-                                textProtectionCache,
-                                explicitContainer,
-                                frame.candidateChildBarriers,
-                                undefined,
-                                doubleBrBarriers,
-                            );
-                        } else {
-                            const candidate = this.genericCandidateForDiscovery(
-                                frame.element,
-                                frame.insideStructural,
-                                textProtectionCache,
-                            );
-                            frame.exitCandidates = candidate ? [candidate] : this.scope === 'all'
-                                ? this.inlineRunCandidates(
-                                    frame.element, true, textProtectionCache, explicitContainer, frame.candidateChildBarriers,
-                                )
-                                : [];
-                        }
-                    }
-                    this.discoveredCandidateChildBarriers.set(
-                        frame.element,
-                        frame.candidateChildBarriers,
-                    );
+                    frame.exitCandidates = this.computeDiscoveryExitCandidates(frame, textProtectionCache);
+                    this.discoveredCandidateChildBarriers.set(frame.element, frame.candidateChildBarriers);
                 }
 
                 const candidate = frame.exitCandidates[frame.exitIndex];
                 frame.exitIndex += 1;
-                const hasMore = frame.exitIndex < frame.exitCandidates.length;
-                if (!hasMore) {
+                if (frame.exitIndex >= frame.exitCandidates.length) {
                     const hasCandidate = frame.descendantHasCandidate || frame.exitCandidates.length > 0;
                     stack.pop();
                     const parent = stack[stack.length - 1];
@@ -1265,62 +1013,14 @@ export class TranslationCandidateCore {
     }
 
     resolveAtPoint(root: Document | ShadowRoot, x: number, y: number): TranslationCandidate | null {
-        return this.withSynchronousReadCache(() => {
-        // 一次坐标解析是同步只读阶段：每个 root 的原生命中栈只读取一次，
-        // 普通正文的祖先守卫也可复用；下一次手势重新读取，避免缓存动态页面。
-        const hitStacks = new Map<Document | ShadowRoot, Element[]>();
-        const elementsAtPoint = (currentRoot: Document | ShadowRoot): Element[] => {
-            let elements = hitStacks.get(currentRoot);
-            if (!elements) {
-                elements = findElementsAtPoint(currentRoot, x, y);
-                hitStacks.set(currentRoot, elements);
-            }
-            return elements;
-        };
-        const resolve = this.createSynchronousResolver();
-        // 编辑器是真实命中屏障：caret API 可能返回相邻辅助文本，命中栈也包含
-        // 整个表单。必须先检查最上层元素，避免跳过输入框后翻译其父容器。
-        const hitRoots = new Set<Document | ShadowRoot>();
-        let hitRoot: Document | ShadowRoot | null = root;
-        while (hitRoot && !hitRoots.has(hitRoot) && hitRoots.size <= maxPointResolutionDepth) {
-            hitRoots.add(hitRoot);
-            const hit: Element | undefined = elementsAtPoint(hitRoot)[0];
-            if (!hit) break;
-            const guard = evaluateHardGuard(hit, this.textOptions());
-            if (guard.reason === 'contenteditable' ||
-                guard.reason === 'excluded-tag' ||
-                guard.reason === 'protected-tag:textarea' ||
-                guard.reason === 'protected-tag:select' ||
-                guard.reason === 'protected-tag:option' ||
-                (guard.reason === 'protected-tag:input' && !getTranslatableControlValueAttribute(hit))) {
-                return null;
-            }
-            hitRoot = hit.shadowRoot;
-        }
-        const visitedRoots = new Set<Document | ShadowRoot>();
-        const resolveInRoot = (currentRoot: Document | ShadowRoot, depth: number): TranslationCandidate | null => {
-            if (depth > maxPointResolutionDepth || visitedRoots.has(currentRoot)) return null;
-            visitedRoots.add(currentRoot);
-
-            const pointedNode = findNodeAtPoint(currentRoot, x, y);
-            if (pointedNode) {
-                const pointedCandidate = resolve(pointedNode);
-                if (pointedCandidate) return this.refineHoverCandidate(pointedCandidate, currentRoot, x, y);
-            }
-
-            for (const element of elementsAtPoint(currentRoot)) {
-                if (element.shadowRoot) {
-                    const shadowCandidate = resolveInRoot(element.shadowRoot, depth + 1);
-                    if (shadowCandidate) return shadowCandidate;
-                }
-                const candidate = resolve(element);
-                if (candidate) return this.refineHoverCandidate(candidate, currentRoot, x, y);
-            }
-            return null;
-        };
-
-        return resolveInRoot(root, 0);
-        });
+        return this.withSynchronousReadCache(() => resolveCandidateAtPoint(
+            root,
+            x,
+            y,
+            this.textOptions(),
+            this.createSynchronousResolver(),
+            (candidate, currentRoot, pointX, pointY) => this.refineHoverCandidate(candidate, currentRoot, pointX, pointY),
+        ));
     }
 
     private refineHoverCandidate(

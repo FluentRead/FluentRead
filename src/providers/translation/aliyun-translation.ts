@@ -8,10 +8,9 @@
 
 import {resolveCloudRegion, services} from '@/src/core/config/catalog';
 import {getAliyunTranslationEndpoint, method} from '@/src/core/config/constants';
-import {getTranslationProviderLanguages} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderLanguages, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import {createHttpStatusError, createProviderCodeError, readJsonResponse} from '@/src/platform/http/errors';
 import {runtimeFetch} from '@/src/platform/http/runtime';
-import {requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderRequest} from '@/src/services/translation/types';
 import {resolveCloudLanguages} from './cloud/languages';
 import {canonicalQueryString, hmacSha1, percentEncode, toBase64} from './cloud/signature';

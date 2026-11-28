@@ -9,10 +9,9 @@
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import { method } from "@/src/core/config/constants";
 import {sha256Hex} from '@/src/shared/function/sha256';
-import {getTranslationProviderLanguages} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderLanguages, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import {createHttpStatusError, readJsonResponse} from '@/src/platform/http/errors';
 import {cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
-import {requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderRequest} from '@/src/services/translation/types';
 
 interface YoudaoResponse {

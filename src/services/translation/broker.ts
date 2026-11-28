@@ -11,7 +11,7 @@
  * 文件职责：编排翻译请求的配置快照、语言解析、缓存、请求去重、超时与 provider 调用，是后台翻译用例的中心服务。
  * 主要内容：createTranslationBroker 同时支持单条、批量和页面摘要，验证 provider 返回数量、类型及明显的原文回显或错语种，图片文字的内部策略接受有效原样结果并隔离缓存，空来源在本地保留；普通数组无论是否缓存都先合并完全相同的原文，再按原位置回填，AI 多段保留独立槽位与邻段语义；仅在原生批次响应结构异常时以相同取消所有权和剩余 deadline 逐段恢复，整批完成前不发布缓存；对完整多段协议逐槽修复上下文回显并拒绝空译文，以包含 Chrome auto 检测样本的完整身份构建缓存键，并按实际消费的云地域和凭据摘要、匿名额度身份、等待策略、清理代次与剩余 deadline 隔离 pending 请求；入口在等待前复制消息，ready 采用有界水合等待，之后按最终服务解析 AI 配置预算并扣除已等待时间，取消检查后沿用可信配置快照，仅未附着的公开请求复制备用配置；批次摘要与分项缓存键只构建一次并复用，重复身份只读写一次；每次公开请求累计缓存复用、上游调用次数、耗时与免费链线路尝试，结束后向注入的统计端口交付只含规模数值、服务与线路标识的事件。 可核对的公开符号包括 createTranslationBroker、聚合导出。
  * 模块边界：本文件位于翻译 application service 层，负责高层用例编排与组合路由；具体协议校验、缓存与在途存储、上游传输调度、异常恢复管线和用量统计下沉到 ./broker/* 子模块，不初始化 DOM 候选或网站规则，不挂载页面 UI，也不把供应商 HTTP 细节扩散到 feature。
- * 摘要共享：同一页面摘要跨取消归属共用一次调用，最后一个可取消等待者离开才中止；术语表修订号经 memoizer 复用。
+ * 术语表修订号：经 memoizer 复用，避免重复序列化与哈希。
  */
 
 import {
@@ -28,7 +28,6 @@ import {
     attachTranslationRequestControl,
     createTranslationProviderConfigSnapshot,
     createTranslationRequestSnapshot,
-    getImageLabelSlots,
     getTranslationGlossaryContext,
     getTranslationGlossarySourceText,
     getTranslationImageInput,
@@ -39,11 +38,9 @@ import {
 import {
     DEFAULT_PROVIDER_TIMEOUT_MS,
     getExplicitTranslationBudget,
-    normalizeDeadlineTimeoutMs,
     startTranslationRequest,
-    TranslationProviderDeadlineError,
 } from './requestDeadline';
-import {createTranslationIdentityPolicy, type CacheRequestMode} from './requestIdentity';
+import {createTranslationIdentityPolicy} from './requestIdentity';
 import {createTranslationRequestScheduler} from './requestScheduler';
 import {createCompositeTranslationRoutingState} from './compositeRouting';
 import {
@@ -53,7 +50,6 @@ import {
 } from './capabilities';
 import {shouldKeepCommonWebTermLabel} from './glossaryProtection';
 import {preparePrivacyRequest} from './privacyProtection';
-import {hasTranslationContent} from '@/src/core/translation/result';
 import {escapePageContextDelimiters} from '@/src/core/translation/prompts';
 import {SUBTITLE_CONTEXT_LIMIT} from '@/src/core/translation/subtitleContext';
 import {buildPageSummaryReference} from '@/src/core/translation/pageSummaryReference';
@@ -67,22 +63,16 @@ import {resolveTranslationRequestModel} from '@/src/core/config/requestModel';
 import {isModelThinkingEnabled} from '@/src/core/config/modelThinking';
 import {supportsVisionTransport} from '@/src/core/config/vision';
 import {PrivacyProtectionError} from '@/src/core/privacy/policy';
-import {sha256Hex} from '@/src/shared/function/sha256';
 import {measureTranslationText} from '@/src/services/translation-stats/measure';
 import {
-    buildPendingRequestKey,
     getRemainingDeadlineMs,
     getSingleSlotProtocol,
     GlossaryRevisionChangedError,
-    isCacheableResult,
-    isCacheableSingleResult,
     isCacheEnabled,
     resolveEmptyTranslationOrigin,
     runWithinDeadline,
     throwIfRequestAborted,
-    usesImageTextContext,
     validatePublicTranslationRequest,
-    type PageSummaryResult,
     type TranslationRequestExecution,
     type TranslationRequestTrace,
 } from './broker/protocol';
@@ -95,6 +85,7 @@ import {
 import {createBrokerCacheStore} from './broker/cacheStore';
 import {createBrokerProviderTransport} from './broker/providerTransport';
 import {createBrokerRecoveryPipeline} from './broker/recoveryPipeline';
+import {createBrokerCachedExecution} from './broker/cachedExecution';
 
 export type {
     TranslationBatchRequestMessage,
@@ -105,10 +96,6 @@ export type {
     TranslationRequestMessage,
     TranslationSingleRequestMessage,
 } from './types';
-
-const PAGE_SUMMARY_LIMIT = 1200;
-// 仅一至两句短参考直接发送；不能使用摘要输出上限作阈值，否则长页逐段重复输入反而更贵。
-const DIRECT_PAGE_CONTEXT_LIMIT = 240;
 
 /** 保留既有 broker 公共入口，模型规则由设置页与后台共用的 core 函数维护。 */
 export {resolveTranslationRequestModel};
@@ -140,7 +127,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
     }
 
     const identity = createTranslationIdentityPolicy(deps);
-    const {getSelectedModel, getEffectiveRequestModel, isPromptBasedAI, isAIContextEnabled, buildCacheKey} = identity;
+    const {getSelectedModel, getEffectiveRequestModel, isPromptBasedAI, isAIContextEnabled} = identity;
     const telemetry = createBrokerTelemetry({deps, now, warn, getSelectedModel});
     const cacheStore = createBrokerCacheStore({deps, now, warn, identity});
     const providerTransport = createBrokerProviderTransport({
@@ -159,375 +146,15 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         quotaDigest: cacheStore.quotaDigest,
         callProviderWithinDeadline: providerTransport.callProviderWithinDeadline,
     });
-
-    type SharedPageSummary = {controller: AbortController; waiters: number; release: () => void};
-    const sharedPageSummaryWaiters = new WeakMap<Promise<PageSummaryResult>, SharedPageSummary>();
-
-    async function addPageSummary(
-        execution: TranslationRequestExecution,
-        pageContext: string,
-        useCache: boolean,
-        requestGeneration: number,
-        requestDeadline: number,
-        modelOverride?: string,
-        requestTimeoutMs?: number,
-    ): Promise<PageSummaryResult> {
-        if (!isAIContextEnabled(execution, modelOverride) || !pageContext.trim()) return {context: '', summarized: false};
-
-        // 很短的参考省掉一次付费调用及首段串行等待；更长材料仍摘要并复用，控制整页累计输入。
-        if (pageContext.trim().length <= DIRECT_PAGE_CONTEXT_LIMIT) return {context: pageContext.trim(), summarized: false};
-
-        const key = cacheStore.buildPageSummaryCacheKey(execution, pageContext, modelOverride);
-        if (useCache) {
-            const cached = cacheStore.pageSummaryCache.get(key);
-            if (cached) return cached;
-        }
-
-        const summaryTimeoutMs = normalizeDeadlineTimeoutMs(requestTimeoutMs as number);
-        // 摘要跨取消归属共享：各请求只登记等待，最后一个可取消等待者离开时才中止共享调用。
-        const pendingKey = `${buildPendingRequestKey(key, summaryTimeoutMs, requestGeneration)}:cache:${useCache ? 'on' : 'off'}${cacheStore.pendingIdentitySuffix({...execution, ownershipKey: undefined}, modelOverride)}`;
-        const existing = cacheStore.pendingPageSummaries.get(pendingKey);
-        if (existing) return waitForSharedPageSummary(existing, sharedPageSummaryWaiters.get(existing)!, execution.abortSignal, requestDeadline);
-
-        const controller = new AbortController();
-        const abortSignal = execution.abortSignal;
-        execution = {...execution, ownershipKey: undefined, abortSignal: controller.signal};
-        const request = (async () => {
-            const fallback: PageSummaryResult = {context: pageContext, summarized: false};
-            try {
-                // 步骤 1：先读持久缓存，覆盖 MV3 service worker 重启后的重复摘要。
-                if (useCache) {
-                    const persisted = await runWithinDeadline(
-                        () => cacheStore.readCacheWithPendingValue(requestGeneration, key),
-                        requestDeadline,
-                        now,
-                        execution.abortSignal,
-                    );
-                    if (persisted !== null) {
-                        const cachedSummary: PageSummaryResult = {context: persisted, summarized: true};
-                        if (requestGeneration === cacheStore.getCacheGeneration()) cacheStore.cachePageSummary(key, cachedSummary);
-                        return cachedSummary;
-                    }
-                }
-
-                // 步骤 2：缓存未命中时生成短摘要，失败时回退到原始上下文。
-                const remainingTotalMs = getRemainingDeadlineMs(requestDeadline, now);
-                const providerTimeoutMs = Math.min(summaryTimeoutMs, remainingTotalMs);
-                const result = await providerTransport.callProviderWithinDeadline(
-                    execution,
-                    attachTranslationProviderConfig({
-                        origin: '',
-                        context: '',
-                        pageContext: '',
-                        summaryPrompt: deps.promptBuilder.buildPageSummaryPrompt(pageContext),
-                        summarySystemPrompt: deps.promptBuilder.buildPageSummarySystemPrompt(),
-                        serviceOverride: execution.service,
-                        sourceLanguage: execution.sourceLanguage,
-                        targetLanguage: execution.targetLanguage,
-                        modelOverride,
-                        thinkingOverride: execution.thinking,
-                        requestTimeoutMs: providerTimeoutMs,
-                    }, execution.config),
-                );
-                const summary = typeof result === 'string' ? result.trim().slice(0, PAGE_SUMMARY_LIMIT) : '';
-                const summarized: PageSummaryResult = summary
-                    ? {context: `Page summary (AI-generated reference):\n${summary}`, summarized: true}
-                    : fallback;
-                if (useCache && requestGeneration === cacheStore.getCacheGeneration()) cacheStore.cachePageSummary(key, summarized);
-                if (useCache && summarized.summarized) await cacheStore.persistCacheWrite(requestGeneration, key, summarized.context);
-                return summarized;
-            } catch (error) {
-                if (execution.abortSignal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
-                    throw error;
-                }
-                if (error instanceof PrivacyProtectionError) throw error;
-                warn('[FluentRead] page context summary failed; using extracted context:', error);
-                // 超时只是本次摘要预算耗尽，不能把原上下文当成成功摘要缓存，否则同 key 无法重试。
-                if (!(error instanceof TranslationProviderDeadlineError)
-                    && useCache
-                    && requestGeneration === cacheStore.getCacheGeneration()) {
-                    cacheStore.cachePageSummary(key, fallback);
-                }
-                return fallback;
-            }
-        })();
-
-        // 共享调用被中止后立即让出 pending 位，后续请求重新发起摘要而不是加入已中止的调用。
-        const entry = {controller, waiters: 0, release: () => { cacheStore.pendingPageSummaries.delete(pendingKey); }};
-        sharedPageSummaryWaiters.set(request, entry);
-        return waitForSharedPageSummary(cacheStore.trackPending(cacheStore.pendingPageSummaries, pendingKey, request), entry, abortSignal, requestDeadline);
-    }
-
-    async function waitForSharedPageSummary(
-        request: Promise<PageSummaryResult>,
-        entry: SharedPageSummary,
-        signal: AbortSignal | undefined,
-        requestDeadline: number,
-    ): Promise<PageSummaryResult> {
-        // 不可取消的等待者永久计数，保证共享调用不会被其他请求的取消中止。
-        entry.waiters += 1;
-        if (!signal) return runWithinDeadline(() => request, requestDeadline, now);
-        const leave = () => {
-            entry.waiters -= 1;
-            if (entry.waiters > 0) return;
-            entry.release();
-            entry.controller.abort();
-        };
-        signal.addEventListener('abort', leave, {once: true});
-        try {
-            return await runWithinDeadline(() => request, requestDeadline, now, signal);
-        } finally {
-            signal.removeEventListener('abort', leave);
-        }
-    }
-
-    async function translateSingleWithCache(
-        execution: TranslationRequestExecution,
-        message: TranslationSingleRequestMessage,
-        context: string,
-        pageContext: string,
-        useCache: boolean,
-        requestGeneration: number,
-        requestDeadline: number,
-        pendingBudgetMs: number,
-        recoverSharedDeadline = true,
-    ): Promise<string> {
-        const key = buildCacheKey(
-            execution,
-            message.origin,
-            context,
-            pageContext,
-            message.validateInlineCodeTranslation === true ? 'inline-code-v1'
-                : message.validateTranslationSlots === true ? 'slot-protocol' : 'single',
-            message.modelOverride,
-            message.sourceLanguageDetectionText,
-            message.subtitleContext,
-        );
-        const imageInput = getTranslationImageInput(message);
-        const imageSuffix = imageInput ? `:image:${sha256Hex(imageInput)}` : '';
-        const pendingKey = `${buildPendingRequestKey(key, pendingBudgetMs, requestGeneration)}:cache:${useCache ? 'on' : 'off'}${imageSuffix}${cacheStore.pendingIdentitySuffix(execution, message.modelOverride)}${cacheStore.pendingAnonymousConfigSuffix(execution)}${cacheStore.pendingCloudConfigSuffix(execution)}${recoverSharedDeadline ? '' : `:recovery-deadline:${requestDeadline}ms`}`;
-        const existing = cacheStore.pendingTranslations.get(pendingKey);
-        // 共享的是 provider 工作；每个等待者仍需保留自己的取消和截止边界。
-        if (existing) {
-            execution.trace.shared = true;
-            try {
-                return await runWithinDeadline(() => existing, requestDeadline, now, execution.abortSignal);
-            } catch (error) {
-                // 仅恢复早于自身截止时间的共享 transport 超时；普通失败和自身取消仍原样返回。
-                if (!recoverSharedDeadline || !(error instanceof TranslationProviderDeadlineError) || now() >= requestDeadline) throw error;
-                // 恢复轮按原绝对截止时间去重；相同等待者共享一次重发，仍最多恢复一轮。
-                execution.trace.shared = false;
-                return translateSingleWithCache(execution, message, context, pageContext, useCache,
-                    requestGeneration, requestDeadline, pendingBudgetMs, false);
-            }
-        }
-
-        const request = useCache ? (async () => {
-            // 步骤 1：先读持久缓存；未命中后只发起一次 provider 请求。
-            const cached = await runWithinDeadline(
-                () => cacheStore.readCacheWithPendingValue(requestGeneration, key),
-                requestDeadline,
-                now,
-                execution.abortSignal,
-            );
-            let leakedPageContext = false;
-            if (cached !== null) {
-                getRemainingDeadlineMs(requestDeadline, now);
-                // 缓存中的软重合可能是已经经过无上下文复验的合法译名；
-                // 只用明确边界/长复制信号否定旧缓存，避免每次都重译。
-                leakedPageContext = recoveryPipeline.isDefiniteRecoveryPageContextLeak(
-                    execution,
-                    message.origin,
-                    cached,
-                    pageContext,
-                    message.modelOverride,
-                );
-                if (isCacheableSingleResult(execution, message, cached) && !leakedPageContext) {
-                    execution.trace.cachedSegments = 1;
-                    return cached;
-                }
-            }
-
-            const result = leakedPageContext
-                ? await recoveryPipeline.callSingleProviderWithoutPageContext(execution, message, requestDeadline, pageContext)
-                : await recoveryPipeline.callSingleProviderWithContextRecovery(execution, message, context, pageContext, requestDeadline);
-            if (isCacheableSingleResult(execution, message, result)) {
-                await cacheStore.persistCacheWrite(requestGeneration, key, result);
-            }
-            return result;
-        })() : recoveryPipeline.callSingleProviderWithContextRecovery(
-            execution,
-            message,
-            context,
-            pageContext,
-            requestDeadline,
-        );
-
-        return cacheStore.trackPending(cacheStore.pendingTranslations, pendingKey, request);
-    }
-
-    async function translateBatchWithCache(
-        execution: TranslationRequestExecution,
-        message: TranslationBatchRequestMessage,
-        context: string,
-        pageContext: string,
-        useCache: boolean,
-        requestGeneration: number,
-        requestDeadline: number,
-        pendingBudgetMs: number,
-        recoverSharedDeadline = true,
-    ): Promise<string[]> {
-        const imageContext = import.meta.env.BROWSER !== 'userscript' && usesImageTextContext(execution, message);
-        const cacheMode: CacheRequestMode = imageContext ? 'image-context-v1'
-            : message.aiMultiSegment === true && !supportsNativeTranslationBatch(execution.service)
-            ? 'ai-multi-segment'
-            : 'batch';
-        const batchKey = buildCacheKey(
-            execution,
-            message.origin,
-            context,
-            pageContext,
-            cacheMode,
-            message.modelOverride,
-            undefined,
-            message.subtitleContext,
-            imageContext ? getImageLabelSlots(message) : undefined,
-        );
-        // 完整批次身份只计算一次；有语境的分项用定长摘要保留邻段和槽位语义，避免逐项携带整个批次。
-        const batchFingerprint = cacheMode !== 'batch' ? sha256Hex(batchKey) : '';
-        const pendingKey = `${buildPendingRequestKey(batchKey, pendingBudgetMs, requestGeneration)}:cache:${useCache ? 'on' : 'off'}${cacheStore.pendingIdentitySuffix(execution, message.modelOverride)}${cacheStore.pendingAnonymousConfigSuffix(execution)}${cacheStore.pendingCloudConfigSuffix(execution)}${import.meta.env.BROWSER !== 'userscript' && message.documentBatch === true ? ':document-batch' : ''}${recoverSharedDeadline ? '' : `:recovery-deadline:${requestDeadline}ms`}`;
-        const existing = cacheStore.pendingBatches.get(pendingKey);
-        if (existing) {
-            execution.trace.shared = true;
-            try {
-                return await runWithinDeadline(() => existing, requestDeadline, now, execution.abortSignal);
-            } catch (error) {
-                // 仅恢复早于自身截止时间的共享 transport 超时；普通失败和自身取消仍原样返回。
-                if (!recoverSharedDeadline || !(error instanceof TranslationProviderDeadlineError) || now() >= requestDeadline) throw error;
-                // 恢复轮按原绝对截止时间去重；相同等待者共享一次重发，仍最多恢复一轮。
-                execution.trace.shared = false;
-                return translateBatchWithCache(execution, message, context, pageContext, useCache,
-                    requestGeneration, requestDeadline, pendingBudgetMs, false);
-            }
-        }
-
-        const request = useCache ? (async () => {
-            const itemKeys = message.origin.map((origin, index) => cacheStore.buildBatchItemCacheKey(
-                execution, origin, index, batchFingerprint, context, pageContext, cacheMode, message.modelOverride,
-                message.subtitleContext,
-            ));
-            // 步骤 1：分项批量读取缓存，单次 IndexedDB 事务读取全部未命中热层的键。
-            const cached = await runWithinDeadline(
-                () => cacheStore.readCacheBatchWithPendingValues(requestGeneration, itemKeys),
-                requestDeadline,
-                now,
-                execution.abortSignal,
-            );
-            const leakedCachedIndexes = new Set<number>();
-            const validatedCached = cached.map((value, index) => {
-                if (!hasTranslationContent(message.origin[index] ?? '')) return message.origin[index] ?? '';
-                if (value === null || !isCacheableResult(message.origin[index]!, value, execution)) return null;
-                if (!recoveryPipeline.isDefiniteRecoveryPageContextLeak(
-                    execution,
-                    message.origin[index]!,
-                    value,
-                    pageContext,
-                    message.modelOverride,
-                )) return value;
-                leakedCachedIndexes.add(index);
-                return null;
-            });
-            const missingIndexes = validatedCached
-                .map((value, index) => value === null ? index : -1)
-                .filter((index) => index >= 0);
-
-            if (missingIndexes.length === 0) {
-                getRemainingDeadlineMs(requestDeadline, now);
-                execution.trace.cachedSegments = message.origin.length;
-                return validatedCached as string[];
-            }
-
-            const missingEntries = missingIndexes.map((index) => ({index, origin: message.origin[index]}));
-            const normalMissingIndexes = missingIndexes.filter((index) => !leakedCachedIndexes.has(index));
-            if (cacheMode !== 'batch' && normalMissingIndexes.length > 0) {
-                // 有语境批次的邻段本身就是翻译输入。只要有普通 miss，必须用完整原批次重算，
-                // 否则“完整批次指纹”会缓存一份实际没看到邻段的结果。
-                const translated = await recoveryPipeline.callBatchProviderWithContextRecovery(
-                    execution,
-                    message,
-                    context,
-                    pageContext,
-                    requestDeadline,
-                );
-                const entriesToWrite: Array<{key: string; value: string}> = [];
-                translated.forEach((value, index) => {
-                    const origin = message.origin[index];
-                    if (isCacheableResult(origin, value, execution)) {
-                        entriesToWrite.push({key: itemKeys[index]!, value});
-                    }
-                });
-                await cacheStore.persistCacheBatchWrite(requestGeneration, entriesToWrite);
-                return translated;
-            }
-            // 只有逐项补齐时缓存结果才会被使用；AI 合批整包重算不计入缓存命中。
-            execution.trace.cachedSegments = message.origin.length - missingIndexes.length;
-            const translatedByKey = new Map<string, string>();
-            const groups = [
-                {
-                    entries: missingEntries.filter(({index}) => !leakedCachedIndexes.has(index)),
-                    startWithoutPageContext: false,
-                },
-                {
-                    entries: missingEntries.filter(({index}) => leakedCachedIndexes.has(index)),
-                    startWithoutPageContext: true,
-                },
-            ];
-            for (const group of groups) {
-                if (group.entries.length === 0) continue;
-                const uniqueEntries = [...new Map(group.entries.map(({origin, index}) => [
-                    itemKeys[index],
-                    origin,
-                ])).entries()];
-                const uniqueOrigins = uniqueEntries.map(([, origin]) => origin);
-                const translated = await recoveryPipeline.callBatchProviderWithContextRecovery(
-                    execution,
-                    {...message, origin: uniqueOrigins},
-                    context,
-                    pageContext,
-                    requestDeadline,
-                    group.startWithoutPageContext,
-                );
-                uniqueEntries.forEach(([key], index) => {
-                    translatedByKey.set(key, translated[index]);
-                });
-            }
-
-            // 步骤 2：按原请求顺序回填结果，并合并单次事务写入有效译文。
-            const result = [...validatedCached] as Array<string | null>;
-            const entriesToWrite: Array<{key: string; value: string}> = [];
-            const writtenKeys = new Set<string>();
-            missingEntries.forEach(({index, origin}) => {
-                const itemKey = itemKeys[index]!;
-                const value = translatedByKey.get(itemKey);
-                result[index] = value as string;
-                if (!writtenKeys.has(itemKey) && isCacheableResult(origin, value, execution)) {
-                    writtenKeys.add(itemKey);
-                    entriesToWrite.push({key: itemKey, value});
-                }
-            });
-
-            await cacheStore.persistCacheBatchWrite(requestGeneration, entriesToWrite);
-            return result as string[];
-        })() : recoveryPipeline.callBatchProviderWithContextRecovery(
-            execution,
-            message,
-            context,
-            pageContext,
-            requestDeadline,
-        );
-
-        return cacheStore.trackPending(cacheStore.pendingBatches, pendingKey, request);
-    }
+    const {addPageSummary, translateSingleWithCache, translateBatchWithCache} = createBrokerCachedExecution({
+        deps,
+        now,
+        warn,
+        identity,
+        cacheStore,
+        providerTransport,
+        recoveryPipeline,
+    });
 
     async function translateWithCache(message: TranslationRequestMessage): Promise<string | string[]> {
         validatePublicTranslationRequest(message);

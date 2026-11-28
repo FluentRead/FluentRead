@@ -2,7 +2,7 @@
  * @file src/features/image-translation/services/mangaInference.worker.ts
  * 文件职责：在独立 Worker 中执行 PaddleOCR、气泡分析、LaMa 和可选离线 CTD 分割，保持 Offscreen 音频与消息线程响应。
  * 主要内容：按需复用已校验模型端口，真实下载和初始化阶段转发，CPU 重建锁定后端；按请求维护 AbortController 响应客户端协作取消消息，排队取消在懒加载模型前即刻退出，推理与分割在进入算子前复核取消并在中止后回报 aborted 保留温热会话，若回退期间原会话已损毁则立即清理对应端口以便后续重建；CTD 只读已导入缓存，接收有界 RGBA 快照并在本线程执行低通缩放与张量构造，验证固定模型元数据，单遍内联循环核验概率并量化独占 seg 后释放所有 ORT 张量；串行会话创建避免同一 Asyncify 运行时交错初始化。
- * 诊断：会话创建成功后报告该会话配置的执行提供程序；不推断混合后端中每个算子的实际设备，也不传输模型或图片内容。
+ * 诊断：会话创建成功后报告该会话配置的执行提供程序，并通过轻量订阅实时同步 Worker 内模型下载进度与状态，标记资源下载错误为 `asset` 以避免误触发 CPU 回退；不推断混合后端中每个算子的实际设备，也不传输模型或图片内容。
  * 模块边界：不读取网页、不翻译文本、不播放音频；协作取消优先提前结束当前推理，单次同步算子超时仍由外部 owner 硬终止。
  */
 import * as ort from 'onnxruntime-web/webgpu';
@@ -11,7 +11,7 @@ import {assertOnnxWasmRuntimeSupported, configureOnnxWasmBackend, resolveOnnxWas
 import {createBrowserMangaOcr} from './mangaOcr';
 import {createBrowserMangaInpainter} from './mangaInpainting';
 import type {MangaInferenceMessage, MangaInferenceResponse} from './mangaInferenceClient';
-import {loadMangaTextSegmentationAsset} from './mangaOcrAssets';
+import {loadMangaTextSegmentationAsset, MangaModelAssetError, subscribeMangaDownloadState} from './mangaOcrAssets';
 import {createImageTextSegmentationInput,isImageTextSegmentationSource,type ImageTextSegmentationSource} from './imageTextSegmentation';
 
 class SegmentationProtocolError extends Error {}
@@ -30,7 +30,7 @@ export function startMangaInferenceWorker(): void {
     let segmenter:ort.InferenceSession|undefined;
     let ocrBroken = false, painterBroken = false;
     let tail: Promise<void> = Promise.resolve(), creating: Promise<void> = Promise.resolve();
-    let currentRequestId = 0;
+    let currentRequestId: number | undefined;
     const controllers = new Map<number, AbortController>();
     const abortError = () => new DOMException('漫画处理已取消', 'AbortError');
     const ignore = () => undefined;
@@ -42,7 +42,7 @@ export function startMangaInferenceWorker(): void {
             const options = args.at(-1) as ort.InferenceSession.SessionOptions | undefined;
             const executionProviders = options?.executionProviders?.map(value => typeof value === 'string' ? value : value.name)
                 .filter((value): value is 'webgpu' | 'wasm' => value === 'webgpu' || value === 'wasm');
-            if (executionProviders?.length) post({requestId: currentRequestId, executionProviders});
+            if (executionProviders?.length) post({requestId: currentRequestId!, executionProviders});
             return session;
         });
     }) as typeof create;
@@ -61,6 +61,7 @@ export function startMangaInferenceWorker(): void {
         }
         scope.postMessage(response,transfer);
     };
+    subscribeMangaDownloadState(download => { if (currentRequestId !== undefined) post({requestId: currentRequestId, download: download ?? null}); });
     async function prepareSeg(progress:(stage:'preparing'|'initializing')=>void,cpu:boolean):Promise<boolean>{
         if(segmenter)return true;
         assertOnnxWasmRuntimeSupported();
@@ -138,7 +139,11 @@ export function startMangaInferenceWorker(): void {
             response = {requestId, success: true, result};
         } catch (error) {
             const aborted = signal.aborted && (error as {name?: unknown} | null | undefined)?.name === 'AbortError';
-            response = {requestId, success: false, ...(aborted ? {aborted: true} : {}), error: error instanceof Error ? error.message : String(error),...(['prepare-seg','segment','dispose-seg'].includes(message.type)?{errorKind:error instanceof SegmentationProtocolError?'protocol' as const:'execution' as const}:{})};
+            const isSeg = ['prepare-seg','segment','dispose-seg'].includes(message.type);
+            const isAsset = !isSeg && (error instanceof MangaModelAssetError || (error as {name?: unknown} | null | undefined)?.name === 'QuotaExceededError');
+            response = {requestId, success: false, ...(aborted ? {aborted: true} : {}), error: error instanceof Error ? error.message : String(error),
+                ...(isSeg ? {errorKind: error instanceof SegmentationProtocolError ? 'protocol' as const : 'execution' as const}
+                    : isAsset ? {errorKind: 'asset' as const} : {})};
         } finally {
             if (ocrBroken) {
                 ocrBroken = false;

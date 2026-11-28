@@ -63,14 +63,21 @@ async function localEntry(recipe: DictionaryRecipe, word: string): Promise<Dicti
             const mime = mediaTypes[clean.slice(clean.lastIndexOf('.') + 1).toLowerCase()];
             if (!resource || !mime || resource.bytes.length > 1024 * 1024 || total + resource.bytes.length > 2 * 1024 * 1024) continue;
             total += resource.bytes.length;
-            let binary = ''; for (const byte of resource.bytes) binary += String.fromCharCode(byte);
-            const url = `data:${mime};base64,${btoa(binary)}`;
+            const url = `data:${mime};base64,${encodeBytesToBase64(resource.bytes)}`;
             html = html.replaceAll(path, url); css = css.replaceAll(path, url);
         }
         return {...EMPTY_DICTIONARY_FIELDS, word: entries[0].word, phonetic: entries[0].phonetic,
             definition: entries.map(item => item.definition).join('\n'), html, css, source: recipe.name, sourceUrl: ''};
     } finally {database.close();}
 }
+function encodeBytesToBase64(bytes: Uint8Array): string {
+    const chunks: string[] = [];
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+        chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 0x8000)));
+    }
+    return btoa(chunks.join(''));
+}
+
 async function query(recipe: DictionaryRecipe, word: string): Promise<WordCardData | null> {
     if (recipe.kind === 'local') {const entry = await localEntry(recipe, word); return entry ? toCard(entry, recipe) : null;}
     const url = dictionaryUrl(recipe.url, word);
@@ -101,8 +108,10 @@ export async function lookupDictionaryRecipe(text: string, input: DictionaryReci
     pending.set(key, request);
     try {
         const card = await request;
-        if (cache.size >= 32) cache.delete(cache.keys().next().value!);
-        cache.set(key, {until: Date.now() + 5 * 60_000, card});
+        if (recipe.kind !== 'local') {
+            if (cache.size >= 32) cache.delete(cache.keys().next().value!);
+            cache.set(key, {until: Date.now() + 5 * 60_000, card});
+        }
         return structuredClone(card);
     } finally {pending.delete(key);}
 }

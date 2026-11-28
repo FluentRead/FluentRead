@@ -19,10 +19,14 @@ export function userscriptMessages<T extends Record<string, string>>(messages: T
     return Object.fromEntries(Object.entries(messages).filter(([key]) => !['learning.collection.undoExtensionNotice', 'popup.donationDescription'].includes(key)
         && !key.startsWith('informationHighlight.')
         && !key.startsWith('dictionary.')
+        && !key.startsWith('scenarioPresets.')
+        && !key.startsWith('commandPalette.')
         && (!key.startsWith('learning.collection.speech') || key === 'learning.collection.speechFailed')
         && !key.startsWith('contextMenu.notice.') && !key.startsWith('video.learning.') && !key.startsWith('video.learningAppearance.')
         && !key.startsWith('video.readingAnnotation.')
-        && !key.startsWith('video.appearance.') && !key.startsWith('video.export') && !key.startsWith('video.ai') && !key.startsWith('video.model')
+        && !key.startsWith('video.appearance.') && !key.startsWith('video.export') && !key.startsWith('video.ai') && !key.startsWith('video.model') && !key.startsWith('video.localMedia.')
+        && !key.startsWith('writing.hotkey.')
+        && !key.startsWith('document.xlsx.')
         && (!key.startsWith('video.modeShortcut.') || key === 'video.modeShortcut.title')
         && key !== 'video.nativeFullscreenHint'
         && !key.startsWith('diagnostics.')
@@ -38,7 +42,10 @@ export function userscriptMessages<T extends Record<string, string>>(messages: T
         && !key.startsWith('popup.quickSettings.') && !key.startsWith('popup.quickTranslation.')
         && !key.startsWith('popup.compact.') && !key.startsWith('popup.displayMode.') && !key.startsWith('popup.pageFont.') && !key.startsWith('document.config.')
         && !key.startsWith('document.translationRecovery.')
-        && !key.startsWith('document.retainedRevisions.') && !key.startsWith('document.translationProgress.'))) as T;
+        && !key.startsWith('document.retainedRevisions.') && !key.startsWith('document.translationProgress.')
+        && !key.startsWith('settings.cloud.e2ee.')
+        && !key.startsWith('settings.cloud.learning.')
+        && !key.startsWith('settings.cloud.autoSync.'))) as T;
 }
 export const zhCNMessages = userscriptMessages(extensionChinese);
 
@@ -63,6 +70,28 @@ const nativeOnlyLegacySources = new Set([
     '译文仅保留在本页，请下载后再离开。',
     '当前翻译和校订结果只保留在本页，离开后无法恢复。建议先下载需要的结果。',
     '重新翻译会替换现有译文和人工校订。你也可以返回并先下载当前结果。',
+    // 扩展专用的云备份端到端加密、学习资产同步与自动同步报错文案。
+    '同步加密口令模式已变化，请重新生成预览。',
+    '云端备份使用自定义端到端加密口令保护，请先输入同步口令。',
+    '同步口令不正确，或云端配置已损坏；本机配置未被修改',
+    '加密口令模式无效',
+    '同步口令至少需要 12 个字符，最多 1024 个字符',
+    '本机学习数据已变化，请重新生成同步预览。',
+    '本机学习数据写入和配置恢复失败，请重新打开设置检查；云端保留本次加密快照。',
+    '合并后的单词本超出 5000 条上限，请清理后再同步',
+    // 扩展专用的写作助手通用网页与文档 PPTX/XLSX/LaTeX 运行期提示文案。
+    '写作助手仅支持常规网页（HTTP/HTTPS）',
+    '当前富文本编辑器由页面框架托管，请复制正文后自行粘贴。',
+    'PPTX 演示文稿',
+    'XLSX 电子表格',
+    'LaTeX 文档',
+    'PPTX 文件结构无效，文件可能已损坏或扩展名不正确',
+    'PPTX 中没有找到可翻译的幻灯片文字',
+    'XLSX 文件结构无效，文件可能已损坏或扩展名不正确',
+    'XLSX 中没有找到可翻译的单元格文字',
+    '该文件不是 PDF、ePub、DOCX、PPTX 或 XLSX 二进制文档',
+    'PPTX 文档状态无效，请重新打开文件',
+    'XLSX 文档状态无效，请重新打开文件',
 ]);
 
 // Userscript does not mount settings-video or its native ASR runtime. Keep config-diff

@@ -55,6 +55,16 @@ describe('writing entry placement', () => {
         expect(doc.querySelectorAll('span')).toHaveLength(1);
     });
 
+    it('places expanded first-class sites before the native send/post action', () => {
+        for (const site of ['outlook', 'x', 'reddit', 'linkedin', 'slack', 'discord', 'notion'] as const) {
+            const doc = page('<div class="actions"><button id="send">Send</button></div>');
+            const action = doc.querySelector<HTMLButtonElement>('#send')!;
+            const host = doc.createElement('span');
+            expect(placeWritingEntry(action, host, site)).toBe(true);
+            expect(action.previousElementSibling).toBe(host);
+        }
+    });
+
     it('does not touch a detached action', () => {
         const doc = page('<button id="comment">Comment</button>');
         const action = doc.querySelector<HTMLButtonElement>('#comment')!;
@@ -75,4 +85,31 @@ it('keeps visit dismissal in document memory and starts fresh in a new document'
     session.dismissWritingForVisit(); expect(session.isWritingDismissedForVisit()).toBe(true);
     expect((await import('@/src/features/writing-assistant/entrySession')).isWritingDismissedForVisit()).toBe(true);
     vi.resetModules(); expect((await import('@/src/features/writing-assistant/entrySession')).isWritingDismissedForVisit()).toBe(false);
+});
+
+it('queues on-demand open targets until a surface handler registers and clears on unmount', async () => {
+    const {vi} = await import('vitest');
+    vi.resetModules();
+    vi.doMock('@/src/services/config/store', () => ({config: {}}));
+    const session = await import('@/src/features/writing-assistant/shortcutRuntime');
+    const doc = page('<textarea id="first"></textarea><textarea id="second"></textarea>');
+    const first = doc.querySelector<HTMLElement>('#first')!;
+    const second = doc.querySelector<HTMLElement>('#second')!;
+    const handler = vi.fn();
+
+    session.requestOpenWritingForEditor(first);
+    session.clearPendingWritingOpenTarget();
+    session.registerWritingOpenHandler(handler);
+    expect(handler).not.toHaveBeenCalled();
+
+    session.registerWritingOpenHandler(null);
+    session.requestOpenWritingForEditor(first);
+    session.registerWritingOpenHandler(handler);
+    expect(handler).toHaveBeenCalledOnce();
+    expect(handler).toHaveBeenCalledWith(first);
+
+    session.requestOpenWritingForEditor(second);
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(handler).toHaveBeenLastCalledWith(second);
+    session.registerWritingOpenHandler(null);
 });

@@ -42,6 +42,7 @@ import {
   type TranslationQueueSession,
 } from '@/src/services/translation/queue';
 import {
+  createTranslationAbortError as createAbortError,
   isRetryableTranslationError,
   TRANSLATION_ERROR_MARKER,
   TranslationRequestError,
@@ -128,12 +129,6 @@ const videoCountPersistence = createConfigCountPersistenceQueue({
   persist: persistCountIncrement,
   onError: (error) => console.error('[FluentRead] 保存视频翻译计数失败:', error),
 });
-
-function createAbortError(): Error {
-  const error = new Error('翻译已取消');
-  error.name = 'AbortError';
-  return error;
-}
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw createAbortError();

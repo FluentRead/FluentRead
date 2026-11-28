@@ -214,14 +214,14 @@ describe('PDF.js pinned binary data factory', () => {
 });
 
 describe('delta UI language packs', () => {
-    it('keeps en-US full locally and reconstructs all 5 remote-base languages identically to full bundles', () => {
+    it('keeps en-US and zh-TW full locally and reconstructs all 5 remote-base languages identically to full bundles', () => {
         const fullFiles = new Map(createUiLanguageBundleFiles().map(item => [item.relativeDest, JSON.parse(item.contents)]));
         const extFiles = createExtensionUiLanguageBundleFiles(PROJECT_ROOT);
-        expect(extFiles).toHaveLength(6);
+        expect(extFiles).toHaveLength(7);
 
         for (const {relativeDest, contents} of extFiles) {
             const parsed = JSON.parse(contents);
-            if (relativeDest === 'i18n/en-US.json') {
+            if (relativeDest === 'i18n/en-US.json' || relativeDest === 'i18n/zh-TW.json') {
                 expect(isDeltaUiLanguageBundle(parsed)).toBe(false);
                 expect(parsed).toEqual(fullFiles.get(relativeDest));
                 continue;
@@ -327,6 +327,14 @@ describe('subframe site rules and scoped Chinese catalog plugins', () => {
         const pagesConfig: {plugins?: unknown[]} = {};
         extendScopedChineseCatalogBuildConfig([{type: 'popup'}, {type: 'options'}], pagesConfig);
         expect(pagesConfig.plugins).toBeUndefined();
+
+        const bridgeConfig: {plugins?: unknown[]} = {};
+        extendScopedChineseCatalogBuildConfig([{type: 'content-script', name: 'youtubeBridge'}], bridgeConfig);
+        expect(bridgeConfig.plugins).toBeUndefined();
+
+        const namelessContentConfig: {plugins?: unknown[]} = {};
+        extendScopedChineseCatalogBuildConfig([{type: 'content-script'}], namelessContentConfig);
+        expect(namelessContentConfig.plugins).toHaveLength(1);
 
         // Verify generateBundle replaces double, single, and backtick-quoted sentinels (Rolldown minifier uses backticks).
         const pluginInstance = scopedChineseCatalogBuildPlugin();
@@ -1087,18 +1095,45 @@ describe('deep slim Layer 1 + Layer 2 edge branches and contracts', () => {
         clearPinnedRemoteUiLanguageBaseCache();
     });
 
-    it('extracts Chinese messages & dynamic template keys cleanly via AST even after quote-containing regex literals', () => {
+    it('extracts Chinese messages & dynamic template keys cleanly via lexical scanner across regexes, division, nested templates, and plus concat', () => {
         const code = [
-            "const re = /['\"<>]/gu;",
-            'function copy(kind) { return t(`paragraphCopy.notice.copied${kind}`); }',
-            "const label = 'common.' + 'brand';",
+            "const re = /['\"`<>]/gu;",
+            "if (cond) /['\"]/g.test(input);",
+            "while (cond) /=foo['\"]/.test(input);",
+            "function fn() { return /['\"]/; } /['\"]/.test(x);",
+            "const div1 = a / b / c;",
+            "const div2 = obj.return / 2;",
+            "const div3 = obj.if(x) / 2;",
+            "const div4 = obj?.if(x) / 2;",
+            "let n = 10; n /= 2;",
+            "for (let t of /a'b/.exec(s)) { const k = 'popup.compact.translate'; }",
+            "async function iter(y) { for await (const x of y) /foo'bar/.test(x); return 'sidepanel.title'; }",
+            "const divOf = of / 2;",
+            "a++\n'paragraphCopy.notice.copied' + kind;",
+            'function copy(kind) { return t(`paragraphCopy.notice.copied${kind ? `sidepanel.${{k: "popup.compact.translate"}.k}` : "common." + "brand"}`); }',
             "const escaped = '\\u7ffb\\u8bd1';",
         ].join('\n');
         const selected = selectReachableChineseMessages(code);
         expect(selected).toHaveProperty('paragraphCopy.notice.copiedOriginal');
         expect(selected).toHaveProperty('paragraphCopy.notice.copiedTranslation');
         expect(selected).toHaveProperty('paragraphCopy.notice.copiedBilingual');
-        expect(selected).toHaveProperty('common.brand');
+        expect(selected).toHaveProperty('popup.compact.translate', '翻译');
+        expect(selected).toHaveProperty('sidepanel.title', '侧边栏翻译');
+        expect(selected).toHaveProperty('common.brand', '流畅阅读');
+
+        // C-style for(;;) / destructuring default 中的 of 除法，以及表达式位置 } 后的除法不得误判为正则
+        for (const snippet of [
+            'for (let x = of / 2; x < 10; x++) { const k = "popup.compact.translate"; const y = b / 2; }',
+            'for (let i = 0; i < of / 2; i++) { const k = "popup.compact.translate"; const y = b / 2; }',
+            'for (let [a = of / 2] of arr) { const k = "popup.compact.translate"; const y = b / 3; }',
+            'const x = { a: 1 } / 2; const k = "popup.compact.translate"; const y = b / 3;',
+            'const x = function() {} / 2; const k = "popup.compact.translate"; const y = b / 3;',
+            'const x = async function() {} / 2; const k = "popup.compact.translate"; const y = b / 3;',
+            'const x = class {} / 2; const k = "popup.compact.translate"; const y = b / 3;',
+            'const x = `a ${ {v:1} / 2 } popup.compact.translate ${ b / 3 }`;',
+        ]) {
+            expect(selectReachableChineseMessages(snippet), snippet).toHaveProperty('popup.compact.translate', '翻译');
+        }
     });
 
     it('prunes site-adaptation catalog JSON for subframe entrypoints without dropping matching rules', () => {

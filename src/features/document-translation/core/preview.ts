@@ -1,10 +1,11 @@
 /**
  * @file src/features/document-translation/core/preview.ts
  * 文件职责：把已解析文档与对应译文转换成安全、可阅读的隔离预览 HTML，统一支持原文、双语和纯译文阅读，以及多种主题、字体与双语版式。
- * 主要内容：提供主动 HTML 剥离、HTML5 阅读器外壳、阅读外观样式与无障碍轻量等待动画；纯文本原样转义并识别多空行场景分隔、水平分割线及中英文章节标题；Markdown 支持 YAML frontmatter 折叠卡片、块级/行内数学公式、带语言标头的代码块、嵌套列表与任务复选框、连续引用与 GitHub Callout、删除线/单下划线斜体/安全外链/内联图片与可横向滚动表格，并为每个片段标注 data-segment-id 供增量补丁同步。
+ * 主要内容：提供主动 HTML 剥离、HTML5 阅读器外壳、阅读外观样式与无障碍轻量等待动画；纯文本原样转义并识别多空行场景分隔、水平分割线及中英文章节标题；Markdown 与 LaTeX 支持原译配对、YAML frontmatter 折叠卡片、块级/行内数学公式、带语言标头的代码块、嵌套列表与任务复选框、连续引用与 GitHub Callout、删除线/单下划线斜体/安全外链/内联图片与可横向滚动表格，并为每个片段标注 data-segment-id 供增量补丁同步。
  * 模块边界：本模块只生成展示字符串，不操作真实 DOM、不执行脚本也不修改文档模型；源文件解析由 document.ts 完成，原位增量同步由 ui/richPreviewSync.ts 负责，二进制分页预览由 pdfPreview.ts 负责。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
+import {stripDocumentInlineMarkers} from '@/src/core/translation/documentInlineMarkers';
 import {
     inspectMarkdownLine,
     parseDocument,
@@ -614,7 +615,7 @@ export function createDocumentPreviewHtml(
     mode: DocumentPreviewMode,
     options?: DocumentPreviewOptions,
 ): string {
-    const previewTranslations = mode !== 'source' && ['markdown', 'txt'].includes(document.format)
+    const previewTranslations = mode !== 'source' && ['markdown', 'txt', 'tex'].includes(document.format)
         ? Array.from({length: document.segments.length}, (_, index) => {
             const translation = translations[index];
             return translation === undefined
@@ -634,6 +635,20 @@ export function createDocumentPreviewHtml(
     }
     if (document.format === 'txt') {
         return renderTextPreview(document, previewTranslations, mode, options);
+    }
+    if (document.format === 'tex') {
+        const body = document.segments.map((segment, index) => {
+            const kind = segment.role === 'title' || segment.role === 'heading'
+                ? 'heading'
+                : segment.role === 'list-item' ? 'list-item' : 'paragraph';
+            const sourceText = stripDocumentInlineMarkers(segment.source);
+            const translatedText = mode === 'source' ? '' : stripDocumentInlineMarkers(previewTranslations[index] || segment.source);
+            return pairedUnit(sourceText, translatedText, mode, kind, {
+                headingLevel: segment.role === 'title' ? 1 : 2,
+                segmentId: segment.id,
+            });
+        }).join('');
+        return readerShell(`<article class="text-article" data-reader-mode="${mode}">${body}</article>`);
     }
     throw new Error(`不支持为 ${document.format} 生成富文档预览`);
 }

@@ -5,6 +5,7 @@ import type {PluginOption} from 'vite';
 import {defineConfig, type ConfigEnv, type UserManifest} from 'wxt';
 import {resolveBrowserCapabilities} from './src/platform/browser/capabilities';
 import {sharedOnnxBuildPlugin, sharedOnnxDist} from './scripts/wasm/manga-onnx-build';
+import {kokoroTransformersBuildPlugin} from './scripts/wasm/kokoro-transformers-build';
 import {packageWasmDiagnostics} from './scripts/wasm/package-diagnostics';
 import {tesseractSdkBuildPlugin} from './scripts/wasm/tesseract-sdk-build';
 import {compactExtensionZip} from './scripts/wasm/compact-extension-zip';
@@ -30,6 +31,7 @@ import {
     resolveOnnxWasmVariant,
 } from './scripts/testing/wxt-manifest-helpers';
 import {
+    aiSdkGatewayStubBuildPlugin,
     attachRolldownTransformFilters,
     configureExtensionUiChunks,
     extendRemoteConfigBuildConfig,
@@ -48,6 +50,7 @@ import {
     collectStaticExtensionPublicAssets,
     escapeExtensionNoncharacters,
     finalizeExtensionZip,
+    isFastZipEnabled,
     resolveExtensionBuildBudget,
 } from './scripts/testing/wxt-asset-helpers';
 
@@ -57,6 +60,8 @@ export {
     configureSafariBackgroundPage,
     configureStableContentUiResources,
     finalizeExtensionZip,
+    isFastZipEnabled,
+    aiSdkGatewayStubBuildPlugin,
     remoteConfigStorageBuildPlugin,
     extendRemoteConfigBuildConfig,
     subframePageContextBuildPlugin,
@@ -130,6 +135,8 @@ function getBuildStaticSetup() {
                 defuddleEntityBuildPlugin(),
                 francRuntimeBuildPlugin(),
                 sharedOnnxBuildPlugin(),
+                kokoroTransformersBuildPlugin(),
+                aiSdkGatewayStubBuildPlugin(),
                 wllamaExtensionWorker(),
                 tesseractSdkBuildPlugin(),
                 escapeExtensionNoncharacters(),
@@ -199,8 +206,8 @@ export default defineConfig({
     manifest: createExtensionManifest,
     zip: {
         name: 'fluent-read',
-        // 发布包采用标准 DEFLATE 的最高压缩等级；仅增加打包时间，不改变解压后的资源或运行时。
-        compressionLevel: 9,
+        // 发布包默认采用标准 DEFLATE 最高压缩等级；显式设置 FLUENTREAD_ZIP_FAST=1 时切换为快速本地打包。
+        compressionLevel: isFastZipEnabled() ? 1 : 9,
         // WXT 0.21 将 includeSources 作为白名单。仅包含复现扩展和审核所需的
         // 文件，点文件只明确允许 .nvmrc，避免带入 .env 等本地配置。
         includeSources: [
@@ -219,6 +226,10 @@ export default defineConfig({
         },
         'zip:extension:done': async (wxt, zipPath) => {
             await finalizeExtensionZip(wxt.config.browser, zipPath);
+            if (isFastZipEnabled()) {
+                wxt.logger.warn('FLUENTREAD_ZIP_FAST=1 已启用：使用 DEFLATE 1 级且跳过 Zopfli WASM 压缩（仅限本地验证，请勿用于商店发布）');
+                return;
+            }
             const compact = await compactExtensionZip(zipPath, __dirname);
             wxt.logger.info(`WASM ZIP compression saved ${compact.savedBytes.toLocaleString('en-US')} bytes`);
         },

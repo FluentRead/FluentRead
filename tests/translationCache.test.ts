@@ -525,7 +525,7 @@ describe('translation cache delayed operation races', () => {
     await resetCache();
   });
 
-  it('returns a delayed cold read snapshot without repopulating the evicted record', async () => {
+  it('does not repopulate an evicted record from a delayed cold read', async () => {
     const victim = record('victim', { lastAccessedAt: 500 });
     await translationCacheDb.entries.bulkPut([victim, ...Array.from({ length: 100 }, (_, index) => (
       record(`keep-${index}`, { lastAccessedAt: 1_000 + index })
@@ -537,11 +537,11 @@ describe('translation cache delayed operation races', () => {
     const pending = translationCache.get('victim', 2_000);
     await translationCache.setLimits({ maxBytes: TRANSLATION_CACHE_MAX_BYTES, maxEntries: 100 }, 2_000);
     resolveRead(victim);
-    await expect(pending).resolves.toBe(victim.translation);
+    await expect(pending).resolves.toBeNull();
     await expect(translationCache.get('victim', 2_001)).resolves.toBeNull();
   });
 
-  it('keeps batch cold hits that land after an unrelated write without touching them', async () => {
+  it('keeps batch cold hits that land after an unrelated write', async () => {
     await translationCacheDb.entries.bulkPut([record('batch-a'), record('batch-b')]);
     let resolveRead!: (value: (TranslationCacheRecord | undefined)[]) => void;
     vi.spyOn(translationCacheDb.entries, 'bulkGet').mockReturnValueOnce(new Promise((resolve) => {
@@ -552,7 +552,7 @@ describe('translation cache delayed operation races', () => {
     resolveRead([record('batch-a'), record('batch-b'), undefined]);
     await expect(pending).resolves.toEqual([record('batch-a').translation, record('batch-b').translation, null]);
     await translationCache.getStats(2_000);
-    await expect(translationCacheDb.entries.get('batch-a')).resolves.toMatchObject({ lastAccessedAt: 1_000 });
+    await expect(translationCacheDb.entries.get('batch-a')).resolves.toMatchObject({ lastAccessedAt: 2_000 });
   });
 
   it.each(['evicted', 'replaced', 'cleared'])('does not revive a committed write whose return is delayed until it is %s', async (state) => {

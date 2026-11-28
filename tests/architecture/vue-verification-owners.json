@@ -149,12 +149,6 @@
       ],
       "scenario": "实际划词面板、选择变化与迟到结果"
     },
-    "src/features/settings/ui/AlwaysTranslateSites.vue": {
-      "kind": "frozen-debt",
-      "sourceSha256": "bd3bee9987da6060eb2c34e87608801156211012bc5d8d38581ce5be725fd1c8",
-      "reason": "实现“始终翻译”、“禁用扩展”与“不显示悬浮球”三类网站名单编辑器，接收域名数组并通过 v-model 更新规范化后的规则集合。 当前尚未登记可确认的自动组件行为消费者；不把父组件mock或源码契约算作该组件行为证明。",
-      "exitCriteria": "修改此文件前，以真实SFC执行对应事件/异步/取消场景并登记消费者，或纳入正式逐文件严格覆盖；不得刷新冻结hash延续豁免。"
-    },
     "src/features/settings/ui/AreaTranslationSettings.vue": {
       "kind": "behavior",
       "tests": [
@@ -299,9 +293,10 @@
     "src/features/settings/ui/RemoteConfigSync.vue": {
       "kind": "behavior",
       "tests": [
-        "tests/remoteSiteSettingsLifecycle.test.ts"
+        "tests/remoteSiteSettingsLifecycle.test.ts",
+        "tests/remoteConfigSyncUpgradeUi.test.ts"
       ],
-      "scenario": "实际SFC敏感同意、合并/恢复/删除、账户切换及卸载后迟到预览取消"
+      "scenario": "实际SFC敏感同意、自定义E2EE口令、学习资产开关与差异预览、WebDAV定时自动同步、合并/恢复/删除、账户切换及卸载后迟到预览取消"
     },
     "src/features/settings/ui/SectionTranslationSettings.vue": {
       "kind": "behavior",
@@ -587,10 +582,11 @@
       "scenario": "实际复习请求、换词与迟到结果"
     },
     "src/features/writing-assistant/ui/WritingEntrySettings.vue": {
-      "kind": "frozen-debt",
-      "sourceSha256": "0730858eae134718a9f020cef1de6de64d19514bfa60e55bafb1992329d3722a",
-      "reason": "提供写作入口的三种关闭范围和完整设置入口。 当前尚未登记可确认的自动组件行为消费者；不把父组件mock或源码契约算作该组件行为证明。",
-      "exitCriteria": "修改此文件前，以真实SFC执行对应事件/异步/取消场景并登记消费者，或纳入正式逐文件严格覆盖；不得刷新冻结hash延续豁免。"
+      "kind": "behavior",
+      "tests": [
+        "tests/writingSiteExpansion.test.ts"
+      ],
+      "scenario": "真实SFC渲染关闭范围选项、快捷键提示、键盘焦点循环、保存中状态、失败提示与取消/保存/打开设置事件"
     },
     "src/features/writing-assistant/ui/WritingPanel.vue": {
       "kind": "behavior",
@@ -661,6 +657,20 @@
         "tests/dictionaryUi.test.ts"
       ],
       "scenario": "模板预览、显式网页加载、卡片导出与本地 Anki 反馈"
+    },
+    "src/features/settings/ui/ScenarioPresetsSettings.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/scenarioPresets.test.ts"
+      ],
+      "scenario": "真实场景预设多选、非破坏性预览、应用持久化及空选/已满足边界"
+    },
+    "src/features/settings/ui/CommandPaletteSettings.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/commandPalette.test.ts"
+      ],
+      "scenario": "真实命令面板开关、预设及自定义快捷键录制、跨功能冲突校验与停用清理"
     },
     "src/ui/components/PopupBrandIcon.vue": {
       "kind": "behavior",

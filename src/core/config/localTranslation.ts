@@ -9,9 +9,55 @@
 export const LOCAL_TRANSLATION_SERVICE_ID = 'localTranslation' as const;
 export const LOCAL_TRANSLATION_MODEL_STATE_KEY = 'fluentReadLocalTranslationModels' as const;
 export const LOCAL_TRANSLATION_DOWNLOAD_STATE_KEY = 'fluentReadLocalTranslationDownloadsV2' as const;
+export const LOCAL_TRANSLATION_DOWNLOAD_SETTINGS_KEY = 'fluentReadLocalTranslationDownloadSettings' as const;
 export const LOCAL_TRANSLATION_DTYPE = 'q8' as const;
 export const LOCAL_TRANSLATION_MODEL_REMOTE_HOST = 'https://huggingface.co/' as const;
+export const DEFAULT_LOCAL_TRANSLATION_MIRROR_URL = 'https://hf-mirror.com' as const;
 export const LOCAL_TRANSLATION_MODEL_REVISION = 'main' as const;
+
+export type LocalTranslationDownloadSourcePreference = 'auto' | 'mirror' | 'official';
+export interface LocalTranslationDownloadOptions {
+    preference?: LocalTranslationDownloadSourcePreference;
+    mirrorUrl?: string;
+}
+
+/** 与 Hugging Face 仓库保持一致文件名的魔搭社区官方加速镜像映射。 */
+export const LOCAL_TRANSLATION_MODELSCOPE_REPOS: Readonly<Record<string, string>> = {
+    'tencent/Hy-MT3-1.8B-GGUF': 'Tencent-Hunyuan/Hy-MT3-1.8B-GGUF',
+    'tencent/Hy-MT2-1.8B-GGUF': 'Tencent-Hunyuan/Hy-MT2-1.8B-GGUF',
+};
+
+export function normalizeLocalTranslationSourcePreference(value: unknown): LocalTranslationDownloadSourcePreference {
+    return value === 'mirror' || value === 'official' ? value : 'auto';
+}
+
+export function normalizeLocalTranslationMirrorUrl(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.search || parsed.hash) return undefined;
+        const normalizedPath = parsed.pathname.replace(/\/+$/u, '');
+        return `${parsed.origin}${normalizedPath}`;
+    } catch {
+        return undefined;
+    }
+}
+
+export function isValidLocalTranslationMirrorUrl(value: string): boolean {
+    return !value.trim() || normalizeLocalTranslationMirrorUrl(value) !== undefined;
+}
+
+export function buildLocalTranslationMirrorPageUrl(repo: string, mirrorUrl?: string): string {
+    const custom = normalizeLocalTranslationMirrorUrl(mirrorUrl);
+    return `${custom || DEFAULT_LOCAL_TRANSLATION_MIRROR_URL}/${repo}`;
+}
+
+export function buildLocalTranslationModelScopePageUrl(repo: string): string | undefined {
+    const modelScopeRepo = LOCAL_TRANSLATION_MODELSCOPE_REPOS[repo];
+    return modelScopeRepo ? `https://modelscope.cn/models/${modelScopeRepo}` : undefined;
+}
 
 export const LOCAL_TRANSLATION_MODEL_IDS = {
     opusZhEn: 'fluentread/opus-zh-en',

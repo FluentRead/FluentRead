@@ -349,4 +349,89 @@ describe('local translation actual mounted page ownership', () => {
         ]);
         expect(segmented?.props['model-value']).toBe('fr');
     });
+    it('allows selecting an undownloaded model by clicking the card body while keeping action/info clicks isolated and idle status visible', async () => {
+        const h = await mount();
+        const hyMt3Card = h.host.querySelector<HTMLElement>(`[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan3}"]`)!;
+        const idleStatus = hyMt3Card.querySelector<HTMLElement>('.local-model-status')!;
+        expect(idleStatus.textContent).toBe('settings.localTranslation.phase.idle');
+        expect(idleStatus.classList.contains('local-models-sr-only')).toBe(false);
+
+        const infoSlot = hyMt3Card.querySelector<HTMLElement>('.local-model-info-slot')!;
+        infoSlot.click();
+        await settle();
+        expect(h.state.config.model[h.state.service]).toBe(primary);
+
+        const downloadBtn = findButton(h.host, `[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan3}"] button`, 'settings.localTranslation.download');
+        downloadBtn.click();
+        await settle();
+        expect(h.state.config.model[h.state.service]).toBe(models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan3);
+
+        const jaCard = h.host.querySelector<HTMLElement>(`[data-model="${alternate}"]`)!;
+        jaCard.querySelector<HTMLElement>('.local-model-size')!.click();
+        await settle();
+        expect(h.state.config.model[h.state.service]).toBe(alternate);
+
+        const staleCardClick = capture(event => event.tag === 'article' && event.props['data-model'] === primary, 'onClick');
+        await leave(h, 'hidden');
+        staleCardClick();
+        await settle();
+        expect(h.state.config.model[h.state.service]).toBe(alternate);
+    });
+    it('supports one-click upgrade from Hy-MT2, download source selection, and validated custom acceleration mirror', async () => {
+        const h = await mount();
+        h.state.config.model.localTranslation = models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan;
+        await settle();
+        const upgradeBtn = h.host.querySelector<HTMLButtonElement>('.local-model-upgrade-action')!;
+        expect(upgradeBtn).not.toBeNull();
+        upgradeBtn.click();
+        await settle();
+        expect(h.state.config.model.localTranslation).toBe(models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan3);
+
+        const sourceControl = renderedEvents.find(event => event.tag === 'SegmentedControl' && event.props.label === 'settings.localTranslation.downloadSource');
+        expect(sourceControl).toBeDefined();
+        sourceControl!.props['onUpdate:modelValue']('mirror');
+        await settle();
+
+        h.host.querySelector<HTMLButtonElement>('[data-local-translation-mirror-toggle]')!.click();
+        await settle();
+        const mirrorInput = h.host.querySelector<HTMLInputElement>('[data-local-translation-mirror-input]')!;
+        mirrorInput.value = 'http://bad.example.com';
+        mirrorInput.dispatchEvent(new dom.window.Event('input', {bubbles: true}));
+        await settle();
+        expect(h.host.querySelector('[data-local-translation-mirror-panel] [role="alert"]')?.textContent).toContain('settings.localTranslation.customMirrorInvalid');
+
+        mirrorInput.value = 'https://proxy.example.com/hf/';
+        mirrorInput.dispatchEvent(new dom.window.Event('input', {bubbles: true}));
+        await settle();
+        expect(h.host.querySelector('[data-local-translation-mirror-panel] [role="alert"]')).toBeNull();
+        expect(h.host.querySelector('.local-models-mirror-badge')?.textContent).toBe('proxy.example.com');
+
+        const downloadBtn = findButton(h.host, `[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan3}"] button`, 'settings.localTranslation.download');
+        downloadBtn.click();
+        await settle();
+        expect(h.backend.offscreen.prepare).toHaveBeenLastCalledWith(
+            models.LOCAL_TRANSLATION_MODEL_IDS.hunyuan3,
+            false,
+            {preference: 'mirror', mirrorUrl: 'https://proxy.example.com/hf'},
+        );
+
+        // Verify preference-only and mirror-only download forwarding branches.
+        const clearBtn = findButton(h.host, '[data-local-translation-mirror-panel] button', 'settings.localTranslation.customMirrorClear');
+        clearBtn.click();
+        await settle();
+        findButton(h.host, `[data-model="${alternate}"] button`, 'settings.localTranslation.download').click();
+        await settle();
+        expect(h.backend.offscreen.prepare).toHaveBeenLastCalledWith(alternate, false, {preference: 'mirror'});
+
+        sourceControl!.props['onUpdate:modelValue']('auto');
+        findButton(h.host, '[data-local-translation-mirror-panel] button', 'hf-mirror.com').click();
+        await settle();
+        findButton(h.host, `[data-model="${models.LOCAL_TRANSLATION_MODEL_IDS.opusFrEn}"] button`, 'settings.localTranslation.download').click();
+        await settle();
+        expect(h.backend.offscreen.prepare).toHaveBeenLastCalledWith(
+            models.LOCAL_TRANSLATION_MODEL_IDS.opusFrEn,
+            false,
+            {mirrorUrl: models.DEFAULT_LOCAL_TRANSLATION_MIRROR_URL},
+        );
+    });
 });

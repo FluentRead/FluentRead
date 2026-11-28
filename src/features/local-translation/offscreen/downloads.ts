@@ -7,7 +7,7 @@
  */
 import {
     LOCAL_TRANSLATION_MODELS, getLocalTranslationModel, isLocalTranslationModel,
-    type LocalTranslationDownloadSnapshot, type LocalTranslationDownloadState, type LocalTranslationModelId,
+    type LocalTranslationDownloadOptions, type LocalTranslationDownloadSnapshot, type LocalTranslationDownloadState, type LocalTranslationModelId,
 } from '@/src/core/config/localTranslation';
 import {
     LOCAL_MODEL_CACHE, artifactComplete, artifactDownloadedBytes, downloadTranslationArtifact,
@@ -101,7 +101,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
         return value;
     };
 
-    const run = async (model: LocalTranslationModelId, controller: AbortController, reverify: boolean): Promise<void> => {
+    const run = async (model: LocalTranslationModelId, controller: AbortController, reverify: boolean, options?: LocalTranslationDownloadOptions): Promise<void> => {
         try {
             if (controller.signal.aborted) return;
             const files = getTranslationArtifacts(model);
@@ -132,7 +132,8 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
                 }
                 let wasVerifying = false;
                 try {
-                    await downloadTranslationArtifact(file, signal, (bytes, verifying) => {
+                    const hasDownloadOptions = Boolean(options?.preference || options?.mirrorUrl);
+                    const onFileProgress = (bytes: number, verifying: boolean) => {
                         if (signal.aborted) return;
                         const now = Date.now();
                         progressByFile.set(fileKey, bytes);
@@ -150,7 +151,10 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
                             lastProgress = now;
                             void persist().catch(abortOnWriteFailure);
                         }
-                    });
+                    };
+                    await (hasDownloadOptions
+                        ? downloadTranslationArtifact(file, signal, onFileProgress, options)
+                        : downloadTranslationArtifact(file, signal, onFileProgress));
                 } finally {
                     remainingFiles--;
                     wasVerifying = verifyingFiles.delete(fileKey);
@@ -236,7 +240,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
                 if (rechecks.get(model) === owner) rechecks.delete(model);
             }
         },
-        async start(value: unknown): Promise<LocalTranslationDownloadSnapshot> {
+        async start(value: unknown, options?: LocalTranslationDownloadOptions): Promise<LocalTranslationDownloadSnapshot> {
             await initialize();
             const model = requireModel(value);
             const descriptor = getLocalTranslationModel(model);
@@ -249,7 +253,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
             const existing = jobs.get(model);
             if (existing?.controller.signal.aborted) {
                 await existing.done;
-                return manager.start(model);
+                return manager.start(model, options);
             }
             if (existing || states.get(model)!.phase === 'ready') return snapshot();
             const reverify = states.get(model)!.needsReverification === true;
@@ -260,7 +264,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
             const done = queue.then(() => saved).then(() => {
                 if (jobs.get(model) !== job) return;
                 job.started = true;
-                return run(model, controller, reverify);
+                return run(model, controller, reverify, options);
             }).catch(async () => {
                 if (jobs.get(model) !== job) return;
                 jobs.delete(model);

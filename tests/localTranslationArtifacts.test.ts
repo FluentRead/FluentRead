@@ -2,7 +2,8 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {sha256} from '@noble/hashes/sha256';
 import {
   MODEL_CHUNK_SIZE, artifactComplete, artifactDownloadedBytes, artifactUrl,
-  downloadTranslationArtifact, invalidateTranslationArtifactReceipt, removeTranslationArtifact, translationArtifactBlob,
+  downloadTranslationArtifact, invalidateTranslationArtifactReceipt, removeTranslationArtifact,
+  resetTranslationDownloadOriginMemory, translationArtifactBlob, translationArtifactDownloadUrls,
   getTranslationArtifacts, type TranslationArtifact,
   matchTranslationArtifact,
 } from '@/src/features/local-translation/offscreen/artifactStore';
@@ -25,6 +26,7 @@ const cache = {
 beforeEach(() => {
   entries.clear();
   vi.clearAllMocks();
+  resetTranslationDownloadOriginMemory();
   vi.stubGlobal('caches', {open: vi.fn(async () => cache)});
   vi.stubGlobal('navigator', {language: 'en-US'});
 });
@@ -365,5 +367,63 @@ describe('verified resumable model downloads', () => {
       if (verifying) entries.delete(`${artifactUrl(file)}?fluent-read-part=0`);
     })).rejects.toThrow();
     expect(await artifactComplete(file)).toBe(false);
+  });
+
+  it('orders ModelScope, custom HTTPS mirrors, and remembers working origins while demoting failed sources', async () => {
+    const hunyuanFile: TranslationArtifact = {
+      repo: 'tencent/Hy-MT3-1.8B-GGUF',
+      revision: 'rev1',
+      path: 'Hy-MT3-1.8B-Q4_K_M.gguf',
+      size: 3,
+      sha256: fileFor(new Uint8Array([1, 2, 3])).sha256,
+    };
+    expect(translationArtifactDownloadUrls(hunyuanFile, {preference: 'official'})).toEqual([
+      'https://huggingface.co/tencent/Hy-MT3-1.8B-GGUF/resolve/rev1/Hy-MT3-1.8B-Q4_K_M.gguf',
+      'https://hf-mirror.com/tencent/Hy-MT3-1.8B-GGUF/resolve/rev1/Hy-MT3-1.8B-Q4_K_M.gguf',
+      'https://modelscope.cn/models/Tencent-Hunyuan/Hy-MT3-1.8B-GGUF/resolve/master/Hy-MT3-1.8B-Q4_K_M.gguf',
+    ]);
+    expect(translationArtifactDownloadUrls(hunyuanFile, {preference: 'mirror'})).toEqual([
+      'https://hf-mirror.com/tencent/Hy-MT3-1.8B-GGUF/resolve/rev1/Hy-MT3-1.8B-Q4_K_M.gguf',
+      'https://modelscope.cn/models/Tencent-Hunyuan/Hy-MT3-1.8B-GGUF/resolve/master/Hy-MT3-1.8B-Q4_K_M.gguf',
+      'https://huggingface.co/tencent/Hy-MT3-1.8B-GGUF/resolve/rev1/Hy-MT3-1.8B-Q4_K_M.gguf',
+    ]);
+    expect(translationArtifactDownloadUrls(hunyuanFile, {
+      preference: 'mirror',
+      mirrorUrl: 'https://proxy.example.com/hf/',
+    })[0]).toBe('https://proxy.example.com/hf/tencent/Hy-MT3-1.8B-GGUF/resolve/rev1/Hy-MT3-1.8B-Q4_K_M.gguf');
+    expect(translationArtifactDownloadUrls(hunyuanFile, {
+      preference: 'mirror',
+      mirrorUrl: 'https://hf-mirror.com/',
+    })).toHaveLength(3);
+
+    const bytesA = new Uint8Array([1, 2, 3]);
+    const fileA = fileFor(bytesA);
+    const bytesB = new Uint8Array([4, 5, 6]);
+    const fileB = {...fileFor(bytesB), path: 'weights-2.bin'};
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response('<html>blocked</html>', {status: 200, headers: {'Content-Type': 'text/html'}}))
+      .mockResolvedValueOnce(new Response(bytesA, {status: 200, headers: {'Content-Length': String(bytesA.length)}}))
+      .mockResolvedValueOnce(new Response(bytesB, {status: 200, headers: {'Content-Length': String(bytesB.length)}}));
+    vi.stubGlobal('fetch', fetcher);
+
+    await downloadTranslationArtifact(fileA, new AbortController().signal, () => undefined);
+    await downloadTranslationArtifact(fileB, new AbortController().signal, () => undefined);
+    expect(fetcher.mock.calls.map(([input]) => new URL(String(input)).origin)).toEqual([
+      'https://huggingface.co',
+      'https://hf-mirror.com',
+      'https://hf-mirror.com',
+    ]);
+  });
+
+  it('rejects mismatched uncompressed Content-Length immediately before streaming and falls back', async () => {
+    const bytes = new Uint8Array([9, 8, 7]);
+    const file = fileFor(bytes);
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(new Uint8Array([9]), {status: 200, headers: {'Content-Length': '999'}}))
+      .mockResolvedValueOnce(new Response(bytes, {status: 200, headers: {'Content-Encoding': 'gzip', 'Content-Length': '999'}}));
+    vi.stubGlobal('fetch', fetcher);
+    await downloadTranslationArtifact(file, new AbortController().signal, () => undefined);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(await artifactComplete(file)).toBe(true);
   });
 });

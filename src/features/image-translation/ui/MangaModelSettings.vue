@@ -1,8 +1,8 @@
 <!--
  * @file src/features/image-translation/ui/MangaModelSettings.vue
  * 运行信息按需显示当前阶段、最近成功会话配置的执行提供程序与自动 CPU 回退状态。
- * 文件职责：提供图片与漫画共用本地模型的准备状态、真实进度、离线导入和缓存清理。
- * 主要内容：供漫画与单图共用，突出当前资源用途和准备状态，离线导入及清理收进次要入口；关闭漫画时只展示识别资源；图片识别的可选文字分割模型只在管理入口说明离线导入和就绪状态，不计入基础资源准备条件；定时读取后台模型缓存和下载快照，下载期间加快读取并显示进度条、百分比和已下载体积，错误会展开管理入口，离线文件经过资源服务校验才入库，保留部分成功并显示错误反馈；自动下载的来源与回退细节不进入用户界面。
+ * 文件职责：提供图片与漫画共用本地模型的准备状态、真实进度、离线导入和防误触两步缓存清理。
+ * 主要内容：供漫画与单图共用，突出当前资源用途和准备状态，离线导入及两步确认清理收进次要入口；关闭漫画时只展示识别资源；图片识别的可选文字分割模型只在管理入口说明离线导入和就绪状态，不计入基础资源准备条件；定时读取后台模型缓存和下载快照，下载期间加快读取并安全计算百分比（总字节未知时回退不定进度条与已下载体积），错误会展开管理入口，清除操作在繁忙、下载中或空间清零时自动取消确认态；自动下载的来源与回退细节不进入用户界面。
  * 模块边界：不运行 OCR/修补、不下载远程代码、不上传选中文件；页面关闭只清理状态订阅，正在处理漫画的任务仍由 Offscreen 和页面取消入口管理。
  -->
 <template>
@@ -21,19 +21,27 @@
       <div v-if="showInpainting" class="manga-resource"><div><strong>{{ translateLegacy('背景文字清除') }}</strong><small>{{ translateLegacy('约 197 MB') }}</small></div><span class="manga-resource-state" :class="{ready: status?.inpaintingReady}">{{ translateLegacy(inpaintingState) }}</span></div>
     </div>
     <p v-if="recognitionUse && !status?.ready" class="manga-resource-hint">{{ translateLegacy('首次翻译时自动准备资源') }}</p>
-    <div v-if="status?.download" class="manga-model-progress" role="status" data-i18n-ignore>
-      <strong>{{ translateLegacy(phaseLabel) }}</strong><span>{{ Math.min(100, Math.floor(status.download.loaded * 100 / status.download.total)) }}% · {{ Math.round(status.download.loaded / 1048576) }} / {{ Math.round(status.download.total / 1048576) }} MB</span>
-      <progress v-if="downloading" :value="status.download.loaded" :max="status.download.total" />
+    <div v-if="downloadInfo" class="manga-model-progress" role="status" data-i18n-ignore>
+      <strong>{{ translateLegacy(phaseLabel) }}</strong><span>{{ downloadInfo.summary }}</span>
+      <progress v-if="downloading && downloadInfo.knownTotal" :value="downloadInfo.loaded" :max="downloadInfo.total" />
+      <progress v-else-if="downloading" />
     </div>
     <small v-if="error || statusError" class="manga-model-error" role="alert" data-i18n-ignore>{{ error || statusError }}</small>
-    <details class="manga-download-settings" :open="!!error || !!statusError || status?.download?.phase === 'error'">
+    <details class="manga-download-settings" :open="detailsOpen">
       <summary>{{ translateLegacy('下载与管理') }}</summary>
       <div v-if="imageRecognition" class="manga-resource manga-optional-segmentation" data-testid="manga-optional-segmentation">
         <div><strong>{{ translateLegacy('精确文字分割（可选）') }}</strong><small>{{ translateLegacy('约 90 MB · 仅离线导入') }}</small><code data-i18n-ignore>{{ MANGA_TEXT_SEGMENTATION_ASSET.file }}</code></div>
         <span class="manga-resource-state" :class="{ready: status?.segmentationReady}">{{ translateLegacy(!status ? '正在检查' : status.segmentationReady ? '已就绪' : '未导入') }}</span>
       </div>
       <div class="manga-model-controls"><button type="button" :disabled="busy || downloading" @click="input?.click()">{{ translateLegacy('导入已下载文件') }}</button><input ref="input" hidden type="file" multiple accept=".onnx,.txt" @change="importFiles" /></div>
-      <div v-if="status?.bytes" class="manga-model-storage"><small>{{ translateLegacy('已占用空间') }} · {{ Math.round(status.bytes / 1048576) }} MB</small><button type="button" :disabled="busy || downloading" @click="remove">{{ translateLegacy('清除已下载资源') }}</button></div>
+      <div v-if="status?.bytes" class="manga-model-storage">
+        <small>{{ translateLegacy('已占用空间') }} · {{ Math.round(status.bytes / 1048576) }} MB</small>
+        <div v-if="confirmingRemove" class="manga-model-remove-confirm">
+          <button type="button" class="manga-model-remove-danger" :disabled="busy || downloading" @click="remove">{{ translateLegacy('确认清除') }}</button>
+          <button ref="cancelRemoveButton" type="button" :disabled="busy || downloading" @click="confirmingRemove = false">{{ translateLegacy('取消') }}</button>
+        </div>
+        <button v-else ref="removeButton" type="button" :disabled="busy || downloading" @click="confirmingRemove = true">{{ translateLegacy('清除已下载资源') }}</button>
+      </div>
     </details>
     <details v-if="status?.inference" class="manga-inference-diagnostics">
       <summary>{{ translateLegacy('运行信息') }}</summary>
@@ -44,7 +52,7 @@
   </section>
 </template>
 <script setup lang="ts">
-import {computed,onBeforeUnmount,onMounted,ref} from 'vue';
+import {computed,nextTick,onBeforeUnmount,onMounted,ref,watch} from 'vue';
 import browser from 'webextension-polyfill';
 import {useUiI18n} from '@/src/ui/i18n';
 import {importMangaModel,MANGA_TEXT_SEGMENTATION_ASSET,type MangaDownloadState} from '../services/mangaOcrAssets';
@@ -61,9 +69,29 @@ const recognitionUse = computed(() => {
 });
 const inpaintingState = computed(() => !status.value ? '正在检查' : status.value.inpaintingReady ? '已就绪' : '需要时下载');
 const stageLabels={idle:'等待中',preparing:'正在准备…',initializing:'正在初始化本地模型…',recognizing:'正在处理图片',completed:'已完成',canceled:'已取消',error:'失败'} as const;
-const busy=ref(false),error=ref(''),statusError=ref(''),input=ref<HTMLInputElement>();
+const busy=ref(false),error=ref(''),statusError=ref(''),confirmingRemove=ref(false),detailsOpen=ref(false),input=ref<HTMLInputElement>(),removeButton=ref<HTMLButtonElement>(),cancelRemoveButton=ref<HTMLButtonElement>();
 const downloading=computed(()=>['downloading','verifying'].includes(status.value?.download?.phase??''));
 const phaseLabel=computed(()=>({downloading:'正在下载漫画模型',verifying:'正在校验漫画模型',paused:'漫画模型下载已暂停',error:'漫画模型下载未完成'}[status.value?.download?.phase??'downloading']));
+const downloadInfo=computed(()=>{
+  const download=status.value?.download;
+  if(!download)return null;
+  const loadedMb=Math.round(download.loaded/1048576);
+  const knownTotal=download.total>0;
+  const summary=knownTotal
+    ?`${Math.max(0,Math.min(100,Math.floor(download.loaded*100/download.total)))}% · ${loadedMb} / ${Math.round(download.total/1048576)} MB`
+    :`${loadedMb} MB`;
+  return {knownTotal,summary,loaded:download.loaded,total:download.total};
+});
+watch([busy,downloading,()=>status.value?.bytes],([isBusy,isDownloading,bytes])=>{
+  if(isBusy||isDownloading||!bytes)confirmingRemove.value=false;
+});
+watch(()=>Boolean(error.value||statusError.value||status.value?.download?.phase==='error'),hasError=>{
+  if(hasError)detailsOpen.value=true;
+});
+watch(confirmingRemove,async confirming=>{
+  await nextTick();
+  (confirming?cancelRemoveButton.value:removeButton.value)?.focus();
+});
 let disposed=false,timer:ReturnType<typeof setTimeout>|undefined;
 async function load(){
   const response=await browser.runtime.sendMessage({type:'fluentReadMangaModelStatus'}) as {success?:boolean;error?:string;ready:boolean;inpaintingReady?:boolean;segmentationReady?:boolean;bytes:number;download?:MangaDownloadState;inference?:MangaInferenceDiagnostics};
@@ -89,7 +117,7 @@ async function importFiles(event:Event){
   finally{busy.value=false;if(input.value)input.value.value='';await load().catch(()=>{error.value=translateLegacy('漫画识别模型状态读取失败');});}
 }
 async function remove(){
-  busy.value=true;error.value='';
+  confirmingRemove.value=false;busy.value=true;error.value='';
   try{const response=await browser.runtime.sendMessage({type:'fluentReadMangaModelRemove'}) as {success?:boolean;error?:string};
     if(!response?.success)throw new Error(response?.error||'漫画识别模型清除失败');await load();
   }catch{error.value=translateLegacy('漫画识别模型清除失败');}
@@ -103,6 +131,8 @@ onBeforeUnmount(()=>{disposed=true;clearTimeout(timer);});
 .manga-model-settings header{display:flex;align-items:center;justify-content:space-between;gap:12px}.manga-model-settings h2{margin:0;font-size:16px}.manga-model-settings header>span{font-size:12px;color:var(--el-text-color-secondary)}.manga-model-settings p{margin:6px 0;font-size:13px;line-height:1.6;color:var(--el-text-color-secondary)}.manga-model-settings small{display:block;font-size:12px;color:var(--el-text-color-secondary)}
 .manga-resource-list{margin-top:12px}.manga-resource{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--el-border-color-lighter)}.manga-resource strong{font-size:14px}.manga-resource>span{font-size:12px;color:var(--el-text-color-secondary);flex-shrink:0}.manga-resource>span.ready{color:var(--el-color-success)}.manga-resource small{margin-top:3px}
 .manga-model-controls{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:12px 0 6px}.manga-model-settings button{border:1px solid var(--el-border-color);border-radius:7px;padding:7px 10px;font:inherit;font-size:13px;background:var(--el-fill-color-blank);color:var(--el-text-color-primary);cursor:pointer;flex-shrink:0}.manga-model-settings button:disabled{opacity:.5;cursor:default}.manga-model-settings :is(button,summary):focus-visible{outline:2px solid var(--el-color-primary);outline-offset:2px}
+.manga-model-remove-confirm{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.manga-model-settings button.manga-model-remove-danger{border-color:var(--el-color-danger);color:var(--el-color-danger)}
 .manga-model-progress{display:grid;gap:6px;margin-top:12px;padding:12px;border-radius:8px;background:var(--el-color-primary-light-9);font-size:13px}.manga-model-progress progress{width:100%;accent-color:var(--el-color-primary)}.manga-model-settings .manga-model-error{color:var(--el-color-danger);margin-top:8px}.manga-model-settings details{font-size:13px;margin-top:14px}.manga-model-settings summary{cursor:pointer}.manga-model-storage{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px}.manga-download-settings>summary{font-weight:600}
 @media(max-width:600px){.manga-model-settings{padding:16px}.manga-model-settings header{align-items:flex-start;flex-direction:column}.manga-resource{gap:8px}.manga-model-storage{align-items:flex-start;flex-direction:column}}
 

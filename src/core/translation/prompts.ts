@@ -1,14 +1,14 @@
 /**
  * @file src/core/translation/prompts.ts
  *
- * 文件职责：生成页面摘要提示词、转义不可信参考中的外层协议标签、识别上下文回显并清理大模型输出中的推理标记，集中维护翻译上下文的提示协议。
- * 主要内容：buildPageSummaryPrompt 把不可信页面材料包在 webpage_context 中，buildPageSummarySystemPrompt 约束两至三句摘要，isLikelyPageContextLeak 用标记、短文本跨语言异常膨胀和有界连续片段信号触发一次重译，isDefinitePageContextLeak 仅识别可用于最终拒绝的明确回显，stripTranslationReasoning 清理 think 标签。 可核对的公开符号包括 buildPageSummaryPrompt、buildPageSummarySystemPrompt、isDefinitePageContextLeak、isLikelyPageContextLeak、stripTranslationReasoning。
+ * 文件职责：生成页面摘要提示词、转义不可信参考中的外层与漫画语境保留协议标签、识别上下文回显并清理大模型输出中的推理标记，集中维护翻译上下文的提示协议。
+ * 主要内容：escapePageContextDelimiters 转义 webpage_context 与 manga_context 保留标签，buildPageSummaryPrompt 把不可信页面材料包在 webpage_context 中，buildPageSummarySystemPrompt 约束两至三句摘要，isLikelyPageContextLeak 用标记、短文本跨语言异常膨胀和有界连续片段信号触发一次重译，isDefinitePageContextLeak 仅识别可用于最终拒绝的明确回显，stripTranslationReasoning 清理 think 标签。 可核对的公开符号包括 escapePageContextDelimiters、buildPageSummaryPrompt、buildPageSummarySystemPrompt、isDefinitePageContextLeak、isLikelyPageContextLeak、stripTranslationReasoning。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
-/** 参考材料不能提前关闭外层数据区域；只转义保留标签，不改写正文和内层证据格式。 */
+/** 参考材料不能提前关闭外层数据区域或伪造漫画语境标记；只转义保留标签，不改写正文和内层证据格式。 */
 export function escapePageContextDelimiters(value: string): string {
-    return value.replace(/<\/?webpage_context\b[^<>]*>/giu, tag => `&lt;${tag.slice(1, -1)}&gt;`);
+    return value.replace(/<\/?(?:webpage_context|manga_context)\b[^<>]*>/giu, tag => `&lt;${tag.slice(1, -1)}&gt;`);
 }
 
 /** 构造 AI 智能上下文的一次性网页摘要提示词。 */

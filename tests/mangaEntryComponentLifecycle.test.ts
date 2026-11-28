@@ -34,7 +34,7 @@ async function mountEntry(toolsDisplay?: 'hover' | 'always') {
     page:{site:'fixture', route:'/chapter/1'},
     settings:{sourceLanguage:undefined as string | undefined, promptEnabled:true, floatingBallVisible:false, downloadConfirmed:false, animations:true, ...(toolsDisplay === undefined ? {} : {toolsDisplay})},
     toggle:vi.fn(), inspectResources:vi.fn(async () => false), persist:vi.fn(async (_patch: Record<string, unknown>) => undefined), openSettings:vi.fn(),
-    startAreaTranslation:vi.fn(async () => true), readManga:undefined as ((event:MouseEvent)=>void) | undefined, readingOpen:false,readingState:undefined as {open:boolean} | undefined,readingChanged:vi.fn(),
+    startAreaTranslation:vi.fn(async () => true), onPeekOriginal:undefined as ((peeking:boolean)=>void) | undefined, readManga:undefined as ((event:MouseEvent)=>void) | undefined, readingOpen:false,readingState:undefined as {open:boolean} | undefined,readingChanged:vi.fn(),
     reading:undefined as {list:()=>MangaReadingList;read:(token:object,signal:AbortSignal)=>Promise<MangaReadingResult>;observe:(token:object,invalid:()=>void)=>(()=>void)|undefined;copy:(text:string)=>Promise<void>;theme:'light'|'dark'|'auto'}|undefined,
   });
   const remove = (value: HostNode) => {if (value.parent) {const at = value.parent.children.indexOf(value); if (at >= 0) value.parent.children.splice(at,1); value.parent = null;}};
@@ -90,13 +90,13 @@ describe('actual manga entry resource consent and lifecycle', () => {
     const {props,exposed,tick,find}=await mountEntry();const token={},stop=vi.fn(),list=vi.fn(()=>({status:'ready' as const,items:[{token,kind:'image' as const,ordinal:1}]})),
       read=vi.fn(async()=>({status:'ready' as const,lines:[{text:'translated',bbox:{x0:0,y0:0,x1:10,y1:10}}]}));
     props.reading={list,read,observe:()=>stop,copy:vi.fn(async()=>{}),theme:'auto'};props.status.active=true;await tick();
-    expect(list).not.toHaveBeenCalled();expect(await exposed.openReading({isTrusted:true} as Event)).toBe(true);await tick();
-    find(value=>value.tag==='button'&&value.text==='图片 1')!.props.onClick({isTrusted:true});await tick();await tick();expect(read).toHaveBeenCalledOnce();expect(props.readingChanged).toHaveBeenCalledWith(true);
+    expect(list).not.toHaveBeenCalled();expect(await exposed.openReading({isTrusted:true} as Event)).toBe(true);await tick();await tick();
+    expect(read).toHaveBeenCalledOnce();expect(props.readingChanged).toHaveBeenCalledWith(true);
     if(reason==='pause')props.status.active=false;else props.page.route='/chapter/2';await tick();expect(stop).toHaveBeenCalledOnce();expect(props.readingChanged).toHaveBeenCalledWith(false);expect(find(value=>value.props.role==='dialog')).toBeUndefined();
   });
   it.each(['list','pending'] as const)('closes %s on transition to area fallback and ignores late results',async phase=>{
     const {props,exposed,tick,find}=await mountEntry(), token={}, pending=deferred<MangaReadingResult>(), read=vi.fn((_token:object,_signal:AbortSignal)=>pending.promise),observe=vi.fn(()=>()=>{});
-    props.reading={list:()=>({status:'ready',items:[{token,kind:'image',ordinal:1}]}),read,observe,copy:vi.fn(async()=>{}),theme:'auto'};
+    props.reading={list:()=>({status:'ready',items:[{token,kind:'image',ordinal:1},{token:{},kind:'canvas',ordinal:2}]}),read,observe,copy:vi.fn(async()=>{}),theme:'auto'};
     props.status.active=true;await tick();await exposed.openReading({isTrusted:true} as Event);await tick();
     if(phase==='pending'){find(value=>value.tag==='button'&&value.text==='图片 1')!.props.onClick({isTrusted:true});await tick();}
     props.status.areaFallback=true;await tick();expect(find(value=>value.props.role==='dialog')).toBeUndefined();
@@ -356,5 +356,159 @@ describe('actual manga entry persistent display lifecycle', () => {
     expect(stopPropagation).toHaveBeenCalledOnce(); expect(button.blur).toHaveBeenCalledTimes(2); expect(panel.expanded).toBe(false); await expectExpanded();
     vi.advanceTimersByTime(60_000); await expectExpanded();
     expect(props.inspectResources).not.toHaveBeenCalled(); expect(props.persist).not.toHaveBeenCalled();
+  });
+});
+
+describe('manga entry telemetry, hold-to-peek original, and theme propagation', () => {
+  it('surfaces live progress pill, error count badge, and contextual telemetry tooltip', async () => {
+    const {panel,props,tick,find} = await mountEntry();
+    props.status.active = true; props.status.pending = true; props.status.progress = 42.4; await tick();
+    expect(find(value => value.props.class === 'fr-manga-progress-pill')?.text).toBe('42%');
+    expect(panel.buttonTitle).toContain('42%');
+
+    props.status.pageCount = 12; props.status.completed = 3; props.status.ahead = 2; await tick();
+    expect(find(value => value.props.class === 'fr-manga-progress-pill')?.text).toBe('3/12');
+    expect(panel.buttonTitle).toContain('已翻译 3/12 页');
+    expect(panel.buttonTitle).toContain('已预译 2 页');
+
+    props.status.pending = false; props.status.errors = 2; await tick();
+    expect(find(value => value.props.class === 'fr-manga-badge fr-manga-error-badge')?.text).toBe('!2');
+
+    props.status.errors = 0; props.status.completed = 12; await tick();
+    expect(find(value => value.props.class === 'fr-manga-progress-pill')?.text).toBe('12/12');
+    expect(find(value => value.props.class === 'fr-manga-badge')?.text).toBe('✓');
+    expect(panel.buttonTitle).toContain('翻译完成 (12/12)');
+
+    props.status.areaFallback = true; await tick();
+    expect(find(value => value.props.class === 'fr-manga-progress-pill')).toBeUndefined();
+  });
+
+  it('exposes hold-to-peek original button only when active with completed pages and releases cleanly', async () => {
+    const {panel,props,tick,find,dispose} = await mountEntry('hover');
+    const peek = vi.fn();
+    props.onPeekOriginal = peek;
+    await tick();
+    expect(find(value => value.props.class?.includes('fr-manga-peek-launcher'))).toBeUndefined();
+
+    props.status.active = true; props.status.completed = 1; await tick();
+    const peekBtn = find(value => value.props.class?.includes('fr-manga-peek-launcher'))!;
+    expect(peekBtn.props['aria-label']).toBe('按住对照原图');
+    expect(peekBtn.props['aria-pressed']).toBe(false);
+
+    // Untrusted, non-primary, and right-click pointerdown are ignored
+    peekBtn.props.onPointerdown({isTrusted: false, button: 0, pointerType: 'mouse', stopPropagation: vi.fn()});
+    peekBtn.props.onPointerdown({isTrusted: true, button: 2, pointerType: 'mouse', stopPropagation: vi.fn()});
+    peekBtn.props.onPointerdown({isTrusted: true, button: 0, isPrimary: false, pointerType: 'touch', stopPropagation: vi.fn()});
+    expect(peek).not.toHaveBeenCalled();
+
+    // Context menu on peek button is prevented
+    const ctxPrevent = vi.fn();
+    peekBtn.props.onContextmenu({preventDefault: ctxPrevent});
+    expect(ctxPrevent).toHaveBeenCalledOnce();
+
+    // Trusted primary pointerdown activates peek, repeated pointerdown is ignored, pointerup releases
+    const stopPropagation = vi.fn();
+    peekBtn.props.onPointerdown({isTrusted: true, button: 0, pointerType: 'mouse', stopPropagation});
+    expect(stopPropagation).toHaveBeenCalledOnce();
+    expect(peek).toHaveBeenCalledWith(true);
+    peekBtn.props.onPointerdown({isTrusted: true, button: 0, pointerType: 'mouse', stopPropagation});
+    expect(peek).toHaveBeenCalledTimes(1);
+    await tick();
+    expect(peekBtn.props['aria-pressed']).toBe(true);
+    expect(peekBtn.props.class).toContain('is-peeking');
+
+    // Holding peek longer than 2.5s idle timeout keeps dock expanded
+    vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    panel.reveal();
+    vi.advanceTimersByTime(3000);
+    expect(panel.expanded).toBe(true);
+    vi.useRealTimers();
+
+    // Dock hover/focus bridge keeps dock expanded when moving to peek button
+    panel.retract({relatedTarget: panel.dock}); expect(panel.expanded).toBe(true);
+    panel.reveal(); panel.retract({relatedTarget: panel.peekLauncher}); expect(panel.expanded).toBe(true);
+    peekBtn.props.onPointerup({stopPropagation: vi.fn()});
+    expect(peek).toHaveBeenLastCalledWith(false);
+    // Repeated stop is a no-op
+    peekBtn.props.onPointercancel({stopPropagation: vi.fn()});
+    expect(peek).toHaveBeenCalledTimes(2);
+
+    // Keyboard Space/Enter hold-to-peek ignores other keys, untrusted and repeat events and releases on keyup
+    const prevent = vi.fn();
+    peekBtn.props.onKeydown({key: 'a', isTrusted: true, repeat: false, preventDefault: prevent});
+    peekBtn.props.onKeydown({key: ' ', isTrusted: false, repeat: false, preventDefault: prevent});
+    peekBtn.props.onKeydown({key: ' ', isTrusted: true, repeat: true, preventDefault: prevent});
+    expect(peek).toHaveBeenCalledTimes(2);
+    peekBtn.props.onKeydown({key: ' ', isTrusted: true, repeat: false, preventDefault: prevent});
+    expect(peek).toHaveBeenLastCalledWith(true);
+    peekBtn.props.onKeyup({key: 'a'});
+    expect(peek).toHaveBeenCalledTimes(3);
+    peekBtn.props.onKeyup({key: ' '});
+    expect(peek).toHaveBeenLastCalledWith(false);
+    peekBtn.props.onKeydown({key: 'Enter', isTrusted: true, repeat: false, preventDefault: prevent});
+    expect(peek).toHaveBeenLastCalledWith(true);
+    peekBtn.props.onKeyup({key: 'Enter'});
+    expect(peek).toHaveBeenLastCalledWith(false);
+
+    // Escape / blur / pointerleave release peek
+    peekBtn.props.onPointerdown({isTrusted: true, button: 0, pointerType: 'touch', stopPropagation: vi.fn()});
+    await tick();
+    expect(find(value => value.props.class?.split(/\s+/).includes('fr-manga-launcher'))!.props.class).toContain('is-touch');
+    peekBtn.props.onBlur();
+    expect(peek).toHaveBeenLastCalledWith(false);
+
+    peekBtn.props.onPointerdown({isTrusted: true, button: 0, pointerType: 'mouse', stopPropagation: vi.fn()});
+    peekBtn.props.onPointerleave();
+    expect(peek).toHaveBeenLastCalledWith(false);
+
+    peekBtn.props.onPointerdown({isTrusted: true, button: 0, pointerType: 'mouse', stopPropagation: vi.fn()});
+    peekBtn.props.onKeydown({key: 'Escape', stopPropagation: vi.fn()});
+    expect(peek).toHaveBeenLastCalledWith(false);
+
+    // Deactivating, route change, standalone hide, and unmount all release active peek
+    peekBtn.props.onPointerdown({isTrusted: true, button: 0, pointerType: 'mouse', stopPropagation: vi.fn()});
+    props.status.active = false; await tick();
+    expect(peek).toHaveBeenLastCalledWith(false);
+
+    props.status.active = true; await tick();
+    find(value => value.props.class?.includes('fr-manga-peek-launcher'))!.props.onPointerdown({isTrusted: true, button: 0, pointerType: 'mouse', stopPropagation: vi.fn()});
+    props.page.route = '/chapter/2'; await tick();
+    expect(peek).toHaveBeenLastCalledWith(false);
+
+    find(value => value.props.class?.includes('fr-manga-peek-launcher'))!.props.onPointerdown({isTrusted: true, button: 0, pointerType: 'mouse', stopPropagation: vi.fn()});
+    props.settings.promptEnabled = false; await tick();
+    expect(peek).toHaveBeenLastCalledWith(false);
+
+    props.settings.promptEnabled = true; await tick();
+    find(value => value.props.class?.includes('fr-manga-peek-launcher'))!.props.onPointerdown({isTrusted: true, button: 0, pointerType: 'mouse', stopPropagation: vi.fn()});
+    props.status.available = false; await tick();
+    expect(peek).toHaveBeenLastCalledWith(false);
+
+    props.status.available = true; await tick();
+    find(value => value.props.class?.includes('fr-manga-peek-launcher'))!.props.onPointerdown({isTrusted: true, button: 0, pointerType: 'mouse', stopPropagation: vi.fn()});
+    dispose();
+    expect(peek).toHaveBeenLastCalledWith(false);
+  });
+
+  it('propagates data-theme to dock, backdrop, and modal, focuses dialog on open, and closes modal on backdrop click', async () => {
+    const {panel,props,tick,find} = await mountEntry();
+    const dockNode = find(value => value.props.class?.includes('fr-manga-dock'))!;
+    expect(dockNode.props['data-theme']).toBe('auto');
+    props.reading = {list: () => ({status: 'ready', items: []}), read: vi.fn(), observe: vi.fn(), copy: vi.fn(), theme: 'dark'};
+    await tick();
+    expect(dockNode.props['data-theme']).toBe('dark');
+    await panel.start(); await tick(); await tick();
+    const backdrop = find(value => value.props.class === 'fr-manga-backdrop')!;
+    const dialog = find(value => value.props.role === 'dialog')!;
+    const focusSpy = vi.spyOn(dialog, 'focus');
+    expect(backdrop.props['data-theme']).toBe('dark');
+    expect(dialog.props['data-theme']).toBe('dark');
+    expect(dialog.props['aria-modal']).toBe('true');
+    expect(dialog.props.tabindex).toBe('-1');
+    backdrop.props.onClick(); await tick();
+    expect(panel.visible).toBe(false);
+    // Closing synchronously before nextTick does not focus stale dialog
+    await panel.start(); panel.close(); await tick(); await tick();
+    expect(focusSpy).not.toHaveBeenCalled();
   });
 });

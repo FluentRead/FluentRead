@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaOcrDeskew.ts
  * 文件职责：仅从识别框内的像素估计浅底水平文字的轻微倾角和旋转后的墨迹边界。
- * 主要内容：支持独立裁图缓冲与整图 RGBA 偏移直读（零画布预检），有界扫描近白背景与深色墨迹，用前景协方差估计基线，仅接受三至十五度、墨迹紧凑且能实质提高有效字高的裁切；仅裁纯白边，保留全部非纯白像素，避免丢失彩色或浅灰文字。
+ * 主要内容：支持独立裁图缓冲与整图 RGBA 偏移直读（零画布预检），有界扫描近白背景与深色墨迹，用前景协方差估计基线，仅接受三至十五度、墨迹紧凑且能实质提高有效字高的裁切；按与估角一致的不透明近白阈值（RGB 均 ≥ 240 且全不透明）裁除 JPEG 扫描近白底边，同时保留全部非近白与半透明前景像素，避免丢失彩色或浅灰文字。
  * 模块边界：纯像素几何，不访问浏览器、模型、语言或已识别文字，不检测新区域，不改动输入像素；画布旋转、取消和识别预算由 OCR 会话负责。
  */
 export interface MangaDeskewPlan {radians:number;width:number;height:number;}
@@ -63,13 +63,14 @@ export function planMangaOcrDeskew(
     return {radians,width:rotatedWidth,height:rotatedHeight};
 }
 
-/** 保留全部非纯白像素及两像素边距，浅灰/彩字同样不可裁掉；噪点或底色使改善不足时保留原框。 */
+/** 保留全部非近白或半透明前景像素及两像素边距，浅灰/彩字同样不可裁掉；仅裁除不透明近白底边，噪点或底色使改善不足时保留原框。 */
 export function trimMangaOcrDeskew(data:Uint8ClampedArray,width:number,height:number,originalHeight:number):MangaDeskewTrim|undefined {
     if(!Number.isInteger(width)||!Number.isInteger(height)||!Number.isInteger(originalHeight)||width<=0||height<=0||originalHeight<=0
         ||width*height>MANGA_DESKEW_PIXEL_BUDGET||data.length!==width*height*4)return;
     let x0=width,y0=height,x1=-1,y1=-1;
     for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-        const index=(y*width+x)*4;if(data[index]===255&&data[index+1]===255&&data[index+2]===255)continue;
+        const index=(y*width+x)*4;
+        if(data[index]>=240&&data[index+1]>=240&&data[index+2]>=240&&data[index+3]===255)continue;
         x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);
     }
     if(x1<0)return;

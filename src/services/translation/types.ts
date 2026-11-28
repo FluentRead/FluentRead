@@ -116,6 +116,8 @@ export interface TranslationRequestMessageBase {
     discourseContext?: string;
     /** 来自 SRT/VTT/ASS 的邻接 cue 原文；文档字幕请求独立携带，不受网页上下文开关影响。 */
     subtitleContext?: string;
+    /** 漫画气泡与旁白对白语境标记；仅由后台受信漫画翻译事务设置，用于漫画提示词与缓存隔离。 */
+    mangaContext?: boolean;
     /** 当前请求是否允许 AI 网页上下文；全文翻译会显式携带会话启动时的冻结值。 */
     enableAIContext?: boolean;
     /** 请求入口冻结的原生合批偏好；缺省由后台当前服务配置解析。 */

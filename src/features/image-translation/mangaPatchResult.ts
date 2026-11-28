@@ -105,7 +105,9 @@ export function parseMangaPatchPacket(value: unknown): MangaPatchPacket {
 export function compressMangaPage(packet: MangaPatchPacket, lines: MangaCompressedPage['lines']): MangaCompressedPage {
     return {width: packet.width, height: packet.height, lines, patches: packet.patches.map(({image, ...rect}) => {
         const decoded = atob(image.slice(22));
-        return {...rect, bytes: Uint8Array.from(decoded, char => char.charCodeAt(0))};
+        const bytes = new Uint8Array(decoded.length);
+        for (let index = 0; index < decoded.length; index++) bytes[index] = decoded.charCodeAt(index);
+        return {...rect, bytes};
     })};
 }
 

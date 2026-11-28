@@ -79,6 +79,9 @@ describe('独立漫画入口所有权和配置端口', () => {
         expect(styles).toContain('var(--fr-color-brand-strong, #dc315f)');expect(styles).toContain('--fr-manga-warning-soft: var(--fr-warning-soft, #fff5df)');
         expect(styles).toMatch(/\.fr-manga-reading\s*\{[^}]*width:\s*min\(420px, calc\(100vw - 32px\)\)/s);
         expect(styles).toMatch(/\.fr-manga-reading button,[\s\S]*?appearance:\s*none;[\s\S]*?font:\s*inherit;/);
+        expect(styles).toContain('.fr-manga-dock');expect(styles).toContain('.fr-manga-backdrop');
+        expect(styles).toContain('.fr-manga-entry[data-theme="dark"]');expect(styles).toContain('.fr-manga-entry[data-theme="auto"]');
+        expect(styles).not.toMatch(/\.fr-manga-entry[^{]*\{[^}]*color:\s*#ff8eae/);
         mocks.config.theme='dark';mocks.subscribe.mock.calls[0][0]();expect(props().reading.theme).toBe('dark');
         mocks.config.theme='light';mocks.subscribe.mock.calls[0][0]();expect(props().reading.theme).toBe('light');
         await props().reading.copy('译文');expect(writeText).toHaveBeenCalledOnce();expect(writeText).toHaveBeenCalledWith('译文');
@@ -191,6 +194,42 @@ describe('独立漫画入口所有权和配置端口', () => {
         await mountMangaEntry({} as never);
         mocks.status.mock.calls.at(-1)![0]({available: true, active: false, pending: false, errors: 0, areaFallback: true});
         expect(await props().startAreaTranslation()).toBe(false);
+    });
+    it('按住对照原图端口只在会话有效时开启，并在暂停、停用或卸载时安全复位', async () => {
+        await mountMangaEntry({} as never);
+        expect(props().onPeekOriginal).toBeUndefined();
+        unmountMangaEntry();
+
+        const onPeekOriginal = vi.fn();
+        await mountMangaEntry({} as never, {onPeekOriginal});
+        const peek = props().onPeekOriginal as (peeking: boolean) => void;
+        expect(peek).toBeTypeOf('function');
+        // 未开启连续翻译时不允许进入对照原图态
+        peek(true); expect(onPeekOriginal).not.toHaveBeenCalled();
+
+        mocks.status.mock.calls.at(-1)![0]({available: true, active: true, pending: false, errors: 0, completed: 2});
+        peek(true); peek(true); expect(onPeekOriginal).toHaveBeenCalledTimes(1); expect(onPeekOriginal).toHaveBeenLastCalledWith(true);
+        peek(false); peek(false); expect(onPeekOriginal).toHaveBeenCalledTimes(2); expect(onPeekOriginal).toHaveBeenLastCalledWith(false);
+
+        // 会话暂停自动复位对照态
+        peek(true); expect(onPeekOriginal).toHaveBeenLastCalledWith(true);
+        mocks.status.mock.calls.at(-1)![0]({available: true, active: false, pending: false, errors: 0, completed: 2});
+        expect(onPeekOriginal).toHaveBeenLastCalledWith(false);
+
+        // 配置关闭自动复位对照态
+        mocks.status.mock.calls.at(-1)![0]({available: true, active: true, pending: false, errors: 0, completed: 2});
+        peek(true); expect(onPeekOriginal).toHaveBeenLastCalledWith(true);
+        mocks.config.on = false; mocks.subscribe.mock.calls.at(-1)![0]();
+        expect(onPeekOriginal).toHaveBeenLastCalledWith(false);
+
+        // 卸载自动复位对照态且旧回调失效
+        mocks.config.on = true; mocks.subscribe.mock.calls.at(-1)![0]();
+        peek(true); expect(onPeekOriginal).toHaveBeenLastCalledWith(true);
+        const callsBeforeUnmount = onPeekOriginal.mock.calls.length;
+        unmountMangaEntry();
+        expect(onPeekOriginal).toHaveBeenCalledTimes(callsBeforeUnmount + 1);
+        expect(onPeekOriginal).toHaveBeenLastCalledWith(false);
+        peek(true); expect(onPeekOriginal).toHaveBeenCalledTimes(callsBeforeUnmount + 1);
     });
     it('备用按钮依据普通悬浮球和站点名单显隐，不重复显示入口', async () => {
         await mountMangaEntry({} as never);

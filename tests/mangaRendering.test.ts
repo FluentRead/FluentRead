@@ -1,7 +1,8 @@
 import {describe,expect,it,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {createMangaBlankLayoutBudget,drawMangaTranslations,planMangaBlankTranslation,sampleMangaBackgrounds} from '@/src/features/image-translation/services/mangaRendering';
+import {createMangaBlankLayoutBudget,drawMangaTranslations,mangaRegionBackground,planMangaBlankTranslation,sampleMangaBackgrounds} from '@/src/features/image-translation/services/mangaRendering';
+import type {MangaAlphaProtection} from '@/src/features/image-translation/services/mangaAlphaProtection';
 import {findMangaBlankSpaces} from '@/src/features/image-translation/services/mangaBlankSpaces';
 import type {MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
 import {mangaMaskBoxes} from '@/src/features/image-translation/mangaPatchResult';
@@ -298,5 +299,129 @@ describe('只在已证明白底放置完整漫画译文',()=>{
         expect(plan(c)).toBeUndefined();expect(c.restore).toHaveBeenCalledOnce();
         const cleanup=new Error('restore after budget failed'),limited=context();limited.restore.mockImplementation(()=>{throw cleanup;});
         expect(()=>planMangaBlankTranslation(limited as any,{...region('字'.repeat(4096)),fontSize:7,bbox:box(20,120,150,160)},220,220,fragmentedSpaces(),createMangaBlankLayoutBudget())).toThrow(cleanup);
+    });
+});
+
+describe('修补后自适应墨色、均匀采样与旋转标签字重',()=>{
+    it('米白压缩气泡按主桶真实均值判定均匀，不受16级量化漂移影响',()=>{
+        const w=80,h=60,pixels=new Uint8ClampedArray(w*h*4);
+        for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+            const drift=(x+y)%5===0?-14:0;
+            pixels.set([247+drift,244+drift,232+drift,255],(y*w+x)*4);
+        }
+        const bg=mangaRegionBackground(pixels,w,h,{x0:12,y0:12,x1:68,y1:48});
+        expect(bg.uniform).toBe(true);
+    });
+
+    it('复杂暗底修补后自动采用白字黑描边与 0.22 倍外描边，并跳过透明保护像素',()=>{
+        const w=300,h=120,dark=new Uint8ClampedArray(w*h*4);
+        for(let i=0;i<dark.length;i+=4)dark.set([25,30,40,255],i);
+        // 在左侧放一片高亮保护孔，确保采样跳过保护像素而不被误判为浅底，右侧空白区仍可读绘制。
+        for(let y=20;y<100;y++)for(let x=20;x<140;x++)dark.set([255,255,255,255],(y*w+x)*4);
+        const hole={x0:20,y0:20,x1:140,y1:100};
+        const runs:number[]=[];const rowStarts=new Uint32Array(h+1);
+        for(let y=0;y<h;y++){rowStarts[y]=runs.length/3;if(y>=20&&y<100)runs.push(y,20,140);}
+        rowStarts[h]=runs.length/3;
+        const protection:MangaAlphaProtection={rectangles:[hole],runs:new Uint16Array(runs),rowStarts};
+        const c=Object.assign(context(),{miterLimit:10,canvas:{lang:'zh-CN'}});
+        const r:MangaRegion={text:'مرحبا',fontSize:16,bbox:{x0:20,y0:20,x1:280,y1:100}};
+        let paintedStyle:{fill:unknown;stroke:unknown;lineWidth:number;miterLimit:number;font:string}|undefined;
+        c.fillText.mockImplementation((text,x,y)=>{
+            paintedStyle={fill:c.fillStyle,stroke:c.strokeStyle,lineWidth:c.lineWidth,miterLimit:c.miterLimit,font:c.font};
+            return {text,x,y,font:c.font};
+        });
+        drawMangaTranslations(c as any,dark,w,h,[r],true,[{color:'rgb(25,30,40)',uniform:false}],protection);
+        expect(paintedStyle).toBeDefined();
+        expect(paintedStyle!.fill).toBe('#ffffff');
+        expect(paintedStyle!.stroke).toBe('#111111');
+        expect(paintedStyle!.miterLimit).toBe(2);
+        expect(paintedStyle!.lineWidth).toBeCloseTo(Number(paintedStyle!.font.match(/ ([\d.e+-]+)px/)![1])*.22,5);
+        // 若框内全透明则安全回退深墨白边。
+        const transparent=new Uint8ClampedArray(w*h*4);
+        const c2=context();
+        let fallbackStyle:{fill:unknown;stroke:unknown}|undefined;
+        c2.fillText.mockImplementation((text,x,y)=>{fallbackStyle={fill:c2.fillStyle,stroke:c2.strokeStyle};return {text,x,y,font:c2.font};});
+        drawMangaTranslations(c2 as any,transparent,w,h,[r],true,[{color:'rgb(25,30,40)',uniform:false}]);
+        expect(fallbackStyle).toEqual({fill:'#111111',stroke:'#ffffff'});
+    });
+
+    it('旋转标签采用一致 600 字重、支持浅底与细描边，缺指标或多行回退通用绘制',()=>{
+        const bbox=box(123,35,148,183);
+        const r:MangaRegion={text:'分区导览',fontSize:25,bbox,sourceBoxes:[bbox],quarterTurn:1};
+        const c1=Object.assign(context(),{miterLimit:10});
+        let labelStyle:{font:string;fill:unknown;stroke:unknown;lineWidth:number;miterLimit:number}|undefined;
+        c1.fillText.mockImplementation((text,x,y)=>{
+            labelStyle={font:c1.font,fill:c1.fillStyle,stroke:c1.strokeStyle,lineWidth:c1.lineWidth,miterLimit:c1.miterLimit};
+            return {text,x,y,font:c1.font};
+        });
+        drawMangaTranslations(c1 as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[r],true,
+            [{color:'rgb(245,245,245)',uniform:false,foregroundOutline:'#222222'}]);
+        expect(labelStyle).toBeDefined();
+        expect(labelStyle!.font).toMatch(/^600 /);expect(labelStyle!.fill).toBe('#111111');expect(labelStyle!.stroke).toBe('#222222');
+        expect(labelStyle!.miterLimit).toBe(2);expect(labelStyle!.lineWidth).toBeCloseTo(Number(labelStyle!.font.match(/ ([\d.e+-]+)px/)![1])*.025,5);
+        // 含换行的旋转标签回退 drawTranslatedImageText。
+        const c2=context();
+        drawMangaTranslations(c2 as never,new Uint8ClampedArray(W*H*4).fill(35),W,H,[{...r,text:'第一\n第二'}],true,
+            [{color:'rgb(35,35,35)',uniform:false}]);
+        expect(c2.fillText).not.toHaveBeenCalled();
+        // 缺少真实字形边界时回退 drawTranslatedImageText。
+        const c3=context();
+        c3.measureText.mockImplementation(text=>({width:text.length*Number(c3.font.match(/ ([\d.e+-]+)px/)![1])*.6} as never));
+        drawMangaTranslations(c3 as never,new Uint8ClampedArray(W*H*4).fill(35),W,H,[r],true,
+            [{color:'rgb(35,35,35)',uniform:false}]);
+        expect(c3.fillText).not.toHaveBeenCalled();
+        // 600 字重缩到 labelMinimum 以下时回退 400 字重通用绘制，不画不可读的极小微字。
+        const c4=context();
+        c4.measureText.mockImplementation(text=>{
+            const size=Number(c4.font.match(/ ([\d.e+-]+)px/)![1]);
+            const scale=c4.font.startsWith('600 ')?1.35:.6;
+            return {width:Array.from(text).length*size*scale,actualBoundingBoxAscent:size*.7,actualBoundingBoxDescent:size*.2,
+                actualBoundingBoxLeft:0,actualBoundingBoxRight:Array.from(text).length*size*scale};
+        });
+        drawMangaTranslations(c4 as never,new Uint8ClampedArray(W*H*4).fill(35),W,H,[{...r,text:'LONG_SPINE_TAG'}],true,
+            [{color:'rgb(35,35,35)',uniform:false}]);
+        expect(c4.fillText).toHaveBeenCalledOnce();
+        expect((c4.fillText.mock.results[0].value as {font:string}).font).toMatch(/^400 /);
+        // 400 字重同样低于 labelMinimum 时不绘制极小微字。
+        const c5=context();
+        drawMangaTranslations(c5 as never,new Uint8ClampedArray(W*H*4).fill(35),W,H,[{...r,text:'A'.repeat(40)}],true,
+            [{color:'rgb(35,35,35)',uniform:false}]);
+        expect(c5.fillText).not.toHaveBeenCalled();
+    });
+
+    it('多行标准与倾斜绘字均执行两遍绘制，全部描边先于全部填充执行',()=>{
+        const c=context();
+        const r:MangaRegion={text:'Line 1 gypq\nLine 2 gypq\nLine 3 gypq',fontSize:16,bbox:{x0:100,y0:20,x1:360,y1:160}};
+        drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[r],true,[{color:'rgb(120,120,120)',uniform:false}]);
+        expect(c.strokeText).toHaveBeenCalledTimes(3);
+        expect(c.fillText).toHaveBeenCalledTimes(3);
+        expect(Math.max(...c.strokeText.mock.invocationCallOrder)).toBeLessThan(Math.min(...c.fillText.mock.invocationCallOrder));
+
+        const tilted=context();
+        const tr:MangaRegion={text:'First tilted\nSecond tilted',fontSize:16,bbox:{x0:100,y0:40,x1:340,y1:140}};
+        const geometry={owner:tr,sourceText:tr.text,radians:Math.PI/36,originX:220,originY:90,bounds:{x0:-110,y0:-40,x1:110,y1:40},width:220,height:80,count:2,heightGain:10};
+        drawMangaTranslations(tilted as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[tr],true,[{color:'rgb(120,120,120)',uniform:false,sourceFontSize:16,sourceTypography:geometry}]);
+        expect(tilted.transform).toHaveBeenCalledOnce();
+        expect(tilted.strokeText).toHaveBeenCalledTimes(2);
+        expect(tilted.fillText).toHaveBeenCalledTimes(2);
+        expect(Math.max(...tilted.strokeText.mock.invocationCallOrder)).toBeLessThan(Math.min(...tilted.fillText.mock.invocationCallOrder));
+    });
+
+    it('多行复杂背景解耦外描边与行距，居中多行均匀气泡启用椭圆塑形',()=>{
+        const c=context();
+        const r:MangaRegion={text:'第一行文字\n第二行文字',fontSize:20,bbox:{x0:100,y0:40,x1:360,y1:120}};
+        drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[r],true,[{color:'rgb(120,120,120)',uniform:false}]);
+        const ys=c.fillText.mock.calls.map(call=>call[2] as number);
+        const paintedFont=(c.fillText.mock.results[0].value as {font:string}).font;
+        const size=Number(paintedFont.match(/ ([\d.e+-]+)px/)![1]);
+        expect(ys).toHaveLength(2);
+        // 行间基线间距保持 1.22×，而非被 0.22× 外描边翻倍拉宽。
+        expect(ys[1]-ys[0]).toBeCloseTo(size*1.22,5);
+        const oval=Object.assign(context(),{canvas:{lang:'en-US'}});
+        const bubble:MangaRegion={text:'One two three four five six seven eight nine ten eleven twelve',fontSize:16,bbox:{x0:100,y0:20,x1:260,y1:180}};
+        drawMangaTranslations(oval as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[bubble],true,[{color:'rgb(255,255,255)',uniform:true}]);
+        const drawnLines=oval.fillText.mock.calls.map(call=>call[0] as string);
+        expect(drawnLines.length).toBeGreaterThanOrEqual(3);
+        expect(drawnLines.join(' ').replace(/\s+/gu,' ')).toBe(bubble.text);
     });
 });

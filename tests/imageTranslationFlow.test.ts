@@ -5,7 +5,7 @@ import {createImageOperationRegistry, createImageTranslationBackgroundHandlers, 
 import {IMAGE_PROGRESS_MESSAGE_TYPE, imageLoadingProgress, isImageTranslationStage, normalizeImageProgress} from '@/src/features/image-translation/progress';
 import {createOpenOptionsPageHandler} from '@/src/features/settings/background';
 import {IMAGE_LOCAL_FAILURES, imageLocalFailureMessage, imageTranslationFailureCode, imageTranslationFailureResponse, createImageTranslationFailure} from '@/src/features/image-translation/failure';
-import {createImageControls} from '@/src/features/image-translation/content/controls';
+import {createImageControls, IMAGE_CONTROLS_CSS} from '@/src/features/image-translation/content/controls';
 import {IMAGE_READER_CSS} from '@/src/features/image-translation/content/textReader';
 import {sendCancellableImageOperation, prepareImageOcrLanguages} from '@/src/features/image-translation/services/client';
 import {imageTranslationProgressTransport} from '@/src/features/image-translation/background/offscreenAdapter';
@@ -1312,5 +1312,75 @@ describe('图片文字面板嵌套 ShadowRoot 所有权',()=>{
         if(scenario==='owned'){expect(warningFocus).toHaveBeenCalledOnce();expect(innerActive).toBe(warning);}
         else {expect(warningFocus).not.toHaveBeenCalled();expect(docActive).toBe(scenario==='document-moved'?external:outerHost);expect(outerActive).toBe(scenario==='middle-moved'?middleExternal:innerHost);}
         ui.dispose();
+    });
+});
+
+describe('漫画单页悬停微胶囊与深色样式', () => {
+    it('已完成漫画单页在未悬停时隐藏，悬停或键盘聚焦显现原图/译图切换与重新翻译，离开恢复隐藏', () => {
+        const {document, window} = parseHTML('<html><body></body></html>');
+        vi.stubGlobal('document', document);
+        let language: UiLanguage = 'zh-CN';
+        const onAction = vi.fn(), onRetranslate = vi.fn();
+        const ui = createImageControls({onAction, onPrepare() {}, onRetranslate, translate: source => translateLegacyText(source, language)});
+        document.body.append(ui.element, ui.feedback);
+        ui.setHovered(false);
+        ui.setLines([{text: '译文'}]);
+        ui.update('translated', '已翻译 · 点击恢复原图', {quiet: true, mangaActions: true, mangaOriginalShown: false});
+        expect(ui.element.dataset.mangaActions).toBe('true');
+        expect(ui.element.dataset.mangaOriginal).toBe('false');
+        expect(ui.element.hidden).toBe(true);
+        expect(ui.element.querySelector<HTMLButtonElement>('.fr-image-inspect')!.hidden).toBe(true);
+        const retranslate = ui.element.querySelector<HTMLButtonElement>('.fr-image-retranslate')!;
+        expect(retranslate.hidden).toBe(false);
+        expect(ui.button.textContent).toBe('原图');
+        expect(retranslate.textContent).toBe('重新翻译');
+
+        ui.setHovered(true);
+        expect(ui.element.hidden).toBe(false);
+        const click = (target: Element, trusted = true) => {
+            const event = new window.Event('click', {bubbles: true});
+            Object.defineProperty(event, 'isTrusted', {value: trusted});
+            target.dispatchEvent(event);
+        };
+        click(retranslate, false); expect(onRetranslate).not.toHaveBeenCalled();
+        click(retranslate, true); expect(onRetranslate).toHaveBeenCalledOnce();
+        click(ui.button, true); expect(onAction).toHaveBeenCalledOnce();
+
+        // 切到原图态并再次更新时保持单一重译按钮节点，本地化同步生效。
+        ui.update('translated', '已翻译 · 点击恢复原图', {quiet: true, mangaActions: true, mangaOriginalShown: true});
+        expect(ui.element.querySelectorAll('.fr-image-retranslate')).toHaveLength(1);
+        expect(ui.button.textContent).toBe('译图');
+        expect(ui.button.title).toContain('查看译图');
+        language = 'en-US'; ui.refreshLanguage();
+        expect(ui.button.textContent).toBe(translateLegacyText('译图', 'en-US'));
+        expect(retranslate.textContent).toBe(translateLegacyText('重新翻译', 'en-US'));
+
+        // 键盘焦点在移出指针后保持微胶囊可见。
+        vi.spyOn(ui.button, 'matches').mockImplementation(selector => selector === ':focus-visible');
+        ui.button.dispatchEvent(new window.Event('focusin', {bubbles: true}));
+        ui.setHovered(false);
+        expect(ui.element.hidden).toBe(false);
+        ui.button.dispatchEvent(new window.Event('focusout', {bubbles: true}));
+        expect(ui.element.hidden).toBe(true);
+
+        // 退出漫画单页态后移除重译按钮，保证错误态按钮数量不变。
+        ui.update('error', '翻译失败', {quiet: true});
+        expect(ui.feedback.querySelector('.fr-image-retranslate')).toBeNull();
+        expect(ui.element.hidden).toBe(true);
+        ui.dispose();
+
+        // 未传入 onRetranslate 时点击安全无异常。
+        const optional = createImageControls({onAction() {}, onPrepare() {}});
+        document.body.append(optional.element, optional.feedback);
+        optional.update('translated', '已翻译', {quiet: true, mangaActions: true});
+        expect(() => click(optional.element.querySelector('.fr-image-retranslate')!, true)).not.toThrow();
+        optional.dispose();
+    });
+
+    it('漫画错误卡片与未绘制徽章包含深色模式与磨砂胶囊样式，单页悬停微胶囊声明独立样式', () => {
+        expect(IMAGE_CONTROLS_CSS).toContain('.fr-image-feedback[data-theme=dark][data-manga=true][data-phase=error]');
+        expect(IMAGE_CONTROLS_CSS).toContain('@media (prefers-color-scheme: dark)');
+        expect(IMAGE_CONTROLS_CSS).toContain('.fr-image-feedback[data-manga=true][data-warning=true] .fr-image-warning-button');
+        expect(IMAGE_CONTROLS_CSS).toContain('.fr-image-controls[data-manga-actions=true]');
     });
 });

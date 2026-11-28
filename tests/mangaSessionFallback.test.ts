@@ -27,4 +27,18 @@ describe('漫画模型 GPU 推理回退',()=>{
         const stopped=session(),controller=new AbortController();controller.abort();stopped.run.mockRejectedValue(new Error('cancelled'));const unnecessary=vi.fn();
         protectMangaSession(stopped as unknown as InferenceSession,unnecessary,()=>controller.signal);await expect(stopped.run()).rejects.toThrow('cancelled');expect(unnecessary).not.toHaveBeenCalled();await stopped.release();
     });
+    it('释放失效 GPU 后若 CPU 创建失败或中止，调用 onBroken 通知上层重建',async()=>{
+        const gpu=session(),controller=new AbortController(),onBroken=vi.fn();
+        gpu.run.mockRejectedValueOnce(new Error('GPU lost'));
+        const createCpu=vi.fn(async()=>{controller.abort();throw new DOMException('已取消','AbortError');});
+        protectMangaSession(gpu as unknown as InferenceSession,createCpu,()=>controller.signal,onBroken);
+        await expect(gpu.run()).rejects.toMatchObject({name:'AbortError'});
+        expect(onBroken).toHaveBeenCalledOnce();
+        // 健康回退不触发 onBroken。
+        const okGpu=session(),okCpu=session(),okBroken=vi.fn();
+        okGpu.run.mockRejectedValueOnce(new Error('GPU lost'));
+        protectMangaSession(okGpu as unknown as InferenceSession,async()=>okCpu as unknown as InferenceSession,()=>undefined,okBroken);
+        await expect(okGpu.run()).resolves.toEqual({output:'pixels'});
+        expect(okBroken).not.toHaveBeenCalled();
+    });
 });

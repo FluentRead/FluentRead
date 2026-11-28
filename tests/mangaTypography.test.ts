@@ -261,6 +261,53 @@ describe('漫画专用完整排版',()=>{
         for(const args of [['',10,10,10],['x',0,10,10],['x',10,NaN,10],['x',10,10,Infinity]] as const)
             expect(layoutMangaTranslationText(args[0],args[1],args[2],measure,args[3])).toEqual({lines:[],fontSize:0,lineHeight:0});
     });
+    it('按归一化目标语言缓存词分割器，支持泰语分词、无效语言回退及缓存上限',()=>{
+        const thai='ภาษาไทยไม่มีช่องว่าง';
+        const thaiLayout=layoutMangaTranslationText(thai,80,120,measure,10,undefined,undefined,{language:'th'});
+        expect(thaiLayout.lines.join('')).toBe(thai);
+        expect(thaiLayout.lines.length).toBeGreaterThan(1);
+        expect(thaiLayout.lines.every(line=>measure(line,thaiLayout.fontSize)<=80)).toBe(true);
+        const mixedThai=layoutMangaTranslationText('Hello ภาษาไทยครับ',100,120,measure,10,undefined,undefined,{language:'th_TH'});
+        expect(mixedThai.lines.join('')).toBe('Hello ภาษาไทยครับ');
+        expect(layoutMangaTranslationText('ก',40,40,measure,10,undefined,undefined,{language:'th'}).lines).toEqual(['ก']);
+        for(const language of ['','auto','ja','zh_CN','ko','zh-TW','zh-HK','en','fr','de','es','it','pt','ru','vi','ar','hi','id','ms','tr','pl','invalid_locale!!!']){
+            const out=layoutMangaTranslationText('流畅阅读漫画',60,60,measure,10,undefined,undefined,{language});
+            expect(out.lines.join('')).toBe('流畅阅读漫画');
+        }
+    });
+    it('多段方差最小化平衡改善行宽差异并跳过超长多段，外描边与行距解耦',()=>{
+        // 末行超过 0.55× 最宽行但极差 > 25%，新平衡依然收拢行宽。
+        const uneven=layoutMangaTranslationText('alpha beta gamma delta\nepsilon zeta eta theta',160,120,measure,10);
+        expect(uneven.lines.join(' ')).toBe('alpha beta gamma delta epsilon zeta eta theta');
+        const fiveParagraphs='a b c d\ne f g h\ni j k l\nm n o p\nq r s t';
+        expect(layoutMangaTranslationText(fiveParagraphs,50,200,measure,10).lines.length).toBeGreaterThanOrEqual(5);
+        // 解耦 bleed：行距保持 1.22×，外包 ink.height 包含顶底两倍 bleed。
+        const decoupled=layoutMangaTranslationText('第一行\n第二行',100,100,measure,10,()=>({ascent:7,descent:2,bleed:3}));
+        expect(decoupled.lineHeight).toBeCloseTo(12.2,6);
+        expect(decoupled.ink).toEqual({height:27.2,baselines:[10,22.2]});
+        expect(layoutMangaTranslationText('第一行',100,100,measure,10,()=>({ascent:7,descent:2,bleed:-1})).ink).toBeUndefined();
+    });
+    it('椭圆气泡塑形收窄首尾行宽，可微调字号且超出8%或增行时回退矩形',()=>{
+        // 已经满足首尾 <= 0.86*width 时直接返回原布局。
+        const already=layoutMangaTranslationText('aa bbbbb cc',50,120,measure,10,undefined,undefined,{elliptical:true});
+        expect(already.lines).toEqual(['aa','bbbbb','cc']);expect(already.fontSize).toBe(10);
+        // 同字号可收窄首尾行贴合椭圆（不依赖 balance 提前收缩）。
+        const shaped=layoutMangaTranslationText('aaaaaa bb ccccccc eeeeeee',100,120,measure,10,undefined,undefined,{elliptical:true});
+        expect(shaped.lines).toEqual(['aaaaaa','bb ccccccc','eeeeeee']);expect(shaped.fontSize).toBe(10);
+        // 椭圆候选不满足约束时拒绝并回退矩形。
+        const rejected=layoutMangaTranslationText('aaaaaa bb ccccccc eeeeeee',100,120,measure,10,undefined,{accept:l=>l.lines[0]!=='aaaaaa'},{elliptical:true});
+        expect(rejected.lines).toEqual(['aaaaaa bb','ccccccc','eeeeeee']);
+        // 只需小幅缩字（<=8%）即可贴合椭圆时接受微调字号。
+        const shrunk=layoutMangaTranslationText('aaaaaaaaa bbbbbbbbbb ccccccccc',100,120,measure,10,undefined,undefined,{elliptical:true});
+        expect(shrunk.lines).toEqual(['aaaaaaaaa','bbbbbbbbbb','ccccccccc']);
+        expect(shrunk.fontSize).toBeGreaterThanOrEqual(9.2);expect(shrunk.fontSize).toBeLessThan(10);
+        // 需要缩字超过 8% 时干净回退矩形布局。
+        const fallback=layoutMangaTranslationText('aaaaaaaaaa bbbbbbbbbb cccccccccc',100,120,measure,10,undefined,undefined,{elliptical:true});
+        expect(fallback.lines).toEqual(['aaaaaaaaaa','bbbbbbbbbb','cccccccccc']);expect(fallback.fontSize).toBe(10);
+        // 缩字后导致行数减少（candLines.length !== target）时拒绝椭圆候选，保持原行数与原字号。
+        const collapsed=layoutMangaTranslationText('aaaaaaaaa bbbbb ccccc ddddd',102,120,measure,10,undefined,undefined,{elliptical:true});
+        expect(collapsed.lines).toEqual(['aaaaaaaaa','bbbbb','ccccc','ddddd']);expect(collapsed.fontSize).toBe(10);
+    });
 });
 describe('原图背景与字体层次',()=>{
     const width=1000,height=400,pixels=new Uint8ClampedArray(width*height*4).fill(255);
@@ -341,11 +388,14 @@ describe('原图背景与字体层次',()=>{
             expect(c.rect).toHaveBeenCalledWith(40,40,92,height);expect(c.fillRect).toHaveBeenCalledWith(40,40,92,height);
         }
     });
-    it('对白适度粗体且短译文不放大，标题使用源字号与白色描边',()=>{
-        const c=context();drawMangaTranslations(c as any,pixels,width,height,[region],true,[{color:'rgb(255,255,255)',uniform:true}]);
+    it('对白适度粗体且短译文不放大，喊叫气泡与标题按源字号保持层次与描边',()=>{
+        const c=context(),dialogue={...region,fontSize:40};
+        drawMangaTranslations(c as any,pixels,width,height,[dialogue],true,[{color:'rgb(255,255,255)',uniform:true}]);
         expect(c.font).toMatch(/^600 34px /);expect(c.fillStyle).toBe('#111111');expect(c.lineWidth).toBeCloseTo(1.19);
+        drawMangaTranslations(c as any,pixels,width,height,[region],true,[{color:'rgb(255,255,255)',uniform:true}]);
+        expect(c.font).toMatch(/^700 62px /);expect(c.fillStyle).toBe('#111111');
         drawMangaTranslations(c as any,pixels,width,height,[region],true,[{color:'rgb(100,100,100)',uniform:false}]);
-        expect(c.font).toMatch(/^800 /);expect(c.strokeStyle).toBe('#ffffff');expect(c.lineWidth).toBeGreaterThan(5);
+        expect(c.font).toMatch(/^800 /);expect(c.strokeStyle).toBe('#ffffff');expect(c.lineWidth).toBeGreaterThan(10);
         drawMangaTranslations(c as any,pixels,width,height,[{...region,vertical:true}],true,[{color:'rgb(100,100,100)',uniform:false}]);
         expect(c.font).toMatch(/^600 /);
     });
@@ -389,7 +439,7 @@ describe('原图背景与字体层次',()=>{
         try{drawMangaTranslations(c as any,pixels,width,height,[{...region,text}]);}finally{vi.unstubAllGlobals();}
         expect(caches).toHaveLength(1);const cache=caches[0];let logicalCharacters=0,storedCharacters=0;
         for(const key of cache.keys()){
-            const match=/^(ltr|rtl)\|(600|800)\|([^|]+)\|/u.exec(key)!;
+            const match=/^(ltr|rtl)\|(600|700|800)\|([^|]+)\|/u.exec(key)!;
             logicalCharacters+=`${match[1]}|${match[2]} ${match[3]}px ${MANGA_TEXT_FONT}|${key.slice(match[0].length)}`.length;storedCharacters+=key.length;
         }
         expect(logicalCharacters).toBeGreaterThan(130000);expect(logicalCharacters).toBeLessThanOrEqual(131072);

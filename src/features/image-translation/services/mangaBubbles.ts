@@ -9,7 +9,7 @@
  * 段落关系：只将本次实际采用的原始识别对象关联到物理行；词界改写、去重或数字合并后的替代对象不能继承关系。漫画只对仍保持单原框身份的未分组页面行采用证明；最终数组包含数值及保护框后才封存私有布局旁证，不向正文或阅读属性添加证明。
  * 气泡补绘：漫画段落仅私下记录实际局部气泡的搜索范围；该范围不是清字授权，后续仍需同源绑定并检查原图中的闭合组件与纯白空处。
  */
-import {groupMangaText,mergeMangaParagraphContinuations,type MangaOcrItem,type MangaRegion} from './mangaRegions';
+import {groupMangaText,mergeMangaParagraphContinuations,sortMangaRegions,type MangaOcrItem,type MangaRegion} from './mangaRegions';
 import {numericEvidenceKey,numericInformation,numericProtection} from './mangaNumeric';
 import {createMangaViewWordBoundaryConsumer,type MangaViewWordBoundaryProof} from './mangaViewWordBoundary';
 import type {ImageDetectionFrame} from './imageDetectionEvidence';
@@ -281,9 +281,9 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
         return grouped;
     });
     const outside=wordBoundaries.record(groupMangaText(outsideItems,language,width,height,'page',true),outsideItems);
-    const regions = [...outside,...paragraphs.flat()].sort((a,b)=>a.bbox.y0-b.bbox.y0||b.bbox.x0-a.bbox.x0);
-    const echoesRemoved=removeOverlappingSpacedEchoes(regions);
-    const result=appendUncoveredNumericGuards(mergeNumericRegions(echoesRemoved),guards,guardEvidence);
+    const echoesRemoved=removeOverlappingSpacedEchoes([...outside,...paragraphs.flat()]);
+    const regions = sortMangaRegions(echoesRemoved,language);
+    const result=appendUncoveredNumericGuards(mergeNumericRegions(regions),guards,guardEvidence);
     const physicalRegions=new Map<MangaRegion,Box>();
     if(page.imageParagraphGapProofs?.length){
         const byBox=new Map<string,MangaRegion[]>();
@@ -307,7 +307,7 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
         try{
             paragraphGaps.seal(result);bindImageParagraphGapEvidence(result,image,width,height);
             const support=consumeImageParagraphGapEvidence(result,image,width,height);
-            const grouped=mergeMangaParagraphContinuations(result,support);
+            const grouped=mergeMangaParagraphContinuations(result,support,language);
             for(const region of grouped)if(physicalRegions.has(region))region.sourceBoxes=[{...physicalRegions.get(region)!}];
             return grouped;
         }finally{

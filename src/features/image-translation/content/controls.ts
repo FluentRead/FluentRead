@@ -1,8 +1,8 @@
 /**
  * @file src/features/image-translation/content/controls.ts
  * 失败层级：错误时仅突出语言准备、模型、服务或重试中的一个主操作，其余动作放入默认收起的原生详情；状态变化仍由同一操作条承接。
- * 文件职责：创建图片翻译的极简纯图标角标操作条与居中毛玻璃旋转指示器，支持单图反馈和不遮挡阅读的漫画模式，支持取消、重试和首次语言准备与模型/服务设置导航。
- * 主要内容：单图提供左下角无框低饱和图标入口、居中纯图标毛玻璃旋转加载球（悬停切换取消图标，首次下载资源时平滑展开百分比胶囊）、纯图标已译微胶囊与全文详情；支持按场景控制是否在文案旁显示百分比，避免常规翻译阶段文字抖动；缺资源回退的已有译文在状态探测或失败时保留可见主入口和展开面板，普通加载与错误仍默认隐藏旧阅读器；文字面板记录实际触发入口并按焦点所有权归还，入口消失时仅回退到同一结果的可见文字按钮，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示同质感极简圆环，暂停会话后的单页排队可取消，失败时在同一边缘提供紧凑的重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
+ * 文件职责：创建图片翻译的极简纯图标角标操作条与居中毛玻璃旋转指示器，支持单图反馈、不遮挡阅读的漫画模式与单页悬停微胶囊，支持取消、重试、单页原图切换与重译以及首次语言准备和设置导航。
+ * 主要内容：单图提供左下角无框低饱和图标入口、居中纯图标毛玻璃旋转加载球（悬停切换取消图标，首次下载资源时平滑展开百分比胶囊）、纯图标已译微胶囊与全文详情；支持按场景控制是否在文案旁显示百分比，避免常规翻译阶段文字抖动；缺资源回退的已有译文在状态探测或失败时保留可见主入口和展开面板，普通加载与错误仍默认隐藏旧阅读器；文字面板记录实际触发入口并按焦点所有权归还，入口消失时仅回退到同一结果的可见文字按钮，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示同质感极简圆环，暂停会话后的单页排队可取消，失败时在同一边缘提供紧凑的重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成页在未悬停或聚焦时完全隐藏，悬停或键盘聚焦才按需显现轻量单页原图/译图切换与重新翻译微胶囊，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
  * 模块边界：仅操作所属 Shadow DOM，不读取配置、不访问网络、不持有图片请求；业务动作及生命周期由 content/runtime 注入。
  */
 import {createImageTextReader, IMAGE_READER_CSS, type ImageReaderLine, type ImageReaderLanguages} from './textReader';
@@ -34,7 +34,7 @@ function mayFocusReader(trigger: HTMLElement): boolean {
     }
 }
 
-export function createImageControls(actions: {onAction(): void; onPrepare(): void; onDismiss?(): void; onInspect?(): void; onSettings?(section: ImageSettingsSection): void; translate?(source: string): string; onWarning?(event: MouseEvent): void}) {
+export function createImageControls(actions: {onAction(): void; onPrepare(): void; onRetranslate?(): void; onDismiss?(): void; onInspect?(): void; onSettings?(section: ImageSettingsSection): void; translate?(source: string): string; onWarning?(event: MouseEvent): void}) {
     const localize = (source: string) => actions.translate?.(source) ?? source;
     const element = document.createElement('div');
     element.className = 'fr-image-controls';
@@ -95,6 +95,10 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     dismiss.type = 'button';
     dismiss.className = 'fr-image-dismiss';
     dismiss.textContent = '关闭';
+    const retranslate = document.createElement('button');
+    retranslate.type = 'button';
+    retranslate.className = 'fr-image-retranslate';
+    retranslate.hidden = true;
     let readerTrigger: HTMLElement | null = null;
     let returningFocus = false;
     const reader = createImageTextReader(localize, ownedFocus => {
@@ -119,9 +123,10 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     let hovered = true;
     let focused = false;
     function refreshVisibility() {
-        element.hidden = feedback.dataset.manga === 'true'
+        const mangaActions = element.dataset.mangaActions === 'true';
+        element.hidden = (feedback.dataset.manga === 'true' && !mangaActions)
             || (phase === 'loading' && details.hidden)
-            || (phase === 'translated' && !hovered && !focused && details.hidden);
+            || ((phase === 'translated' || mangaActions) && !hovered && !focused && details.hidden);
     }
     let hasLines = false;
     let phase: ImageControlPhase = 'idle';
@@ -157,12 +162,17 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         dismiss.title = localize('关闭图片翻译提示');
         dismiss.setAttribute('aria-label', dismiss.title);
         const manga = feedback.dataset.manga === 'true';
+        const mangaActions = element.dataset.mangaActions === 'true';
+        const mangaOriginal = mangaActions && element.dataset.mangaOriginal === 'true';
         const originalRetained = !manga && sourceMessage === '已识别文字，原图未改动';
         const dismissAction = originalRetained || (phase === 'error' && feedback.dataset.preparation === 'true');
-        button.textContent = localize(dismissAction ? '关闭' : phase === 'loading' ? '取消' : phase === 'translated' ? '原图' : phase === 'error' ? '重试' : '翻译');
-        const actionTitle = dismissAction ? dismiss.title : localize(phase === 'loading' ? '取消图片翻译' : phase === 'translated' ? '恢复原图' : sourceMessage);
+        button.textContent = localize(mangaOriginal ? '译图' : dismissAction ? '关闭' : phase === 'loading' ? '取消' : phase === 'translated' ? '原图' : phase === 'error' ? '重试' : '翻译');
+        const actionTitle = mangaOriginal ? localize('查看译图') : dismissAction ? dismiss.title : localize(phase === 'loading' ? '取消图片翻译' : phase === 'translated' ? '恢复原图' : sourceMessage);
         button.title = `${brand} · ${actionTitle}`;
         button.setAttribute('aria-label', button.title);
+        retranslate.textContent = localize('重新翻译');
+        retranslate.title = `${brand} · ${localize('重新翻译')}`;
+        retranslate.setAttribute('aria-label', retranslate.title);
         const localizedMessage = localize(sourceMessage);
         warningButton.textContent = manga ? localize('未绘制') : originalRetained ? inspect.textContent : '!';
         warningButton.title = manga || sourceMessage === '部分译文未绘制，请查看图片文字'
@@ -192,6 +202,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         if (target === modelSettings) actions.onSettings?.('settings-services');
         if (target === serviceSettings) actions.onSettings?.('settings-image-translation');
         if (target === dismiss) actions.onDismiss?.();
+        if (target === retranslate) actions.onRetranslate?.();
         if (target === inspect) {
             if (details.hidden) openReader(inspect);
             else {reader.close();actions.onInspect?.();refreshVisibility();}
@@ -233,10 +244,14 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     row.append(...actionButtons, more);
     feedback.append(heading, status, progressBar, errorDetails);
     element.append(details, row);
-    const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number; showPercent?: boolean; quiet?: boolean; warning?: boolean; warningAction?: boolean; queued?: boolean; modelSettings?: boolean; serviceSettings?: boolean; errorDetails?: string; retainedReading?: boolean} = {}) => {
+    const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number; showPercent?: boolean; quiet?: boolean; warning?: boolean; warningAction?: boolean; queued?: boolean; modelSettings?: boolean; serviceSettings?: boolean; errorDetails?: string; retainedReading?: boolean; mangaActions?: boolean; mangaOriginalShown?: boolean} = {}) => {
         phase = next;
         retainedReading = options.retainedReading === true && (next === 'loading' || next === 'error');
+        const mangaActions = options.quiet === true && next === 'translated' && options.mangaActions === true;
+        const mangaOriginalShown = mangaActions && options.mangaOriginalShown === true;
         element.dataset.phase = next;
+        element.dataset.mangaActions = String(mangaActions);
+        element.dataset.mangaOriginal = String(mangaOriginalShown);
         button.dataset.phase = next;
         feedback.dataset.phase = next;
         feedback.dataset.manga = String(options.quiet === true);
@@ -255,6 +270,8 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         refreshLanguage();
         warningButton.hidden = !(feedback.dataset.warning === 'true' && options.warningAction === true);
         if (warningButton.hidden) warningButton.remove();else if (warningButton.parentElement !== feedback) feedback.append(warningButton);
+        retranslate.hidden = !mangaActions;
+        if (retranslate.hidden) retranslate.remove();else if (retranslate.parentElement !== row) row.insertBefore(retranslate, more);
         status.hidden = next === 'idle' || (next === 'translated' && (feedback.dataset.warning !== 'true' || !warningButton.hidden));
         feedback.hidden = feedback.dataset.warning === 'true' ? false : options.quiet === true ? next !== 'loading' && next !== 'error' : status.hidden;
         progressBar.hidden = next !== 'loading' || progress === undefined;
@@ -274,7 +291,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         const actionsOwner = feedbackOwnsActions ? feedback : element;
         // 进度更新会频繁刷新状态；仅在状态容器变化时移动操作条，避免重挂载打断悬停与焦点。
         if (row.parentElement !== actionsOwner) actionsOwner.insertBefore(row, feedbackOwnsActions ? errorDetails : null);
-        inspect.hidden = !canRead();
+        inspect.hidden = !canRead() || feedback.dataset.manga === 'true';
         if (next === 'error') {
             const primary = !prepare.hidden ? prepare : !modelSettings.hidden ? modelSettings : !serviceSettings.hidden ? serviceSettings : button;
             for (const control of actionButtons) {
@@ -303,7 +320,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         setLines(lines: ImageReaderLine[], languages?: ImageReaderLanguages) {
             hasLines = lines.length > 0;
             reader.setLines(lines, languages);
-            inspect.hidden = !canRead();
+            inspect.hidden = !canRead() || feedback.dataset.manga === 'true';
         },
         dispose() {
             disposed = true;

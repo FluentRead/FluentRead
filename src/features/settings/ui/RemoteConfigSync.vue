@@ -1,15 +1,16 @@
 <!--
 @file src/features/settings/ui/RemoteConfigSync.vue
-文件职责：用清晰的保存、恢复与逐项合并流程完成Google Drive 与 WebDAV 共用的配置云备份。
-主要内容：以同级选项展示始终同步且不可关闭的基础配置与默认关闭的敏感配置；敏感配置须明确同意，选择在本机持续保存直到手动关闭。
-预览说明旧备份范围和恢复保护，不在选项区重复展示范围摘要与恢复提示。
+文件职责：用清晰的保存、恢复、端到端口令保护、学习资产合并与可选自动同步流程完成 Google Drive 与 WebDAV 共用的配置云备份。
+主要内容：以同级选项展示始终同步且不可关闭的基础配置、默认关闭的敏感配置及三类默认关闭的学习资产（单词本与独立上下文、个人校订、阅读材料元数据）；敏感配置须明确同意，选择在本机持续保存直到手动关闭。
+提供端到端加密口令模式切换（兼容模式与自定义零知识口令）、12 字符强度校验与遗忘警示、会话或本机加密留存及一键清除；WebDAV 侧额外展示默认关闭的定时自动同步周期、状态与立即安全合并入口。
+预览说明旧备份范围、端到端升级提示、学习数据逐类增改数量和恢复保护，不在选项区重复展示范围摘要与恢复提示。
 风险确认集中展示存储方式、泄露风险与持续生效的选择；删除确认将云端删除范围、本机保留说明与加粗的确认词合入同一个提示块，输入框紧接其后；次要说明在独立浮层展示，避免展开时改变弹窗与按钮位置。
 删除前须输入本次界面语言的确认文本，再点击确认；只删除已核验版本的备份文件，并保留本机配置。
 删除入口在核验和删除请求期间显示加载动画，完成或失败后恢复；同步操作不触发删除动画。
 通过左侧操作插槽集中显示同步与连接设置，右侧记录插槽统一显示账号和时间，窄屏改为上下排列；预览顶部一行显示本次账号、同步范围标签（说明收在悬停提示里）和更换账号入口；按两步流程说明影响范围，
 先选择操作再确认影响，确认页把方向、差异数量与一句影响说明合并在标题下，没有差异时不显示展开按钮和空列表，只有存在被隐藏内容的条目才提示“已隐藏”；WebDAV 内容核验兼容模式提示避免多设备同时同步，仍保留只读供应商的恢复限制；默认展示差异与连接变更类别，小屏保留操作区。
 Drive 已上传但未完成核验时单独显示警示，不误报未上传，也不更新成功记录。
-模块边界：只消费后台脱敏预览和同步记录；不获取完整配置、令牌或用户口令，由父级提供存储方式和客户端。
+模块边界：只消费后台脱敏预览、口令状态与同步记录；不获取完整配置或令牌，单次自定义口令仅在内存短暂持有并随取消或卸载清除，由父级提供存储方式和客户端。
 -->
 <template>
   <section class="drive-sync" :data-testid="`${kind}-sync`" :aria-busy="busy">
@@ -23,6 +24,79 @@ Drive 已上传但未完成核验时单独显示警示，不误报未上传，�
         <label :for="`${kind}-include-sensitive`"><strong>{{ t('settings.cloud.includeSensitive') }}</strong><span :id="`${kind}-sensitive-description`">{{ t('settings.cloud.sensitiveDescription') }}</span></label>
         <el-switch :id="`${kind}-include-sensitive`" :model-value="includeSensitive" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.includeSensitive')" :aria-describedby="`${kind}-sensitive-description`" data-testid="cloud-include-sensitive" @change="toggleSensitive" />
       </div>
+      <div class="cloud-scope-option">
+        <label :for="`${kind}-include-vocabulary`"><strong>{{ t('settings.cloud.learning.vocabulary') }}</strong><span :id="`${kind}-vocabulary-description`">{{ t('settings.cloud.learning.vocabularyDescription') }}</span></label>
+        <el-switch :id="`${kind}-include-vocabulary`" :model-value="learningScope.includeVocabulary" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.learning.vocabulary')" :aria-describedby="`${kind}-vocabulary-description`" data-testid="cloud-include-vocabulary" @change="toggleLearning('includeVocabulary', $event)" />
+      </div>
+      <div v-if="learningScope.includeVocabulary" class="cloud-scope-option cloud-scope-suboption">
+        <label :for="`${kind}-include-vocabulary-context`"><strong>{{ t('settings.cloud.learning.vocabularyContext') }}</strong><span :id="`${kind}-vocabulary-context-description`">{{ t('settings.cloud.learning.vocabularyContextDescription') }}</span></label>
+        <el-switch :id="`${kind}-include-vocabulary-context`" :model-value="learningScope.includeVocabularyContext" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.learning.vocabularyContext')" :aria-describedby="`${kind}-vocabulary-context-description`" data-testid="cloud-include-vocabulary-context" @change="toggleLearning('includeVocabularyContext', $event)" />
+      </div>
+      <div class="cloud-scope-option">
+        <label :for="`${kind}-include-corrections`"><strong>{{ t('settings.cloud.learning.corrections') }}</strong><span :id="`${kind}-corrections-description`">{{ t('settings.cloud.learning.correctionsDescription') }}</span></label>
+        <el-switch :id="`${kind}-include-corrections`" :model-value="learningScope.includePersonalCorrections" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.learning.corrections')" :aria-describedby="`${kind}-corrections-description`" data-testid="cloud-include-corrections" @change="toggleLearning('includePersonalCorrections', $event)" />
+      </div>
+      <div class="cloud-scope-option">
+        <label :for="`${kind}-include-materials`"><strong>{{ t('settings.cloud.learning.materials') }}</strong><span :id="`${kind}-materials-description`">{{ t('settings.cloud.learning.materialsDescription') }}</span></label>
+        <el-switch :id="`${kind}-include-materials`" :model-value="learningScope.includeReadingMaterials" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.learning.materials')" :aria-describedby="`${kind}-materials-description`" data-testid="cloud-include-materials" @change="toggleLearning('includeReadingMaterials', $event)" />
+      </div>
+    </div>
+    <div v-if="hasPassphraseSupport" class="cloud-e2ee" data-testid="cloud-e2ee-section">
+      <div class="cloud-e2ee-header">
+        <strong>{{ t('settings.cloud.e2ee.title') }}</strong>
+        <span class="cloud-e2ee-badge" role="status" data-testid="cloud-e2ee-status">{{ e2eeStatusText }}</span>
+      </div>
+      <div class="cloud-e2ee-modes" role="radiogroup" :aria-label="t('settings.cloud.e2ee.title')">
+        <label :class="{'is-selected': e2eeMode === 'app'}">
+          <input v-model="e2eeMode" type="radio" :name="`${kind}-e2ee-mode`" value="app" :disabled="busy || previewVisible" data-testid="cloud-e2ee-mode-app" />
+          <span>{{ t('settings.cloud.e2ee.modeLegacy') }}</span>
+        </label>
+        <label :class="{'is-selected': e2eeMode === 'custom'}">
+          <input v-model="e2eeMode" type="radio" :name="`${kind}-e2ee-mode`" value="custom" :disabled="busy || previewVisible" data-testid="cloud-e2ee-mode-custom" />
+          <span>{{ t('settings.cloud.e2ee.modeCustom') }}</span>
+        </label>
+      </div>
+      <template v-if="e2eeMode === 'custom'">
+        <el-alert :title="t('settings.cloud.e2ee.warning')" type="warning" :closable="false" show-icon class="cloud-e2ee-warning" />
+        <div class="cloud-e2ee-fields">
+          <label :for="`${kind}-e2ee-passphrase`">{{ t('settings.cloud.e2ee.passphraseLabel') }}</label>
+          <el-input :id="`${kind}-e2ee-passphrase`" v-model="passphraseDraft" type="password" show-password :placeholder="t('settings.cloud.e2ee.passphrasePlaceholder')" :disabled="busy || previewVisible" :maxlength="1024" autocomplete="new-password" data-testid="cloud-e2ee-passphrase" />
+          <p v-if="passphraseDraft" class="cloud-e2ee-strength" :class="`is-${passphraseStrength}`" data-testid="cloud-e2ee-strength">{{ passphraseStrengthLabel }}</p>
+          <label :for="`${kind}-e2ee-confirm`">{{ t('settings.cloud.e2ee.confirmLabel') }}</label>
+          <el-input :id="`${kind}-e2ee-confirm`" v-model="passphraseConfirm" type="password" show-password :placeholder="t('settings.cloud.e2ee.confirmPlaceholder')" :disabled="busy || previewVisible" :maxlength="1024" autocomplete="new-password" data-testid="cloud-e2ee-confirm" />
+          <p v-if="passphraseMismatch" class="cloud-e2ee-mismatch" role="alert" data-testid="cloud-e2ee-mismatch">{{ t('settings.cloud.e2ee.mismatch') }}</p>
+          <label :for="`${kind}-e2ee-remember`">{{ t('settings.cloud.e2ee.rememberLabel') }}</label>
+          <select :id="`${kind}-e2ee-remember`" class="cloud-native-select" :disabled="busy || previewVisible" data-testid="cloud-e2ee-remember" @change="changeE2eeRemember">
+            <option value="none" :selected="e2eeRemember === 'none'">{{ t('settings.cloud.e2ee.rememberNone') }}</option>
+            <option value="session" :selected="e2eeRemember === 'session'">{{ t('settings.cloud.e2ee.rememberSession') }}</option>
+            <option value="device" :selected="e2eeRemember === 'device'">{{ t('settings.cloud.e2ee.rememberDevice') }}</option>
+          </select>
+        </div>
+        <div class="cloud-e2ee-actions">
+          <el-button size="small" type="primary" :disabled="busy || previewVisible || !canApplyPassphrase" data-testid="cloud-e2ee-apply" @click="applyPassphraseSettings">{{ t('settings.cloud.e2ee.apply') }}</el-button>
+          <el-button v-if="passphraseState?.hasStoredPassphrase" size="small" link type="danger" :disabled="busy || previewVisible" data-testid="cloud-e2ee-forget" @click="forgetStoredPassphrase">{{ t('settings.cloud.e2ee.forget') }}</el-button>
+        </div>
+      </template>
+      <div v-else-if="passphraseState?.mode === 'custom'" class="cloud-e2ee-actions">
+        <el-button size="small" :disabled="busy || previewVisible" data-testid="cloud-e2ee-apply" @click="applyPassphraseSettings">{{ t('settings.cloud.e2ee.apply') }}</el-button>
+      </div>
+    </div>
+    <div v-if="hasAutoSyncSupport && status?.available" class="cloud-autosync" data-testid="cloud-auto-sync-section">
+      <div class="cloud-scope-option">
+        <label :for="`${kind}-auto-sync-enabled`"><strong>{{ t('settings.cloud.autoSync.title') }}</strong><span :id="`${kind}-auto-sync-description`">{{ t('settings.cloud.autoSync.description') }}</span></label>
+        <el-switch :id="`${kind}-auto-sync-enabled`" :model-value="autoSyncState?.enabled === true" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.autoSync.title')" :aria-describedby="`${kind}-auto-sync-description`" data-testid="cloud-auto-sync-enabled" @change="toggleAutoSync" />
+      </div>
+      <div v-if="autoSyncState" class="cloud-autosync-controls">
+        <label :for="`${kind}-auto-sync-interval`">{{ t('settings.cloud.autoSync.interval') }}</label>
+        <select :id="`${kind}-auto-sync-interval`" class="cloud-native-select" :disabled="busy || previewVisible" data-testid="cloud-auto-sync-interval" @change="changeAutoSyncInterval">
+          <option value="30" :selected="autoSyncState.intervalMinutes === 30">{{ t('settings.cloud.autoSync.interval30m') }}</option>
+          <option value="60" :selected="autoSyncState.intervalMinutes === 60">{{ t('settings.cloud.autoSync.interval60m') }}</option>
+          <option value="360" :selected="autoSyncState.intervalMinutes === 360">{{ t('settings.cloud.autoSync.interval6h') }}</option>
+          <option value="1440" :selected="autoSyncState.intervalMinutes === 1440">{{ t('settings.cloud.autoSync.interval24h') }}</option>
+        </select>
+        <el-button v-if="autoSyncState.enabled" size="small" :disabled="busy || previewVisible" data-testid="cloud-auto-sync-run-now" @click="runAutoSyncNow">{{ t('settings.cloud.autoSync.runNow') }}</el-button>
+      </div>
+      <p v-if="autoSyncState && autoSyncState.enabled" class="cloud-autosync-status" role="status" data-testid="cloud-auto-sync-status">{{ autoSyncStatusText }}</p>
     </div>
     <el-alert v-if="error && !previewVisible" :title="error" :type="uploadUnverified ? 'warning' : 'error'" :closable="false" show-icon class="drive-error" />
     <el-alert v-if="status?.cleanupPending && !previewVisible" :title="t('settings.cloud.cleanupPending')" type="warning" :closable="false" show-icon class="drive-error" />
@@ -79,11 +153,21 @@ Drive 已上传但未完成核验时单独显示警示，不误报未上传，�
           <span class="cloud-preview-scope" role="status" data-testid="cloud-preview-scope" :title="t(preview.includeSensitive ? 'settings.cloud.previewSensitive' : 'settings.cloud.preserveLocal')" :aria-label="`${t(preview.includeSensitive ? 'settings.cloud.scopeSensitive' : 'settings.cloud.scopeSettings')}：${t(preview.includeSensitive ? 'settings.cloud.previewSensitive' : 'settings.cloud.preserveLocal')}`"><strong>{{ t(preview.includeSensitive ? 'settings.cloud.scopeSensitive' : 'settings.cloud.scopeSettings') }}</strong></span>
           <el-button v-if="kind === 'google-drive'" link :loading="switchingAccount" :disabled="busy" :data-testid="`${kind}-switch-account`" @click="switchAccount">{{ t('settings.drive.switchAccount') }}</el-button>
         </div>
+        <el-alert v-if="preview.keyMode === 'custom' && preview.remoteKeyMode === 'app'" :title="t('settings.cloud.e2ee.upgradeNotice')" type="info" :closable="false" show-icon class="drive-error drive-preview-notice" data-testid="cloud-e2ee-upgrade-notice" />
         <el-alert v-if="preview.remoteIncludesSensitive && !preview.includeSensitive" :title="t('settings.cloud.legacySensitive')" type="warning" :closable="false" show-icon class="drive-error drive-preview-notice" data-testid="cloud-legacy-sensitive" />
         <el-alert v-else-if="preview.hasRemote && preview.includeSensitive && !preview.remoteIncludesSensitive" :title="t('settings.cloud.remoteSettingsOnly')" type="info" :closable="false" show-icon class="drive-error drive-preview-notice" />
         <el-alert v-if="error" :title="error" :type="uploadUnverified ? 'warning' : 'error'" :closable="false" show-icon class="drive-error drive-preview-notice" />
         <el-alert v-if="preview.canUpload === false" :title="t('settings.cloud.restoreOnly')" type="warning" :closable="false" show-icon class="drive-error drive-preview-notice" :data-testid="`${kind}-restore-only`" />
         <el-alert v-else-if="preview.requiresExclusiveAccess" :title="t('settings.webdav.concurrentWarning')" type="warning" :closable="false" show-icon class="drive-error drive-preview-notice" data-testid="webdav-sync-compatibility" />
+        <div v-if="activeLearningSummaryItems.length" class="cloud-learning-preview" data-testid="cloud-learning-preview">
+          <strong>{{ t('settings.cloud.learning.previewTitle') }}</strong>
+          <ul>
+            <li v-for="item in activeLearningSummaryItems" :key="item.key" :data-testid="`cloud-learning-diff-${item.key}`">
+              <span>{{ item.label }}</span>
+              <span>{{ item.summary }}</span>
+            </li>
+          </ul>
+        </div>
 
         <ol v-if="preview.hasRemote && !identical && preview.canUpload !== false" class="drive-steps" :aria-label="t('settings.drive.stepsLabel')">
           <li :class="{'is-current': step === 'choose'}" :aria-current="step === 'choose' ? 'step' : undefined"><span>1</span>{{ t('settings.drive.chooseStep') }}</li>
@@ -170,7 +254,7 @@ Drive 已上传但未完成核验时单独显示警示，不误报未上传，�
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, onUnmounted, ref, watch} from 'vue';
+import {computed, onMounted, onUnmounted, reactive, ref, watch} from 'vue';
 import {ElAlert, ElIcon, ElInput, ElMessage, ElPagination, ElPopover, ElSwitch} from 'element-plus';
 import {ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CircleCheck, Delete, Download, Switch, Upload, User, Warning} from '@element-plus/icons-vue';
 import 'element-plus/es/components/alert/style/css';
@@ -179,25 +263,91 @@ import 'element-plus/es/components/pagination/style/css';
 import 'element-plus/es/components/popover/style/css';
 import 'element-plus/es/components/switch/style/css';
 import {useUiI18n} from '@/src/ui/i18n';
-import {CloudBackupRequestError, type createCloudBackupClient} from '@/src/services/config/cloudBackupClient';
+import {CloudBackupRequestError, type CloudBackupCommitOptions, type CloudBackupPrepareOptions, type createCloudBackupClient} from '@/src/services/config/cloudBackupClient';
+import {evaluatePassphraseStrength, type DriveEncryptionKeyMode} from '@/src/platform/google-drive/encryption';
+import {DEFAULT_LEARNING_SYNC_SCOPE, hasAnyLearningSyncScope, type LearningSyncScope} from '@/src/core/config/learningSync';
+import type {CloudPassphraseConfigInput, CloudPassphraseRememberScope, CloudPassphraseStatus} from '@/src/services/config/cloudPassphraseStore';
+import type {CloudAutoSyncConfigPatch, CloudAutoSyncIntervalMinutes, CloudAutoSyncStatus} from '@/src/services/config/cloudAutoSync';
 import {chooseDriveRow, driveRowChoice, groupDrivePreviewChanges, initialDriveDirection, localizeDrivePreviewLanguage, unresolvedDriveChanges, type DrivePreviewRow} from '../model/googleDrivePreview';
 import type {DriveChoice} from '@/src/core/config/driveSync';
 import type {DriveSyncDirection, DriveSyncPreview, DriveSyncStatus} from '@/src/services/config/googleDriveSync';
 import type {CloudBackupDeletePreview} from '@/src/services/config/remoteConfigSync';
 
-const props = defineProps<{client: Pick<ReturnType<typeof createCloudBackupClient>, 'status' | 'prepare' | 'commit' | 'cancel' | 'prepareDelete' | 'commitDelete'>; provider: string; kind: 'google-drive' | 'webdav'}>();
+type SyncClient = Pick<ReturnType<typeof createCloudBackupClient>, 'status' | 'prepare' | 'commit' | 'cancel' | 'prepareDelete' | 'commitDelete'> & {
+  passphraseStatus?: () => Promise<CloudPassphraseStatus>;
+  configurePassphrase?: (input: CloudPassphraseConfigInput) => Promise<CloudPassphraseStatus>;
+  clearPassphrase?: () => Promise<CloudPassphraseStatus>;
+  autoSyncStatus?: () => Promise<CloudAutoSyncStatus>;
+  configureAutoSync?: (patch: CloudAutoSyncConfigPatch) => Promise<CloudAutoSyncStatus>;
+  runAutoSyncNow?: () => Promise<CloudAutoSyncStatus>;
+};
+
+const props = defineProps<{client: SyncClient; provider: string; kind: 'google-drive' | 'webdav'}>();
 const emit = defineEmits<{busy: [value: boolean]}>();
 const {t: baseT, translateLegacy, language} = useUiI18n();
 const client = props.client;
 const mapping: Record<string, string> = {'settings.drive.downloadDescription': 'settings.cloud.downloadDescription', 'settings.drive.uploadDescription': 'settings.cloud.uploadDescription', 'settings.drive.firstTitle': 'settings.cloud.firstTitle', 'settings.drive.selectedAccount': 'settings.cloud.selectedAccount'};
 function t(key: string, params?: Record<string, string | number>) {return baseT(mapping[key] ?? key, {...params, provider: props.provider});}
 
+const hasPassphraseSupport = computed(() => typeof client.passphraseStatus === 'function' && typeof client.configurePassphrase === 'function' && typeof client.clearPassphrase === 'function');
+const hasAutoSyncSupport = computed(() => typeof client.autoSyncStatus === 'function' && typeof client.configureAutoSync === 'function' && typeof client.runAutoSyncNow === 'function');
+
 const status = ref<DriveSyncStatus | null>(null);
 const busy = ref(false);
 const deleting = ref(false);
 const includeSensitive = ref(false);
 const sensitivePreferenceKey = 'fluentread-cloud-backup-include-sensitive';
+const learningPreferenceKey = 'fluentread-cloud-backup-learning-scope';
 try {includeSensitive.value = localStorage.getItem(sensitivePreferenceKey) === 'true';} catch { /* 无法读取已保存选择时保持默认关闭。 */ }
+const learningScope = reactive<LearningSyncScope>({...DEFAULT_LEARNING_SYNC_SCOPE});
+function loadLearningPreference() {
+  try {
+    const raw = localStorage.getItem(learningPreferenceKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Partial<LearningSyncScope>;
+    learningScope.includeVocabulary = parsed.includeVocabulary === true;
+    learningScope.includeVocabularyContext = learningScope.includeVocabulary && parsed.includeVocabularyContext === true;
+    learningScope.includePersonalCorrections = parsed.includePersonalCorrections === true;
+    learningScope.includeReadingMaterials = parsed.includeReadingMaterials === true;
+  } catch { /* 无法读取学习同步偏好时保持默认全部关闭。 */ }
+}
+loadLearningPreference();
+
+const passphraseState = ref<CloudPassphraseStatus | null>(null);
+const e2eeMode = ref<DriveEncryptionKeyMode>('app');
+const passphraseDraft = ref('');
+const passphraseConfirm = ref('');
+const e2eeRemember = ref<CloudPassphraseRememberScope>('session');
+const activeEphemeralPassphrase = ref<string | undefined>(undefined);
+const passphraseStrength = computed(() => evaluatePassphraseStrength(passphraseDraft.value));
+const passphraseStrengthLabel = computed(() => {
+  if (passphraseStrength.value === 'strong') return t('settings.cloud.e2ee.strength.strong');
+  if (passphraseStrength.value === 'fair') return t('settings.cloud.e2ee.strength.fair');
+  if (passphraseStrength.value === 'weak') return t('settings.cloud.e2ee.strength.weak');
+  return t('settings.cloud.e2ee.strength.too-short');
+});
+const passphraseMismatch = computed(() => Boolean(passphraseConfirm.value && passphraseDraft.value !== passphraseConfirm.value));
+const passphraseValid = computed(() => passphraseDraft.value.trim().length >= 12 && passphraseDraft.value.length <= 1024 && passphraseDraft.value === passphraseConfirm.value);
+const canApplyPassphrase = computed(() => e2eeMode.value === 'app' || e2eeRemember.value === 'none' || passphraseValid.value);
+const e2eeStatusText = computed(() => {
+  if (!passphraseState.value || passphraseState.value.mode === 'app') return t('settings.cloud.e2ee.statusLegacy');
+  if (passphraseState.value.storageScope === 'device') return t('settings.cloud.e2ee.statusDevice');
+  if (passphraseState.value.storageScope === 'session') return t('settings.cloud.e2ee.statusSession');
+  return t('settings.cloud.e2ee.statusLocked');
+});
+
+const autoSyncState = ref<CloudAutoSyncStatus | null>(null);
+const autoSyncStatusText = computed(() => {
+  const current = autoSyncState.value;
+  if (!current) return '';
+  if (current.state === 'synced') return t('settings.cloud.autoSync.statusSynced');
+  if (current.state === 'conflict') return t('settings.cloud.autoSync.statusConflict', {count: current.conflictCount || 1});
+  if (current.state === 'passphrase-locked') return t('settings.cloud.autoSync.statusLocked');
+  if (current.state === 'offline') return t('settings.cloud.autoSync.statusOffline');
+  if (current.state === 'error') return t('settings.cloud.autoSync.statusError');
+  return t('settings.cloud.autoSync.statusIdle');
+});
+
 const consentVisible = ref(false);
 const riskAcknowledged = ref(false);
 const switchingAccount = ref(false);
@@ -219,7 +369,34 @@ const choices = ref<Record<string, string>>({});
 const page = ref(1);
 const detailsVisible = ref(false);
 const automaticVisible = ref(false);
-const identical = computed(() => Boolean(preview.value?.hasRemote && !preview.value.changes.length && preview.value.includeSensitive === preview.value.remoteIncludesSensitive));
+const identical = computed(() => Boolean(
+  preview.value?.hasRemote
+  && !preview.value.changes.length
+  && preview.value.includeSensitive === preview.value.remoteIncludesSensitive
+  && !preview.value.learningSummary?.hasAnyChanges
+  && !(preview.value.keyMode === 'custom' && preview.value.remoteKeyMode === 'app'),
+));
+const activeLearningSummaryItems = computed(() => {
+  const summary = preview.value?.learningSummary;
+  if (!summary) return [];
+  const entries = [
+    {key: 'vocabulary', label: t('settings.cloud.learning.vocabulary'), item: summary.vocabulary},
+    {key: 'corrections', label: t('settings.cloud.learning.corrections'), item: summary.personalCorrections},
+    {key: 'materials', label: t('settings.cloud.learning.materials'), item: summary.readingMaterials},
+  ];
+  return entries.filter(entry => entry.item.enabled).map(entry => ({
+    key: entry.key,
+    label: entry.label,
+    summary: entry.item.hasChanges
+      ? t('settings.cloud.learning.diffSummary', {
+        local: entry.item.localCount,
+        remote: entry.item.remoteCount,
+        added: entry.item.addedFromRemote,
+        updated: entry.item.updatedFromRemote,
+      })
+      : t('settings.cloud.learning.noChanges', {count: entry.item.localCount}),
+  }));
+});
 const rows = computed(() => groupDrivePreviewChanges(preview.value?.changes ?? []));
 const conflictRows = computed(() => rows.value.filter(row => !row.recommended));
 const automaticRows = computed(() => rows.value.filter(row => row.recommended));
@@ -250,12 +427,51 @@ async function perform(operation: () => Promise<void>, deletionOperation = false
   busy.value = true; deleting.value = deletionOperation; error.value = ''; uploadUnverified.value = false;
   try {await operation();} catch (failure) {if (alive) {
     uploadUnverified.value = failure instanceof CloudBackupRequestError && failure.errorKey === 'settings.cloud.uploadUnverified';
+    if (failure instanceof CloudBackupRequestError && (failure.errorKey === 'settings.cloud.e2ee.passphraseRequired' || failure.errorKey === 'settings.cloud.e2ee.wrongPassphrase')) {
+      e2eeMode.value = 'custom';
+    }
     error.value = failure instanceof CloudBackupRequestError && failure.errorKey ? t(failure.errorKey, failure.params) : failure instanceof Error ? translateLegacy(failure.message) : translateLegacy('同步未完成，请重试');
   }}
   finally {if (alive) {busy.value = false; deleting.value = false;}}
 }
+function toggleLearning(field: keyof LearningSyncScope, value: boolean | string | number) {
+  if (busy.value || previewVisible.value) return;
+  const enabled = value === true;
+  learningScope[field] = enabled;
+  if (field === 'includeVocabulary' && !enabled) learningScope.includeVocabularyContext = false;
+  try {localStorage.setItem(learningPreferenceKey, JSON.stringify({...learningScope}));} catch { /* 本地偏好写入受限时仅保持当前页面有效。 */ }
+  if (hasAutoSyncSupport.value && autoSyncState.value?.enabled) {
+    void client.configureAutoSync!({learningScope: {...learningScope}}).then(next => {if (alive) autoSyncState.value = next;}).catch(() => undefined);
+  }
+}
+function buildPrepareOptions(): CloudBackupPrepareOptions | undefined {
+  const options: CloudBackupPrepareOptions = {};
+  if (hasAnyLearningSyncScope(learningScope)) options.learningScope = {...learningScope};
+  if (hasPassphraseSupport.value && e2eeMode.value === 'custom') {
+    options.keyMode = 'custom';
+    if (!passphraseState.value?.hasStoredPassphrase && passphraseValid.value) {
+      activeEphemeralPassphrase.value = passphraseDraft.value;
+      options.passphrase = passphraseDraft.value;
+    } else {
+      activeEphemeralPassphrase.value = undefined;
+    }
+  } else {
+    activeEphemeralPassphrase.value = undefined;
+  }
+  return Object.keys(options).length > 0 ? options : undefined;
+}
+function buildCommitOptions(): CloudBackupCommitOptions | undefined {
+  if (!hasPassphraseSupport.value || e2eeMode.value !== 'custom') return undefined;
+  return {
+    keyMode: 'custom',
+    ...(activeEphemeralPassphrase.value ? {passphrase: activeEphemeralPassphrase.value} : {}),
+  };
+}
 async function requestPreview() {
-  const result = await client.prepare(includeSensitive.value);
+  const prepareOptions = buildPrepareOptions();
+  const result = prepareOptions
+    ? await client.prepare(includeSensitive.value, prepareOptions)
+    : await client.prepare(includeSensitive.value);
   if (!alive) {await client.cancel(result.id); return;}
   preview.value = result;
   choices.value = Object.fromEntries(result.changes.filter(change => change.recommended).map(change => [change.id, change.recommended!]));
@@ -265,6 +481,73 @@ async function requestPreview() {
   page.value = 1; detailsVisible.value = true; automaticVisible.value = true; previewVisible.value = true;
 }
 async function prepare() {await perform(requestPreview);}
+function changeE2eeRemember(event: Event) {
+  const value = (event.target as HTMLSelectElement).value;
+  if (value === 'none' || value === 'session' || value === 'device') e2eeRemember.value = value;
+}
+async function applyPassphraseSettings() {
+  if (!hasPassphraseSupport.value || !canApplyPassphrase.value) return;
+  await perform(async () => {
+    const next = await client.configurePassphrase!(
+      e2eeMode.value === 'app'
+        ? {mode: 'app'}
+        : {
+          mode: 'custom',
+          rememberScope: e2eeRemember.value,
+          ...(passphraseValid.value ? {passphrase: passphraseDraft.value} : {}),
+        },
+    );
+    if (!alive) return;
+    passphraseState.value = next;
+    e2eeMode.value = next.mode;
+    if (e2eeRemember.value !== 'none') {
+      passphraseDraft.value = '';
+      passphraseConfirm.value = '';
+    }
+    ElMessage.success(t('settings.cloud.e2ee.saved'));
+  });
+}
+async function forgetStoredPassphrase() {
+  if (!hasPassphraseSupport.value) return;
+  await perform(async () => {
+    const next = await client.clearPassphrase!();
+    if (!alive) return;
+    passphraseState.value = next;
+    passphraseDraft.value = '';
+    passphraseConfirm.value = '';
+    activeEphemeralPassphrase.value = undefined;
+    ElMessage.success(t('settings.cloud.e2ee.cleared'));
+  });
+}
+async function toggleAutoSync(value: boolean | string | number) {
+  if (!hasAutoSyncSupport.value) return;
+  await perform(async () => {
+    const next = await client.configureAutoSync!({
+      enabled: value === true,
+      includeSensitive: includeSensitive.value,
+      learningScope: {...learningScope},
+    });
+    if (alive) autoSyncState.value = next;
+  });
+}
+async function changeAutoSyncInterval(event: Event) {
+  if (!hasAutoSyncSupport.value) return;
+  const minutes = Number((event.target as HTMLSelectElement).value) as CloudAutoSyncIntervalMinutes;
+  await perform(async () => {
+    const next = await client.configureAutoSync!({intervalMinutes: minutes});
+    if (alive) autoSyncState.value = next;
+  });
+}
+async function runAutoSyncNow() {
+  if (!hasAutoSyncSupport.value) return;
+  await perform(async () => {
+    const next = await client.runAutoSyncNow!();
+    if (alive) {
+      autoSyncState.value = next;
+      status.value = await client.status();
+    }
+  });
+}
 async function requestDeletion() {
   deleteConfirmation.value = '';
   const result = await client.prepareDelete();
@@ -302,11 +585,15 @@ function saveSensitivePreference(value: boolean): boolean {
     localStorage.setItem(sensitivePreferenceKey, String(value));
     includeSensitive.value = value;
     error.value = '';
+    if (hasAutoSyncSupport.value && autoSyncState.value?.enabled) {
+      void client.configureAutoSync!({includeSensitive: value}).then(next => {if (alive) autoSyncState.value = next;}).catch(() => undefined);
+    }
     return true;
   } catch {error.value = t('settings.cloud.sensitiveSaveFailed'); return false;}
 }
 function handleSensitivePreferenceChange(event: StorageEvent) {
   if (event.storageArea === localStorage && (event.key === sensitivePreferenceKey || event.key === null)) includeSensitive.value = event.newValue === 'true';
+  if (event.storageArea === localStorage && (event.key === learningPreferenceKey || event.key === null)) loadLearningPreference();
 }
 function confirmSensitive() {
   if (!riskAcknowledged.value) return;
@@ -326,24 +613,45 @@ async function switchAccount() {
 async function commit() {
   if (step.value !== 'review' || !canCommit.value || !preview.value || !direction.value) return;
   const selected = {id: preview.value.id, direction: direction.value, choices: {...choices.value}};
+  const commitOptions = buildCommitOptions();
   await perform(async () => {
     if (!alive) return;
     try {
-      const result = await client.commit(selected.id, selected.direction, selected.choices);
-      if (alive) {status.value = result; ElMessage.success(t('settings.cloud.syncComplete', {provider: props.provider}));}
+      const result = commitOptions
+        ? await client.commit(selected.id, selected.direction, selected.choices, commitOptions)
+        : await client.commit(selected.id, selected.direction, selected.choices);
+      if (alive) {
+        status.value = result;
+        activeEphemeralPassphrase.value = undefined;
+        ElMessage.success(t('settings.cloud.syncComplete', {provider: props.provider}));
+      }
     } finally {if (alive) previewVisible.value = false;}
   });
 }
 async function cancelPreview() {await perform(async () => {await client.cancel(preview.value?.id); previewVisible.value = false;});}
-function clearPreview() {preview.value = null; choices.value = {}; direction.value = '';}
+function clearPreview() {preview.value = null; choices.value = {}; direction.value = ''; activeEphemeralPassphrase.value = undefined;}
 function endSession() {if (preview.value || deletion.value || busy.value) void client.cancel(preview.value?.id ?? deletion.value?.id).catch(() => undefined);}
 async function refreshStatus() {await perform(async () => {
-  try {status.value = await client.status();}
+  try {
+    const [nextStatus, nextPassphrase, nextAutoSync] = await Promise.all([
+      client.status(),
+      hasPassphraseSupport.value ? client.passphraseStatus!() : Promise.resolve(null),
+      hasAutoSyncSupport.value ? client.autoSyncStatus!() : Promise.resolve(null),
+    ]);
+    if (!alive) return;
+    status.value = nextStatus;
+    if (nextPassphrase) {
+      passphraseState.value = nextPassphrase;
+      e2eeMode.value = nextPassphrase.mode;
+      e2eeRemember.value = nextPassphrase.storageScope === 'none' ? 'session' : nextPassphrase.storageScope;
+    }
+    if (nextAutoSync) autoSyncState.value = nextAutoSync;
+  }
   catch (failure) {status.value = {available: false, reason: t('settings.cloud.unavailable'), account: null, lastSyncedAt: null}; throw failure;}
 });}
 defineExpose({refreshStatus});
 onMounted(() => {window.addEventListener('storage', handleSensitivePreferenceChange); void refreshStatus();});
-onUnmounted(() => {window.removeEventListener('storage', handleSensitivePreferenceChange); alive = false; endSession(); clearPreview();});
+onUnmounted(() => {window.removeEventListener('storage', handleSensitivePreferenceChange); alive = false; passphraseDraft.value = ''; passphraseConfirm.value = ''; endSession(); clearPreview();});
 </script>
 
 <style scoped>
@@ -357,11 +665,35 @@ onUnmounted(() => {window.removeEventListener('storage', handleSensitivePreferen
 .cloud-scope {border:1px solid var(--el-border-color-lighter); border-radius:10px; padding:16px; background:var(--el-fill-color-blank);}
 .cloud-scope-option {display:flex; gap:16px; align-items:center;}
 .cloud-scope-option+.cloud-scope-option {margin-top:12px; padding-top:12px; border-top:1px solid var(--el-border-color-lighter);}
+.cloud-scope-suboption {padding-inline-start:16px;}
 .cloud-scope-option>label {display:grid; gap:5px; flex:1; min-width:0; cursor:pointer;}
 .cloud-scope-option:first-child>label {cursor:default;}
 .cloud-scope-option strong {font-size:13px; font-weight:500;}
 .cloud-scope-option label>span {font-size:12px; line-height:1.7; color:var(--el-text-color-secondary); overflow-wrap:anywhere;}
 .cloud-scope-option>.el-switch {flex-shrink:0;}
+.cloud-e2ee,.cloud-autosync {margin-top:16px; border:1px solid var(--el-border-color-lighter); border-radius:10px; padding:16px; background:var(--el-fill-color-blank);}
+.cloud-e2ee-header {display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;}
+.cloud-e2ee-header strong {font-size:13px; font-weight:600;}
+.cloud-e2ee-badge {font-size:12px; padding:2px 8px; border-radius:999px; background:var(--el-fill-color-light); color:var(--el-text-color-secondary);}
+.cloud-e2ee-modes {display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
+.cloud-e2ee-modes label {display:flex; align-items:center; gap:6px; padding:8px 12px; border:1px solid var(--el-border-color); border-radius:8px; font-size:12px; cursor:pointer;}
+.cloud-e2ee-modes label.is-selected {border-color:var(--el-color-primary); background:var(--el-color-primary-light-9);}
+.cloud-e2ee-modes input {accent-color:var(--el-color-primary); margin:0;}
+.cloud-e2ee-warning {margin-bottom:12px;}
+.cloud-e2ee-fields {display:grid; gap:8px; margin-bottom:12px;}
+.cloud-e2ee-fields>label {font-size:12px; color:var(--el-text-color-regular);}
+.cloud-e2ee-strength {margin:0; font-size:12px;}
+.cloud-e2ee-strength.is-too-short,.cloud-e2ee-strength.is-weak,.cloud-e2ee-mismatch {margin:0; font-size:12px; color:var(--el-color-danger);}
+.cloud-e2ee-strength.is-fair {color:var(--el-color-warning);}
+.cloud-e2ee-strength.is-strong {color:var(--el-color-success);}
+.cloud-e2ee-actions {display:flex; flex-wrap:wrap; align-items:center; gap:10px;}
+.cloud-native-select {height:32px; padding:0 10px; border:1px solid var(--el-border-color); border-radius:6px; background:var(--el-bg-color); color:var(--el-text-color-primary); font:inherit; font-size:12px;}
+.cloud-autosync-controls {display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid var(--el-border-color-lighter); font-size:12px;}
+.cloud-autosync-status {margin:10px 0 0; font-size:12px; color:var(--el-text-color-secondary);}
+.cloud-learning-preview {margin:0 0 20px; padding:12px 14px; border:1px solid var(--el-border-color-lighter); border-radius:8px; background:var(--el-fill-color-light);}
+.cloud-learning-preview strong {display:block; font-size:13px; margin-bottom:8px;}
+.cloud-learning-preview ul {list-style:none; margin:0; padding:0; display:grid; gap:6px;}
+.cloud-learning-preview li {display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; font-size:12px; color:var(--el-text-color-regular);}
 .cloud-preview-scope {flex-shrink:0; padding:3px 9px; border:1px solid var(--el-border-color-lighter); border-radius:999px; background:var(--el-bg-color); font-size:11px; line-height:1.6; color:var(--el-text-color-regular); cursor:help;}
 .cloud-preview-scope strong {font-weight:600;}
 .cloud-consent-intro {margin:0 0 14px; font-size:13px; line-height:1.7; color:var(--el-text-color-regular);}

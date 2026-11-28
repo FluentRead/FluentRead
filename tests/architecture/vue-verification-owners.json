@@ -299,9 +299,10 @@
     "src/features/settings/ui/RemoteConfigSync.vue": {
       "kind": "behavior",
       "tests": [
-        "tests/remoteSiteSettingsLifecycle.test.ts"
+        "tests/remoteSiteSettingsLifecycle.test.ts",
+        "tests/remoteConfigSyncUpgradeUi.test.ts"
       ],
-      "scenario": "实际SFC敏感同意、合并/恢复/删除、账户切换及卸载后迟到预览取消"
+      "scenario": "实际SFC敏感同意、自定义E2EE口令、学习资产开关与差异预览、WebDAV定时自动同步、合并/恢复/删除、账户切换及卸载后迟到预览取消"
     },
     "src/features/settings/ui/SectionTranslationSettings.vue": {
       "kind": "behavior",

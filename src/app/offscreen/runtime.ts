@@ -141,7 +141,13 @@ export function startOffscreenApp(): void {
         },
         localTranslation: {
             translate: (request, signal) => translateLocalText(request, signal),
-            prepare: (request) => prepareLocalTranslationModel(request.model),
+            prepare: (request) => {
+                const options = request.preference || request.mirrorUrl ? {
+                    ...(request.preference ? {preference: request.preference} : {}),
+                    ...(request.mirrorUrl ? {mirrorUrl: request.mirrorUrl} : {}),
+                } : undefined;
+                return options ? prepareLocalTranslationModel(request.model, options) : prepareLocalTranslationModel(request.model);
+            },
             pause: (request) => pauseLocalTranslationModelDownload(request.model),
             status: getLocalTranslationModelStatus,
             removeModel: request => removeLocalTranslationModel(request.model),

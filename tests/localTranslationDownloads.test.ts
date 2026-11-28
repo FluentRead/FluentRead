@@ -756,3 +756,12 @@ it('真实离屏模型到真实后台状态处理：迟到存储回执不会覆�
     expect(mirrored.tasks.find(task => task.model === ids.opusZhEn)?.phase).toBe('ready');
   } finally {release(); page.dispatchEvent(new Event('pagehide')); vi.useRealTimers(); vi.resetModules();}
 });
+
+it('forwards download source preference and custom mirror options to artifact downloads', async () => {
+  const manager = createLocalTranslationDownloadManager();
+  await manager.start(ids.opusZhEn, {preference: 'mirror', mirrorUrl: 'https://proxy.example.com/hf'});
+  await vi.waitFor(() => expect(fake.download).toHaveBeenCalled());
+  expect(fake.download.mock.calls[0]?.[3]).toEqual({preference: 'mirror', mirrorUrl: 'https://proxy.example.com/hf'});
+  fake.gates.get(ids.opusZhEn)!();
+  await vi.waitFor(async () => expect(await phase(manager)).toBe('ready'));
+});

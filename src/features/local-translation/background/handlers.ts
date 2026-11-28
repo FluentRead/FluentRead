@@ -7,12 +7,13 @@
  */
 import {isMessageRecord} from '@/src/core/messaging/validation';
 import type {LocalTranslationOffscreenOptions, LocalTranslationRequest} from '@/src/platform/offscreen/localTranslation';
-import type {LocalTranslationModelId, LocalTranslationDownloadSnapshot} from '@/src/core/config/localTranslation';
+import type {LocalTranslationDownloadOptions, LocalTranslationDownloadSnapshot, LocalTranslationModelId} from '@/src/core/config/localTranslation';
 import type {LocalTranslationStatus} from '@/src/core/messaging/offscreen';
 import type {BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
 import {
     LOCAL_TRANSLATION_MODEL_STATE_KEY, LOCAL_TRANSLATION_DOWNLOAD_STATE_KEY,
     isLocalTranslationModel, normalizeLocalTranslationDownloadSnapshot,
+    normalizeLocalTranslationMirrorUrl, normalizeLocalTranslationSourcePreference,
 } from '@/src/core/config/localTranslation';
 
 export const LOCAL_TRANSLATION_MODEL_STATE_MESSAGE = 'fluentReadGetLocalTranslationModelState' as const;
@@ -23,7 +24,7 @@ export const LOCAL_TRANSLATION_PROGRESS_MESSAGE = 'fluentReadLocalTranslationDow
 
 export interface LocalTranslationBackgroundDependencies {
     readonly offscreen: {
-        prepare(model: LocalTranslationModelId, keepWarm?: boolean): Promise<LocalTranslationDownloadSnapshot>;
+        prepare(model: LocalTranslationModelId, keepWarm?: boolean, options?: LocalTranslationDownloadOptions): Promise<LocalTranslationDownloadSnapshot>;
         status(): Promise<LocalTranslationStatus>;
         remove(model: LocalTranslationModelId): Promise<void>;
         pause(model: LocalTranslationModelId): Promise<LocalTranslationDownloadSnapshot>;
@@ -79,7 +80,16 @@ export function createLocalTranslationBackgroundHandlers(
         },
         {
             type: LOCAL_TRANSLATION_MODEL_PREPARE_MESSAGE,
-            async handle(message) { return {...await dependencies.offscreen.prepare(modelFrom(message), false), success: true}; },
+            async handle(message) {
+                const model = modelFrom(message);
+                const record = message as unknown as Record<string, unknown>;
+                const options: LocalTranslationDownloadOptions = {};
+                if (record.preference !== undefined) options.preference = normalizeLocalTranslationSourcePreference(record.preference);
+                const mirrorUrl = normalizeLocalTranslationMirrorUrl(record.mirrorUrl);
+                if (mirrorUrl) options.mirrorUrl = mirrorUrl;
+                const hasOptions = options.preference !== undefined || options.mirrorUrl !== undefined;
+                return {...await (hasOptions ? dependencies.offscreen.prepare(model, false, options) : dependencies.offscreen.prepare(model, false)), success: true};
+            },
         },
         {
             type: LOCAL_TRANSLATION_MODEL_PAUSE_MESSAGE,

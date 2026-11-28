@@ -1,15 +1,22 @@
 /**
  * @file src/features/local-translation/offscreen/artifactStore.ts
  *
- * 文件职责：保存本地翻译模型的分块文件并执行可恢复的多源下载。
- * 主要内容：预索引工件查表、流式边下边算 SHA-256 校验与断点续传盘面复验、有界并发分块读写与字节计数、来源回退和离线读取，下载内存有明确上限；拒绝响应立即释放未读正文，清理不阻塞镜像回退。
+ * 文件职责：保存本地翻译模型的分块文件并执行可恢复的多源与加速镜像下载。
+ * 主要内容：预索引工件查表、流式边下边算 SHA-256 校验与断点续传盘面复验、有界并发分块读写与字节计数、支持自动优选/降权记忆、魔搭社区及自定义 HTTPS 加速镜像的多源回退和离线读取，并在流式接收前拦截 HTML 错误页与长度不符响应；下载内存有明确上限，拒绝响应立即释放未读正文，清理不阻塞镜像回退。
  * 模块边界：只操作专属 Cache Storage，不保存页面状态、不初始化推理引擎，也不向下载源发送翻译文本。
  */
+import {demoteMirrorOrigin, orderMirrorUrls, rememberPreferredMirrorOrigin, resetPreferredMirrorOrigins} from '@/src/core/assets/mirrors';
 import {huggingFaceDownloadOrigins} from '@/src/platform/http/modelDownloads';
 import {cancelUnreadResponseBody} from '@/src/platform/http/runtime';
 import {sha256} from '@noble/hashes/sha256';
 import frozenArtifacts from '@/src/core/config/localTranslationArtifacts.json';
-import {getLocalTranslationModel} from '@/src/core/config/localTranslation';
+import {
+    LOCAL_TRANSLATION_MODELSCOPE_REPOS,
+    getLocalTranslationModel,
+    normalizeLocalTranslationMirrorUrl,
+    normalizeLocalTranslationSourcePreference,
+    type LocalTranslationDownloadOptions,
+} from '@/src/core/config/localTranslation';
 
 export interface TranslationArtifact {
     repo: string;
@@ -33,6 +40,29 @@ export function getTranslationArtifacts(model: unknown): TranslationArtifact[] {
 
 export function artifactUrl(file: TranslationArtifact): string {
     return `${OFFICIAL_ORIGIN}/${file.repo}/resolve/${file.revision}/${file.path}`;
+}
+
+export function translationArtifactDownloadUrls(
+    file: TranslationArtifact,
+    options?: LocalTranslationDownloadOptions,
+): string[] {
+    const preference = normalizeLocalTranslationSourcePreference(options?.preference);
+    const customMirror = normalizeLocalTranslationMirrorUrl(options?.mirrorUrl);
+    const hfOrigins = huggingFaceDownloadOrigins(preference);
+    const hfUrls = hfOrigins.map((origin) => `${origin}/${file.repo}/resolve/${file.revision}/${file.path}`);
+    const modelScopeRepo = LOCAL_TRANSLATION_MODELSCOPE_REPOS[file.repo];
+    const modelScopeUrl = modelScopeRepo ? `https://modelscope.cn/models/${modelScopeRepo}/resolve/master/${file.path}` : undefined;
+    const builtinUrls = modelScopeUrl
+        ? (hfOrigins[0] === OFFICIAL_ORIGIN ? [...hfUrls, modelScopeUrl] : [hfUrls[0]!, modelScopeUrl, ...hfUrls.slice(1)])
+        : hfUrls;
+    const orderedBuiltin = preference === 'auto' ? orderMirrorUrls(builtinUrls) : builtinUrls;
+    if (!customMirror) return orderedBuiltin;
+    const customUrl = `${customMirror}/${file.repo}/resolve/${file.revision}/${file.path}`;
+    return [customUrl, ...orderedBuiltin.filter((url) => url !== customUrl)];
+}
+
+export function resetTranslationDownloadOriginMemory(): void {
+    resetPreferredMirrorOrigins();
 }
 
 const artifactsByUrl = new Map<string, TranslationArtifact>();
@@ -200,7 +230,7 @@ async function verifyStreamingArtifact(
 
 async function receiveArtifact(
     file: TranslationArtifact,
-    origin: string,
+    sourceUrl: string,
     signal: AbortSignal,
     progress: (bytes: number, verifying: boolean) => void,
 ): Promise<void> {
@@ -224,23 +254,35 @@ async function receiveArtifact(
     try {
         abortIfNeeded(signal);
         armTimeout(15_000);
-        response = await fetch(artifactUrl(file).replace(OFFICIAL_ORIGIN, origin), {
+        response = await fetch(sourceUrl, {
             signal: controller.signal,
             credentials: 'omit',
             referrerPolicy: 'no-referrer',
             headers: offset ? {Range: `bytes=${offset}-`} : {},
         });
         if (!response.ok || !response.body) throw new Error('LOCAL_TRANSLATION_NETWORK');
+        if (/text\/html/iu.test(response.headers?.get('Content-Type') || '')) {
+            throw new Error('LOCAL_TRANSLATION_NETWORK');
+        }
         if (response.status === 206) {
             const range = /^bytes (\d+)-(\d+)\/(\d+)$/u.exec(response.headers.get('Content-Range') || '');
             if (!range || Number(range[1]) !== offset || Number(range[2]) !== file.size - 1 || Number(range[3]) !== file.size) {
                 throw new Error('LOCAL_TRANSLATION_INTEGRITY');
             }
-        } else if (response.status === 200 && offset) {
-            // Some sources ignore Range. Replacing chunks from zero keeps the cache coherent.
-            await removeTranslationArtifact(file);
-            offset = 0;
-        } else if (response.status !== 200) {
+        } else if (response.status === 200) {
+            const contentLength = !response.headers?.get('Content-Encoding') ? response.headers?.get('Content-Length') : null;
+            if (contentLength !== null && contentLength !== undefined) {
+                const parsedLength = Number(contentLength);
+                if (Number.isFinite(parsedLength) && parsedLength >= 0 && parsedLength !== file.size) {
+                    throw new Error('LOCAL_TRANSLATION_INTEGRITY');
+                }
+            }
+            if (offset) {
+                // Some sources ignore Range. Replacing chunks from zero keeps the cache coherent.
+                await removeTranslationArtifact(file);
+                offset = 0;
+            }
+        } else {
             throw new Error('LOCAL_TRANSLATION_NETWORK');
         }
         const streamingDigest = offset === 0 ? sha256.create() : undefined;
@@ -292,6 +334,7 @@ export async function downloadTranslationArtifact(
     file: TranslationArtifact,
     signal: AbortSignal,
     progress: (bytes: number, verifying: boolean) => void,
+    options?: LocalTranslationDownloadOptions,
 ): Promise<void> {
     abortIfNeeded(signal);
     const complete = await artifactComplete(file);
@@ -300,16 +343,18 @@ export async function downloadTranslationArtifact(
     // 旧收据可能指向缺块；修复期间不能让其他读取者看到未经重新校验的文件。
     await invalidateTranslationArtifactReceipt(file);
     abortIfNeeded(signal);
-    const sources = huggingFaceDownloadOrigins();
+    const sources = translationArtifactDownloadUrls(file, options);
     let lastError: unknown;
-    for (const origin of sources) {
+    for (const sourceUrl of sources) {
         abortIfNeeded(signal);
         try {
-            await receiveArtifact(file, origin, signal, progress);
+            await receiveArtifact(file, sourceUrl, signal, progress);
+            rememberPreferredMirrorOrigin(sourceUrl);
             return;
         } catch (error) {
             abortIfNeeded(signal);
             if (error instanceof Error && error.name === 'QuotaExceededError') throw error;
+            demoteMirrorOrigin(sourceUrl);
             lastError = error;
         }
     }

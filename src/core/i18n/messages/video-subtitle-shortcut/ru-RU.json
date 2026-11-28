@@ -1,0 +1,18 @@
+{
+  "video.modeShortcut.action.listening-cycle": "Тренировка аудирования (Выкл → Оригинал → Двуязычный)",
+  "video.modeShortcut.action.listening-cycleDescription": "Начинает без субтитров, затем переключает на «Только оригинал», «Двуязычный» и снова выключает — удобно слушать на слух, а затем сверять текст и перевод.",
+  "video.modeShortcut.action.toggle-visibility": "Показать ↔ Выкл (сохранить текущий режим)",
+  "video.modeShortcut.action.toggle-visibilityDescription": "Скрывает или возвращает видеосубтитры одним нажатием, сохраняя выбранный режим: двуязычный, только перевод или только оригинал.",
+  "video.modeShortcut.hotkeyNeedModifier": "Сочетание клавиш для видеосубтитров должно содержать модификатор или функциональную клавишу (F1–F12), чтобы не перехватывать одиночные клавиши плеера",
+  "video.modeShortcut.enabledDescriptionCustomEmpty": "После включения нажимайте сочетание клавиш на страницах с видео для переключения режима субтитров; пока своё сочетание не записано, используется {shortcut}.",
+  "video.modeShortcut.conflictInline": "Текущее сочетание конфликтует с «{feature}». Сначала измените сочетание ниже, затем включите переключатель.",
+  "video.modeShortcut.disabledByConflict": "Сочетание режима видеосубтитров конфликтовало с «{feature}» и было автоматически отключено. Измените его в разделе «Перевод и отображение».",
+  "video.modeShortcut.switchedWithKey": "Режим видеосубтитров: {mode} ({shortcut})",
+  "video.modeShortcut.menuBadge": "Клавиши {shortcut}",
+  "video.modeShortcut.appearanceEnabledHint": "Сочетание включено: {shortcut} ({action})",
+  "video.modeShortcut.appearanceDisabledHint": "Включить переключение с клавиатуры можно в «Перевод и отображение → Клавиша смены режима субтитров»",
+  "video.localMedia.translateNow": "Перевести субтитры",
+  "video.localMedia.hiddenListeningHint": "Субтитры скрыты (режим аудирования). Нажмите на фразу, чтобы перейти к этому моменту.",
+  "commandPalette.action.switchVideoSubtitleMode.title": "Переключить режим видеосубтитров",
+  "commandPalette.action.switchVideoSubtitleMode.description": "Переключает двуязычный режим, только оригинал, только перевод или выключение по текущему правилу сочетания клавиш"
+}

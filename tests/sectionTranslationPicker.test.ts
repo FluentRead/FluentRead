@@ -2500,3 +2500,104 @@ describe('划选路径与独立滚动容器的几何边界', () => {
         expect(h.onPick).toHaveBeenCalledWith(expected);
     });
 });
+
+describe('editingTarget 输入态与播放器控件边界判定', () => {
+    it('放行非文本 input、开放 ShadowRoot 宿主与明确非输入角色自定义元素，继续保护文本输入与封闭自定义宿主', () => {
+        const {document: doc} = parseHTML(`<html><body>
+            <input id="default-input" />
+            <input id="text-input" type="text" />
+            <input id="range-input" type="range" />
+            <input id="checkbox-input" type="checkbox" />
+            <media-controller id="open-host"></media-controller>
+            <yt-player-slider id="slider-host" role="slider"></yt-player-slider>
+            <yt-player-btn id="btn-host" role="button"></yt-player-btn>
+            <closed-editor id="closed-no-role"></closed-editor>
+            <closed-editor id="closed-other-role" role="presentation"></closed-editor>
+            <closed-editor id="closed-app" role="application"></closed-editor>
+            <closed-editor id="closed-region" role="region"></closed-editor>
+            <div id="tab-div" tabindex="0"></div>
+            <div id="plain-div"></div>
+            <video id="video-el"></video>
+            <textarea id="ta"></textarea>
+            <div id="ce" contenteditable="true"><span id="ce-child"></span></div>
+            <div id="role-tb" role="textbox"></div>
+        </body></html>`);
+        let active: Element | null = doc.body;
+        Object.defineProperty(doc, 'activeElement', {configurable: true, get: () => active});
+        const eventFor = (target: Element) => ({composedPath: () => [target, doc.body]} as unknown as KeyboardEvent);
+
+        const defaultInput = doc.getElementById('default-input')!;
+        const textInput = doc.getElementById('text-input')!;
+        const rangeInput = doc.getElementById('range-input')!;
+        const checkboxInput = doc.getElementById('checkbox-input')!;
+        const openHost = doc.getElementById('open-host')!;
+        const openShadow = openHost.attachShadow({mode: 'open'});
+        const sliderHost = doc.getElementById('slider-host')!;
+        const btnHost = doc.getElementById('btn-host')!;
+        const closedNoRole = doc.getElementById('closed-no-role')!;
+        const closedOtherRole = doc.getElementById('closed-other-role')!;
+        const closedApp = doc.getElementById('closed-app')!;
+        const closedRegion = doc.getElementById('closed-region')!;
+        const tabDiv = doc.getElementById('tab-div')!;
+        const plainDiv = doc.getElementById('plain-div')!;
+        const videoEl = doc.getElementById('video-el')!;
+        const textarea = doc.getElementById('ta')!;
+        const ceChild = doc.getElementById('ce-child')!;
+        const roleTb = doc.getElementById('role-tb')!;
+
+        active = doc.body;
+        expect(isEditingInPage({composedPath: () => [doc.body, doc]} as unknown as KeyboardEvent, doc)).toBe(false);
+        active = textarea;
+        expect(isEditingInPage(eventFor(textarea), doc)).toBe(true);
+        active = ceChild;
+        expect(isEditingInPage(eventFor(ceChild), doc)).toBe(true);
+        const contentEditableMock = doc.createElement('div');
+        Object.defineProperty(contentEditableMock, 'isContentEditable', {configurable: true, value: true});
+        active = contentEditableMock;
+        expect(isEditingInPage(eventFor(contentEditableMock), doc)).toBe(true);
+        active = roleTb;
+        expect(isEditingInPage(eventFor(roleTb), doc)).toBe(true);
+        active = plainDiv;
+        expect(isEditingInPage(eventFor(plainDiv), doc)).toBe(true);
+
+        active = defaultInput;
+        expect(isEditingInPage(eventFor(defaultInput), doc)).toBe(true);
+        active = textInput;
+        expect(isEditingInPage(eventFor(textInput), doc)).toBe(true);
+
+        active = rangeInput;
+        expect(isEditingInPage(eventFor(rangeInput), doc)).toBe(false);
+        active = checkboxInput;
+        expect(isEditingInPage(eventFor(checkboxInput), doc)).toBe(false);
+
+        // 开放 ShadowRoot 已被 deepActiveElement 穿透；宿主自身聚焦时不视为封闭编辑器
+        Object.defineProperty(openShadow, 'activeElement', {configurable: true, get: () => null});
+        active = openHost;
+        expect(isEditingInPage(eventFor(openHost), doc)).toBe(false);
+
+        // 开放 ShadowRoot 内部文本框聚焦时仍被准确识别为编辑态
+        const shadowInput = doc.createElement('input');
+        openShadow.appendChild(shadowInput);
+        Object.defineProperty(openShadow, 'activeElement', {configurable: true, get: () => shadowInput});
+        expect(isEditingInPage(eventFor(openHost), doc)).toBe(true);
+
+        // 无开放 ShadowRoot 的自定义元素：明确非输入交互角色放行，其余继续保护
+        active = sliderHost;
+        expect(isEditingInPage(eventFor(sliderHost), doc)).toBe(false);
+        active = btnHost;
+        expect(isEditingInPage(eventFor(btnHost), doc)).toBe(false);
+        active = closedNoRole;
+        expect(isEditingInPage(eventFor(closedNoRole), doc)).toBe(true);
+        active = closedOtherRole;
+        expect(isEditingInPage(eventFor(closedOtherRole), doc)).toBe(true);
+        active = closedApp;
+        expect(isEditingInPage(eventFor(closedApp), doc)).toBe(true);
+        active = closedRegion;
+        expect(isEditingInPage(eventFor(closedRegion), doc)).toBe(true);
+
+        active = tabDiv;
+        expect(isEditingInPage(eventFor(tabDiv), doc)).toBe(false);
+        active = videoEl;
+        expect(isEditingInPage(eventFor(videoEl), doc)).toBe(false);
+    });
+});

@@ -12,6 +12,7 @@ import selfHelpText from './self-help/en-US.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
 import {dictionaryWorkspaceMessages} from './dictionaryWorkspace';
+import {videoSubtitleShortcutMessages} from './videoSubtitleShortcut';
 import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesEnglishMessages} from './sectionTranslationRules';
 import {mimoRetirementLegacyText} from './mimoRetirement';
@@ -602,6 +603,7 @@ export const enUSMessages = {
     ...privacyProtectionEnglishMessages,
     ...selectionDictionaryMessages["en-US"],
     ...dictionaryWorkspaceMessages["en-US"],
+    ...videoSubtitleShortcutMessages["en-US"],
     ...sectionTranslationRulesEnglishMessages,
     "settings.requestLimits.retryIntervals": "Retry intervals",
     "settings.requestLimits.apiKeyRecovery": "Failed key cooldown",

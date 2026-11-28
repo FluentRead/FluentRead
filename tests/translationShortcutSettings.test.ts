@@ -637,4 +637,17 @@ describe('已有自定义录制草稿与其它快捷键的外部回写隔离', (
         expect(JSON.stringify(external)).toBe(serialized);
         expect(writes).toEqual([]);
     });
+
+    it('拒绝与已启用写作助手热键冲突的快捷键，并在关闭视频翻译后释放视频字幕热键', () => {
+        const {config, state} = mountWithNormalizedSettingsEcho({
+            videoTranslationEnabled: false,
+            videoSubtitleModeHotkeyEnabled: true,
+            videoSubtitleModeHotkey: 'Alt+M',
+        });
+        config.value.writing = {...config.value.writing, enabled: true, writingHotkey: 'Alt+W'};
+        expect(state.validateCustomFullPageHotkey('Alt+W')).toContain('写作助手');
+        expect(state.validateCustomFullPageHotkey('Alt+M')).toBe('');
+        config.value.videoTranslationEnabled = true;
+        expect(state.validateCustomFullPageHotkey('Alt+M')).not.toBe('');
+    });
 });

@@ -4,6 +4,7 @@ import type {VideoAiFullCaptureOptions} from '@/src/features/video-subtitle/cont
 import {Config} from '@/src/core/config/model';
 import {BilibiliAiSource} from '@/src/features/video-subtitle/content/bilibiliAiSource';
 import {mountPlatformCaptions} from '@/src/features/video-subtitle/content/platformRuntime';
+import {getActiveVideoSubtitleModeController} from '@/src/features/video-subtitle/content/activeModeController';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 registerAllUiLanguageBundles();
 
@@ -365,7 +366,8 @@ describe('网页会议字幕生命周期', () => {
         expect(f.document.getElementById('fluent-read-platform-captions')?.parentElement?.id).toBe('fullscreen');
         native.textContent = ''; await vi.advanceTimersByTimeAsync(300);
         expect(f.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
-        expect(native.style.getPropertyValue('visibility')).toBe('');
+        // 空档期间保持原生字幕隐藏，避免下一句出现前闪烁；换会议与卸载时恢复。
+        expect(native.style.getPropertyValue('visibility')).toBe('hidden');
         native.textContent = sentence; f.window.location.href = 'https://meet.google.com/xxx-yyyy-zzz'; await vi.advanceTimersByTimeAsync(300);
         expect(f.translate).toHaveBeenCalledTimes(2);
         native.style.setProperty('visibility', 'collapse'); dispose();
@@ -494,18 +496,37 @@ describe('完整课程字幕公共挂载', () => {
         expect(native.style.getPropertyValue('visibility')).toBe('hidden');
         f.video.currentTime = 1; await vi.advanceTimersByTimeAsync(300);
         expect(f.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
-        expect(native.style.getPropertyValue('visibility')).toBe('');
+        // 空档期间保持原生字幕隐藏，仅切到关闭、换媒体或销毁时恢复，消除闪烁。
+        expect(native.style.getPropertyValue('visibility')).toBe('hidden');
         f.config.videoSubtitleOffsetMs = 500; f.change(); await vi.advanceTimersByTimeAsync(100);
         expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source);
         f.menu().querySelector<HTMLButtonElement>('[data-action="toggle-subtitle-downloads"]')!.click();
         f.menu().querySelector<HTMLButtonElement>('[data-action="download-subtitles"]')!.click();
         await vi.advanceTimersByTimeAsync(0);
         expect(f.download).toHaveBeenCalledWith(expect.stringContaining('00:00:00,000 --> 00:00:01,000'), 'en', expect.any(Array), 'srt');
+        const fetchBeforeOff = f.fetch.mock.calls.length;
+        const translateBeforeOff = f.translate.mock.calls.length;
         f.choose('off'); expect(f.config.videoSubtitleVisible).toBe(true); expect(f.document.getElementById('fluent-read-course-controls')).not.toBeNull();
         expect(native.style.getPropertyValue('visibility')).toBe('');
+        // 课程平台切 off 后重新开启，复用已就绪时间轴与译文缓存，不重新拉取或重译。
+        f.choose('bilingual'); await vi.advanceTimersByTimeAsync(350);
+        expect(f.fetch).toHaveBeenCalledTimes(fetchBeforeOff);
+        expect(f.translate).toHaveBeenCalledTimes(translateBeforeOff);
+        expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('测试译文');
+        // 课程平台快捷键切到 off 时只关闭本页手动开关，不污染全局 videoSubtitleVisible。
+        f.config.videoSubtitleModeHotkeyEnabled = true;
+        f.config.videoSubtitleModeHotkeyAction = 'cycle-all';
+        f.change();
         f.choose('original-only'); await vi.advanceTimersByTimeAsync(350);
         expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('');
-        expect(f.translate).toHaveBeenCalledOnce();
+        expect(f.translate).toHaveBeenCalledTimes(translateBeforeOff);
+        const keydownOff = Object.assign(new f.window.Event('keydown', {bubbles: true, cancelable: true}), {
+            key: 'm', code: 'KeyM', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false, repeat: false, isComposing: false,
+        });
+        Object.defineProperty(keydownOff, 'isTrusted', {value: true});
+        f.window.dispatchEvent(keydownOff);
+        expect(f.config.videoSubtitleVisible).toBe(true);
+        expect(native.style.getPropertyValue('visibility')).toBe('');
         f.menu().querySelector<HTMLButtonElement>('[data-action="open-subtitle-tools"]')!.click();
         f.menu().querySelector<HTMLButtonElement>('[data-action="toggle-course-auto"]')!.click();
         expect(f.config.videoCourseAutoStart).toEqual({bilibili: true, udemy: true, edx: false});
@@ -993,7 +1014,9 @@ describe('B 站无字幕本地识别接入', () => {
             : {code: 0, data: {cid: 456, subtitle: {subtitles: [{lan: 'en', subtitle_url: '//aisubtitle.hdslb.com/a.json'}]}}})));
         f.config.videoCourseAutoStart.bilibili = true; f.start(); await vi.advanceTimersByTimeAsync(500);
         expect(f.generate().hidden).toBe(true); expect(f.send).not.toHaveBeenCalled();
-        valid = false; f.choose('off'); f.choose('bilingual'); await vi.advanceTimersByTimeAsync(500);
+        valid = false;
+        Object.defineProperty(f.window, 'location', {value: new URL('https://www.bilibili.com/video/BV1xx411c7mD/?p=2'), configurable: true});
+        f.change(); await vi.advanceTimersByTimeAsync(500);
         expect(f.menu().querySelector('[data-source-status]')!.textContent).toBeTruthy();
         expect(f.send).not.toHaveBeenCalled(); expect(bilibiliCapture.start).not.toHaveBeenCalled();
     });
@@ -1311,5 +1334,92 @@ describe('平台运行时可靠性、低延迟与跨浏览器增强', () => {
         await vi.advanceTimersByTimeAsync(100);
         expect(d.shadow()?.querySelector('.source')?.textContent).toBe('Video 2 cue');
         disposeDisney();
+    });
+
+    it('人工目标轨在双语与仅原文往返间保留不清空读音、按钮 title 语言无关、同步 subscribe 无 TDZ、空档清理断连节点并注册活跃模式控制器', async () => {
+        // 1) 人工 targetTrack 在 bilingual <-> original-only 间保留不撕裂且不重算读音
+        const f = videoFixture('https://www.disneyplus.com/video/demo');
+        Object.assign(f.source, {language: 'ja', cues: [{startTime: 0, endTime: 2, text: '今日はいい天気です。'}]});
+        f.config.videoSubtitleAppearance.readingAnnotation = true;
+        f.config.videoPreferHumanSubtitles = true;
+        const disposeHuman = f.start();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe('今日はいい天気です。');
+        expect(f.shadow()?.querySelector('.reading')?.textContent).toBe('Reading: 今日はいい天気です。');
+        expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('人工字幕');
+        expect(f.target.mode).toBe('hidden');
+        expect(readingPort.annotate).toHaveBeenCalledTimes(1);
+
+        f.config.videoSubtitleDisplayMode = 'original-only'; f.change();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('');
+        expect(f.shadow()?.querySelector('.reading')?.textContent).toBe('Reading: 今日はいい天気です。');
+        expect(f.target.mode).toBe('hidden');
+        expect(readingPort.annotate).toHaveBeenCalledTimes(1);
+        expect(f.translate).not.toHaveBeenCalled();
+
+        f.config.videoSubtitleDisplayMode = 'bilingual'; f.change();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('人工字幕');
+        expect(f.shadow()?.querySelector('.reading')?.textContent).toBe('Reading: 今日はいい天気です。');
+        expect(f.target.mode).toBe('hidden');
+        expect(readingPort.annotate).toHaveBeenCalledTimes(1);
+        expect(f.translate).not.toHaveBeenCalled();
+
+        // 关闭人工优先时仅恢复 targetTrack 模式而不清空读音
+        f.config.videoPreferHumanSubtitles = false; f.change();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.target.mode).toBe('disabled');
+        expect(f.shadow()?.querySelector('.reading')?.textContent).toBe('Reading: 今日はいい天気です。');
+        expect(readingPort.annotate).toHaveBeenCalledTimes(1);
+        disposeHuman();
+
+        // 2) 同步触发 subscribe 不触发 syncKeydownListener TDZ，按钮 title 使用 locale-neutral 分隔符，且注册活跃模式控制器
+        const c = courseFixture('bilibili');
+        c.config.uiLanguage = 'en-US';
+        c.config.videoSubtitleModeHotkeyEnabled = true;
+        c.config.videoSubtitleModeHotkey = 'Alt+M';
+        c.config.videoSubtitleModeHotkeyAction = 'cycle-all';
+        c.ports.subscribe = vi.fn((listener: (cfg: Config) => void) => {
+            listener(c.config);
+            return vi.fn();
+        });
+        let disposeCourse!: () => void;
+        expect(() => { disposeCourse = c.start(); }).not.toThrow();
+        const button = c.menu().querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
+        expect(button.title).not.toContain('（');
+        expect(button.title).not.toContain('）');
+        expect(button.title).toMatch(/^FluentRead subtitles · Off · (?:Alt|Option)\+M$/);
+
+        const controller = getActiveVideoSubtitleModeController();
+        expect(controller).not.toBeNull();
+        expect(controller!.isActive()).toBe(true);
+        expect(controller!.getCurrentMode()).toBe('off');
+        expect(controller!.switchMode()).toBe('bilingual');
+        expect(controller!.getCurrentMode()).toBe('bilingual');
+        expect(controller!.switchMode()).toBe('translation-only');
+        expect(controller!.switchMode()).toBe('original-only');
+        expect(controller!.switchMode()).toBe('off');
+        // 课程平台 off 不污染全局 videoSubtitleVisible
+        expect(c.config.videoSubtitleVisible).toBe(true);
+        expect(controller!.getCurrentMode()).toBe('off');
+        c.config.videoTranslationEnabled = false; c.change();
+        expect(controller!.isActive()).toBe(false);
+        expect(controller!.switchMode()).toBeNull();
+        disposeCourse();
+        expect(getActiveVideoSubtitleModeController()).toBeNull();
+
+        // 3) !source 空档清理 captionVisibility 中已断连的节点
+        const m = fixture('https://meet.google.com/abc-defg-hij', '<span id="cap" data-caption-text>First line.</span>');
+        const cap = m.document.getElementById('cap')!;
+        const disposeMeet = m.start();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(cap.style.getPropertyValue('visibility')).toBe('hidden');
+        cap.remove();
+        await vi.advanceTimersByTimeAsync(300);
+        expect(m.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
+        // 空档已清理断连节点后，后续销毁不再触碰已移除节点样式
+        disposeMeet();
+        expect(cap.style.getPropertyValue('visibility')).toBe('hidden');
     });
 });

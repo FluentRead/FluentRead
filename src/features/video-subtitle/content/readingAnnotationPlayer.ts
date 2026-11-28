@@ -24,7 +24,7 @@ interface ReadingPlayerPorts {
   scheduleLayout(): void;
   updateMenu(): void;
   updateCaption(): void;
-  resetCaption(): void;
+  resetCaption(preserveReading?: boolean): void;
   session?: VideoReadingAnnotationSession;
 }
 
@@ -155,9 +155,14 @@ export function createVideoReadingPlayer(ports: ReadingPlayerPorts) {
     },
     syncConfig(nextConfig: Config): void {
       const nextMode = normalizeVideoSubtitleDisplayMode(nextConfig.videoSubtitleDisplayMode);
-      if (nextMode !== displayMode) {displayMode = nextMode; ports.resetCaption();}
-      if (!browserCapabilities.extensionDom || !nextConfig.videoSubtitleAppearance.readingAnnotation || !nextConfig.on || !nextConfig.videoTranslationEnabled || nextConfig.videoSubtitleVisible === false
-        || nextMode === 'translation-only') controller.clear();
+      const keepReading = browserCapabilities.extensionDom
+        && nextConfig.videoSubtitleAppearance.readingAnnotation === true
+        && nextConfig.on
+        && nextConfig.videoTranslationEnabled
+        && nextConfig.videoSubtitleVisible !== false
+        && nextMode !== 'translation-only';
+      if (nextMode !== displayMode) {displayMode = nextMode; ports.resetCaption(keepReading);}
+      if (!keepReading) controller.clear();
     },
   };
 }

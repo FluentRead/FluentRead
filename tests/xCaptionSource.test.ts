@@ -573,5 +573,17 @@ describe('X 原生字幕来源', () => {
     secondBtn.remove();
     firstBtn.remove();
     expect(f.source.sync()!.textContent).toBe('Sidecar still visible');
+
+    // 画中画或元素全屏且 FluentRead 自有轨处于 showing 时，跳过给 <video> 重加隐藏类；退出后恢复隐藏原生绘制。
+    Object.defineProperty(f.document, 'pictureInPictureElement', {configurable: true, value: f.state.video});
+    f.source.sync();
+    expect(f.state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(false);
+    Object.defineProperty(f.document, 'pictureInPictureElement', {configurable: true, value: null});
+    Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: f.state.video});
+    f.source.sync();
+    expect(f.state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(false);
+    Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: null});
+    f.source.sync();
+    expect(f.state.video.classList.contains(VIDEO_NATIVE_CUE_HIDDEN_CLASS)).toBe(true);
   });
 });

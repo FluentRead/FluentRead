@@ -236,7 +236,8 @@ display: block !important;
 :is(#${translationLayerId}, #${subtitleScrollHostId}).${displayHiddenClass} {
 visibility: hidden !important;
 }
-:is(#${translationLayerId}, #${subtitleScrollHostId}).${displayTranslationOnlyClass} #${normalizedCaptionOverlayId} {
+:is(#${translationLayerId}, #${subtitleScrollHostId}).${displayTranslationOnlyClass} #${normalizedCaptionOverlayId},
+:is(#${translationLayerId}, #${subtitleScrollHostId}).${displayOriginalOnlyClass} #${translationOverlayId} {
 display: none !important;
 }
 .${nativeCaptionHiddenClass} :is(#ytp-caption-window-container, .ytp-caption-window-container) {
@@ -641,6 +642,27 @@ padding: 4px 8px !important;
 #${translationMenuId} .fluent-read-video-menu-order-original { background: var(--fr-video-menu-text) !important; }
 #${translationMenuId} .fluent-read-video-menu-order-translation { background: var(--fr-video-menu-brand-text) !important; width: 9px !important; }
 #${translationMenuId} .fluent-read-video-menu-order-setting[data-active="false"] .fluent-read-video-menu-mode[aria-checked="true"] { background: var(--fr-video-menu-control) !important; box-shadow: inset 0 0 0 1px var(--fr-video-menu-border) !important; color: var(--fr-video-menu-muted) !important; }
+#${translationMenuId} .fluent-read-video-menu-mode-shortcut {
+display: inline-flex !important;
+align-items: center !important;
+justify-self: end !important;
+max-width: 100% !important;
+padding: 1px 6px !important;
+border-radius: 999px !important;
+background: var(--fr-video-menu-control) !important;
+color: var(--fr-video-menu-muted) !important;
+font-size: 10px !important;
+font-weight: 500 !important;
+line-height: 1.4 !important;
+white-space: nowrap !important;
+overflow: hidden !important;
+text-overflow: ellipsis !important;
+}
+#${translationMenuId}[data-layout="wide"] .fluent-read-video-menu-mode-shortcut {
+flex: 1 0 100% !important;
+width: fit-content !important;
+margin-left: auto !important;
+}
 #${translationMenuId} .fluent-read-video-menu-mode-group,
 #${translationMenuId} .fluent-read-video-menu-order-controls {
 display: flex !important;

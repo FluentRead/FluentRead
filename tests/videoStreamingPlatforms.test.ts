@@ -229,6 +229,7 @@ describe('主流流媒体平台运行时生命周期', () => {
         // 快捷键 Alt+M 切换显示模式（双语 <-> 仅原文）
         f.config.videoSubtitleModeHotkeyEnabled = true;
         f.config.videoSubtitleModeHotkeyAction = 'bilingual-original';
+        f.change();
         const shortcutEvent = Object.assign(new f.window.Event('keydown', {bubbles: true, cancelable: true}), {
             key: 'm',
             code: 'KeyM',
@@ -244,20 +245,30 @@ describe('主流流媒体平台运行时生命周期', () => {
         await vi.advanceTimersByTimeAsync(100);
         expect(f.config.videoSubtitleDisplayMode).toBe('original-only');
 
-        // 通过控制栏菜单切换关闭模式：恢复原生字幕，但保留控制栏按钮以便重新开启
+        // 按钮 title 含当前模式与快捷键，菜单含快捷键胶囊，读音按钮使用 aria-checked
         const toggleBtn = f.controlsShadow()!.querySelector<HTMLButtonElement>('#fluent-read-video-subtitle-button')!;
+        expect(toggleBtn.title).toContain('原文');
+        expect(toggleBtn.title).toMatch(/Alt\+M|Option\+M/);
         toggleBtn.click();
+        expect(f.controlsShadow()!.querySelector<HTMLElement>('[data-mode-shortcut-badge]')?.hidden).toBe(false);
+        const readingBtn = f.controlsShadow()!.querySelector<HTMLButtonElement>('[data-action="toggle-reading-annotation"]')!;
+        expect(readingBtn.hasAttribute('aria-pressed')).toBe(false);
+        expect(readingBtn.getAttribute('aria-checked')).toBe('false');
+
+        // 通过控制栏菜单切换关闭模式：恢复原生字幕，读音按钮禁用，但保留控制栏按钮以便重新开启
         f.controlsShadow()!.querySelector<HTMLButtonElement>('[data-mode="off"]')!.click();
         await vi.advanceTimersByTimeAsync(100);
         expect(f.config.videoSubtitleVisible).toBe(false);
+        expect(readingBtn.disabled).toBe(true);
         expect(nativeCaption.style.getPropertyValue('visibility')).toBe('visible');
         expect(f.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
         expect(f.document.getElementById('fluent-read-platform-controls')).not.toBeNull();
 
-        // 切回仅原文和仅译文模式
+        // 切回仅原文和仅译文模式（仅译文下读音按钮提示需包含原文）
         f.controlsShadow()!.querySelector<HTMLButtonElement>('[data-mode="original-only"]')!.click();
         await vi.advanceTimersByTimeAsync(100);
         expect(f.config.videoSubtitleVisible).toBe(true);
+        expect(readingBtn.disabled).toBe(false);
         expect(f.captionShadow()?.querySelector<HTMLElement>('.source')?.hidden).toBe(false);
         expect(f.captionShadow()?.querySelector('.translation')?.textContent).toBe('');
 
@@ -265,6 +276,7 @@ describe('主流流媒体平台运行时生命周期', () => {
         await vi.advanceTimersByTimeAsync(100);
         expect(f.captionShadow()?.querySelector<HTMLElement>('.source')?.hidden).toBe(true);
         expect(f.captionShadow()?.querySelector('.translation')?.textContent).toBe('流媒体测试译文');
+        expect(readingBtn.title).toContain('原文');
 
         // SPA 导航离开平台后完整移除控制栏与浮层并恢复原生节点
         Object.defineProperty(f.window, 'location', {value: new URL('https://example.com/other'), configurable: true});
@@ -399,6 +411,44 @@ describe('主流流媒体平台运行时生命周期', () => {
         await vi.advanceTimersByTimeAsync(100);
         expect(f.captionShadow()?.querySelector('.translation')?.textContent).toBe('流媒体重试成功');
         expect(retryBtn.hidden).toBe(true);
+        dispose();
+    });
+
+    it('Disney+ 无控制栏在隐藏字幕时可通过快捷键唤醒，且关闭快捷键时卸载 window 监听', async () => {
+        const f = createStreamingFixture(
+            'https://www.disneyplus.com/video/12345',
+            `<div class="btm-media-player">
+                <video></video>
+                <div class="dss-hls-subtitle-overlay">Disney line.</div>
+            </div>`,
+        );
+        f.config.videoSubtitleVisible = false;
+        f.config.videoSubtitleModeHotkeyEnabled = true;
+        f.config.videoSubtitleModeHotkeyAction = 'bilingual-original';
+
+        const removed: string[] = [];
+        const originalRemove = f.window.removeEventListener.bind(f.window);
+        f.window.removeEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions) => {
+            removed.push(type);
+            return originalRemove(type, listener, options);
+        }) as typeof f.window.removeEventListener;
+        const dispose = f.start();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.document.getElementById('fluent-read-platform-captions')).toBeNull();
+
+        const wakeEvent = Object.assign(new f.window.Event('keydown', {bubbles: true, cancelable: true}), {
+            key: 'm', code: 'KeyM', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false, repeat: false, isComposing: false,
+        });
+        Object.defineProperty(wakeEvent, 'isTrusted', {value: true});
+        f.window.dispatchEvent(wakeEvent);
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.config.videoSubtitleVisible).toBe(true);
+        expect(f.captionShadow()?.querySelector('.source')?.textContent).toBe('Disney line.');
+
+        // 关闭快捷键时立即移除 window keydown 监听
+        f.config.videoSubtitleModeHotkeyEnabled = false;
+        f.change();
+        expect(removed).toContain('keydown');
         dispose();
     });
 });

@@ -11,6 +11,7 @@ import selfHelpText from './self-help/ko-KR.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
 import {dictionaryWorkspaceMessages} from './dictionaryWorkspace';
+import {videoSubtitleShortcutMessages} from './videoSubtitleShortcut';
 import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesKoreanMessages} from './sectionTranslationRulesAsian';
 import {mimoRetirementLegacyText} from './mimoRetirement';
@@ -601,6 +602,7 @@ export const koKRMessages = {
     ...privacyProtectionMessages["ko-KR"],
     ...selectionDictionaryMessages["ko-KR"],
     ...dictionaryWorkspaceMessages["ko-KR"],
+    ...videoSubtitleShortcutMessages["ko-KR"],
     ...sectionTranslationRulesKoreanMessages,
     "settings.requestLimits.retryIntervals": "재시도 간격",
     "settings.requestLimits.apiKeyRecovery": "실패한 Key 쿨다운",

@@ -8,7 +8,7 @@
   <SettingsGroup :title="t('video.modeShortcut.title')" :description="t('video.modeShortcut.description')">
     <SettingsItem
       :label="t('video.modeShortcut.enabled')"
-      :description="t('video.modeShortcut.enabledDescription', {shortcut: hotkeyDisplayName})"
+      :description="enabledDescription"
       :disabled="!props.config.videoTranslationEnabled"
     >
       <el-switch
@@ -23,14 +23,14 @@
     <SettingsItem
       :label="t('video.modeShortcut.hotkey')"
       :description="t('video.modeShortcut.hotkeyDescription')"
-      :disabled="!hotkeyControlsEnabled"
+      :disabled="!props.config.videoTranslationEnabled"
     >
       <div class="hotkey-config">
         <el-select
           :model-value="props.config.videoSubtitleModeHotkey"
           data-testid="video-subtitle-mode-hotkey"
           :aria-label="t('video.modeShortcut.hotkey')"
-          :disabled="!hotkeyControlsEnabled"
+          :disabled="!props.config.videoTranslationEnabled"
           @change="handleHotkeyChange"
         >
           <el-option v-for="item in VIDEO_SUBTITLE_MODE_HOTKEY_OPTIONS" :key="item.value" :value="item.value" :label="item.label" data-i18n-ignore />
@@ -42,7 +42,7 @@
           <el-button
             size="small"
             text
-            :disabled="!hotkeyControlsEnabled"
+            :disabled="!props.config.videoTranslationEnabled"
             :aria-label="t('video.modeShortcut.hotkeyEdit')"
             :title="t('video.modeShortcut.hotkeyEdit')"
             @click="openCustomHotkeyDialog"
@@ -50,18 +50,26 @@
             <el-icon><Edit /></el-icon>
           </el-button>
         </div>
+        <small
+          v-if="currentHotkeyConflict && !props.config.videoSubtitleModeHotkeyEnabled"
+          class="video-subtitle-hotkey-conflict"
+          data-testid="video-subtitle-mode-hotkey-conflict"
+          role="status"
+        >
+          {{ currentHotkeyConflict }}
+        </small>
       </div>
     </SettingsItem>
     <SettingsItem
       :label="t('video.modeShortcut.action')"
       :description="t(`video.modeShortcut.action.${props.config.videoSubtitleModeHotkeyAction}Description`)"
-      :disabled="!hotkeyControlsEnabled"
+      :disabled="!props.config.videoTranslationEnabled"
     >
       <el-select
         v-model="props.config.videoSubtitleModeHotkeyAction"
         data-testid="video-subtitle-mode-hotkey-action"
         :aria-label="t('video.modeShortcut.action')"
-        :disabled="!hotkeyControlsEnabled"
+        :disabled="!props.config.videoTranslationEnabled"
       >
         <el-option
           v-for="action in VIDEO_SUBTITLE_MODE_HOTKEY_ACTIONS"
@@ -90,6 +98,7 @@ import {
     DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY,
     VIDEO_SUBTITLE_MODE_HOTKEY_ACTIONS,
     VIDEO_SUBTITLE_MODE_HOTKEY_OPTIONS,
+    isSupportedCustomVideoSubtitleModeHotkey,
     resolveVideoSubtitleModeHotkey,
     videoSubtitleModeHotkeyDisplayName,
 } from '@/src/core/config/videoSubtitleShortcut';
@@ -114,15 +123,19 @@ const CustomHotkeyInput = defineAsyncComponent(() => import('@/src/ui/components
 
 const props = withDefaults(defineProps<{config: Config; active?: boolean}>(), {active: true});
 const {t, translateLegacy} = useUiI18n();
-const hotkeyControlsEnabled = computed(() => props.config.videoTranslationEnabled && props.config.videoSubtitleModeHotkeyEnabled);
 const {active: hotkeyEditorActive, showCustomHotkeyDialog, isCurrentDraft, openCustomHotkeyDialog, closeCustomHotkeyDialog, commitHotkeyDraft} = useHotkeyDraft(
     () => props.config,
     {mode: 'videoSubtitleModeHotkey', custom: 'customVideoSubtitleModeHotkey'},
-    () => props.active && hotkeyControlsEnabled.value,
+    () => props.active && props.config.videoTranslationEnabled,
 );
 const hotkeyDisplayName = computed(() => videoSubtitleModeHotkeyDisplayName(
     props.config.videoSubtitleModeHotkey,
     props.config.customVideoSubtitleModeHotkey,
+));
+const enabledDescription = computed(() => (
+    props.config.videoSubtitleModeHotkey === 'custom' && !props.config.customVideoSubtitleModeHotkey
+        ? t('video.modeShortcut.enabledDescriptionCustomEmpty', {shortcut: hotkeyDisplayName.value})
+        : t('video.modeShortcut.enabledDescription', {shortcut: hotkeyDisplayName.value})
 ));
 
 /** 列出已被其他功能占用的快捷键，避免一次按键同时触发字幕切换和其他网页动作。 */
@@ -172,8 +185,22 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
     ];
 }
 
+/** 查找与目标组合键冲突的功能名称；无冲突时返回空字符串。 */
+function findHotkeyConflictFeature(hotkey: string): string {
+    const resolved = canonicalizeHotkey(hotkey) || DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY;
+    const identity = resolved.toLocaleLowerCase();
+    const owner = reservedHotkeyOwners().find(item => canonicalizeHotkey(item.hotkey).toLocaleLowerCase() === identity);
+    if (owner) return owner.feature;
+    const profile = findEnabledQuickTranslationHotkeyConflict(props.config.quickTranslationProfiles ?? [], resolved);
+    if (!profile) return '';
+    return t(`quickTranslation.heading.${quickTranslationActionKey(profile.action)}`);
+}
+
 /** 供自定义录制对话框、预设切换与开关启用实时校验；返回空字符串表示可以使用。 */
 function findHotkeyConflict(hotkey: string): string {
+    if (hotkey && hotkey !== 'none' && !isSupportedCustomVideoSubtitleModeHotkey(hotkey)) {
+        return t('video.modeShortcut.hotkeyNeedModifier');
+    }
     const resolved = canonicalizeHotkey(hotkey) || DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY;
     const identity = resolved.toLocaleLowerCase();
     const owner = reservedHotkeyOwners().find(item => canonicalizeHotkey(item.hotkey).toLocaleLowerCase() === identity);
@@ -184,6 +211,17 @@ function findHotkeyConflict(hotkey: string): string {
         group: t(`quickTranslation.heading.${quickTranslationActionKey(profile.action)}`),
     });
 }
+
+const currentHotkeyConflict = computed(() => {
+    if (!props.config.videoTranslationEnabled) return '';
+    const activeHotkey = resolveVideoSubtitleModeHotkey(
+        props.config.videoSubtitleModeHotkey,
+        props.config.customVideoSubtitleModeHotkey,
+    );
+    const feature = findHotkeyConflictFeature(activeHotkey);
+    if (feature) return t('video.modeShortcut.conflictInline', {feature});
+    return findHotkeyConflict(activeHotkey);
+});
 
 /** 开启时若当前组合已被占用，保持关闭并说明原因。 */
 function handleEnabledChange(enabled: string | number | boolean): void {
@@ -229,4 +267,5 @@ function handleCustomHotkeyCancel(): void {
 .video-subtitle-hotkey-custom { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border: 1px dashed var(--line, #e7e9f0); border-radius: 8px; }
 .video-subtitle-hotkey-text { font-size: 12px; color: var(--ink, #172033); }
 .video-subtitle-hotkey-placeholder { color: var(--muted, #737c8f); }
+.video-subtitle-hotkey-conflict { color: var(--fr-warning, #b45309); font-size: 12px; line-height: 1.5; }
 </style>

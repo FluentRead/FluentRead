@@ -378,6 +378,29 @@ describe('本地音视频离线转写与导出会话', () => {
         expect(await session.transcribe(f.file, false)).toBe(true);
         expect(session.getSnapshot().translatedCount).toBe(0);
 
+        // 动态回调在转写完成后实时求值：识别期间切到仅原文（回调返回 false）时跳过翻译，返回 true 时执行翻译
+        let shouldTranslate = true;
+        const dynamicFalse = createSessionFixture();
+        dynamicFalse.send.mockImplementation(async (msg: unknown) => {
+            const payload = msg as {type: string};
+            if (payload.type === 'fluentReadGetLocalVideoModelState') {
+                return {success: true, models: ['small'], available: {tiny: false, base: false, small: true}};
+            }
+            if (payload.type === 'fluentReadTranscribeLocalVideoAudio') {
+                shouldTranslate = false;
+                return {success: true, text: 'Dynamic sentence.', segments: [{startMs: 0, endMs: 1800, text: 'Dynamic sentence.'}]};
+            }
+            return {success: true};
+        });
+        expect(await dynamicFalse.session.transcribe(dynamicFalse.file, () => shouldTranslate)).toBe(true);
+        expect(dynamicFalse.translate).not.toHaveBeenCalled();
+        expect(dynamicFalse.session.getSnapshot().translatedCount).toBe(0);
+
+        const dynamicTrue = createSessionFixture();
+        expect(await dynamicTrue.session.transcribe(dynamicTrue.file, () => true)).toBe(true);
+        expect(dynamicTrue.translate).toHaveBeenCalled();
+        expect(dynamicTrue.session.getSnapshot().translatedCount).toBe(2);
+
         // 首次补译遇到错误，记录失败计数；再次补译全部成功
         expect(await session.translatePending()).toBe(true);
         expect(session.getSnapshot().failedTranslationCount).toBeGreaterThan(0);

@@ -160,6 +160,7 @@ import { resolveReservedClickSelectionHotkey } from '@/src/core/config/clickSele
 import { resolveParagraphCopyHotkey } from '@/src/core/config/paragraphCopy'
 import { findEnabledQuickTranslationHotkeyConflict, quickTranslationActionKey } from '@/src/core/config/quickTranslation'
 import { resolveSectionTranslationHotkey } from '@/src/core/config/sectionTranslation'
+import { resolveReservedVideoSubtitleModeHotkey } from '@/src/core/config/videoSubtitleShortcut'
 import { canonicalizeHotkey, resolveConfiguredHotkey } from '@/src/core/hotkey'
 import { resolveWritingHotkey } from '@/src/core/config/writing'
 import {
@@ -325,6 +326,10 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
         ? resolveSectionTranslationHotkey(props.config.sectionTranslationHotkey, props.config.customSectionTranslationHotkey)
         : '',
       feature: t('sectionTranslation.settings.title'),
+    },
+    {
+      hotkey: resolveReservedVideoSubtitleModeHotkey(props.config),
+      feature: t('video.modeShortcut.title'),
     },
     {
       hotkey: props.config.informationHighlight?.hotkeyEnabled === true

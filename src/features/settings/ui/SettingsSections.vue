@@ -411,7 +411,7 @@
     <section v-if="hasVisitedSection('settings-video')" v-show="props.activeSection === 'settings-video'" id="settings-video" class="settings-section">
       <SettingsPanel name="general" :active="props.activePanel">
         <SettingsGroup>
-          <FeatureEnableCard v-model="config.videoTranslationEnabled" title="视频字幕翻译" :description="t('video.description')" />
+          <FeatureEnableCard :model-value="config.videoTranslationEnabled" title="视频字幕翻译" :description="t('video.description')" @update:model-value="handleVideoTranslationEnabledChange" />
           <template v-if="config.videoTranslationEnabled">
             <p v-if="selectedVideoServiceUnavailableMessage" class="video-service-warning" role="status">{{ selectedVideoServiceLabel }} · {{ selectedVideoServiceUnavailableMessage }}</p>
             <SettingsItem :label="t('video.course.auto')">
@@ -624,6 +624,14 @@ import {
 } from '@/src/core/config/customOpenAI';
 import {getCompositeTranslationProvider, isCompositeTranslationProviderId, withCompositeTranslationServiceOptions} from '@/src/core/config/compositeTranslation';
 import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation';
+import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
+import {resolveCommandPaletteHotkey} from '@/src/core/config/commandPalette';
+import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy';
+import {findEnabledQuickTranslationHotkeyConflict, inputBoxTranslationTriggerHotkey, quickTranslationActionKey} from '@/src/core/config/quickTranslation';
+import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation';
+import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
+import {resolveWritingHotkey} from '@/src/core/config/writing';
+import {canonicalizeHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
 import {useServiceCatalogActions} from './useServiceCatalogActions';
 import {
   Config,
@@ -1194,6 +1202,28 @@ const handlePluginStateChange = (_isEnabled: boolean) => {
   // 总开关只控制当前运行状态，不覆盖各功能的已保存偏好。
   broadcastFeatureState(['toggleFloatingBall', 'updateSelectionTranslatorMode', 'toggleSelectionAreaTranslator']);
 };
+function findVideoSubtitleConflictFeature(c: Config): string {
+  const hotkey = resolveVideoSubtitleModeHotkey(c.videoSubtitleModeHotkey, c.customVideoSubtitleModeHotkey), id = canonicalizeHotkey(hotkey).toLowerCase();
+  const owners: [string, string][] = [
+    [resolveReservedClickSelectionHotkey(c), translateLegacy('两点选取')], [resolveConfiguredHotkey(c.hotkey, c.customHotkey), t('popup.hoverTranslation')],
+    [resolveConfiguredHotkey(c.floatingBallHotkey, c.customFloatingBallHotkey), t('quickTranslation.commonFullPageShortcut')],
+    [c.selectionTranslatorMode === 'disabled' || c.disableSelectionTranslator === true ? '' : resolveConfiguredHotkey(c.selectionTranslatorTrigger, c.customSelectionTranslatorHotkey), t('popup.selectionTranslation')],
+    [c.selectionAreaEnabled ? resolveAreaTranslationHotkey(c.selectionAreaHotkey, c.customSelectionAreaHotkey) : '', t('popup.areaTranslation')],
+    [c.paragraphCopyEnabled ? resolveParagraphCopyHotkey(c.paragraphCopyHotkey, c.customParagraphCopyHotkey) : '', t('paragraphCopy.settings.title')],
+    [c.sectionTranslationHotkeyEnabled ? resolveSectionTranslationHotkey(c.sectionTranslationHotkey, c.customSectionTranslationHotkey) : '', t('sectionTranslation.settings.title')],
+    [c.commandPaletteEnabled ? resolveCommandPaletteHotkey(c.commandPaletteHotkey, c.customCommandPaletteHotkey) : '', t('commandPalette.title')],
+    [c.informationHighlight?.hotkeyEnabled === true ? c.informationHighlight.hotkey ?? '' : '', t('informationHighlight.title')],
+    [inputBoxTranslationTriggerHotkey(c.inputBoxTranslationTrigger, c.customInputBoxTranslationHotkey), translateLegacy('输入框翻译')], [resolveWritingHotkey(c.writing), translateLegacy('写作助手')],
+  ];
+  const owner = owners.find(([taken]) => canonicalizeHotkey(taken).toLowerCase() === id);
+  const profile = owner ? null : findEnabledQuickTranslationHotkeyConflict(c.quickTranslationProfiles ?? [], hotkey);
+  return owner ? owner[1] : profile ? t(`quickTranslation.heading.${quickTranslationActionKey(profile.action)}`) : '';
+}
+function handleVideoTranslationEnabledChange(enabled: boolean): void {
+  const feature = enabled && config.value.videoSubtitleModeHotkeyEnabled ? findVideoSubtitleConflictFeature(config.value) : '';
+  if (feature) {updateConfigAtomically(draft => {draft.videoTranslationEnabled = true; draft.videoSubtitleModeHotkeyEnabled = false;}); ElMessage.warning(t('video.modeShortcut.disabledByConflict', {feature})); return;}
+  config.value.videoTranslationEnabled = enabled;
+}
 
 const hoverDelayContext = useSettingsActionContext(
   () => !disposed && viewActive.value && props.activeSection === 'settings-translation'

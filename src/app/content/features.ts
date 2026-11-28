@@ -27,8 +27,10 @@ export {
     unmountFloatingBall,
 } from '@/src/features/floating-ball/public';
 export {
+    getActiveVideoSubtitleModeController,
     isSupportedVideoPage,
     mountVideoSubtitleTranslation,
+    videoSubtitleModeLabelKey,
 } from '@/src/features/video-subtitle/public';
 export {
     createInputTranslationContentFeature,

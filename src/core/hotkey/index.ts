@@ -110,7 +110,7 @@ export function normalizeHotkeyEventKey(event: Pick<KeyboardEvent, 'key' | 'code
     if (Object.prototype.hasOwnProperty.call(REGULAR_KEYS, key)) return key;
     return codeKey || key;
   }
-  if (key && key !== 'unidentified' && key !== 'dead') return key;
+  if (key && key !== 'unidentified' && key !== 'dead' && key !== 'process') return key;
   return codeKey || key;
 }
 
@@ -306,6 +306,28 @@ export function canonicalizeHotkey(hotkeyString: string): string {
   return [...orderedModifiers, key].join('+');
 }
 
+const HOTKEY_MODIFIER_BITS: Readonly<Record<string, number>> = Object.assign(Object.create(null), {
+  ctrl: 1,
+  alt: 2,
+  shift: 4,
+  meta: 8,
+});
+
+const HOTKEY_CTRL_ALT_MASK = 3;
+
+const HOTKEY_SPECIAL_KEY_MAPPINGS: Readonly<Record<string, readonly string[]>> = {
+  space: [' ', 'space'],
+  enter: ['enter', 'return'],
+  escape: ['escape', 'esc'],
+  backspace: ['backspace'],
+  delete: ['delete', 'del'],
+  tab: ['tab'],
+  arrowup: ['arrowup', 'up'],
+  arrowdown: ['arrowdown', 'down'],
+  arrowleft: ['arrowleft', 'left'],
+  arrowright: ['arrowright', 'right'],
+};
+
 /**
  * 检查事件是否匹配指定的快捷键
  * @param event 键盘事件
@@ -315,53 +337,38 @@ export function canonicalizeHotkey(hotkeyString: string): string {
 export function matchesHotkey(event: KeyboardEvent, parsedHotkey: ParsedHotkey): boolean {
   if (!parsedHotkey.isValid) return false;
 
-  // 检查修饰键
-  const requiredModifiers = new Set(parsedHotkey.modifiers);
-  const actualModifiers = new Set();
-
-  if (event.ctrlKey) actualModifiers.add('ctrl');
-  if (event.altKey) actualModifiers.add('alt');
-  if (event.shiftKey) actualModifiers.add('shift');
-  if (event.metaKey) actualModifiers.add('meta');
+  // 检查修饰键（4-bit 位掩码避免每次按键分配集合）
+  let requiredMask = 0;
+  for (const modifier of parsedHotkey.modifiers) {
+    const bit = HOTKEY_MODIFIER_BITS[modifier];
+    if (!bit) return false;
+    requiredMask |= bit;
+  }
+  const actualMask =
+    (event.ctrlKey ? 1 : 0)
+    | (event.altKey ? 2 : 0)
+    | (event.shiftKey ? 4 : 0)
+    | (event.metaKey ? 8 : 0);
 
   // 修饰键必须完全匹配
-  if (requiredModifiers.size !== actualModifiers.size) return false;
-  for (const modifier of requiredModifiers) {
-    if (!actualModifiers.has(modifier)) return false;
+  if (requiredMask !== actualMask) return false;
+
+  // 欧洲键盘布局的 AltGr 在浏览器中会同时置位 ctrlKey 与 altKey，避免误判为 Ctrl+Alt 组合键。
+  if (
+    (requiredMask & HOTKEY_CTRL_ALT_MASK) === HOTKEY_CTRL_ALT_MASK
+    && typeof event.getModifierState === 'function'
+    && event.getModifierState('AltGraph')
+  ) {
+    return false;
   }
 
   // 检查普通按键
   const eventKey = normalizeHotkeyEventKey(event);
 
-  // 处理特殊按键映射
-  const keyMappings: Record<string, string[]> = {
-    'space': [' ', 'space'],
-    'enter': ['enter', 'return'],
-    'escape': ['escape', 'esc'],
-    'backspace': ['backspace'],
-    'delete': ['delete', 'del'],
-    'tab': ['tab'],
-    'arrowup': ['arrowup', 'up'],
-    'arrowdown': ['arrowdown', 'down'],
-    'arrowleft': ['arrowleft', 'left'],
-    'arrowright': ['arrowright', 'right'],
-  };
-
-  if (Object.hasOwn(keyMappings, parsedHotkey.key)) {
-    return keyMappings[parsedHotkey.key].includes(eventKey);
+  if (Object.hasOwn(HOTKEY_SPECIAL_KEY_MAPPINGS, parsedHotkey.key)) {
+    return HOTKEY_SPECIAL_KEY_MAPPINGS[parsedHotkey.key].includes(eventKey);
   }
 
-  // 普通字母数字键
-  if (/^[a-z0-9]$/.test(parsedHotkey.key)) {
-    return eventKey === parsedHotkey.key;
-  }
-
-  // 功能键
-  if (/^f\d+$/.test(parsedHotkey.key)) {
-    return eventKey === parsedHotkey.key;
-  }
-
-  // 符号键直接比较
   return eventKey === parsedHotkey.key;
 }
 

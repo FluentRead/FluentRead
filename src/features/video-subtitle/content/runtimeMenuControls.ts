@@ -7,6 +7,11 @@
 import browser from 'webextension-polyfill';
 import {hasUiLanguageBundle, type UiLanguage} from '@/src/core/i18n';
 import {normalizeVideoSubtitleOffsetMs, type Config} from '@/src/core/config/model';
+import {
+    normalizeVideoSubtitleModeHotkeyAction,
+    resolveNextVideoSubtitleMenuMode,
+    videoSubtitleModeHotkeyDisplayName,
+} from '@/src/core/config/videoSubtitleShortcut';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {getFullscreenElement} from '@/src/platform/dom/fullscreen';
 import {sendRuntimeMessage} from '@/src/platform/browser/runtimeMessages';
@@ -14,13 +19,20 @@ import {VIDEO_LOCAL_TRANSCRIPTION_MODELS} from '@/src/features/video-subtitle/tr
 import {resolveVideoTranslationUiStatus} from './captionClock';
 import {supportsSafariNativeVideoFullscreen} from './nativeFullscreen';
 import {getVideoServiceLabel} from './serviceProfile';
-import {handleVideoSubtitleModeShortcutKeydown, notifyVideoSubtitleModeSwitch} from './modeShortcut';
+import type {ActiveVideoSubtitleModeController} from './activeModeController';
+import {
+    handleVideoSubtitleModeShortcutKeydown,
+    notifyVideoSubtitleModeSwitch,
+    videoSubtitleModeLabelKey,
+    type VideoSubtitleModeShortcutPorts,
+} from './modeShortcut';
 import {
     createVideoPlayerMenu,
     isVideoModelPromptOpen,
     renderVideoAiMenu,
     renderVideoAiModelSelection,
     renderVideoMenuMode,
+    renderVideoMenuModeShortcut,
     renderVideoSubtitleOrder,
     renderVideoModelPrompt,
     renderVideoSubtitleTiming,
@@ -125,6 +137,7 @@ export interface VideoRuntimeMenuControls {
     closeMenu(): void;
     renderPlayerUiState(): void;
     selectMenuMode(mode: VideoMenuMode): void;
+    createActiveModeController(): ActiveVideoSubtitleModeController;
     createPlayerMenu(player: HTMLElement): HTMLElement;
     createPlayerButton(): HTMLButtonElement;
     handleDocumentClick(event: MouseEvent): void;
@@ -168,8 +181,15 @@ export function createVideoRuntimeMenuControls(ports: VideoRuntimeMenuPorts): Vi
 
         const enabled = config.on && config.videoTranslationEnabled;
         const visible = config.videoSubtitleVisible !== false;
+        const selectedMode: VideoMenuMode = enabled && visible ? normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode) : 'off';
+        const activeShortcut = config.videoSubtitleModeHotkeyEnabled === true
+            ? videoSubtitleModeHotkeyDisplayName(config.videoSubtitleModeHotkey, config.customVideoSubtitleModeHotkey)
+            : '';
+        const modeLabel = videoUi(videoSubtitleModeLabelKey(selectedMode));
         const status = config.on
-            ? (enabled && visible ? videoUi('video.enabled') : videoUi('video.disabled'))
+            ? (enabled && visible
+                ? `${videoUi('video.enabled')} · ${modeLabel}${activeShortcut ? ` · ${activeShortcut}` : ''}`
+                : videoUi('video.disabled'))
             : videoUi('video.globalDisabled');
         button?.classList.toggle(VIDEO_TRANSLATION_ACTIVE_CLASS, enabled && visible);
         // 入口只开关菜单；清理复用节点上的旧 toggle 语义，不把字幕状态冒充点击动作。
@@ -194,8 +214,8 @@ export function createVideoRuntimeMenuControls(ports: VideoRuntimeMenuPorts): Vi
         }
         const choice = ports.aiModelSetup.choice;
         renderVideoModelPrompt(menu, choice && {options: VIDEO_LOCAL_TRANSCRIPTION_MODELS, ...choice}, language);
-        const selectedMode: VideoMenuMode = enabled && visible ? normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode) : 'off';
         renderVideoMenuMode(menu, selectedMode, !config.on, status);
+        renderVideoMenuModeShortcut(menu, activeShortcut || null, language);
         renderVideoSubtitleOrder(menu, config.videoSubtitleAppearance.bilingualOrder, !enabled || !visible, selectedMode === 'bilingual');
         const service = menu.querySelector<HTMLElement>('[data-service-label]');
         const serviceLabel = localizeVideoUiText(getVideoServiceLabel(config.videoService || config.service), language);
@@ -256,7 +276,8 @@ export function createVideoRuntimeMenuControls(ports: VideoRuntimeMenuPorts): Vi
             ports.persistVideoConfig({videoSubtitleVisible: false});
             ports.downloads.cancel();
             ports.aiModelSetup.reset();
-            if (ports.getAiState().fullActive) {
+            const ai = ports.getAiState();
+            if (ai.fullActive && ai.phase !== 'ready') {
                 ports.stopFullAiSubtitleGeneration();
             }
             return;
@@ -464,16 +485,44 @@ export function createVideoRuntimeMenuControls(ports: VideoRuntimeMenuPorts): Vi
         closeMenu();
     };
 
+    const notifyModeSwitch = (mode: VideoMenuMode) => notifyVideoSubtitleModeSwitch(
+        mode,
+        videoUi,
+        config.videoSubtitleModeHotkeyEnabled === true
+            ? videoSubtitleModeHotkeyDisplayName(config.videoSubtitleModeHotkey, config.customVideoSubtitleModeHotkey)
+            : undefined,
+    );
+
+    const shortcutPorts: VideoSubtitleModeShortcutPorts = {
+        document,
+        config,
+        isActive: () => !ports.isDestroyed() && config.on && config.videoTranslationEnabled && isSupportedVideoPage()
+            && Boolean(ports.getPlayerTarget() || ports.getObservedVideo()?.isConnected),
+        isVisible: () => config.videoSubtitleVisible !== false,
+        applyMode: selectMenuMode,
+        notify: notifyModeSwitch,
+    };
+
+    const createActiveModeController = (): ActiveVideoSubtitleModeController => ({
+        isActive: shortcutPorts.isActive,
+        getCurrentMode: () => (shortcutPorts.isVisible() ? normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode) : 'off'),
+        switchMode: () => {
+            if (!shortcutPorts.isActive()) return null;
+            const nextMode = resolveNextVideoSubtitleMenuMode(
+                normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode),
+                shortcutPorts.isVisible(),
+                normalizeVideoSubtitleModeHotkeyAction(config.videoSubtitleModeHotkeyAction),
+            );
+            selectMenuMode(nextMode);
+            notifyModeSwitch(nextMode);
+            return nextMode;
+        },
+    });
+
     const handleDocumentKeydown = (event: KeyboardEvent) => {
         if (!event.isTrusted) return;
-        if (handleVideoSubtitleModeShortcutKeydown(event, {
-            document,
-            config,
-            isActive: () => !ports.isDestroyed() && config.on && config.videoTranslationEnabled && isSupportedVideoPage() && Boolean(ports.getObservedVideo() || ports.getPlayerTarget()),
-            isVisible: () => config.videoSubtitleVisible !== false,
-            applyMode: selectMenuMode,
-            notify: mode => notifyVideoSubtitleModeSwitch(mode, videoUi),
-        })) return;
+        if (config.videoSubtitleModeHotkeyEnabled === true
+            && handleVideoSubtitleModeShortcutKeydown(event, shortcutPorts)) return;
         if (event.key !== 'Escape' || !menuElement || menuElement.hidden) return;
         // 全屏 Escape 属于浏览器；菜单可以同时收尾，但不能阻止退出全屏。
         if (!getFullscreenElement(document)) event.preventDefault();
@@ -497,6 +546,7 @@ export function createVideoRuntimeMenuControls(ports: VideoRuntimeMenuPorts): Vi
         closeMenu,
         renderPlayerUiState,
         selectMenuMode,
+        createActiveModeController,
         createPlayerMenu,
         createPlayerButton,
         handleDocumentClick,

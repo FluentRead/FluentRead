@@ -55,7 +55,10 @@ export function normalizeUserscriptConfig(value: unknown): Config {
     const rawService = isRecord(value) ? value.service : undefined;
     const rawVideoService = isRecord(value) ? value.videoService : undefined;
     const rawInputBoxTranslationService = isRecord(value) ? value.inputBoxTranslationService : undefined;
-    const next = normalizeConfig(value);
+    const normalizedInput = isRecord(value)
+        ? {...value, videoTranslationEnabled: false, videoSubtitleModeHotkeyEnabled: false}
+        : value;
+    const next = normalizeConfig(normalizedInput);
     if (typeof rawService === 'string' && !isUserscriptServiceSupported(rawService)) {
         next.service = services.microsoft;
     } else if (!isUserscriptServiceSupported(next.service)) {
@@ -75,6 +78,7 @@ export function normalizeUserscriptConfig(value: unknown): Config {
     next.selectionAreaEnabled = false;
     next.disableImageTranslator = true;
     next.videoTranslationEnabled = false;
+    next.videoSubtitleModeHotkeyEnabled = false;
     next.maxConcurrentTranslations = Math.min(20, Math.max(1, Number(next.maxConcurrentTranslations) || 6));
     return next;
 }
@@ -130,6 +134,7 @@ async function migrateLegacyConfig(): Promise<Config> {
     next.disableImageTranslator = true;
     next.selectionAreaEnabled = false;
     next.videoTranslationEnabled = false;
+    next.videoSubtitleModeHotkeyEnabled = false;
 
     const legacyService = String(await getStoredValue('model') || '');
     if (legacyService) next.service = legacyServiceMap[legacyService] || services.microsoft;

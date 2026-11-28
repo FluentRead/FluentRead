@@ -1,0 +1,18 @@
+{
+  "video.modeShortcut.action.listening-cycle": "Práctica auditiva (Desactivado → Original → Bilingüe)",
+  "video.modeShortcut.action.listening-cycleDescription": "Empieza sin subtítulos y cambia sucesivamente a Solo original, Bilingüe y de vuelta a Desactivado para escuchar primero y comprobar el texto después.",
+  "video.modeShortcut.action.toggle-visibility": "Mostrar ↔ Desactivado (conservar modo actual)",
+  "video.modeShortcut.action.toggle-visibilityDescription": "Oculta o restaura los subtítulos de vídeo con una pulsación conservando tu selección actual de Bilingüe, Solo traducción o Solo original.",
+  "video.modeShortcut.hotkeyNeedModifier": "El atajo de subtítulos de vídeo debe incluir una tecla modificadora o una tecla de función (F1-F12) para no interferir con los controles de una sola tecla del reproductor",
+  "video.modeShortcut.enabledDescriptionCustomEmpty": "Al activarlo, pulsa el atajo en páginas de vídeo para cambiar el modo de subtítulos; se usará {shortcut} mientras no grabes una combinación personalizada.",
+  "video.modeShortcut.conflictInline": "Esta combinación entra en conflicto con «{feature}». Cambia el atajo abajo antes de activarla.",
+  "video.modeShortcut.disabledByConflict": "El atajo de modo de subtítulos de vídeo entró en conflicto con «{feature}» y se desactivó automáticamente. Cambia la combinación en Traducción y visualización.",
+  "video.modeShortcut.switchedWithKey": "Subtítulos de vídeo cambiados a: {mode} ({shortcut})",
+  "video.modeShortcut.menuBadge": "Atajo {shortcut}",
+  "video.modeShortcut.appearanceEnabledHint": "Atajo activado: {shortcut} ({action})",
+  "video.modeShortcut.appearanceDisabledHint": "Puedes activar el cambio con teclado en Traducción y visualización → Atajo de modo de subtítulos",
+  "video.localMedia.translateNow": "Traducir subtítulos",
+  "video.localMedia.hiddenListeningHint": "Subtítulos ocultos (modo de escucha). Haz clic en una frase para saltar a ese punto.",
+  "commandPalette.action.switchVideoSubtitleMode.title": "Cambiar modo de subtítulos de vídeo",
+  "commandPalette.action.switchVideoSubtitleMode.description": "Alterna entre Bilingüe, Solo original, Solo traducción o Desactivado según la regla actual del atajo de subtítulos"
+}

@@ -194,8 +194,10 @@ describe('播放器读音与原轨上下文所有权', () => {
     f.visibility('visible'); expect(signal.aborted).toBe(false); f.visibility('hidden'); expect(signal.aborted).toBe(true);
     f.visibility('visible'); f.render(); await flush();
     f.reading.syncConfig(mocks.config); expect(f.ports.resetCaption).not.toHaveBeenCalled();
+    mocks.config.videoSubtitleDisplayMode = 'original-only'; f.reading.syncConfig(mocks.config);
+    expect(f.ports.resetCaption).toHaveBeenCalledWith(true); expect(f.reading.state.status).toBe('loading');
     mocks.config.videoSubtitleDisplayMode = 'translation-only'; f.reading.syncConfig(mocks.config);
-    expect(f.ports.resetCaption).toHaveBeenCalledOnce(); expect(f.reading.state.status).toBe('idle');
+    expect(f.ports.resetCaption).toHaveBeenCalledWith(false); expect(f.reading.state.status).toBe('idle');
     mocks.config.videoSubtitleDisplayMode = 'bilingual';
     for (const key of ['on', 'videoTranslationEnabled', 'videoSubtitleVisible'] as const) {
       mocks.config[key] = false; f.reading.syncConfig(mocks.config); mocks.config[key] = true;

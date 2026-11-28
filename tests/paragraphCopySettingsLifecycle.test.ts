@@ -112,6 +112,69 @@ describe('段落复制设置实际组件草稿归属', () => {
         state.handleCustomHotkeyConfirm('none');
         expect(props.config.paragraphCopyHotkey).toBe('Shift+D'); expect(state.showCustomHotkeyDialog).toBe(true);
     });
+    it('段落复制开关开启前复验快捷键占用，且视频字幕关闭总开关后释放占用', () => {
+        props.config.paragraphCopyEnabled = false;
+        props.config.paragraphCopyHotkey = 'Alt+C';
+        props.config.videoTranslationEnabled = true;
+        props.config.videoSubtitleModeHotkeyEnabled = true;
+        props.config.videoSubtitleModeHotkey = 'custom';
+        props.config.customVideoSubtitleModeHotkey = 'Alt+C';
+
+        state.handleEnabledChange(true);
+        expect(props.config.paragraphCopyEnabled).toBe(false);
+        expect(feedback.warning).toHaveBeenCalledTimes(1);
+
+        // 视频翻译总开关关闭后释放保留热键，允许开启段落复制
+        props.config.videoTranslationEnabled = false;
+        state.handleEnabledChange(true);
+        expect(props.config.paragraphCopyEnabled).toBe(true);
+
+        state.handleEnabledChange(false);
+        expect(props.config.paragraphCopyEnabled).toBe(false);
+    });
+    it('关闭态存在快捷键冲突时保持快捷键可编辑以解除死锁，并校验智能高亮与旧版划词禁用开关', async () => {
+        // 1) 智能高亮开启快捷键时识别冲突，关闭后释放
+        props.config.informationHighlight = {...props.config.informationHighlight, hotkeyEnabled: true, hotkey: 'Alt+H'};
+        expect(state.findHotkeyConflict('Alt+H')).toBe('paragraphCopy.settings.hotkeyConflict');
+        props.config.informationHighlight = {...props.config.informationHighlight, hotkeyEnabled: false, hotkey: 'Alt+H'};
+        expect(state.findHotkeyConflict('Alt+H')).toBe('');
+
+        // 2) disableSelectionTranslator === true 时即使 mode 未置 disabled 也释放划词占用
+        props.config.selectionTranslatorMode = 'bilingual';
+        props.config.selectionTranslatorTrigger = 'custom';
+        props.config.customSelectionTranslatorHotkey = 'Alt+Q';
+        props.config.disableSelectionTranslator = false;
+        expect(state.findHotkeyConflict('Alt+Q')).toBe('paragraphCopy.settings.hotkeyConflict');
+        props.config.disableSelectionTranslator = true;
+        expect(state.findHotkeyConflict('Alt+Q')).toBe('');
+
+        // 3) 段落复制关闭且当前热键与视频字幕模式快捷键冲突时，允许直接更换组合键解除冲突再重开
+        props.config.paragraphCopyEnabled = false;
+        props.config.paragraphCopyHotkey = 'Alt+C';
+        props.config.customParagraphCopyHotkey = '';
+        props.config.videoTranslationEnabled = true;
+        props.config.videoSubtitleModeHotkeyEnabled = true;
+        props.config.videoSubtitleModeHotkey = 'custom';
+        props.config.customVideoSubtitleModeHotkey = 'Alt+C';
+        await settle();
+
+        expect(state.currentHotkeyConflict).toBe('paragraphCopy.settings.hotkeyConflict');
+        expect(state.showHotkeySelector).toBe(true);
+        state.handleEnabledChange(true);
+        expect(props.config.paragraphCopyEnabled).toBe(false);
+
+        // 通过自定义录制更换为无冲突快捷键后，冲突消除且开关可以成功开启
+        state.handleHotkeyChange('custom');
+        expect(state.showCustomHotkeyDialog).toBe(true);
+        state.handleCustomHotkeyConfirm('Alt+J');
+        await settle();
+        expect(props.config.paragraphCopyHotkey).toBe('custom');
+        expect(props.config.customParagraphCopyHotkey).toBe('Alt+J');
+        expect(state.currentHotkeyConflict).toBe('');
+
+        state.handleEnabledChange(true);
+        expect(props.config.paragraphCopyEnabled).toBe(true);
+    });
 });
 
 // 同一生产草稿协议下的圈选/局部/复制入口，保留真实 SFC setup 与 core 冲突规则。

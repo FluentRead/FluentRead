@@ -35,6 +35,14 @@ export function isSupportedVideoPage(): boolean {
     return false;
 }
 
+export function getActiveVideoSubtitleModeController(): null {
+    return null;
+}
+
+export function videoSubtitleModeLabelKey(): string {
+    return 'video.modeOff';
+}
+
 export function toggleContextMenuImage(): boolean { return false; }
 
 /** Userscript 没有原生右键菜单，圈选翻译入口始终不可用。 */

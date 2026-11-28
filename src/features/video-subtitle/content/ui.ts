@@ -455,6 +455,15 @@ export function videoUi(key: string, params?: Record<string, string | number | b
   return translateVideoUi(key, getVideoUiLanguage(config.uiLanguage), params);
 }
 
+function syncVideoDisplayModeClasses(target: HTMLElement): void {
+  const mode = normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode);
+  const enabled = config.on !== false && config.videoTranslationEnabled !== false;
+  target.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, enabled && mode === 'translation-only');
+  target.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, enabled && mode === 'original-only');
+  target.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, enabled && config.videoSubtitleVisible === false);
+  setAttrIfChanged(target, 'data-fluent-read-video-display-mode', mode);
+}
+
 export function getOrCreateVideoSubtitleLayer(player: HTMLElement): HTMLElement {
   let layer = document.getElementById(VIDEO_TRANSLATION_LAYER_ID);
   if (!layer) {
@@ -463,6 +472,7 @@ export function getOrCreateVideoSubtitleLayer(player: HTMLElement): HTMLElement 
     layer.className = 'fluent-read-video-subtitle-layer fluent-read-video-ui notranslate';
     layer.setAttribute('data-fluent-read-ui', 'video-subtitle');
     layer.setAttribute('translate', 'no');
+    syncVideoDisplayModeClasses(layer);
   }
   if (layer.parentElement !== player) {
     const panel = findOwnedSubtitlePanel(layer, VIDEO_SUBTITLE_PANEL_ID);
@@ -527,13 +537,15 @@ export function getOrCreateNormalizedCaptionOverlay(player: HTMLElement): HTMLEl
 }
 
 /** 字幕运行时只保留状态所有权，自有 DOM 的清空交由 UI 层完成。 */
-export function clearRenderedVideoTranslation(owner: Document): void {
+export function clearRenderedVideoTranslation(owner: Document, preserveReading = false): void {
   owner.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => {
     subtitleLayoutSnapshots.delete(panel);
     resetSubtitlePanelLayout(panel);
   });
   owner.querySelectorAll(`#${VIDEO_TRANSLATION_OVERLAY_ID}`).forEach(node => writeVideoCaptionText(node, ''));
-  owner.querySelectorAll(`#${VIDEO_READING_OVERLAY_ID}`).forEach(node => {if (node.textContent !== '') node.textContent = '';});
+  if (!preserveReading) {
+    owner.querySelectorAll(`#${VIDEO_READING_OVERLAY_ID}`).forEach(node => {if (node.textContent !== '') node.textContent = '';});
+  }
 }
 
 export function deactivateNormalizedVideoCaption(owner: Document): void {
@@ -935,18 +947,10 @@ export function applyVideoDisplayState(container: HTMLElement): void {
       resetSubtitlePanelLayout(panel);
     });
   }
-  const mode = normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode);
-  const enabled = config.on !== false && config.videoTranslationEnabled !== false;
-  container.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, enabled && mode === 'translation-only');
-  container.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, enabled && mode === 'original-only');
-  container.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, enabled && config.videoSubtitleVisible === false);
-  setAttrIfChanged(container, 'data-fluent-read-video-display-mode', mode);
+  syncVideoDisplayModeClasses(container);
   const layer = document.getElementById(VIDEO_TRANSLATION_LAYER_ID);
-  layer?.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, enabled && mode === 'translation-only');
-  layer?.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, enabled && mode === 'original-only');
-  layer?.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, enabled && config.videoSubtitleVisible === false);
   if (layer) {
-    setAttrIfChanged(layer, 'data-fluent-read-video-display-mode', mode);
+    syncVideoDisplayModeClasses(layer);
     syncSubtitleScrollHostState(layer);
   }
 }

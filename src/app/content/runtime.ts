@@ -6,6 +6,7 @@
  */
 import {createLearningContentFeatures} from './learningFeatures';
 import {createReaderContentFeatures} from './readerFeatures';
+import {createCommandPaletteContentFeature} from './commandPaletteFeature';
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
 import {createShadowRootUi} from 'wxt/utils/content-script-ui/shadow-root';
 import {constants} from '@/src/core/config/constants';
@@ -183,7 +184,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         activePageFeatureRegistry = createContentFeatureRegistry([
             ...createLearningContentFeatures(ctx, config, capabilities),
             ...createReaderContentFeatures(ctx, config),
-            ...(import.meta.env.BROWSER === 'userscript' ? [] : [informationHighlight!.feature]),
+            ...(import.meta.env.BROWSER === 'userscript' ? [] : [informationHighlight!.feature, createCommandPaletteContentFeature(ctx, config, capabilities, informationHighlight)]),
         ], {capabilities,
             onError: (featureId, phase, error) => {
                 console.error(`[FluentRead] 内容功能 ${featureId} ${phase} 失败:`, error);

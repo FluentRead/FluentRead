@@ -107,6 +107,7 @@ import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelect
 import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy';
 import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation';
 import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
+import {resolveCommandPaletteHotkey} from '@/src/core/config/commandPalette';
 import {findEnabledQuickTranslationHotkeyConflict, inputBoxTranslationTriggerHotkey, quickTranslationActionKey} from '@/src/core/config/quickTranslation';
 import {WritingChoices} from '@/src/features/writing-assistant/ui/public';
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
@@ -182,6 +183,7 @@ function reservedWritingHotkeyOwners(): {hotkey: string; feature: string}[] {
     {hotkey: current.paragraphCopyEnabled ? resolveParagraphCopyHotkey(current.paragraphCopyHotkey, current.customParagraphCopyHotkey) : '', feature: t('paragraphCopy.settings.title')},
     {hotkey: current.sectionTranslationHotkeyEnabled ? resolveSectionTranslationHotkey(current.sectionTranslationHotkey, current.customSectionTranslationHotkey) : '', feature: t('sectionTranslation.settings.title')},
     {hotkey: current.videoSubtitleModeHotkeyEnabled ? resolveVideoSubtitleModeHotkey(current.videoSubtitleModeHotkey, current.customVideoSubtitleModeHotkey) : '', feature: t('video.modeShortcut.title')},
+    {hotkey: current.commandPaletteEnabled ? resolveCommandPaletteHotkey(current.commandPaletteHotkey, current.customCommandPaletteHotkey) : '', feature: t('commandPalette.title')},
     {hotkey: current.informationHighlight?.hotkeyEnabled === true ? current.informationHighlight.hotkey ?? '' : '', feature: t('informationHighlight.title')},
     {hotkey: inputBoxTranslationTriggerHotkey(current.inputBoxTranslationTrigger, current.customInputBoxTranslationHotkey), feature: translateLegacy('输入框翻译')},
   ];

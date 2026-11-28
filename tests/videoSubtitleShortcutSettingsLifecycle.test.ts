@@ -93,9 +93,9 @@ describe('视频字幕显示模式快捷键设置组件生命周期与冲突校�
 
         state.handleHotkeyChange('custom');
         expect(state.showCustomHotkeyDialog).toBe(true);
-        state.handleCustomHotkeyConfirm('alt+k');
+        state.handleCustomHotkeyConfirm('alt+u');
         expect(props.config.videoSubtitleModeHotkey).toBe('custom');
-        expect(props.config.customVideoSubtitleModeHotkey).toBe('Alt+K');
+        expect(props.config.customVideoSubtitleModeHotkey).toBe('Alt+U');
         expect(feedback).toHaveBeenCalledWith(expect.objectContaining({type: 'success'}));
 
         state.openCustomHotkeyDialog();
@@ -109,7 +109,7 @@ describe('视频字幕显示模式快捷键设置组件生命周期与冲突校�
         props.active = false;
         await settle();
         expect(state.showCustomHotkeyDialog).toBe(false);
-        state.handleCustomHotkeyConfirm('Alt+K');
+        state.handleCustomHotkeyConfirm('Alt+U');
         state.handleEnabledChange(false);
         expect(props.config.videoSubtitleModeHotkey).toBe('Alt+M');
         expect(props.config.videoSubtitleModeHotkeyEnabled).toBe(true);

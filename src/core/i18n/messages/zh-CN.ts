@@ -28,6 +28,7 @@ import {translationStatsChineseMessages} from './translationStats';
 import {localTranslationChineseMessages} from './localTranslation';
 
 import {personalCorrectionChineseMessages} from './personalCorrections';
+import {task7ChineseMessages} from './task7Features';
 
 import countForms from './count-forms.json';
 
@@ -42,6 +43,7 @@ export const zhCNMessages = {
     "feedback.retryHint": "稍后重试，原文和当前选区会继续保留。",
     ...countForms['zh-CN'],
     ...personalCorrectionChineseMessages,
+    ...task7ChineseMessages,
     "document.config.loadFailed": "设置未能读取，请重新加载后再试。",
     "popup.compact.translate": "翻译",
     "popup.compact.restore": "还原",

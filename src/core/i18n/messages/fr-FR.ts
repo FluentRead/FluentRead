@@ -32,6 +32,7 @@ import {translationStatsFrenchMessages} from './translationStats';
 import {localTranslationFrenchMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
+import {task7Messages, task7LegacyText} from './task7Features';
 
 import countForms from './count-forms.json';
 
@@ -46,6 +47,7 @@ export const frFRMessages = {
     "feedback.retryHint": "Réessayez dans un instant. Le texte source et votre sélection restent disponibles.",
     ...countForms['fr-FR'],
     ...personalCorrectionMessages['fr-FR'],
+    ...task7Messages['fr-FR'],
     "document.config.loadFailed": "Impossible de charger les paramètres. Rechargez la page et réessayez.",
     "popup.compact.translate": "Traduire",
     "popup.compact.restore": "Rétablir",
@@ -2570,6 +2572,7 @@ const frFRLegacyTextBase: Readonly<Record<string, string>> = {
     'FluentRead 备份': 'Sauvegarde FluentRead',
     'FluentRead 翻译中心': 'Centre de traduction FluentRead',
     ...mimoRetirementLegacyText['fr-FR'],
+    ...task7LegacyText['fr-FR'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'Les clés pay-as-you-go MiMo commencent généralement par sk- ; Veuillez vous assurer que la clé provient de la page des clés API.',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'L’initialisation du service OCR a échoué. Veuillez rouvrir la page des paramètres et réessayer.',
     'Offscreen 文档': 'Document hors écran',

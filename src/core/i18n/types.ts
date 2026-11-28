@@ -8,7 +8,7 @@
  * src/ui/i18n.ts 负责，内容翻译请求不得复用这些界面语言标识。
  */
 
-export type UiLanguage = 'zh-CN' | 'en-US' | 'ja-JP' | 'ko-KR' | 'fr-FR' | 'ru-RU' | 'es-ES';
+export type UiLanguage = 'zh-CN' | 'zh-TW' | 'en-US' | 'ja-JP' | 'ko-KR' | 'fr-FR' | 'ru-RU' | 'es-ES';
 
 export type TranslationValue = string | number | boolean;
 

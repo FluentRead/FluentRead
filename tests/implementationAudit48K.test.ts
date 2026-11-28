@@ -63,6 +63,7 @@ import {mountVocabularyReencounter, unmountVocabularyReencounter} from '@/src/fe
 import {registerUiLanguageBundle, translate, translateLegacyText, type RegisteredUiLanguage} from '@/src/core/i18n';
 import * as i18n from '@/src/core/i18n';
 import * as onboardingMessages from '@/src/core/i18n/messages/onboarding';
+import * as scenarioPresets from '@/src/core/config/scenarioPresets';
 import brandTaglines from '@/src/core/i18n/messages/brand-taglines.json';
 import {createLegacyCorrectionText, correctionRows} from '@/src/core/i18n/messages/legacy-corrections';
 import {useSettingsActionContext} from '@/src/features/settings/model/useSettingsActionContext';
@@ -135,9 +136,10 @@ function loadClientComponent(file: 'src/ui/components/UiLanguageOnboarding.vue' 
     const modules: Record<string, Record<string, unknown>> = {
         vue: Vue, '@/src/core/i18n': i18n, '@/src/core/i18n/messages/onboarding': onboardingMessages,
         '@/src/core/i18n/messages/brand-taglines.json': {default: brandTaglines},
-        '@/src/ui/i18n': {useUiI18n: () => ({language: ports.language, setLanguage: ports.setLanguage})},
+        '@/src/core/config/scenarioPresets': scenarioPresets,
+        '@/src/ui/i18n': {useUiI18n: () => ({language: ports.language, setLanguage: ports.setLanguage, t: (key: string) => key})},
         '@/src/features/settings/model/useSettingsActionContext': {useSettingsActionContext},
-        'webextension-polyfill': {default: browser}, '@/src/services/config/store': {config: ports.config, subscribeConfig: ports.subscribe},
+        'webextension-polyfill': {default: browser}, '@/src/services/config/store': {config: ports.config, subscribeConfig: ports.subscribe, requestConfigPatch: vi.fn()},
         '@/src/core/i18n/language': i18n,
         '@/src/ui/interfaceAppearance': {applyInterfaceSkin: ports.appearance, applyInterfaceFont: ports.appearance, applyInterfaceTheme: ports.appearance},
     };
@@ -297,6 +299,7 @@ describe('48K 轻量资源经实际运行时消费者', () => {
     it('实际 Popup 模块加载失败同时显示双语反馈，重试释放订阅并调用重开端口', async () => {
         mountClient(loadClientComponent('src/app/popup/PopupOnboarding.vue')); await settle();
         click('.onboarding-form > .onboarding-confirm'); await settle();
+        click('[data-testid="onboarding-scenario-skip"]'); await settle();
         expect(element('.onboarding-load-error').textContent).toContain('菜单加载失败，请重试。');
         expect(element('.onboarding-load-error').textContent).toContain('The menu could not be loaded. Please retry.');
         expect(element('.onboarding-load-error button').textContent).toBe('重试 / Retry');

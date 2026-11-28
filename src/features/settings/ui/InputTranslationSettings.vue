@@ -158,6 +158,7 @@ import { getMissingCredentialMessage } from '@/src/core/config/validation'
 import type { Config } from '@/src/core/config/model'
 import { getCustomOpenAIProviderModels, isCustomOpenAIProviderId } from '@/src/core/config/customOpenAI'
 import { resolveAreaTranslationHotkey } from '@/src/core/config/areaTranslation'
+import { resolveCommandPaletteHotkey } from '@/src/core/config/commandPalette'
 import { resolveReservedClickSelectionHotkey } from '@/src/core/config/clickSelection'
 import { resolveParagraphCopyHotkey } from '@/src/core/config/paragraphCopy'
 import { findEnabledQuickTranslationHotkeyConflict, quickTranslationActionKey } from '@/src/core/config/quickTranslation'
@@ -335,6 +336,12 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
       feature: translateLegacy('智能高亮'),
     },
     {hotkey: resolveWritingHotkey(props.config.writing), feature: translateLegacy('写作助手')},
+    {
+      hotkey: props.config.commandPaletteEnabled
+        ? resolveCommandPaletteHotkey(props.config.commandPaletteHotkey, props.config.customCommandPaletteHotkey)
+        : '',
+      feature: translateLegacy('全局命令面板'),
+    },
   ]
 }
 

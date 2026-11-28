@@ -75,6 +75,7 @@ import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslat
 import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy'
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection'
 import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation'
+import {resolveCommandPaletteHotkey} from '@/src/core/config/commandPalette'
 import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut'
 import {resolveWritingHotkey} from '@/src/core/config/writing'
 import {findEnabledQuickTranslationHotkeyConflict, inputBoxTranslationTriggerHotkey} from '@/src/core/config/quickTranslation'
@@ -102,6 +103,7 @@ function hotkeyConflict(hotkey: string, enabled = props.config.informationHighli
     config.paragraphCopyEnabled ? resolveParagraphCopyHotkey(config.paragraphCopyHotkey, config.customParagraphCopyHotkey) : '',
     config.selectionAreaEnabled ? resolveAreaTranslationHotkey(config.selectionAreaHotkey, config.customSelectionAreaHotkey) : '',
     config.videoSubtitleModeHotkeyEnabled ? resolveVideoSubtitleModeHotkey(config.videoSubtitleModeHotkey, config.customVideoSubtitleModeHotkey) : '',
+    config.commandPaletteEnabled ? resolveCommandPaletteHotkey(config.commandPaletteHotkey, config.customCommandPaletteHotkey) : '',
     inputBoxTranslationTriggerHotkey(config.inputBoxTranslationTrigger, config.customInputBoxTranslationHotkey), resolveReservedClickSelectionHotkey(config), resolveWritingHotkey(config.writing)]
   return taken.some(item => canonicalizeHotkey(item || '').toLocaleLowerCase() === identity) || findEnabledQuickTranslationHotkeyConflict(config.quickTranslationProfiles ?? [], hotkey)
     ? t('informationHighlight.hotkey.conflict') : ''

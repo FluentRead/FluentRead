@@ -97,7 +97,7 @@ export async function verifyLocalizedExtensionMetadata(directory, manifest) {
     const descriptions = JSON.parse(await readFile(path.join(PROJECT_ROOT, 'src/core/i18n/messages/product-descriptions.json'), 'utf8'));
     const toolbarDescriptions = JSON.parse(await readFile(path.join(PROJECT_ROOT, 'src/core/i18n/messages/toolbar-descriptions.json'), 'utf8'));
     const locales = Object.entries(descriptions).map(([language, description]) => ({
-        locale: language === 'zh-CN' ? 'zh_CN' : language.split('-')[0],
+        locale: language === 'zh-CN' ? 'zh_CN' : language === 'zh-TW' ? 'zh_TW' : language.split('-')[0],
         description,
         toolbarDescription: toolbarDescriptions[language],
     }));

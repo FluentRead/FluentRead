@@ -663,6 +663,20 @@
         "tests/dictionaryUi.test.ts"
       ],
       "scenario": "模板预览、显式网页加载、卡片导出与本地 Anki 反馈"
+    },
+    "src/features/settings/ui/ScenarioPresetsSettings.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/scenarioPresets.test.ts"
+      ],
+      "scenario": "真实场景预设多选、非破坏性预览、应用持久化及空选/已满足边界"
+    },
+    "src/features/settings/ui/CommandPaletteSettings.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/commandPalette.test.ts"
+      ],
+      "scenario": "真实命令面板开关、预设及自定义快捷键录制、跨功能冲突校验与停用清理"
     }
   }
 }

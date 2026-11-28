@@ -88,7 +88,7 @@ export function resolveWritingReferenceLanguage(value: unknown, uiLanguage: UiLa
     const language = normalizeWritingReferenceLanguage(value);
     if (language === 'off') return '';
     if (language !== 'ui') return language;
-    const uiTargets: Record<UiLanguage, string> = {'zh-CN': 'zh-Hans', 'en-US': 'en', 'ja-JP': 'ja', 'ko-KR': 'ko', 'fr-FR': 'fr', 'ru-RU': 'ru', 'es-ES': 'es'};
+    const uiTargets: Record<UiLanguage, string> = {'zh-CN': 'zh-Hans', 'zh-TW': 'zh-Hant', 'en-US': 'en', 'ja-JP': 'ja', 'ko-KR': 'ko', 'fr-FR': 'fr', 'ru-RU': 'ru', 'es-ES': 'es'};
     return uiTargets[uiLanguage];
 }
 /** 只接受目录语言与旧自动值，协议不能靠规范化把任意语言静默变成合法值。 */

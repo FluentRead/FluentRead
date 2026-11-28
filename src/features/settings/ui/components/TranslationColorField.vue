@@ -101,6 +101,7 @@ const {locale: inheritedVendorLocale} = useLocale()
 // 锁版本公开词条适配；只覆盖当前取色器两项，不改变父级或全局 vendor 配置。
 const pickerClearLabels = {
   'zh-CN': '清空',
+  'zh-TW': '清空',
   'en-US': 'Clear',
   'ja-JP': 'クリア',
   'ko-KR': '초기화',

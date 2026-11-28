@@ -10,6 +10,7 @@ import type {Config} from '@/src/core/config/model';
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
 import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
 import {resolveWritingHotkey} from '@/src/core/config/writing';
+import {resolveCommandPaletteHotkey} from '@/src/core/config/commandPalette';
 import {findEnabledQuickTranslationHotkeyConflict, quickTranslationActionKey, inputBoxTranslationTriggerHotkey} from '@/src/core/config/quickTranslation';
 import {canonicalizeHotkey, parseHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
 import {useUiI18n} from '@/src/ui/i18n';
@@ -65,6 +66,12 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
         const reservedWriting = resolveWritingHotkey(config.value.writing);
         if (reservedWriting && canonical === canonicalizeHotkey(reservedWriting).toLowerCase()) {
             return t('quickTranslation.legacyConflictEdit', {feature: translateLegacy('写作助手')});
+        }
+        const reservedCommandPalette = config.value.commandPaletteEnabled
+            ? resolveCommandPaletteHotkey(config.value.commandPaletteHotkey, config.value.customCommandPaletteHotkey)
+            : '';
+        if (reservedCommandPalette && canonical === canonicalizeHotkey(reservedCommandPalette).toLowerCase()) {
+            return t('quickTranslation.legacyConflictEdit', {feature: t('commandPalette.title')});
         }
         return '';
     }

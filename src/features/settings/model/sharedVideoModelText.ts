@@ -36,10 +36,12 @@ const rows: readonly Row[] = [
     ["共享模型文件响应无效，请重试下载", "The shared model file response is invalid. Try downloading again.", "共有モデルファイルの応答が無効です。もう一度ダウンロードしてください。", "공유 모델 파일 응답이 올바르지 않습니다. 다시 다운로드하세요.", "La réponse du fichier de modèle partagé est invalide. Réessayez le téléchargement.", "Ответ файла общей модели недействителен. Скачайте его снова.", "La respuesta del archivo compartido del modelo no es válida. Intenta descargarlo de nuevo."],
     ["模型正在使用或下载，请结束后再迁移", "The model is in use or downloading. Stop it before moving it.", "モデルの使用中またはダウンロード中です。終了してから移行してください。", "모델을 사용 중이거나 다운로드 중입니다. 끝난 뒤 옮기세요.", "Le modèle est utilisé ou en cours de téléchargement. Arrêtez-le avant de le déplacer.", "Модель используется или скачивается. Остановите процесс перед переносом.", "El modelo se está usando o descargando. Deténlo antes de moverlo."],
 ];
-const columns: Record<UiLanguage, 0 | 1 | 2 | 3 | 4 | 5 | 6> = {
+const zhTWRows: Readonly<Record<string, string>> = {"跨浏览器共享模型": "跨瀏覽器共享模型", "共享目录可用": "共享目錄可用", "清除本机副本": "清除本機副本", "迁移到共享目录": "遷移到共享目錄", "正在迁移模型": "正在遷移模型", "下载到共享目录": "下載到共享目錄", "共享模型目录说明": "共享模型目錄說明", "在每个浏览器中选择同一文件夹；Whisper 文件写入 FluentRead/whisper 子目录。已有模型可迁移到共享目录。断开只移除本浏览器授权，不会删除共享文件。": "在每個瀏覽器中選擇同一資料夾；Whisper 檔案寫入 FluentRead/whisper 子目錄。已有模型可遷移到共享目錄。斷開只移除本瀏覽器授權，不會刪除共享檔案。", "当前浏览器不支持目录共享，仍可使用浏览器内模型。": "當前瀏覽器不支援目錄共享，仍可使用瀏覽器內模型。", "目录共享不可用": "目錄共享不可用", "未连接；模型继续保存在此浏览器中。": "未連線；模型繼續儲存在此瀏覽器中。", "已授权；新模型会保存到共享目录。": "已授權；新模型會儲存到共享目錄。", "需要重新授权；请选择同一文件夹以继续使用。": "需要重新授權；請選擇同一資料夾以繼續使用。", "重新授权或更换文件夹": "重新授權或更換資料夾", "选择共享文件夹": "選擇共享資料夾", "断开共享": "斷開共享", "无法打开共享模型目录，请重试": "無法開啟共享模型目錄，請重試", "无法断开共享模型目录，请重试": "無法斷開共享模型目錄，請重試", "无法读取共享模型目录状态，请重试": "無法讀取共享模型目錄狀態，請重試", "模型迁移失败，请重试": "模型遷移失敗，請重試", "共享模型目录需要重新授权，请在本地 AI 字幕设置中重新选择同一文件夹": "共享模型目錄需要重新授權，請在本機 AI 字幕設定中重新選擇同一資料夾", "请先在本地 AI 字幕设置中选择共享模型文件夹": "請先在本機 AI 字幕設定中選擇共享模型資料夾", "浏览器缓存中的模型文件不完整，请先重新下载": "瀏覽器快取中的模型檔案不完整，請先重新下載", "共享模型文件校验失败，请重试迁移": "共享模型檔案驗證失敗，請重試遷移", "共享模型文件长度不完整，请重试": "共享模型檔案長度不完整，請重試", "共享模型文件响应无效，请重试下载": "共享模型檔案回應無效，請重試下載", "模型正在使用或下载，请结束后再迁移": "模型正在使用或下載，請結束後再遷移"};
+const columns: Record<Exclude<UiLanguage, 'zh-TW'>, 0 | 1 | 2 | 3 | 4 | 5 | 6> = {
   'zh-CN': 0, 'en-US': 1, 'ja-JP': 2, 'ko-KR': 3, 'fr-FR': 4, 'ru-RU': 5, 'es-ES': 6,
 };
 
 export function translateSharedVideoModelText(value: string, language: UiLanguage): string | undefined {
+  if (language === 'zh-TW') return Object.hasOwn(zhTWRows, value) ? zhTWRows[value] : undefined;
   return rows.find(row => row[0] === value)?.[columns[language]];
 }

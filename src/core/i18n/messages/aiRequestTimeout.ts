@@ -14,6 +14,11 @@ export const aiRequestTimeoutChineseMessages = {
 
 export const aiRequestTimeoutMessages: Readonly<Record<UiLanguage, Readonly<Record<string, string>>>> = {
     "zh-CN": aiRequestTimeoutChineseMessages,
+    "zh-TW": {
+        "settings.requestLimits.aiTimeout": "AI 翻譯要求逾時",
+        "settings.requestLimits.aiTimeoutHelp": "每次 AI 翻譯要求預設等待 120 秒，可設為 10–600 秒。慢模型或長文字可適當延長等待時間。",
+        "settings.requestLimits.seconds": "秒",
+    },
     "en-US": {
         "settings.requestLimits.aiTimeout": "AI translation request timeout",
         "settings.requestLimits.aiTimeoutHelp": "Each AI translation request waits up to 120 seconds by default. Range: 10–600 seconds. Allow more time for slow models or long text.",

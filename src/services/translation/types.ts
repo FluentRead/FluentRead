@@ -11,6 +11,7 @@ import type {CompositeTranslationProvider} from '@/src/core/config/compositeTran
 import type {DeepLApiPlan} from '@/src/core/config/deepl';
 import type {ModelThinkingMapping} from '@/src/core/config/modelThinking';
 import type {GlossaryLibrary} from '@/src/core/glossary';
+import type {PrivacyActivityInput} from '@/src/core/privacy/activity';
 import type {TranslationRequestStatsEvent} from '@/src/services/translation-stats/types';
 import type {TranslationRequestScheduler, TranslationRequestIdentity, TranslationRequestLease} from './requestScheduler';
 
@@ -375,6 +376,10 @@ export interface TranslationBrokerDependencies {
     captureTranslationStatsGeneration?: () => number;
     /** 翻译请求结束后同步交付统计事件；实现方自行缓冲写入，不能阻塞或改变翻译结果。 */
     recordTranslationRequest?: (event: TranslationRequestStatsEvent, generation: number) => void;
+    /** 请求开始时捕获隐私防护记录代次，清空记录后才结束的旧请求不会写回。 */
+    capturePrivacyActivityGeneration?: () => number;
+    /** 翻译隐私防护命中脱敏或拦截后交付仅含不可逆星号摘要的记录；异常不得影响主流程。 */
+    recordPrivacyActivity?: (event: PrivacyActivityInput, generation: number) => void;
     /** 响应前等待本地缓存和用量写入的最长宽限期；主要供测试和受限运行时注入。 */
     persistenceGraceMs?: number;
     now?: () => number;

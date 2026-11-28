@@ -5,7 +5,15 @@
  * 模块边界：映射仅在调用栈内存中存在，不序列化、不写日志、不发送网络；JavaScript 字符串由 GC 回收，不声称物理内存擦除。
  */
 import {createPrivacyDetector, type PrivacySpan} from './detect';
+import {formatPrivacyMaskedDisplay} from './maskDisplay';
+import type {
+    PrivacyActivityCategory,
+    PrivacyActivitySummary,
+    PrivacyMaskedSample,
+} from './activity';
 import {MAX_PRIVACY_MATCHES, MAX_PRIVACY_TEXT_LENGTH, PrivacyProtectionError, type PrivacyProtectionPolicy} from './policy';
+
+const SESSION_MAX_SAMPLES = 6;
 
 export interface PrivacyPacket {
     readonly text: string;
@@ -17,11 +25,29 @@ export function createPrivacySession(policy: PrivacyProtectionPolicy, terms: rea
     const detect = createPrivacyDetector(policy, terms);
     const values = new Map<string, string>();
     const originals = new Map<string, string>();
+    const categoryCounts: Partial<Record<PrivacyActivityCategory, number>> = {};
+    const sampleKeys = new Set<string>();
+    const samples: PrivacyMaskedSample[] = [];
+    let hitCount = 0;
     let prefix = '';
     let processed = 0;
     let disposed = false;
     function assertLive() {
         if (disposed) throw new PrivacyProtectionError('PRIVACY_SESSION_UNAVAILABLE');
+    }
+    function recordSpans(text: string, spans: readonly PrivacySpan[]) {
+        for (const span of spans) {
+            hitCount += 1;
+            categoryCounts[span.category] = (categoryCounts[span.category] ?? 0) + 1;
+            if (samples.length < SESSION_MAX_SAMPLES) {
+                const masked = formatPrivacyMaskedDisplay(text.slice(span.start, span.end), span.category);
+                const key = `${span.category}:${masked}`;
+                if (!sampleKeys.has(key)) {
+                    sampleKeys.add(key);
+                    samples.push({category: span.category, masked});
+                }
+            }
+        }
     }
     function tokenFor(value: string): string {
         const known = originals.get(value);
@@ -46,6 +72,7 @@ export function createPrivacySession(policy: PrivacyProtectionPolicy, terms: rea
             if (processed > MAX_PRIVACY_TEXT_LENGTH * 4) throw new PrivacyProtectionError('PRIVACY_CAPACITY_EXCEEDED');
             if (text.length > MAX_PRIVACY_TEXT_LENGTH) throw new PrivacyProtectionError('PRIVACY_CAPACITY_EXCEEDED');
             const spans = explicitCategory && text ? [{start: 0, end: text.length, category: explicitCategory}] : detect(text);
+            if (spans.length) recordSpans(text, spans);
             if (spans.length && policy.mode === 'block') throw new PrivacyProtectionError('PRIVACY_CONTENT_BLOCKED');
             const expected = new Map<string, number>();
             if (!spans.length) return {text, spans, expected};
@@ -62,6 +89,13 @@ export function createPrivacySession(policy: PrivacyProtectionPolicy, terms: rea
             return {text: parts.join(''), spans, expected};
         },
         get tokens(): readonly string[] {return [...values.keys()];},
+        get summary(): PrivacyActivitySummary {
+            return {
+                hitCount,
+                categoryCounts: {...categoryCounts},
+                samples: samples.map(sample => ({...sample})),
+            };
+        },
         restore(result: unknown, packet: PrivacyPacket, allowMissing = false): string {
             assertLive();
             if (typeof result !== 'string') throw new PrivacyProtectionError('PRIVACY_RESTORE_FAILED');

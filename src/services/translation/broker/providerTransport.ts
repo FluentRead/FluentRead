@@ -148,7 +148,12 @@ export function createBrokerProviderTransport(options: BrokerProviderTransportOp
                     });
                     const operation = Promise.resolve().then(async () => {
                         throwIfRequestAborted(execution.abortSignal);
-                        const privacy = preparePrivacyRequest(providerMessage, execution.config);
+                        const observePrivacy = deps.recordPrivacyActivity && execution.privateContext !== true
+                            ? (event: Parameters<NonNullable<TranslationBrokerDependencies['recordPrivacyActivity']>>[0]) => {
+                                deps.recordPrivacyActivity!(event, execution.trace.privacyActivityGeneration);
+                            }
+                            : undefined;
+                        const privacy = preparePrivacyRequest(providerMessage, execution.config, observePrivacy);
                         try {
                             if (restoreLiteralEmoji) return restoreLiteralEmoji(privacy.restore(await provider({...privacy.message})));
                             const protectedRequest = prepareGlossaryRequest(privacy.message, privacy.config);

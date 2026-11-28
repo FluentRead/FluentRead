@@ -986,7 +986,13 @@ describe('userscript browser shim injection', () => {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
-        const retainedKeys = Object.keys(extension).filter(key => !extensionOnlyUndoKeys.includes(key) && !cloudUpgradeKeys.includes(key) && !key.startsWith('informationHighlight.') && !key.startsWith('dictionary.') && !key.startsWith('scenarioPresets.') && !key.startsWith('commandPalette.')
+        const privacyLogKeys = Object.keys(extension).filter(key => key.startsWith('privacy.log.'));
+        expect(privacyLogKeys.length).toBeGreaterThan(0);
+        for (const key of privacyLogKeys) {
+            expect(extension[key]).toBeTruthy();
+            expect(Object.hasOwn(projected, key)).toBe(false);
+        }
+        const retainedKeys = Object.keys(extension).filter(key => !extensionOnlyUndoKeys.includes(key) && !cloudUpgradeKeys.includes(key) && !privacyLogKeys.includes(key) && !key.startsWith('informationHighlight.') && !key.startsWith('dictionary.') && !key.startsWith('scenarioPresets.') && !key.startsWith('commandPalette.')
             && (!key.startsWith('learning.collection.speech') || key === 'learning.collection.speechFailed')
             && !noticeKeys.includes(key) && !learningKeys.includes(key) && !readingAnnotationKeys.includes(key) && !subtitleAppearanceKeys.includes(key) && !learningAppearanceKeys.includes(key) && !subtitleExportKeys.includes(key) && !videoAsrKeys.includes(key) && !subtitleModeShortcutKeys.includes(key) && !readerRecoveryKeys.includes(key)
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)

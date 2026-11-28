@@ -161,7 +161,14 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
 
         message = createTranslationRequestSnapshot(message);
 
-        const trace: TranslationRequestTrace = {cachedSegments: 0, shared: false, upstreamCalls: 0, upstreamMs: 0, routeAttempts: []};
+        const trace: TranslationRequestTrace = {
+            cachedSegments: 0,
+            shared: false,
+            upstreamCalls: 0,
+            upstreamMs: 0,
+            routeAttempts: [],
+            privacyActivityGeneration: deps.capturePrivacyActivityGeneration?.() ?? 0,
+        };
         const startedAt = startTranslationRequest(message, now);
         const statsGeneration = deps.captureTranslationStatsGeneration?.() ?? 0;
         try {
@@ -241,6 +248,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 if (requestControl) attachTranslationRequestControl(child, requestControl);
                 const memberTrace: TranslationRequestTrace = {
                     cachedSegments: 0, shared: false, upstreamCalls: 0, upstreamMs: 0, routeAttempts: [],
+                    privacyActivityGeneration: trace.privacyActivityGeneration,
                 };
                 try {
                     const result = await executeTranslation(child, memberTrace, startedAt, true);
@@ -274,11 +282,24 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         if (deps.serviceTypes.isAI(selectedService)) {
             trace.model = cleanModelName(getEffectiveRequestModel(current, selectedService, message.modelOverride));
         }
+        const glossarySource = getTranslationGlossaryContext(message);
+        const observePrivacy = deps.recordPrivacyActivity && glossarySource?.privateContext !== true
+            ? (event: Parameters<NonNullable<TranslationBrokerDependencies['recordPrivacyActivity']>>[0]) => {
+                try {
+                    deps.recordPrivacyActivity!(event, trace.privacyActivityGeneration);
+                } catch (error) {
+                    warn('[FluentRead] privacy activity record failed:', error);
+                }
+            }
+            : undefined;
         const imageInput = getTranslationImageInput(message);
-        if (imageInput && current.privacyProtection?.enabled) throw new PrivacyProtectionError('PRIVACY_IMAGE_BLOCKED');
+        if (imageInput && current.privacyProtection?.enabled) {
+            observePrivacy?.({action: 'image-blocked', serviceId: selectedService, hitCount: 1});
+            throw new PrivacyProtectionError('PRIVACY_IMAGE_BLOCKED');
+        }
         // 阻止模式先检查完整输入，不能先发送无敏感词的网页摘要，再发现正文需要阻止。
         if (current.privacyProtection?.enabled && current.privacyProtection.mode === 'block') {
-            const preflight = preparePrivacyRequest(message, current);
+            const preflight = preparePrivacyRequest(message, current, observePrivacy);
             preflight.dispose();
         }
         if (imageInput && Array.isArray(message.origin) && message.origin.length > 0) {
@@ -300,7 +321,6 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             && message.glossaryRevision !== buildGlossaryRevision(current.glossaryLibraries, current.glossaryEnabled)) {
             throw new GlossaryRevisionChangedError();
         }
-        const glossarySource = getTranslationGlossaryContext(message);
         // 文档合批只接受受信入口的数组；保留同一分项译文缓存，pending 则按执行策略隔离。
         if (import.meta.env.BROWSER !== 'userscript' && message.documentBatch !== undefined
             && (message.documentBatch !== true || !Array.isArray(message.origin) || glossarySource?.context !== 'document')) {

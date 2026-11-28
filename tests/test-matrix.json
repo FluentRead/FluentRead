@@ -582,6 +582,7 @@
       "tests/videoCourseCaptions.test.ts",
       "tests/imageFlatTextRepair.test.ts",
       "tests/privacyProtection.test.ts",
+      "tests/privacyActivityRepository.test.ts",
       "tests/sharedVideoModelDirectory.test.ts",
       "tests/htmlMedia.test.ts",
       "tests/subtitleExport.test.ts",

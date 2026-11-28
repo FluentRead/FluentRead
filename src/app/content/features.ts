@@ -56,7 +56,7 @@ export {
 export {
     toggleContextMenuImage,
     setMangaPeekOriginal,
-    isImageTranslatorNeeded, isMangaReaderPage, mountMangaEntry, unmountMangaEntry,
+    isImageTranslatorNeeded, isImageTranslatorMounted, isMangaReaderPage, mountMangaEntry, unmountMangaEntry,
     mountImageTranslator,
     unmountImageTranslator,
 } from '@/src/features/image-translation/public';

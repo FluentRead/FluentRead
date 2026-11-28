@@ -124,7 +124,7 @@ async function initializeConfigAutoBackups(): Promise<void> {
         const parsed = parseConfigAutoBackups(stored);
         if (parsed) {
             initialized = true;
-            setBackupState(parsed, false);
+            setBackupState(parsed);
             // 有原子条件提交才自动清理旧存储；GM 等 get/set-only 端口
             // 保留脱敏内存投影，等显式捕获再持久化，避免迟到迁移覆盖新值。
             if (storage.setItemIfUnchanged && JSON.stringify(stored) !== serializeConfigAutoBackups(parsed)) {
@@ -133,7 +133,7 @@ async function initializeConfigAutoBackups(): Promise<void> {
                     if (!written) {
                         const revision = storedChangeRevision;
                         const latest = parseConfigAutoBackups(await storage.getItem(CONFIG_AUTO_BACKUP_STORAGE_KEY));
-                        if (latest && revision === storedChangeRevision) setBackupState(latest, false);
+                        if (latest && revision === storedChangeRevision) setBackupState(latest);
                     }
                 } catch (error) {
                     console.warn('[FluentRead] 自动配置备份可恢复投影迁移暂未落盘', error);
@@ -150,7 +150,7 @@ async function initializeConfigAutoBackups(): Promise<void> {
                 // 不写任何数据。watch 已安装状态时直接沿用，否则重新读取胜出值。
                 if (!backupState) {
                     const latest = parseConfigAutoBackups(await storage.getItem(CONFIG_AUTO_BACKUP_STORAGE_KEY));
-                    if (!backupState) setBackupState(latest || baseline, false);
+                    if (!backupState) setBackupState(latest || baseline);
                 }
                 initialized = true;
                 return;
@@ -159,10 +159,10 @@ async function initializeConfigAutoBackups(): Promise<void> {
         // 无 CAS 时自动初始化只建立可用内存基线；普通 get/set 或重读
         // 无法保障跨上下文原子性，不能自动发出可能覆盖较新快照的写入。
         initialized = true;
-        if (!backupState || storedChangeRevision === initialRevision) setBackupState(baseline, false);
+        if (!backupState || storedChangeRevision === initialRevision) setBackupState(baseline);
     } catch (error) {
         initialized = true;
-        if (!backupState) setBackupState(createBaselineConfigAutoBackups(config), false);
+        if (!backupState) setBackupState(createBaselineConfigAutoBackups(config));
         console.error('[FluentRead] 自动配置备份初始读取失败，保留可用备份状态', error);
     }
 }

@@ -133,6 +133,21 @@ class TranslationCache {
   private limits = normalizeTranslationCacheLimits(undefined);
   private clearEpoch = 0;
   private contentRevision = 0;
+  private pruneRevision = 0;
+  private readonly keyRevisions = new Map<string, number>();
+
+  private bumpKeyRevision(key: string): void {
+    this.keyRevisions.delete(key);
+    this.keyRevisions.set(key, this.contentRevision);
+    if (this.keyRevisions.size > 512) {
+      this.keyRevisions.clear();
+      this.pruneRevision += 1;
+    }
+  }
+
+  private getKeyRevision(key: string): number {
+    return this.keyRevisions.get(key) ?? 0;
+  }
 
   private remember(record: TranslationCacheRecord): void {
     this.memory.delete(record.key);
@@ -159,6 +174,7 @@ class TranslationCache {
     if (keys.length === 0) return;
     await translationCacheDb.entries.bulkDelete(keys);
     this.contentRevision += 1;
+    this.pruneRevision += 1;
     keys.forEach((key) => this.memory.delete(key));
     totals.entries -= keys.length;
   }
@@ -251,7 +267,8 @@ class TranslationCache {
 
   async get(key: string, now = Date.now()): Promise<string | null> {
     const epoch = this.clearEpoch;
-    const revision = this.contentRevision;
+    const pruneRevision = this.pruneRevision;
+    const keyRevision = this.getKeyRevision(key);
     const memoryRecord = this.memory.get(key);
     if (memoryRecord) {
       if (isExpired(memoryRecord, now)) {
@@ -267,7 +284,8 @@ class TranslationCache {
 
     try {
       const record = await translationCacheDb.entries.get(key);
-      if (epoch !== this.clearEpoch || revision !== this.contentRevision || !record) return null;
+      if (epoch !== this.clearEpoch || pruneRevision !== this.pruneRevision
+        || this.getKeyRevision(key) !== keyRevision || !record) return null;
       if (isExpired(record, now)) {
         await this.removeExpired(key, now, epoch);
         return null;
@@ -303,6 +321,7 @@ class TranslationCache {
         if (!previous) totals.entries += 1;
         await translationCacheDb.entries.put(record);
         this.contentRevision += 1;
+        this.bumpKeyRevision(key);
         // 新值提交后若被其他写入推进修订号而跳过晋升，也不能留下同 key 的旧热值。
         this.memory.delete(key);
         const removed = await this.prune(totals, now);
@@ -342,7 +361,7 @@ class TranslationCache {
   async getMany(keys: readonly string[], now = Date.now()): Promise<Array<string | null>> {
     if (keys.length === 0) return [];
     const epoch = this.clearEpoch;
-    const revision = this.contentRevision;
+    const pruneRevision = this.pruneRevision;
     const results = new Array<string | null>(keys.length).fill(null);
     const missedByKey = new Map<string, number[]>();
     const expiredMemoryKeys: string[] = [];
@@ -377,10 +396,13 @@ class TranslationCache {
 
     try {
       const missedKeys = [...missedByKey.keys()];
+      const keyRevisions = missedKeys.map((key) => this.getKeyRevision(key));
       const records = await translationCacheDb.entries.bulkGet(missedKeys);
-      if (epoch !== this.clearEpoch || revision !== this.contentRevision) return results;
+      if (epoch !== this.clearEpoch || pruneRevision !== this.pruneRevision) return results;
       const expiredDbKeys: string[] = [];
       for (let index = 0; index < missedKeys.length; index += 1) {
+        const key = missedKeys[index]!;
+        if (this.getKeyRevision(key) !== keyRevisions[index]) continue;
         const record = records[index];
         if (!record) continue;
         if (isExpired(record, now)) {
@@ -388,7 +410,7 @@ class TranslationCache {
           continue;
         }
         this.touch(record, now);
-        for (const slot of missedByKey.get(missedKeys[index]!)!) {
+        for (const slot of missedByKey.get(key)!) {
           results[slot] = record.translation;
         }
       }
@@ -444,7 +466,10 @@ class TranslationCache {
         }
         await translationCacheDb.entries.bulkPut(records);
         this.contentRevision += 1;
-        for (const key of keys) this.memory.delete(key);
+        for (const key of keys) {
+          this.bumpKeyRevision(key);
+          this.memory.delete(key);
+        }
         const removed = await this.prune(totals, now);
         await translationCacheDb.totals.put(totals);
         persistedRecords = records.filter((record) => !removed.has(record.key));
@@ -480,6 +505,8 @@ class TranslationCache {
   async clear(): Promise<void> {
     this.clearEpoch += 1;
     this.contentRevision += 1;
+    this.pruneRevision += 1;
+    this.keyRevisions.clear();
     this.memory.clear();
     this.pendingTouches.clear();
     clearTimeout(this.touchFlushTimer);

@@ -79,7 +79,7 @@ function renderLiveText(
         node,
         getCurrentTranslationCore(scope).shouldStayOriginal,
         getTranslationStateProtectionBoundary(node, state),
-        getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node),
+        getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node, scope),
     );
     // 正常路径的会话范围已冻结；同一次同步提交直接复用完整槽快照，避免再遍历一次
     // 宿主和全部祖先。范围不一致的兼容调用仍分别校验，不能扩大可写入的文本集合。

@@ -73,7 +73,7 @@ vi.mock('@/src/app/content/features', async () => {
         'autoTranslateEnglishPage', 'cancelPendingHoverTranslation', 'handleTranslation', 'noteBilingualHostGesture',
         'inputBoxTranslationConfigKey', 'isAreaTranslatorMounted', 'isFullPageTranslationActive',
         'mountAreaTranslator', 'startAreaTranslationFromContextMenu', 'mountFloatingBall', 'mountImageTranslator', 'mountSelectionTranslator',
-        'isImageTranslatorNeeded', 'isMangaReaderPage', 'mountMangaEntry', 'setMangaPeekOriginal', 'unmountMangaEntry',
+        'isImageTranslatorNeeded', 'isImageTranslatorMounted', 'isMangaReaderPage', 'mountMangaEntry', 'setMangaPeekOriginal', 'unmountMangaEntry',
         'mountTranslationProgressPanel', 'mountVideoSubtitleTranslation', 'isSupportedVideoPage',
         'mountParagraphCopyContentFeature', 'mountSectionTranslationContentFeature',
         'readVisibleTranslationRoot',
@@ -906,6 +906,8 @@ describe('content composition root 冷启动与暂停恢复', () => {
         for (const [mount, unmount, id] of rows) {vi.mocked(mount).mockImplementation((() => {hosts.add(id);}) as never);vi.mocked(unmount).mockImplementation(() => {hosts.delete(id);});}
         let areaMounted = false;vi.mocked(features.mountAreaTranslator).mockImplementation((() => {areaMounted = true;}) as never);
         vi.mocked(features.unmountAreaTranslator).mockImplementation(() => {areaMounted = false;});vi.mocked(features.isAreaTranslatorMounted).mockImplementation(() => areaMounted);
+        let imageMounted = false;vi.mocked(features.mountImageTranslator).mockImplementation((() => {imageMounted = true;}) as never);
+        vi.mocked(features.unmountImageTranslator).mockImplementation(() => {imageMounted = false;});vi.mocked(features.isImageTranslatorMounted).mockImplementation(() => imageMounted);
         vi.mocked(features.isImageTranslatorNeeded).mockReturnValue(true);vi.mocked(features.isMangaReaderPage).mockReturnValue(true);
         Object.assign(mocks.config, {disableFloatingBall: false, disableSelectionTranslator: false, disableImageTranslator: false, selectionAreaEnabled: true, translationProgressPanelEnabled: true, imageTranslationMangaEnabled: true});
         const failure = new Error('Selection surface temporarily unavailable');vi.mocked(features.mountSelectionTranslator).mockImplementationOnce(() => {throw failure;});

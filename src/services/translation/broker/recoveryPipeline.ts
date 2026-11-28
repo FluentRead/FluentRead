@@ -456,6 +456,7 @@ export function createBrokerRecoveryPipeline(options: BrokerRecoveryPipelineOpti
                     origin: nativeBatch ? [...nativeOrigins] : message.origin,
                     context: startWithoutPageContext ? '' : context,
                     pageContext: startWithoutPageContext ? '' : pageContext,
+                    ...(startWithoutPageContext ? {subtitleContext: undefined} : {}),
                 }, requestDeadline, now),
             );
             results = nativeBatch ? validateNativeBatchResults(nativeOrigins, result)

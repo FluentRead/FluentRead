@@ -606,27 +606,18 @@ import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import { computed, defineAsyncComponent, nextTick, ref, shallowRef, watch, onActivated, onBeforeUnmount, onDeactivated, onUnmounted } from 'vue'
 
 import {isValidAzureEndpoint} from '@/src/core/config/azure';
-import { cloudRegionOptions, customModelString, defaultOption, getCloudCredentialLabels, getDefaultCloudRegion, getMultilingualTargetLanguageLabel, options, resolveConfiguredModel, services, servicesType } from '@/src/core/config/catalog';
+import { getMultilingualTargetLanguageLabel, options, resolveConfiguredModel, services } from '@/src/core/config/catalog';
 import GlossaryLibrarySelect from '@/src/ui/components/GlossaryLibrarySelect.vue';
 import {
-  createNextCustomOpenAIProviderId,
   getCustomOpenAIProvider,
   isCustomOpenAIProviderId,
-  LEGACY_CUSTOM_OPENAI_PROVIDER_ID,
   MAX_CUSTOM_OPENAI_MODEL_LENGTH,
   MAX_CUSTOM_OPENAI_MODELS_PER_PROVIDER,
-  normalizeCustomOpenAIModels,
-  normalizeCustomOpenAIProviders,
-  removeCustomOpenAIProvider,
   withCustomOpenAIServiceOptions,
-  type CustomOpenAIProvider,
 } from '@/src/core/config/customOpenAI';
-import {createNextCompositeTranslationProviderId, getCompositeTranslationProvider, isCompositeTranslationProviderId, normalizeCompositeTranslationProviders, removeCompositeTranslationProvider, withCompositeTranslationServiceOptions, type CompositeTranslationProvider} from '@/src/core/config/compositeTranslation';
-import {
-  withModelThinkingPreference,
-} from '@/src/core/config/modelThinking';
+import {getCompositeTranslationProvider, isCompositeTranslationProviderId, withCompositeTranslationServiceOptions} from '@/src/core/config/compositeTranslation';
 import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation';
-import {useServiceModelOptions} from './services/modelOptions';
+import {useServiceCatalogActions} from './useServiceCatalogActions';
 import {
   Config,
   MOUSE_HOVER_TRANSLATION_DELAY_MAX,
@@ -709,11 +700,6 @@ import type {OfficialSiteRuleRelease} from '@/src/core/site-adaptation/officialR
 import {
   officialSiteRuleUpdatesEnabled, readOfficialSiteRuleRelease, refreshOfficialSiteRuleRelease,
 } from '@/src/services/site-adaptation/officialClient';
-import {
-  getApiKeyRequirementKey,
-  getMissingCredentialMessage,
-  isApiKeyRequired,
-} from '@/src/core/config/validation';
 const ImageOcrSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/image-translation/ui/public').then(module => module.ImageOcrSettings));
 const MangaSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('@/src/features/image-translation/ui/public').then(module => module.MangaSettings));
 const VideoLocalModelSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./VideoLocalModelSettings.vue'));
@@ -751,7 +737,6 @@ const PrivacyProtectionSettings = defineAsyncComponent(() => import('./PrivacyPr
 import {useTranslationShortcutSettings} from './useTranslationShortcutSettings';
 import {useSettingsActionContext} from '../model/useSettingsActionContext';
 import {useConfigEditor} from '../model/useConfigEditor';
-import {removeConfiguredModel} from '@/src/core/config/modelEditing';
 import {
   config as runtimeConfig,
   configReady,
@@ -764,7 +749,7 @@ import {
   getTranslationServiceUnavailableMessage,
   supportsTranslationGlossary,
 } from '@/src/services/translation/capabilities';
-import {markDisabledTranslationServices, normalizeDisabledTranslationServices} from '@/src/core/config/serviceAvailability';
+import {markDisabledTranslationServices} from '@/src/core/config/serviceAvailability';
 import {chatGPTPlanDevelopmentEnabled} from '@/src/platform/chatgpt-plan/buildMode';
 
 const props = withDefaults(defineProps<{
@@ -1036,107 +1021,44 @@ const catalogServiceOptions = computed(() => {
     : available.has(option.value) ? [option] : []);
 });
 const availableServiceOptions = computed(() => markDisabledTranslationServices(platformAvailableServiceOptions.value, config.value.disabledTranslationServices));
-// 显式设为默认沿用通用设置的配置补丁链；目录浏览本身只改变编辑目标。
-const setDefaultConfigurationService = (value: string) => {
-  if (!viewActive.value || props.activeSection !== 'settings-services'
-    || (value === services.chatgptPlan && !chatGPTPlanDevelopmentEnabled)
-    || value !== selectedConfigurationService.value
-    || !availableServiceOptions.value.some(item => item.value === value && !item.disabled)) return;
-  config.value.service = value;
-};
-const manageableServiceOptions = computed(() => platformAvailableServiceOptions.value
-  .filter(item => !item.disabled && item.value !== 'machine' && item.value !== 'ai'));
-const removedServiceOptions = computed(() => {
-  const disabled = new Set(normalizeDisabledTranslationServices(config.value.disabledTranslationServices));
-  return manageableServiceOptions.value.filter(item => disabled.has(item.value));
-});
-function resolveServiceAvailabilityChange(service: string, enabled: boolean) {
-  const serviceOptions = manageableServiceOptions.value;
-  const item = serviceOptions.find(option => option.value === service);
-  const disabled = new Set(normalizeDisabledTranslationServices(config.value.disabledTranslationServices));
-  if (!item || disabled.has(service) === !enabled) return;
-  if (enabled) disabled.delete(service);
-  else disabled.add(service);
-  const fallback = serviceOptions.find(option => !disabled.has(option.value));
-  if (!fallback) return;
-  const replacement = disabled.has(config.value.service) ? fallback : undefined;
-  return {item, disabled, replacement};
-}
-const serviceAvailabilityContext = useSettingsActionContext(
-  () => viewActive.value && props.activeSection === 'settings-services' && (!props.activePanel || props.activePanel === 'connections'),
-  () => [config.value, selectedConfigurationService.value],
-);
-const pendingServiceAvailability = shallowRef<(Pick<NonNullable<ReturnType<typeof resolveServiceAvailabilityChange>>, 'item' | 'replacement'> & {
-  current: () => boolean;
-}) | null>(null);
-function requestServiceRemoval(service: string, enabled: boolean): void {
-  if (!serviceAvailabilityContext.active.value || pendingServiceAvailability.value || enabled !== false) return;
-  const change = resolveServiceAvailabilityChange(service, false);
-  if (change) {
-    const {item, replacement} = change;
-    pendingServiceAvailability.value = {item, replacement, current: serviceAvailabilityContext.capture()};
-  }
-}
-const currentServiceAvailabilityChange = computed(() => {
-  const request = pendingServiceAvailability.value;
-  if (!request?.current()) return;
-  const change = resolveServiceAvailabilityChange(request.item.value, false);
-  if (change?.item === request.item && change.replacement === request.replacement) return change;
-});
-watch(currentServiceAvailabilityChange, change => {
-  if (!change) pendingServiceAvailability.value = null;
-}, {flush: 'sync'});
-const serviceAvailabilityActions = computed(() => {
-  const request = pendingServiceAvailability.value;
-  const cancel = () => {
-    if (request === pendingServiceAvailability.value) pendingServiceAvailability.value = null;
-  };
-  const confirm = () => {
-    if (!request || request !== pendingServiceAvailability.value) return;
-    const change = currentServiceAvailabilityChange.value;
-    cancel();
-    if (!change) return;
-    applyServiceAvailabilityChange(change);
-  };
-  return {
-    cancel,
-    update: (open: boolean) => {if (!open) cancel();},
-    confirm,
-    handleEnter: (event: KeyboardEvent) => {
-      if (event.repeat || event.isComposing) {
-        event.preventDefault();
-        return;
-      }
-      // Element Plus 将初始焦点放在弹窗容器。焦点移到按钮后，由按钮处理回车。
-      if (event.target === event.currentTarget) {
-        event.preventDefault();
-        confirm();
-      }
-    },
-  };
-});
-function applyServiceAvailabilityChange(change: NonNullable<ReturnType<typeof resolveServiceAvailabilityChange>>): void {
-  updateConfigAtomically(draft => {
-    draft.disabledTranslationServices = [...change.disabled];
-    if (change.replacement) draft.service = change.replacement.value;
-  });
-}
-function restoreService(service: string): void {
-  if (!serviceAvailabilityContext.active.value) return;
-  const change = resolveServiceAvailabilityChange(service, true);
-  if (change) applyServiceAvailabilityChange(change);
-}
-// 目录中的机器 / AI 标记只用于分组，不再作为不可选择的菜单选项。
-const textServiceGroups = computed(() => {
-  const groups: {value: string; label: string; options: typeof availableServiceOptions.value}[] = [];
-  for (const item of availableServiceOptions.value) {
-    if (item.value === 'machine' || item.value === 'ai') {
-      groups.push({value: item.value, label: item.label, options: []});
-    } else {
-      groups.at(-1)?.options.push(item);
-    }
-  }
-  return groups.filter(group => group.options.length > 0);
+const {
+  updateConfigAtomically,
+  setDefaultConfigurationService,
+  removedServiceOptions,
+  serviceAvailabilityContext,
+  pendingServiceAvailability,
+  requestServiceRemoval,
+  serviceAvailabilityActions,
+  restoreService,
+  textServiceGroups,
+  selectedConfigurationCustomModelCount,
+  configurationModelOptions,
+  selectedCustomProvider,
+  selectedConfigurationModel,
+  selectedConfigurationModelThinking,
+  openCustomProviderDialog,
+  createCompositeProvider,
+  deleteSelectedCompositeProvider,
+  createCustomProvider,
+  updateSelectedCustomProvider,
+  deleteSelectedCustomProvider,
+  selectConfigurationModel,
+  updateSelectedConfigurationModelThinking,
+  addConfigurationModel,
+  removeConfigurationModel,
+  configurationCompute,
+} = useServiceCatalogActions({
+  config,
+  configurationService,
+  selectedConfigurationService,
+  platformAvailableServiceOptions,
+  availableServiceOptions,
+  viewActive,
+  activeSection: () => props.activeSection,
+  activePanel: () => props.activePanel,
+  isDisposed: () => disposed,
+  customProviderDialogOpen,
+  customProviderDialogRequested,
 });
 const defaultTextServiceLabel = computed(() => (
   serviceOptionsWithCustomProviders.value.find((item: any) => item.value === config.value.service)?.label || config.value.service
@@ -1171,225 +1093,9 @@ const selectionTranslatorModeOptions = [
   {value: 'translation-only', label: '仅译文'},
 ];
 
-interface CustomProviderDraft {
-  name: string
-  endpoint: string
-  apiKey: string
-  model: string
-}
-
-/**
- * 需要同时改变 profile 与其模型/凭据映射的操作必须只发布一个完整快照。
- * 全局配置监听使用 flush: sync；逐字段修改会让中间态先被 normalize 后回灌，
- * 既产生多条历史，也可能把刚删除的当前模型重新补回列表。
- */
 function setAIMultiSegmentLimits(limits: AiMultiSegmentLimits): void {
   updateConfigAtomically(draft => Object.assign(draft, limits));
 }
-
-function updateConfigAtomically(update: (draft: Config) => void): void {
-  const draft = normalizeConfig(config.value);
-  update(draft);
-  config.value = normalizeConfig(draft);
-}
-
-const {
-  builtInModels: builtInConfigurationModels,
-  customModelCount: selectedConfigurationCustomModelCount,
-  modelOptions: configurationModelOptions,
-  selectedCustomProvider,
-  selectedModel: selectedConfigurationModel,
-  selectedModelThinking: selectedConfigurationModelThinking,
-} = useServiceModelOptions(config, selectedConfigurationService);
-
-function openCustomProviderDialog(): void {
-  if (disposed || !serviceAvailabilityContext.active.value) return;
-  customProviderDialogRequested.value = true;
-  customProviderDialogOpen.value = true;
-}
-
-function createCompositeProvider(draft: Omit<CompositeTranslationProvider, 'id'>): void {
-  if (disposed || !viewActive.value || props.activeSection !== 'settings-services') return;
-  const id = createNextCompositeTranslationProviderId(config.value.compositeTranslationProviders);
-  updateConfigAtomically((next) => {
-    next.compositeTranslationProviders = normalizeCompositeTranslationProviders([
-      ...next.compositeTranslationProviders, {...draft, id},
-    ], next.customOpenAIProviders);
-  });
-  configurationService.value = id;
-  ElMessage({message: '组合翻译已添加', type: 'success', grouping: true, duration: 1800});
-}
-
-function deleteSelectedCompositeProvider(service: string): void {
-  if (disposed || !viewActive.value || props.activeSection !== 'settings-services'
-    || service !== selectedConfigurationService.value
-    || !getCompositeTranslationProvider(config.value.compositeTranslationProviders, service)) return;
-  updateConfigAtomically((next) => {
-    next.compositeTranslationProviders = removeCompositeTranslationProvider(next.compositeTranslationProviders, service);
-    // 归一化负责清理各功能、快捷方案与常用列表中的失效组合选择。
-    if (next.service === service) next.service = defaultOption.service;
-  });
-  configurationService.value = config.value.service;
-  ElMessage({message: '组合翻译已删除', type: 'success', grouping: true, duration: 1800});
-}
-
-function createCustomProvider(draft: CustomProviderDraft): void {
-  if (disposed || !viewActive.value || props.activeSection !== 'settings-services') return;
-  const id = createNextCustomOpenAIProviderId(config.value.customOpenAIProviders);
-  const provider: CustomOpenAIProvider = {
-    id,
-    name: draft.name,
-    endpoint: draft.endpoint,
-    models: [draft.model],
-  };
-  updateConfigAtomically((next) => {
-    next.customOpenAIProviders = normalizeCustomOpenAIProviders([
-      ...next.customOpenAIProviders,
-      provider,
-    ]);
-    next.model[id] = draft.model;
-    next.documentModel[id] = draft.model;
-    next.system_role[id] = defaultOption.system_role;
-    next.user_role[id] = defaultOption.user_role;
-    if (draft.apiKey) next.token[id] = draft.apiKey;
-    next.modelThinking = withModelThinkingPreference(next.modelThinking, id, draft.model, false);
-  });
-  configurationService.value = id;
-  ElMessage({message: '自定义服务已添加', type: 'success', grouping: true, duration: 1800});
-}
-
-function updateSelectedCustomProvider(patch: Partial<Pick<CustomOpenAIProvider, 'name' | 'endpoint'>>): void {
-  const service = selectedConfigurationService.value;
-  config.value.customOpenAIProviders = config.value.customOpenAIProviders.map((provider) => (
-    provider.id === service ? {...provider, ...patch} : provider
-  ));
-}
-
-function deleteSelectedCustomProvider(): void {
-  const service = selectedConfigurationService.value;
-  if (!getCustomOpenAIProvider(config.value.customOpenAIProviders, service)) return;
-  updateConfigAtomically((next) => {
-    next.customOpenAIProviders = removeCustomOpenAIProvider(next.customOpenAIProviders, service);
-    for (const mapping of [
-      next.token,
-      next.model,
-      next.documentModel,
-      next.customModel,
-      next.customModels,
-      next.modelThinking,
-      next.documentCustomModel,
-      next.proxy,
-      next.system_role,
-      next.user_role,
-      next.customBody,
-      next.customHeaders,
-    ]) delete mapping[service];
-    // normalizeConfig 会根据删除后的 profile 列表精确保留仍可达的鉴权键。
-    // 不能用 `${service}:` 做前缀删除：旧 ID `custom` 也是新 ID
-    // `custom:*` 的前缀，会误删其他自定义服务的免 Key 偏好。
-    if (next.service === service) next.service = defaultOption.service;
-    if (next.documentService === service) next.documentService = '';
-    if (next.videoService === service) next.videoService = '';
-    next.translationCenterServices = next.translationCenterServices.filter((item) => item !== service);
-    if (service === LEGACY_CUSTOM_OPENAI_PROVIDER_ID) next.custom = defaultOption.custom;
-  });
-  configurationService.value = config.value.service;
-  ElMessage({message: '自定义服务已删除', type: 'success', grouping: true, duration: 1800});
-}
-
-function selectConfigurationModel(model: string): void {
-  const service = selectedConfigurationService.value;
-  if (selectedCustomProvider.value) {
-    config.value.model[service] = model;
-    return;
-  }
-  if (builtInConfigurationModels.value.includes(model)) {
-    config.value.model[service] = model;
-    return;
-  }
-  updateConfigAtomically((next) => {
-    next.customModel[service] = model;
-    next.model[service] = customModelString;
-  });
-}
-
-function updateSelectedConfigurationModelThinking(enabled: boolean): void {
-  const service = selectedConfigurationService.value;
-  const model = selectedConfigurationModel.value;
-  if (!model) return;
-  config.value.modelThinking = withModelThinkingPreference(
-    config.value.modelThinking,
-    service,
-    model,
-    enabled,
-  );
-}
-
-function addConfigurationModel(model: string): void {
-  const service = selectedConfigurationService.value;
-  const provider = selectedCustomProvider.value;
-  if (provider) {
-    updateConfigAtomically((next) => {
-      next.customOpenAIProviders = normalizeCustomOpenAIProviders(
-        next.customOpenAIProviders.map((item) => item.id === service
-          ? {...item, models: [...item.models, model]}
-          : item),
-      );
-      next.model[service] = model;
-      next.modelThinking = withModelThinkingPreference(next.modelThinking, service, model, false);
-    });
-    return;
-  }
-  updateConfigAtomically((next) => {
-    next.customModels[service] = normalizeCustomOpenAIModels([
-      ...(next.customModels[service] || []),
-      model,
-    ]);
-    next.customModel[service] = model;
-    next.model[service] = customModelString;
-    next.modelThinking = withModelThinkingPreference(next.modelThinking, service, model, false);
-  });
-}
-
-function removeConfigurationModel(model: string): void {
-  updateConfigAtomically(next => removeConfiguredModel(
-    next, selectedConfigurationService.value, model, builtInConfigurationModels.value[0] || '',
-  ));
-}
-
-// 右侧表单只派生当前编辑服务；默认翻译服务仍由 config.service 独立管理。
-const configurationCompute = ref({
-  showAI: computed(() => (selectedConfigurationService.value !== services.chatgptPlan || chatGPTPlanDevelopmentEnabled) && (isCustomOpenAIProviderId(selectedConfigurationService.value) || servicesType.isAI(selectedConfigurationService.value))),
-  showProxy: computed(() => isCustomOpenAIProviderId(selectedConfigurationService.value) || servicesType.isUseProxy(selectedConfigurationService.value)),
-  showModel: computed(() => selectedConfigurationService.value !== services.chatgptPlan && (isCustomOpenAIProviderId(selectedConfigurationService.value) || servicesType.isUseModel(selectedConfigurationService.value))),
-  showCustomBody: computed(() => isCustomOpenAIProviderId(selectedConfigurationService.value) || servicesType.isUseCustomBody(selectedConfigurationService.value)),
-  showToken: computed(() => isCustomOpenAIProviderId(selectedConfigurationService.value) || servicesType.isUseToken(selectedConfigurationService.value)),
-  allowCustomModels: computed(() => selectedConfigurationService.value !== services.localTranslation),
-  requireApiKey: computed({
-    get: () => isApiKeyRequired(selectedConfigurationService.value, config.value),
-    set: (value: boolean) => {
-      config.value.requireApiKey[getApiKeyRequirementKey(selectedConfigurationService.value, config.value)] = value;
-    },
-  }),
-  credentialWarning: computed(() => getMissingCredentialMessage(selectedConfigurationService.value, config.value)),
-  showYoudao: computed(() => servicesType.isYoudao(selectedConfigurationService.value)),
-  showTencent: computed(() => servicesType.isTencent(selectedConfigurationService.value)),
-  // 云服务厂商：主密钥沿用 token[service]，第二段密钥与地域分别来自 secret/serviceRegion。
-  showCloudVendor: computed(() => servicesType.isCloudVendor(selectedConfigurationService.value)),
-  showServiceSecret: computed(() => servicesType.isUseSecret(selectedConfigurationService.value)),
-  showServiceRegion: computed(() => servicesType.isUseRegion(selectedConfigurationService.value)),
-  cloudCredentialLabels: computed(() => getCloudCredentialLabels(selectedConfigurationService.value)),
-  cloudRegionOptions: computed(() => cloudRegionOptions[selectedConfigurationService.value] || []),
-  defaultCloudRegion: computed(() => getDefaultCloudRegion(selectedConfigurationService.value)),
-  showOllamaEndpoint: computed(() => selectedConfigurationService.value === services.ollama),
-  showCustomOpenAI: computed(() => Boolean(getCustomOpenAIProvider(config.value.customOpenAIProviders, selectedConfigurationService.value))),
-  showDeepLX: computed(() => selectedConfigurationService.value === 'deeplx'),
-  showMiniMaxRegion: computed(() => selectedConfigurationService.value === services.minimax),
-  showMiMoRegion: computed(() => selectedConfigurationService.value === services.mimo),
-  showNewAPI: computed(() => servicesType.isNewApi(selectedConfigurationService.value)),
-  showAzureOpenaiEndpoint: computed(() => servicesType.isAzureOpenai(selectedConfigurationService.value)),
-  showDeepseekApiType: computed(() => selectedConfigurationService.value === 'deepseek'),
-});
 
 // 监听主题变化
 watch(() => config.value.theme, (newTheme) => {
@@ -1472,7 +1178,7 @@ const handleTranslationProgressPanelChange = (_isEnabled: boolean) => {
 watch(() => config.value.selectionTranslatorMode, (newMode) => {
   config.value.disableSelectionTranslator = newMode === 'disabled';
   broadcastFeatureState(['updateSelectionTranslatorMode']);
-});
+}, {flush: 'sync'});
 const handlePluginStateChange = (_isEnabled: boolean) => {
   // 总开关只控制当前运行状态，不覆盖各功能的已保存偏好。
   broadcastFeatureState(['toggleFloatingBall', 'updateSelectionTranslatorMode', 'toggleSelectionAreaTranslator']);

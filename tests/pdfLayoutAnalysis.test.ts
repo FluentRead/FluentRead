@@ -2295,11 +2295,22 @@ describe('display-operator baseline ownership beside prose', () => {
         const sourcePath = fileURLToPath(new URL('../src/features/document-translation/core/pdfLayoutAnalysis.ts', import.meta.url));
         const typescriptPath = createRequire(import.meta.url).resolve('typescript');
         const program = `
-const fs = require('node:fs'), crypto = require('node:crypto'), ts = require(${JSON.stringify(typescriptPath)});
-const source = fs.readFileSync(${JSON.stringify(sourcePath)}, 'utf8'), exportsPort = {};
-const dependencySource = fs.readFileSync(require('node:path').join(require('node:path').dirname(${JSON.stringify(sourcePath)}), 'pdfBorderlessTable.ts'), 'utf8'), dependencyExports = {};
-new Function('exports', ts.transpileModule(dependencySource, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(dependencyExports);
-new Function('require', 'exports', ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(id => {if (id === './pdfBorderlessTable') return dependencyExports; throw new Error('Unexpected import: ' + id);}, exportsPort);
+const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), ts = require(${JSON.stringify(typescriptPath)});
+const dir = path.dirname(${JSON.stringify(sourcePath)}), cache = new Map();
+function loadLocal(filePath) {
+    if (cache.has(filePath)) return cache.get(filePath);
+    const mod = {};
+    cache.set(filePath, mod);
+    const code = fs.readFileSync(filePath, 'utf8');
+    const js = ts.transpileModule(code, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+    new Function('require', 'exports', js)(id => {
+        if (!id.startsWith('./')) throw new Error('Unexpected import: ' + id);
+        return loadLocal(path.join(dir, id.slice(2) + '.ts'));
+    }, mod);
+    return mod;
+}
+const source = fs.readFileSync(${JSON.stringify(sourcePath)}, 'utf8');
+const exportsPort = loadLocal(${JSON.stringify(sourcePath)});
 console.log('loaded-before-call:' + crypto.createHash('sha256').update(source).digest('hex'));
 const cases = ${JSON.stringify(cases)}, before = JSON.stringify(cases);
 const results = cases.map(atoms => exportsPort.pdfLayoutLines(atoms));

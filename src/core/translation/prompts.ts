@@ -39,6 +39,8 @@ function normalizeLeakComparable(value: string): string {
     return value.normalize('NFKC').toLocaleLowerCase().replace(/\s+/gu, ' ').trim();
 }
 
+const NORMALIZED_PAGE_CONTEXT_LEAK_MARKERS = PAGE_CONTEXT_LEAK_MARKERS.map(normalizeLeakComparable);
+
 function contextOnlyAsciiTokens(context: string, origin: string): string[] {
     const originTokens = new Set(
         (origin.match(/[a-z][a-z0-9_.:/#-]{4,}/giu) ?? []).map((token) => token.toLocaleLowerCase()),
@@ -142,20 +144,36 @@ function hasExtremeShortSourceExpansion(origin: string, result: string): boolean
  * 参考正文被翻译成另一语言的漏检；这只触发一次无上下文复验。长段被上下文替换且未膨胀时，再检测
  * 原文没有的连续片段是否覆盖了大部分译文；该信号只用于一次无上下文重译。
  */
+function isDefiniteNormalizedPageContextLeak(
+    normalizedOrigin: string,
+    normalizedResult: string,
+    normalizedContext: string,
+): boolean {
+    if (NORMALIZED_PAGE_CONTEXT_LEAK_MARKERS.some((normalizedMarker) =>
+        normalizedResult.includes(normalizedMarker) && !normalizedOrigin.includes(normalizedMarker))) return true;
+
+    if (normalizedContext.length >= 80
+        && normalizedResult.includes(normalizedContext)
+        && !normalizedOrigin.includes(normalizedContext)) return true;
+    return false;
+}
+
 export function isLikelyPageContextLeak(origin: string, result: string, pageContext: string): boolean {
     const normalizedContext = normalizeLeakComparable(pageContext);
     const normalizedResult = normalizeLeakComparable(result);
     if (!normalizedContext || !normalizedResult) return false;
 
     const normalizedOrigin = normalizeLeakComparable(origin);
-    if (isDefinitePageContextLeak(origin, result, pageContext)) return true;
+    if (isDefiniteNormalizedPageContextLeak(normalizedOrigin, normalizedResult, normalizedContext)) return true;
     if (hasExtremeShortSourceExpansion(normalizedOrigin, normalizedResult)) return true;
 
-    const leakedTokens = contextOnlyAsciiTokens(pageContext, origin)
-        .filter((token) => normalizedResult.includes(token));
     const resultExpandedBeyondSource = normalizedResult.length
         >= Math.max(normalizedOrigin.length * 2.5, normalizedOrigin.length + 60);
-    if (resultExpandedBeyondSource && leakedTokens.length >= 3) return true;
+    if (resultExpandedBeyondSource) {
+        const leakedTokens = contextOnlyAsciiTokens(pageContext, origin)
+            .filter((token) => normalizedResult.includes(token));
+        if (leakedTokens.length >= 3) return true;
+    }
 
     const cjkResultExpandedBeyondSource = normalizedResult.length
         >= Math.max(normalizedOrigin.length * 2, normalizedOrigin.length + 12);
@@ -171,15 +189,7 @@ export function isDefinitePageContextLeak(origin: string, result: string, pageCo
     if (!normalizedContext || !normalizedResult) return false;
 
     const normalizedOrigin = normalizeLeakComparable(origin);
-    if (PAGE_CONTEXT_LEAK_MARKERS.some((marker) => {
-        const normalizedMarker = normalizeLeakComparable(marker);
-        return normalizedResult.includes(normalizedMarker) && !normalizedOrigin.includes(normalizedMarker);
-    })) return true;
-
-    if (normalizedContext.length >= 80
-        && normalizedResult.includes(normalizedContext)
-        && !normalizedOrigin.includes(normalizedContext)) return true;
-    return false;
+    return isDefiniteNormalizedPageContextLeak(normalizedOrigin, normalizedResult, normalizedContext);
 }
 
 /** 去除模型可能泄漏到译文中的思考标签，避免把推理过程渲染进页面。 */

@@ -31,7 +31,7 @@ export function syncTranslationDisplayMode(node: HTMLElement, state: Translation
         !isTranslationArtifactCurrent(node, state)) return false;
     const core = getCurrentTranslationCore(state.scope);
     const boundary = getTranslationStateProtectionBoundary(node, state);
-    const protection = getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node);
+    const protection = getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node, state.scope);
     const parts = collectLiveTranslationTextSlots(node, core.shouldStayOriginal, boundary, {
         ...protection,
         sourceTextSlotHosts: new Set((state.singleTextSlotHosts || []).map(({host}) => host)),

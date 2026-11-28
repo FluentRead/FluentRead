@@ -231,6 +231,8 @@ function parseConfigPersistenceMessage(
 }
 
 /** 创建配置持久化 handler；队列状态封装在 handler 实例内，避免 background 暴露全局可变状态。 */
+const MAX_CLIENT_SEQUENCE_ENTRIES = 512;
+
 export function createConfigPersistenceHandler<TConfig>(
     dependencies: ConfigPersistenceDependencies<TConfig>,
 ): BackgroundMessageHandler<ConfigPersistenceContext, ConfigPersistenceMessage, ConfigPersistenceResponse> {
@@ -240,6 +242,17 @@ export function createConfigPersistenceHandler<TConfig>(
     const activeSequenceByClient = new Map<string, {sequence: number; result: Promise<number>}>();
     const localCoordinator = createConfigMutationCoordinator();
     const runMutation = dependencies.runMutation || localCoordinator.run;
+
+    function recordClientSequence(map: Map<string, number>, clientId: string, sequence: number): void {
+        map.delete(clientId);
+        map.set(clientId, sequence);
+        if (map.size <= MAX_CLIENT_SEQUENCE_ENTRIES) return;
+        for (const existingClientId of map.keys()) {
+            if (existingClientId === clientId || activeSequenceByClient.has(existingClientId)) continue;
+            map.delete(existingClientId);
+            if (map.size <= MAX_CLIENT_SEQUENCE_ENTRIES) break;
+        }
+    }
 
     return {
         type: CONFIG_PERSIST_MESSAGE_TYPE,
@@ -260,7 +273,7 @@ export function createConfigPersistenceHandler<TConfig>(
                     return {success: true, revision: await active.result};
                 }
                 if (request.sequence > latestSequence) {
-                    latestSequenceByClient.set(request.clientId, request.sequence);
+                    recordClientSequence(latestSequenceByClient, request.clientId, request.sequence);
                 }
             }
 
@@ -299,7 +312,7 @@ export function createConfigPersistenceHandler<TConfig>(
                         );
                     await dependencies.saveConfig(prepared, {recordHistory: true});
                     if (request.sequence) {
-                        committedSequenceByClient.set(request.clientId, Math.max(
+                        recordClientSequence(committedSequenceByClient, request.clientId, Math.max(
                             committedSequenceByClient.get(request.clientId) || 0,
                             request.sequence,
                         ));

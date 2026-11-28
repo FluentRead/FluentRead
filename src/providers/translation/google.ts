@@ -487,7 +487,7 @@ async function executeGoogleTexts(texts: readonly string[], fromLang: string, to
 }
 
 type PendingGoogleText = {
-    text: string; fromLang: string; toLang: string; signal: AbortSignal; deadlineAt: number;
+    text: string; escapedCharacters: number; fromLang: string; toLang: string; signal: AbortSignal; deadlineAt: number;
     lease?: TranslationRequestLease;
     settled: boolean; resolve: (text: string) => void; reject: (error: unknown) => void;
     removeAbortListener: () => void; cancelBatch?: () => void;
@@ -536,7 +536,7 @@ function flushGoogleTexts(): void {
         if (task.settled) continue;
         const key = JSON.stringify([task.fromLang, task.toLang]);
         let group = groups.get(key);
-        const characters = escapeGoogleText(task.text).length + 11;
+        const characters = task.escapedCharacters;
         if (group && (group.tasks.length >= GOOGLE_BATCH_MAX_ITEMS || group.characters + characters > GOOGLE_BATCH_MAX_CHARACTERS)) {
             dispatchGoogleBatch(group.tasks);
             group = undefined;
@@ -557,16 +557,23 @@ function enqueueGoogleText(
 ): Promise<string> {
     if (signal?.aborted) return Promise.reject(abortErrorFromSignal(signal));
     if (!hasTranslationContent(text)) return Promise.resolve(text);
+    const escapedCharacters = escapeGoogleText(text).length + 11;
     return new Promise((resolve, reject) => {
-        const task: PendingGoogleText = {text, fromLang, toLang, signal, deadlineAt, lease,
+        const task: PendingGoogleText = {text, escapedCharacters, fromLang, toLang, signal, deadlineAt, lease,
             settled: false, resolve, reject, removeAbortListener: subscribeAbort(() => {
                 settleGoogleText(task, abortErrorFromSignal(signal), true);
                 task.cancelBatch?.();
             })};
         pendingTexts.push(task);
-        const matching = pendingTexts.filter(item => item.fromLang === fromLang && item.toLang === toLang);
-        const characters = matching.reduce((total, item) => total + escapeGoogleText(item.text).length + 11, 0);
-        if (matching.length >= GOOGLE_BATCH_MAX_ITEMS || characters >= GOOGLE_BATCH_MAX_CHARACTERS) flushGoogleTexts();
+        let matchingCount = 0;
+        let characters = 0;
+        for (const item of pendingTexts) {
+            if (item.fromLang === fromLang && item.toLang === toLang) {
+                matchingCount += 1;
+                characters += item.escapedCharacters;
+            }
+        }
+        if (matchingCount >= GOOGLE_BATCH_MAX_ITEMS || characters >= GOOGLE_BATCH_MAX_CHARACTERS) flushGoogleTexts();
         else flushTimer ??= setTimeout(flushGoogleTexts, GOOGLE_BATCH_WINDOW_MS);
     });
 }

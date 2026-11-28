@@ -1,23 +1,76 @@
 /**
  * @file src/core/config/diff.ts
  * 文件职责：把两份配置转换为可供预览的结构化差异，同时确保凭据和嵌套敏感内容只显示脱敏摘要。
- * 主要内容：维护设置字段到页面分组及中文标签的映射，按服务展示原生翻译合批开关，在高级设置中以秒展示 AI 翻译超时，格式化枚举、映射和长文本，用迭代比较检查深层对象并对预览深度作安全摘要，生成稳定的分组差异结果。
+ * 主要内容：维护设置字段到页面分组及中文标签的注册表 FIELD_DEFINITIONS，结合 diffLabels 与 diffFormatters 执行字段级和映射级比较，生成稳定排序的分组差异结果。
  * 模块边界：本文件是无浏览器副作用的纯配置算法，不读取存储、不打开确认框也不执行恢复；设置页面只消费其脱敏后的 ConfigDiffResult。
  */
 import {CONFIG_CREDENTIAL_FIELDS, isSensitiveConfigKey, jsonValuesEqual as valuesEqual} from './credentials';
-import {options} from './catalog';
-import {FREE_TRANSLATION_PROVIDERS} from './freeTranslation';
-import {isCustomOpenAIProviderId} from './customOpenAI';
 import {
-    interfaceSkinOptions,
-    interfaceVisibilityOptions,
-    popupModuleOptions,
-    popupQuickFeatureOptions,
-} from './interfaceAppearance';
-import {translationLoadingStyleOptions} from './translationLoadingStyle';
-import {SENTENCE_HIGHLIGHT_STYLES} from './sentenceHighlight';
-import {LOCAL_TTS_MODE_OPTIONS} from './localTts';
+    configRecord,
+    DEPTH_LIMITED_PREVIEW,
+    DEPTH_LIMITED_SUMMARY,
+    formatArray,
+    formatBoolean,
+    formatCompositeTranslationProviders,
+    formatCustomBody,
+    formatCustomOpenAIProviders,
+    formatEnum,
+    formatGlossaryLibraries,
+    formatGlossarySelection,
+    formatInterfaceVisibility,
+    formatNumber,
+    formatPopupModuleOrder,
+    formatPopupQuickFeatureOrder,
+    formatPopupQuickFeatureVisibility,
+    formatPrompt,
+    formatQuickTranslationProfiles,
+    formatRecord,
+    formatRequestRate,
+    formatService,
+    formatString,
+    formatTranslationAppearanceValue,
+    formatValue,
+    isRecord,
+    sanitizeSensitiveValue,
+    type ValueFormatter,
+} from './diffFormatters';
+import {
+    BILLING_PLAN_LABELS,
+    DEEPL_API_PLAN_LABELS,
+    DEEPSEEK_API_LABELS,
+    DEEPSEEK_THINKING_LABELS,
+    DISPLAY_LABELS,
+    EXCLUDED_DIFF_FIELDS,
+    FLOATING_BALL_CLICK_ACTION_LABELS,
+    FLOATING_BALL_TOOLS_DISPLAY_LABELS,
+    FLOATING_HOTKEY_LABELS,
+    FULL_PAGE_MODE_LABELS,
+    HOVER_TRIGGER_LABELS,
+    INPUT_OUTPUT_LABELS,
+    INPUT_TRIGGER_LABELS,
+    INTERFACE_FONT_LABELS,
+    INTERFACE_SKIN_LABELS,
+    LANGUAGE_LABELS,
+    labelsFor,
+    LOCAL_TTS_MODE_LABELS,
+    PARAGRAPH_COPY_CONTENT_LABELS,
+    REGION_LABELS,
+    SELECTION_MODE_LABELS,
+    SELECTION_TRIGGER_LABELS,
+    serviceName,
+    SIDE_LABELS,
+    SIDEPANEL_SCOPE_LABELS,
+    STYLE_LABELS,
+    THEME_LABELS,
+    TRANSLATION_APPEARANCE_FIELD_LABELS,
+    TRANSLATION_LOADING_STYLE_LABELS,
+    TRANSLATION_SCOPE_LABELS,
+    UI_LANGUAGE_LABELS,
+    VIDEO_DISPLAY_MODE_LABELS,
+    VIDEO_SUBTITLE_MODE_HOTKEY_ACTION_LABELS,
+} from './diffLabels';
 import {WORD_DICTIONARY_SOURCE_OPTIONS} from './selectionDictionary';
+import {SENTENCE_HIGHLIGHT_STYLES} from './sentenceHighlight';
 import {parseApiKeyRequirementKey} from './validation';
 
 export const CONFIG_DIFF_GROUPS = [
@@ -53,9 +106,6 @@ export interface ConfigDiffResult {
     groups: ConfigDiffGroup[];
 }
 
-type ConfigRecord = Record<string, unknown>;
-type ValueFormatter = (value: unknown) => string;
-
 interface MappingDefinition {
     itemLabel: (key: string) => string;
     format: ValueFormatter;
@@ -69,31 +119,7 @@ interface FieldDefinition {
     mapping?: MappingDefinition;
 }
 
-type Option = {value: unknown; label: string};
-
-const EXCLUDED_FIELDS = new Set([
-    'count',
-    'persistCredentials',
-    'videoServiceDefaultMigrated',
-    'freeTranslationBilibiliDefaultApplied',
-    'aiPlatformDefaultRemovalMigrated',
-    'uiLanguageSetupCompleted',
-    // 关闭前偏好随快照保存，但不作为独立用户操作重复展示。
-    'hoverShortcutBeforeDisable',
-    'selectionTranslatorModeBeforeDisable',
-    '__fluentConfigRevision',
-]);
 const CREDENTIAL_FIELDS = new Set<string>(CONFIG_CREDENTIAL_FIELDS);
-const SENSITIVE_SUMMARY_PREFIX = '敏感内容已隐藏';
-const MAX_INLINE_ITEMS = 4;
-const MAX_INLINE_TEXT_LENGTH = 120;
-const MAX_PREVIEW_DEPTH = 32;
-const DEPTH_LIMITED_PREVIEW = Symbol('depth-limited-preview');
-const DEPTH_LIMITED_SUMMARY = '已配置（内容已摘要）';
-
-function isRecord(value: unknown): value is ConfigRecord {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function toSnakeCase(value: string): string {
     return value
@@ -101,365 +127,6 @@ function toSnakeCase(value: string): string {
         .replace(/[^a-zA-Z0-9]+/g, '_')
         .replace(/^_+|_+$/g, '')
         .toLowerCase();
-}
-
-function containsSensitiveContent(value: string): boolean {
-    return /(?:authorization|bearer\s+[a-z0-9._~+/=-]+|(?:api[-_ ]?key|token|password|passwd|secret)\s*["']?\s*[:=])/iu.test(value)
-        || /:\/\/[^/\s:@]+:[^/\s@]+@/u.test(value);
-}
-
-function sensitiveSummary(value: string): string {
-    return `${SENSITIVE_SUMMARY_PREFIX}（${value.length} 字符）`;
-}
-
-function sanitizeSensitiveContent(value: unknown, seen: WeakSet<object>, depth: number, preview: {depthLimited: boolean}): unknown {
-    if (depth >= MAX_PREVIEW_DEPTH) {
-        preview.depthLimited = true;
-        return DEPTH_LIMITED_PREVIEW;
-    }
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-            try {
-                const parsed = JSON.parse(trimmed) as unknown;
-                if (isRecord(parsed) || Array.isArray(parsed)) {
-                    return sanitizeSensitiveContent(parsed, seen, depth + 1, preview);
-                }
-            } catch {
-                // 非 JSON 的 prompt 或模板会在下方按普通文本处理。
-            }
-        }
-        return containsSensitiveContent(value) ? sensitiveSummary(value) : value;
-    }
-    if (Array.isArray(value)) {
-        if (seen.has(value)) return '[循环引用]';
-        seen.add(value);
-        const result = value.map((item) => sanitizeSensitiveContent(item, seen, depth + 1, preview));
-        seen.delete(value);
-        return result;
-    }
-    if (!isRecord(value)) return value;
-    if (seen.has(value)) return '[循环引用]';
-    seen.add(value);
-
-    const result: ConfigRecord = {};
-    for (const [key, item] of Object.entries(value)) {
-        if (isSensitiveConfigKey(key)) continue;
-        Object.defineProperty(result, key, {
-            value: sanitizeSensitiveContent(item, seen, depth + 1, preview),
-            enumerable: true, configurable: true, writable: true,
-        });
-    }
-    seen.delete(value);
-    return result;
-}
-
-function sanitizeSensitiveValue(value: unknown): unknown {
-    const preview = {depthLimited: false};
-    const sanitized = sanitizeSensitiveContent(value, new WeakSet<object>(), 0, preview);
-    // 整个字段使用已翻译的摘要，避免嵌套键和值拼接后无法命中旧文案翻译。
-    return preview.depthLimited ? DEPTH_LIMITED_PREVIEW : sanitized;
-}
-
-function labelsFor(...optionLists: ReadonlyArray<ReadonlyArray<Option>>): Map<unknown, string> {
-    return new Map(optionLists.flatMap((items) => items.map((item) => [item.value, item.label] as const)));
-}
-
-const LANGUAGE_LABELS = labelsFor(options.to, options.inputBoxTranslationTarget, options.from);
-const SERVICE_LABELS = labelsFor(options.services, FREE_TRANSLATION_PROVIDERS.map(provider => ({value: provider.id, label: provider.label})));
-const STYLE_LABELS = labelsFor(options.styles);
-const THEME_LABELS = labelsFor(options.theme);
-const UI_LANGUAGE_LABELS = new Map<unknown, string>([
-    ['zh-CN', '中文'],
-    ['en-US', 'English'],
-    ['ja-JP', '日本語'],
-    ['ko-KR', '한국어'],
-    ['fr-FR', 'Français'],
-    ['ru-RU', 'Русский'],
-    ['es-ES', 'Español'],
-]);
-const INTERFACE_SKIN_LABELS = labelsFor(interfaceSkinOptions);
-const SIDEPANEL_SCOPE_LABELS = new Map<unknown, string>([['tab', '仅当前标签页'], ['window', '整个窗口']]);
-const INTERFACE_FONT_LABELS = new Map<unknown, string>([
-    ['inter', 'Inter · 推荐'],
-    ['system', '系统字体'],
-    ['noto-sans-sc', 'Noto Sans SC · 中文'],
-    ['roboto', 'Roboto · 简洁'],
-    ['source-sans-3', 'Source Sans 3 · 易读'],
-    ['ibm-plex-sans', 'IBM Plex Sans · 理性'],
-    ['manrope', 'Manrope · 几何'],
-    ['nunito-sans', 'Nunito Sans · 柔和'],
-    ['lxgw-wenkai', '霞鹜文楷 · 手写'],
-    ['noto-serif-sc', 'Noto Serif SC · 书卷'],
-]);
-const TRANSLATION_LOADING_STYLE_LABELS = labelsFor(translationLoadingStyleOptions);
-const TRANSLATION_SCOPE_LABELS = new Map<unknown, string>([['content', '关闭'], ['all', '开启']]);
-const POPUP_MODULE_LABELS = new Map<string, string>(popupModuleOptions.map((item) => [item.id, item.label]));
-const POPUP_QUICK_FEATURE_LABELS = new Map<string, string>(
-    popupQuickFeatureOptions.map((item) => [item.id, item.label]),
-);
-const HOVER_TRIGGER_LABELS = labelsFor(options.keys);
-const SELECTION_TRIGGER_LABELS = labelsFor(options.selectionTranslatorTriggers);
-const FLOATING_HOTKEY_LABELS = labelsFor(options.floatingBallHotkeys);
-const INPUT_TRIGGER_LABELS = labelsFor(options.inputBoxTranslationTrigger);
-const INPUT_OUTPUT_LABELS = new Map<unknown, string>([
-    ['replace', '替换原文'], ['append', '原文在前，译文在后'], ['prepend', '译文在前，原文在后'],
-]);
-const BILLING_PLAN_LABELS = labelsFor(options.minimaxBillingPlan, options.mimoBillingPlan);
-const DEEPL_API_PLAN_LABELS = new Map<unknown, string>([
-    ['free', 'API Free（免费）'],
-    ['pro', 'API Pro（付费）'],
-]);
-const REGION_LABELS = labelsFor(options.minimaxRegion, options.mimoRegion);
-const DEEPSEEK_API_LABELS = labelsFor(options.deepseekApiType);
-const DEEPSEEK_THINKING_LABELS = labelsFor(options.deepseekThinkingMode);
-const PARAGRAPH_COPY_CONTENT_LABELS = new Map<unknown, string>([
-    ['auto', '跟随页面显示'],
-    ['original', '原文'],
-    ['translation', '译文'],
-    ['bilingual', '原文和译文'],
-]);
-const DISPLAY_LABELS = new Map<unknown, string>([
-    [0, '仅译文模式'],
-    [1, '双语对照模式'],
-]);
-const FULL_PAGE_MODE_LABELS = new Map<unknown, string>([
-    ['viewport', '按阅读进度'],
-    ['all', '立即翻译到网页底部'],
-]);
-const SELECTION_MODE_LABELS = new Map<unknown, string>([
-    ['disabled', '关闭'],
-    ['bilingual', '双语显示'],
-    ['translation-only', '只显示译文'],
-]);
-const LOCAL_TTS_MODE_LABELS = labelsFor(LOCAL_TTS_MODE_OPTIONS);
-const VIDEO_DISPLAY_MODE_LABELS = new Map<unknown, string>([
-    ['bilingual', '双语显示'],
-    ['translation-only', '只显示译文'],
-    ['original-only', '只显示原文'],
-]);
-const VIDEO_SUBTITLE_MODE_HOTKEY_ACTION_LABELS = new Map<unknown, string>([
-    ['bilingual-original', '双语 ↔ 原文'],
-    ['cycle-display', '双语 → 译文 → 原文'],
-    ['cycle-all', '双语 → 译文 → 原文 → 关闭'],
-]);
-const SIDE_LABELS = new Map<unknown, string>([
-    ['left', '左侧'],
-    ['right', '右侧'],
-]);
-const FLOATING_BALL_TOOLS_DISPLAY_LABELS = new Map<unknown, string>([
-    ['hover', '悬停时显示'],
-    ['always', '始终显示'],
-    ['hidden', '不显示'],
-]);
-const FLOATING_BALL_CLICK_ACTION_LABELS = new Map<unknown, string>([
-    ['translate', '翻译/显示原文'],
-    ['settings', '打开设置页'],
-    ['none', '仅拖动'],
-]);
-const TRANSLATION_APPEARANCE_FIELD_LABELS = new Map<string, string>([
-    ['textColor', '译文颜色'],
-    ['backgroundColor', '译文背景色'],
-    ['lineColor', '线条颜色'],
-    ['fillColor', '标记底色'],
-    ['fontScale', '译文字号'],
-    ['fontWeight', '译文字重'],
-    ['fontFamily', '译文字体'],
-    ['opacity', '译文不透明度'],
-    ['customCss', 'CSS'],
-]);
-// 颜色留空与 default 都表示沿用样式自带外观；字号和不透明度都是百分比。
-const TRANSLATION_APPEARANCE_VALUE_LABELS = new Map<unknown, string>([
-    ['', '默认'],
-    ['default', '默认'],
-    ['normal', '常规'],
-    ['semibold', '中粗'],
-    ['bold', '加粗'],
-    ['sans', '无衬线'],
-    ['serif', '衬线'],
-    ['mono', '等宽'],
-]);
-
-function formatEnum(value: unknown, labels: Map<unknown, string>): string {
-    return labels.get(value) ?? formatValue(value);
-}
-
-function formatBoolean(value: unknown, inverted = false): string {
-    if (typeof value !== 'boolean') return formatValue(value);
-    return (inverted ? !value : value) ? '开启' : '关闭';
-}
-
-function formatNumber(value: unknown, suffix = ''): string {
-    return typeof value === 'number' && Number.isFinite(value)
-        ? `${value}${suffix}`
-        : formatValue(value);
-}
-
-function formatTranslationAppearanceValue(value: unknown): string {
-    if (typeof value === 'number') return formatNumber(value, '%');
-    return TRANSLATION_APPEARANCE_VALUE_LABELS.get(value) ?? formatValue(value);
-}
-
-function formatRequestRate(value: unknown): string {
-    return value === 0 ? '不限速' : formatNumber(value, ' 次');
-}
-
-function formatString(value: string): string {
-    if (!value.trim()) return '未设置';
-    if (value.startsWith(SENSITIVE_SUMMARY_PREFIX)) return value;
-    if (value.length > MAX_INLINE_TEXT_LENGTH) return `长文本（${value.length} 字符）`;
-    return value.replace(/\s+/gu, ' ').trim();
-}
-
-function formatArray(value: unknown[], itemFormatter: ValueFormatter = formatValue): string {
-    if (value.length === 0) return '无';
-    const visible = value.slice(0, MAX_INLINE_ITEMS).map(itemFormatter).join('、');
-    return value.length > MAX_INLINE_ITEMS
-        ? `${value.length} 项：${visible} 等`
-        : visible;
-}
-
-function formatRecord(value: ConfigRecord): string {
-    const entries = Object.entries(value).filter(([key]) => !isSensitiveConfigKey(key));
-    if (entries.length === 0) return '无';
-    const visible = entries.slice(0, MAX_INLINE_ITEMS).map(([key, item]) => {
-        const displayKey = SERVICE_LABELS.get(key) ?? key;
-        return `${displayKey}：${formatValue(item)}`;
-    }).join('；');
-    return entries.length > MAX_INLINE_ITEMS ? `${entries.length} 项：${visible} 等` : visible;
-}
-
-function formatValue(value: unknown): string {
-    if (value === undefined || value === null || value === '') return '未设置';
-    if (typeof value === 'boolean') return formatBoolean(value);
-    if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '未设置';
-    if (typeof value === 'string') return formatString(value);
-    if (Array.isArray(value)) return formatArray(value);
-    if (isRecord(value)) return formatRecord(value);
-    return String(value);
-}
-
-function formatPrompt(value: unknown): string {
-    if (value === undefined || value === null || value === '') return '未设置';
-    if (typeof value === 'string') {
-        if (value.startsWith(SENSITIVE_SUMMARY_PREFIX)) return value;
-        return `已配置（${value.length} 字符）`;
-    }
-    return formatValue(value);
-}
-
-function formatCustomBody(value: unknown): string {
-    if (value === undefined || value === null || value === '') return '未设置';
-    if (typeof value === 'string' && value.startsWith(SENSITIVE_SUMMARY_PREFIX)) return value;
-    if (Array.isArray(value)) return `${value.length} 项 JSON（内容已摘要）`;
-    if (isRecord(value)) return `${Object.keys(value).length} 个公开字段（内容已摘要）`;
-    if (typeof value === 'string') return `文本请求体（${value.length} 字符，内容已摘要）`;
-    return '已配置（内容已摘要）';
-}
-
-function serviceName(key: string): string {
-    if (SERVICE_LABELS.has(key)) return SERVICE_LABELS.get(key)!;
-    if (isCustomOpenAIProviderId(key)) {
-        return `自定义服务 ${key.slice('custom:'.length)}`;
-    }
-    return key;
-}
-
-function formatService(value: unknown): string {
-    return typeof value === 'string' ? serviceName(value) : formatValue(value);
-}
-
-function formatInterfaceVisibility(value: unknown): string {
-    if (!isRecord(value)) return formatValue(value);
-    return interfaceVisibilityOptions
-        .map(({key, label}) => `${label}${value[key] === false ? '关闭' : '开启'}`)
-        .join('、');
-}
-
-function formatPopupModuleOrder(value: unknown): string {
-    if (!Array.isArray(value)) return formatValue(value);
-    if (value.length === 0) return '无';
-    return value.map((item) => typeof item === 'string'
-        ? POPUP_MODULE_LABELS.get(item) ?? item
-        : formatValue(item)).join(' → ');
-}
-
-function formatPopupQuickFeatureVisibility(value: unknown): string {
-    if (!isRecord(value)) return formatValue(value);
-    return popupQuickFeatureOptions
-        .map(({id, label}) => `${label}：${value[id] === false ? '隐藏' : '显示'}`)
-        .join('、');
-}
-
-function formatPopupQuickFeatureOrder(value: unknown): string {
-    if (!Array.isArray(value)) return formatValue(value);
-    if (value.length === 0) return '无';
-    return value.map((item) => typeof item === 'string'
-        ? POPUP_QUICK_FEATURE_LABELS.get(item) ?? item
-        : formatValue(item)).join(' → ');
-}
-
-function formatCustomOpenAIProviders(value: unknown): string {
-    if (!Array.isArray(value) || value.length === 0) return '无';
-    return formatArray(value, (item) => {
-        if (!isRecord(item)) return formatValue(item);
-        const name = typeof item.name === 'string' && item.name.trim() ? item.name.trim() : '未命名服务';
-        const endpoint = formatValue(item.endpoint);
-        const models = Array.isArray(item.models) ? formatArray(item.models) : '无';
-        return `${name}（接口：${endpoint}；模型：${models}）`;
-    });
-}
-
-function formatCompositeTranslationProviders(value: unknown): string {
-    if (!Array.isArray(value) || value.length === 0) return '无';
-    return formatArray(value, (item) => {
-        if (!isRecord(item)) return formatValue(item);
-        const name = typeof item.name === 'string' && item.name.trim() ? item.name.trim() : '未命名组合';
-        const strategy = item.strategy === 'random' ? '随机' : item.strategy === 'smart' ? '智能' : '轮流';
-        const members = Array.isArray(item.services) ? formatArray(item.services, formatService) : '无';
-        return `${name}（${strategy}；成员：${members}；单次超时：${formatValue(item.timeoutMs)} ms）`;
-    });
-}
-
-function formatQuickTranslationProfiles(value: unknown): string {
-    if (!Array.isArray(value) || value.length === 0) return '无';
-    return value.map((item) => {
-        if (!isRecord(item)) return formatValue(item);
-        const action = item.action === 'full-page' ? '全文' : item.action === 'section' ? '局部' : '悬停';
-        const hotkey = typeof item.hotkey === 'string' && item.hotkey ? item.hotkey : '未设置';
-        const service = typeof item.service === 'string' && item.service
-            ? serviceName(item.service)
-            : '默认服务';
-        const model = typeof item.model === 'string' && item.model ? ` · ${item.model}` : '';
-        const language = typeof item.targetLanguage === 'string' && item.targetLanguage
-            ? formatEnum(item.targetLanguage, LANGUAGE_LABELS)
-            : '默认语言';
-        const display = item.displayMode === 'bilingual'
-            ? '双语'
-            : item.displayMode === 'translation-only' ? '仅译文' : '默认显示';
-        const range = item.action === 'full-page'
-            ? `，${item.fullPageMode === 'viewport'
-                ? '按阅读进度'
-                : item.fullPageMode === 'all' ? '立即翻译到网页底部' : '默认范围'}`
-            : '';
-        const disabled = item.enabled === false ? '（已停用）' : '';
-        const glossary = item.glossaryIds === undefined ? '' : `，术语库：${formatGlossarySelection(item.glossaryIds)}`;
-        return `${action} ${hotkey}${disabled}：${service}${model}，${language}，${display}${range}${glossary}`;
-    }).join('；');
-}
-
-/** 历史预览只显示规模，避免把用户保存的专业词句展开到配置差异中。 */
-function formatGlossaryLibraries(value: unknown): string {
-    if (!Array.isArray(value)) return formatValue(value);
-    const libraries = value.filter(isRecord);
-    const entries = libraries.reduce((count, library) => count + (Array.isArray(library.entries) ? library.entries.length : 0), 0);
-    return `${libraries.length} 套词库，${entries} 条术语`;
-}
-
-function formatGlossarySelection(value: unknown): string {
-    if (value == null) return '跟随全局词库';
-    if (!Array.isArray(value)) return formatValue(value);
-    return value.length ? `指定 ${value.length} 套词库` : '不使用术语库';
 }
 
 function serviceMapping(label: string, format: ValueFormatter = formatValue): MappingDefinition {
@@ -710,15 +377,13 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
         personalCorrectionsEnabled: {group: 'tools', label: '个人校订', format: formatBoolean} satisfies FieldDefinition,
     }),
 };
+
 /** 云备份复用已知设置的名称；未知字段绝不将原始键当作可见标签。 */
 export function configDiffFieldLabel(field: string): string | undefined {
     return Object.hasOwn(FIELD_DEFINITIONS, field) ? FIELD_DEFINITIONS[field].label : undefined;
 }
-const FIELD_ORDER = new Map(Object.keys(FIELD_DEFINITIONS).map((field, index) => [field, index]));
 
-function configRecord(value: unknown): ConfigRecord {
-    return isRecord(value) ? value : {};
-}
+const FIELD_ORDER = new Map(Object.keys(FIELD_DEFINITIONS).map((field, index) => [field, index]));
 
 function humanizeUnknownKey(key: string): string {
     const words = toSnakeCase(key).split('_').filter(Boolean);
@@ -757,7 +422,7 @@ function diffMapping(
 }
 
 function diffField(field: string, before: unknown, after: unknown): {group: ConfigDiffGroupId; changes: ConfigDiffItem[]} | null {
-    if (EXCLUDED_FIELDS.has(field) || CREDENTIAL_FIELDS.has(field)) return null;
+    if (EXCLUDED_DIFF_FIELDS.has(field) || CREDENTIAL_FIELDS.has(field)) return null;
     const definition = Object.hasOwn(FIELD_DEFINITIONS, field) ? FIELD_DEFINITIONS[field] : undefined;
     if (!definition && isSensitiveConfigKey(field)) return null;
     if (valuesEqual(before, after)) return null;

@@ -141,12 +141,13 @@ function syntheticCandidateStructureSignature(
     if (!indexes) return null;
     const segment = owner.ownerDocument.createElement('span');
     nodes.forEach((node) => segment.appendChild(node.cloneNode(true)));
-    const protectionOptions = allowTopLevelApplicationShell
+    const core = getCurrentTranslationCore(scope);
+    const protectionOptions = core.textOptions(allowTopLevelApplicationShell
         ? {allowTopLevelApplicationShell: true, protectedElement: segment}
-        : {protectedElement: segment};
+        : {protectedElement: segment});
     const textNodes = collectLiveTranslationTextSlots(
         segment,
-        getCurrentTranslationCore(scope).shouldStayOriginal,
+        core.shouldStayOriginal,
         segment,
         protectionOptions,
     ).map((slot) => slot.node);

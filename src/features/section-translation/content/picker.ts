@@ -1,27 +1,42 @@
 /**
  * @file src/features/section-translation/content/picker.ts
  * 文件职责：实现局部翻译的区域选择模式，稳定预览鼠标下的内容块，支持单击锁定或按住左键划过多个区域，松开后用可见按钮调整并确认翻译或恢复，并在选择期间拦截网页自身的点击与悬停反应。
- * 主要内容：以封闭 Shadow Root 绘制高亮与紧凑操作条，显式勾选后展示记忆动作与范围，保存成功才翻译，失败保留重试并忽略失效结果；拖动保留折线路径并按帧复用命中解析、合并选区，松手统一盘点，空白起划进入正文时收窄外壳且不因间隙扩大；悬停稳定窗到期复验真实落点并拒绝迟到回调，绘制先批量读取区域和标签尺寸再按变化写入；支持范围图标和方向键调整，按每帧 150 步发现开放 ShadowRoot；正文、布局及保护属性变化合并盘点并贴合高亮，退出时清理计时器、观察器和焦点；与其他临时指针选区共享单一手势所有权，成功启动时交接，确认或取消时释放；确认按钮或 Enter 执行，Esc、右键、关闭和隐藏退出。
- * 模块边界：本模块只处理手势、高亮和选择生命周期，所有事件先校验 isTrusted；区域判定规则来自 ../core，区域盘点、翻译和提示文案由调用方注入，不直接发起翻译、不读取配置存储。
+ * 主要内容：组合 pickerOverlay 封闭 Shadow UI 与 pickerShadowObserver 分帧影子树观察器，协调指针划选路径、悬停稳定窗、区域扩缩、记忆规则确认与单手势会话交接生命周期。
+ * 模块边界：本模块只处理手势、高亮编排和选择生命周期，所有事件先校验 isTrusted；浮层 DOM 构建在 pickerOverlay.ts，ShadowRoot 增量扫描在 pickerShadowObserver.ts，区域判定规则来自 ../core，不直接发起翻译或读取配置存储。
  */
-import pickerStyles from './picker.css?inline';
-import {claimPointerSelectionSession} from '@/src/shared/dom/pointerSelectionSession';
+
 import {getComposedParent} from '@/src/core/translation/public';
+import {claimPointerSelectionSession} from '@/src/shared/dom/pointerSelectionSession';
 import {
     describeSectionScope,
     expandSectionElement,
     isSectionPickerUi,
     resolveSectionElement,
     resolveSectionLabel,
-    type SectionGeometry,
     type SectionLabelSummary,
     type SectionRect,
 } from '../core';
+import {
+    cancelFrame,
+    containsContent,
+    containsPoint,
+    createOverlayElement,
+    createPickerOverlay,
+    elementAtPoint,
+    hasVisibleBox,
+    positionBox,
+    positionLabel,
+    RECT_KEYS,
+    scheduleFrame,
+    SECTION_PICKER_HOST_ATTRIBUTE,
+    sectionGeometry as geometry,
+    setText,
+    toggleClass,
+    type SectionPickerPoint,
+} from './pickerOverlay';
+import {createPickerShadowScanner, TARGET_OBSERVATION} from './pickerShadowObserver';
 
-export interface SectionPickerPoint {
-    readonly x: number;
-    readonly y: number;
-}
+export {SECTION_PICKER_HOST_ATTRIBUTE, type SectionPickerPoint};
 
 export interface SectionRememberChoice {
     readonly site: string;
@@ -47,44 +62,16 @@ export interface SectionPickerOptions {
     isEditing?(event: KeyboardEvent): boolean;
 }
 
-export const SECTION_PICKER_HOST_ATTRIBUTE = 'section-picker';
 const INSPECT_DELAY_MS = 90;
 const TARGET_SETTLE_MS = 80;
 const POINTER_TOLERANCE = 6;
 const CONFIRM_ANIMATION_MS = 320;
 const TOPMOST_NOTICE_MS = 1200;
-const LABEL_GAP = 6;
-/** 高亮框向外留出的距离，避免边框压在区域边缘的文字上。 */
-const BOX_OUTSET = 3;
-const VIEWPORT_MARGIN = 4;
-const MAX_SHADOW_DEPTH = 16;
-const SHADOW_SCAN_STEPS_PER_FRAME = 150;
-const RECT_KEYS = ['left', 'top', 'width', 'height'] as const;
-/** 只监听会改变布局、可见性或原文保护的属性，避免任意 data-* 计数驱动整页重绘。 */
-const TARGET_OBSERVATION: MutationObserverInit = {
-    childList: true,
-    characterData: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class', 'style', 'hidden', 'open', 'aria-hidden', 'translate', 'contenteditable', 'lang', 'dir', 'slot'],
-};
 
 /** 选择期间这些指针事件不交给网页，避免链接跳转、按钮触发、拖拽或划词浮层。 */
 const INTERCEPTED_MOUSE_EVENTS = ['mousedown', 'mouseup', 'click', 'dblclick', 'auxclick'] as const;
 /** 悬停卡片、下拉菜单等网页悬停反应会遮挡目标区域，选择期间一并屏蔽。 */
 const SUPPRESSED_HOVER_EVENTS = ['pointerover', 'mouseover'] as const;
-
-const geometry: SectionGeometry = {
-    display(element) {
-        try {
-            return element.ownerDocument.defaultView!.getComputedStyle(element).display;
-        } catch {
-            // 取不到计算样式（例如元素所在文档没有视图）时按块级处理，不因此丢失可选区域。
-            return '';
-        }
-    },
-    rect: (element) => element.getBoundingClientRect(),
-};
 
 interface PickerSession {
     dispose(confirmed: boolean): void;
@@ -109,166 +96,17 @@ export function startSectionPicker(options: SectionPickerOptions): boolean {
     return true;
 }
 
-function applyHostStyles(host: HTMLElement): void {
-    // 宿主页样式不能把浮层放回文档流、截断或让它接收指针；外观细节留在 Shadow Root。
-    const importantStyles: Record<string, string> = {
-        display: 'block',
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '0',
-        height: '0',
-        margin: '0',
-        padding: '0',
-        border: '0',
-        overflow: 'visible',
-        opacity: '1',
-        visibility: 'visible',
-        transform: 'none',
-        'pointer-events': 'none',
-        'z-index': '2147483647',
-    };
-    Object.entries(importantStyles).forEach(([property, value]) => host.style.setProperty(property, value, 'important'));
-}
-
-function createElement(tag: string, className: string, text?: string): HTMLElement {
-    const element = document.createElement(tag);
-    element.className = className;
-    if (text !== undefined) element.textContent = text;
-    return element;
-}
-
-/** 同值文案不替换文本节点，避免重复布局和辅助技术状态通知。 */
-function setText(element: HTMLElement, text: string): void {
-    if (element.textContent !== text) element.textContent = text;
-}
-
-function containsPoint(rect: SectionRect, point: SectionPickerPoint, tolerance = 0): boolean {
-    return point.x >= rect.left - tolerance && point.x <= rect.left + rect.width + tolerance
-        && point.y >= rect.top - tolerance && point.y <= rect.top + rect.height + tolerance;
-}
-
-function hasVisibleBox(element: Element, rect: SectionRect): boolean {
-    if (rect.width <= 0 || rect.height <= 0) return false;
-    try {
-        // visibility 可从祖先继承，而且 hidden/collapse 仍可能保留非零布局盒子。
-        const visibility = element.ownerDocument.defaultView!.getComputedStyle(element).visibility;
-        return visibility !== 'hidden' && visibility !== 'collapse';
-    } catch {
-        // 与区域几何端口一致：旧文档无法读取样式时保留有尺寸的选区。
-        return true;
-    }
-}
-
-/** DOM contains 不穿过 ShadowRoot；沿组合祖先判断内容归属，并限制恶意超深树。 */
-function containsContent(root: Element, node: Node): boolean {
-    let current: Element | null = node.nodeType === 1 ? node as Element
-        : node.parentElement ?? (node.nodeType === 11 ? (node as ShadowRoot).host : null);
-    for (let depth = 0; current && depth < 512; depth += 1) {
-        if (current === root) return true;
-        current = getComposedParent(current);
-    }
-    return false;
-}
-
-const scheduleFrame = (callback: () => void): number => typeof window.requestAnimationFrame === 'function'
-    ? window.requestAnimationFrame(callback)
-    : window.setTimeout(callback, 16);
-
-const cancelFrame = (handle: number): void => {
-    if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(handle);
-    else window.clearTimeout(handle);
-};
-
 function createPickerSession(options: SectionPickerOptions): PickerSession {
     const controller = new AbortController();
     const {signal} = controller;
     const previousFocus = document.activeElement as HTMLElement | null;
 
     // Step 1: 创建封闭 Shadow Root 浮层；网页脚本无法读取或改写其中的界面。
-    const host = document.createElement('fluent-read-section-picker');
-    host.setAttribute('data-fluent-read-ui', SECTION_PICKER_HOST_ATTRIBUTE);
-    host.setAttribute('translate', 'no');
-    applyHostStyles(host);
-    const shadow = host.attachShadow({mode: 'closed'});
-    const style = document.createElement('style');
-    style.textContent = pickerStyles;
-    const box = createElement('div', 'fr-section-box');
-    const label = createElement('div', 'fr-section-label');
-    label.setAttribute('aria-hidden', 'true');
-    const labelAction = createElement('span', 'fr-section-label-action');
-    const labelMeta = createElement('span', 'fr-section-label-meta');
-    label.append(labelAction, labelMeta);
-    const bar = createElement('div', 'fr-section-bar');
-    bar.tabIndex = -1;
-    bar.setAttribute('role', 'region');
-    bar.setAttribute('aria-label', options.text('sectionTranslation.picker.title'));
-    const heading = createElement('div', 'fr-section-bar-heading');
-    const instruction = createElement('span', 'fr-section-bar-instruction', options.text('sectionTranslation.picker.preview'));
-    instruction.setAttribute('role', 'status');
-    instruction.setAttribute('aria-live', 'polite');
-    const actions = createElement('div', 'fr-section-bar-actions');
-    actions.setAttribute('role', 'toolbar');
-    actions.setAttribute('aria-label', options.text('sectionTranslation.picker.title'));
-    const button = (name: string): HTMLButtonElement => {
-        const result = createElement('button', `fr-section-button fr-section-${name}`, options.text(`sectionTranslation.picker.${name}`)) as HTMLButtonElement;
-        result.type = 'button';
-        return result;
-    };
-    const larger = button('expand');
-    const smaller = button('shrink');
-    for (const [control, symbol] of [[larger, '＋'], [smaller, '−']] as const) {
-        control.setAttribute('aria-label', control.textContent!);
-        control.title = control.textContent!;
-        control.textContent = symbol;
-        control.classList.add('fr-section-size-button');
-    }
-    const reselect = button('reselect');
-    const confirm = button('confirm');
-    const close = createElement('button', 'fr-section-bar-close', '×') as HTMLButtonElement;
-    close.type = 'button';
-    close.setAttribute('aria-label', options.text('sectionTranslation.picker.close'));
-    close.title = options.text('sectionTranslation.picker.close');
-    heading.append(createElement('strong', 'fr-section-bar-title', options.text('sectionTranslation.picker.title')), instruction, close);
-    actions.append(larger, smaller, reselect, confirm);
-    const remember = createElement('div', 'fr-section-remember');
-    const rememberLabel = createElement('label', 'fr-section-remember-label');
-    const rememberCheckbox = document.createElement('input');
-    rememberCheckbox.type = 'checkbox';
-    rememberCheckbox.className = 'fr-section-remember-checkbox';
-    rememberLabel.append(rememberCheckbox, createElement('span', '', options.text('sectionTranslation.rules.remember')));
-    const rememberFields = createElement('div', 'fr-section-remember-fields');
-    const createChoice = (label: string, className: string, choices: readonly {value: string; label: string}[]): HTMLSelectElement => {
-        const field = createElement('label', 'fr-section-remember-field');
-        const select = document.createElement('select');
-        select.className = className;
-        select.setAttribute('aria-label', options.text(label));
-        for (const choice of choices) {
-            const option = document.createElement('option');
-            option.value = choice.value;
-            option.textContent = options.text(choice.label);
-            select.append(option);
-        }
-        field.append(select);
-        rememberFields.append(field);
-        return select;
-    };
-    const rememberScope = createChoice('sectionTranslation.rules.scope', 'fr-section-remember-scope', [
-        {value: 'path', label: 'sectionTranslation.rules.path'}, {value: 'site', label: 'sectionTranslation.rules.site'},
-    ]);
-    const rememberMode = createChoice('sectionTranslation.rules.nextVisit', 'fr-section-remember-mode', [
-        {value: 'remind', label: 'sectionTranslation.rules.remind'}, {value: 'auto', label: 'sectionTranslation.rules.auto'},
-    ]);
-    const rememberAddress = createElement('small', 'fr-section-remember-address');
-    rememberAddress.id = 'fr-section-remember-address';
-    rememberScope.setAttribute('aria-describedby', rememberAddress.id);
-    const rememberStatus = createElement('span', 'fr-section-remember-status');
-    rememberStatus.setAttribute('role', 'status');
-    rememberStatus.setAttribute('aria-live', 'polite');
-    remember.append(rememberLabel, rememberFields, rememberAddress, rememberStatus);
-    bar.append(heading, remember, actions);
-    shadow.append(style, box, label, bar);
-    document.documentElement.appendChild(host);
+    const {
+        host, shadow, box, label, labelAction, labelMeta, bar, heading, instruction,
+        larger, smaller, reselect, confirm, close, remember, rememberCheckbox,
+        rememberFields, rememberScope, rememberMode, rememberAddress, rememberStatus,
+    } = createPickerOverlay(options.text);
 
     let pointer: SectionPickerPoint | null = options.initialPoint ?? null;
     let target: Element | null = null;
@@ -298,11 +136,6 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
     let remembering = false;
     let rememberRevision = 0;
     const summaries = new WeakMap<Element, SectionLabelSummary>();
-    let shadowScanFrame = 0;
-    let shadowScans: {root: Node; walker: TreeWalker; current: Element | null}[] = [];
-    let shadowScanIndex = 0;
-    let queuedShadowScans = new WeakSet<Node>();
-    let observedShadowRoots = new WeakSet<ShadowRoot>();
 
     /** 事件落在本浮层或 FluentRead 其他界面（通知、悬浮球等）上时交还给它们自己处理。 */
     const isExtensionUiEvent = (event: Event): boolean => typeof event.composedPath === 'function'
@@ -312,17 +145,6 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
     function consume(event: Event, preventDefault = true): void {
         if (preventDefault) event.preventDefault();
         event.stopImmediatePropagation();
-    }
-
-    /** 逐层进入可读取的 ShadowRoot，找到指针下最深的网页元素。 */
-    function elementAtPoint(point: SectionPickerPoint): Element | null {
-        let element = document.elementFromPoint(point.x, point.y);
-        for (let depth = 0; element?.shadowRoot && depth < MAX_SHADOW_DEPTH; depth += 1) {
-            const inner: Element | null = element.shadowRoot.elementFromPoint(point.x, point.y);
-            if (!inner || inner === element) break;
-            element = inner;
-        }
-        return element;
     }
 
     function setTone(tone: 'translate' | 'restore' | 'muted'): void {
@@ -340,6 +162,13 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         const roots = selectedRoots();
         return roots.length === 1 ? roots[0] : roots;
     }
+
+    const shadowScanner = createPickerShadowScanner({
+        getMutationObserver: () => mutationObserver,
+        isActive: () => !disposed && locked && Boolean(target?.isConnected),
+        getSelectedRoots: selectedRoots,
+        onShadowRootDiscovered: () => scheduleInspect(true),
+    });
 
     function setSwept(roots: Element[]): void {
         swept = roots;
@@ -420,7 +249,7 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
     }
 
     function setTarget(next: Element | null): void {
-        cancelShadowScanning();
+        shadowScanner.cancel();
         resizeObserver?.disconnect();
         mutationObserver?.disconnect();
         rememberRevision += 1;
@@ -487,8 +316,8 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
                 if (disposed || locked || revision !== settleRevision) return;
                 settleTimer = undefined;
                 // 指针可能已离开，但对应绘制帧尚未到达；旧稳定窗不能先闪出过时区域。
-                const hit = pointer && elementAtPoint(pointer);
-                if (hit === host || (hit && isSectionPickerUi(hit)) || resolveSectionElement(hit, geometry) !== base) {
+                const latestHit = pointer && elementAtPoint(pointer);
+                if (latestHit === host || (latestHit && isSectionPickerUi(latestHit)) || resolveSectionElement(latestHit, geometry) !== base) {
                     cancelSettling();
                     targetDirty = true;
                     scheduleRender();
@@ -499,31 +328,6 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
             return;
         }
         commitBase(base);
-    }
-
-    /** 只写实际变化的样式，静止区域中的指针移动不重复使浮层布局失效。 */
-    function setStyle(element: HTMLElement, property: 'transform' | 'width' | 'height', value: string): void {
-        if (element.style[property] !== value) element.style[property] = value;
-    }
-
-    function toggleClass(element: HTMLElement, name: string, enabled: boolean): void {
-        if (element.classList.contains(name) !== enabled) element.classList.toggle(name, enabled);
-    }
-
-    function positionBox(element: HTMLElement, rect: SectionRect): void {
-        setStyle(element, 'transform', `translate(${Math.round(rect.left - BOX_OUTSET)}px, ${Math.round(rect.top - BOX_OUTSET)}px)`);
-        setStyle(element, 'width', `${Math.round(rect.width + BOX_OUTSET * 2)}px`);
-        setStyle(element, 'height', `${Math.round(rect.height + BOX_OUTSET * 2)}px`);
-    }
-
-    /** 标签尺寸在全部边框写入前统一读取；定位阶段只计算并写入。 */
-    function positionLabel(rect: SectionRect, labelWidth: number, labelHeight: number, viewportWidth: number, viewportHeight: number): void {
-        const above = rect.top - BOX_OUTSET - labelHeight - LABEL_GAP;
-        const top = above >= VIEWPORT_MARGIN
-            ? above
-            : Math.min(Math.max(rect.top + LABEL_GAP, VIEWPORT_MARGIN), viewportHeight - labelHeight - VIEWPORT_MARGIN);
-        const left = Math.min(Math.max(rect.left, VIEWPORT_MARGIN), Math.max(VIEWPORT_MARGIN, viewportWidth - labelWidth - VIEWPORT_MARGIN));
-        setStyle(label, 'transform', `translate(${Math.round(left)}px, ${Math.round(top)}px)`);
     }
 
     function render(): void {
@@ -574,7 +378,7 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         renderedRect = rect;
         const others = swept.filter(root => root !== target);
         while (extraBoxes.length < others.length) {
-            const extra = createElement('div', 'fr-section-box');
+            const extra = createOverlayElement('div', 'fr-section-box');
             shadow.insertBefore(extra, label);
             extraBoxes.push(extra);
         }
@@ -602,7 +406,7 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
             toggleClass(extra, 'tone-muted', box.classList.contains('tone-muted'));
             positionBox(extra, bounds);
         });
-        positionLabel(rect, labelWidth, labelHeight, viewportWidth, viewportHeight);
+        positionLabel(label, rect, labelWidth, labelHeight, viewportWidth, viewportHeight);
     }
 
     function scheduleRender(): void {
@@ -734,7 +538,7 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         if (shadow.activeElement && previousFocus?.isConnected) previousFocus.focus?.({preventScroll: true});
         mutationObserver?.disconnect();
         resizeObserver?.disconnect();
-        cancelShadowScanning();
+        shadowScanner.cancel();
         cancelSettling();
         if (frame) cancelFrame(frame);
         if (inspectTimer !== undefined) clearTimeout(inspectTimer);
@@ -778,8 +582,10 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
             const distance = Math.hypot(point.x - drag.last.x, point.y - drag.last.y);
             const steps = Math.max(1, Math.min(64, Math.ceil(distance / 12)));
             for (let step = 1; step <= steps; step += 1) {
-                const element = elementAtPoint({x: drag.last.x + (point.x - drag.last.x) * step / steps,
-                    y: drag.last.y + (point.y - drag.last.y) * step / steps});
+                const element = elementAtPoint({
+                    x: drag.last.x + (point.x - drag.last.x) * step / steps,
+                    y: drag.last.y + (point.y - drag.last.y) * step / steps,
+                });
                 let hit = resolved.get(element);
                 if (hit === undefined) {
                     hit = resolveSectionElement(element, geometry);
@@ -792,8 +598,7 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
                 if (ancestorIndex >= 0) {
                     selected.delete(roots[ancestorIndex]!);
                     roots.splice(ancestorIndex, 1, hit);
-                }
-                else roots.push(hit);
+                } else roots.push(hit);
                 selected.add(hit);
             }
             drag.last = point;
@@ -998,71 +803,15 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
                 // 不重新扫描锁定范围；只发现已插入子树中的新宿主和嵌套开放根。
                 for (const record of contentRecords) {
                     if (record.type !== 'childList' || !selectedRoots().some(root => containsContent(root, record.target))) continue;
-                    for (const added of record.addedNodes) enqueueShadowScan(added);
+                    for (const added of record.addedNodes) shadowScanner.enqueue(added);
                 }
-                if (!shadowScanFrame) scanShadowRoots();
+                if (!shadowScanner.isScheduled()) shadowScanner.scan();
             }
             // 保留上一份可执行摘要直到新盘点完成；确认仍会同步复核，动态正文不会让按钮一直禁用。
             scheduleInspect(true);
             scheduleRender();
         }
     }) : null;
-
-    function cancelShadowScanning(): void {
-        if (shadowScanFrame) cancelFrame(shadowScanFrame);
-        shadowScanFrame = 0;
-        shadowScans = [];
-        shadowScanIndex = 0;
-        queuedShadowScans = new WeakSet<Node>();
-        observedShadowRoots = new WeakSet<ShadowRoot>();
-    }
-
-    function enqueueShadowScan(root: Node): void {
-        if (!mutationObserver || !target || !selectedRoots().some(selected => containsContent(selected, root)) || queuedShadowScans.has(root)) return;
-        // 文本变更只刷新摘要，不创建扫描器；遍历器只访问元素，不递归进入影子树。
-        if (root.nodeType !== 1 && root.nodeType !== 11) return;
-        queuedShadowScans.add(root);
-        const walker = document.createTreeWalker(root, 1);
-        shadowScans.push({root, walker, current: root.nodeType === 1 ? root as Element : walker.nextNode() as Element | null});
-    }
-
-    function scanShadowRoots(): void {
-        shadowScanFrame = 0;
-        if (disposed || !locked || !target?.isConnected) return;
-        let remaining = SHADOW_SCAN_STEPS_PER_FRAME;
-        let found = false;
-        let checkedRoot: Node | undefined;
-        while (shadowScanIndex < shadowScans.length && remaining > 0) {
-            const scan = shadowScans[shadowScanIndex]!;
-            const element = scan.current;
-            remaining -= 1;
-            // 同一同步批次内只检查一次归属；下一帧继续时仍复核网页是否移走了子树。
-            if (!element || (checkedRoot !== scan.root && !selectedRoots().some(root => containsContent(root, scan.root)))) {
-                queuedShadowScans.delete(scan.root);
-                shadowScanIndex += 1;
-                continue;
-            }
-            checkedRoot = scan.root;
-            const root = element.shadowRoot;
-            if (root && !observedShadowRoots.has(root)) {
-                observedShadowRoots.add(root);
-                mutationObserver!.observe(root, TARGET_OBSERVATION);
-                enqueueShadowScan(root);
-                found = true;
-            }
-            scan.current = scan.walker.nextNode() as Element | null;
-            if (!scan.current) {
-                queuedShadowScans.delete(scan.root);
-                shadowScanIndex += 1;
-            }
-        }
-        if (found) scheduleInspect(true);
-        if (shadowScanIndex < shadowScans.length) shadowScanFrame = scheduleFrame(scanShadowRoots);
-        else {
-            shadowScans = [];
-            shadowScanIndex = 0;
-        }
-    }
 
     function observeTarget(): void {
         mutationObserver?.observe(document.documentElement, TARGET_OBSERVATION);
@@ -1073,8 +822,8 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         }
         // 锁定后才发现范围内的开放 ShadowRoot；大范围分帧完成，不阻塞一次点击。
         if (locked && target) {
-            selectedRoots().forEach(enqueueShadowScan);
-            scanShadowRoots();
+            selectedRoots().forEach(shadowScanner.enqueue);
+            shadowScanner.scan();
         }
     }
     observeTarget();

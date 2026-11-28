@@ -156,6 +156,9 @@ function validateImportData(value: unknown): Record<string, unknown> {
 
 function vocabularyFailure(error: unknown, logOperationFailure: (error: unknown) => void): VocabularyBookResponse<never> {
     if (error instanceof VocabularyBookHandlerError) return {success: false, error: {code: error.code, message: error.message}};
+    if (error instanceof Error && error.name === 'VocabularyBookError' && typeof (error as Error & {code?: unknown}).code === 'string') {
+        return {success: false, error: {code: (error as Error & {code: VocabularyBookErrorCode}).code, message: error.message}};
+    }
 
     logOperationFailure(error);
     const message = error instanceof Error ? error.message : '本地单词本暂时不可用';

@@ -1,6 +1,6 @@
 /**
  * @file src/ui/interfaceAppearance.ts
- * 文件职责：把已经归一化的界面皮肤和字体配置应用到扩展页面根节点，为 Popup 和 Options 共享同一套界面切换入口。
+ * 文件职责：把已经归一化的界面皮肤和字体配置应用到扩展页面根节点，为 Popup 和 Options 共享同一套界面切换入口，并持久化仅供 Popup 首帧防闪烁使用的非敏感外观提示。
  * 主要内容：按页面注册与释放所属根节点，字体异步准备绑定原目标和当前请求；切换保留旧字体直到就绪，按文件持有并清除自己注册的 FontFace，保留共享字体，公开下载和缓存状态。
  * 模块边界：本文件只负责扩展自身页面的 DOM 属性，不读取或保存配置，不影响网页内容脚本和宿主页面样式。
  */
@@ -167,7 +167,29 @@ export async function prepareInterfaceFont(value: unknown, root?: HTMLElement | 
   if (isCurrentFontRequest(target, request)) loadRequestedFont(target, request)
 }
 
+export const POPUP_STARTUP_APPEARANCE_KEY = 'fluentread:popup-startup-appearance'
+
 export function applyInterfaceTheme(dark: boolean, root?: HTMLElement | null): void {
   const target = root || resolveInterfaceAppearanceRoot()
   target?.classList.toggle('dark', dark)
+}
+
+/** 仅缓存 Popup 首帧外观提示（皮肤、宽度、明暗模式与画布色），不包含任何业务配置或敏感数据。 */
+export function persistPopupStartupAppearance(skinValue: unknown, themeValue: unknown): void {
+  try {
+    if (typeof localStorage === 'undefined') return
+    const skin = getInterfaceSkinOption(skinValue)
+    const theme = themeValue === 'dark' || themeValue === 'light' ? themeValue : 'auto'
+    localStorage.setItem(POPUP_STARTUP_APPEARANCE_KEY, JSON.stringify({
+      skin: skin.value,
+      skinKind: skin.kind,
+      width: skin.popupWidth,
+      theme,
+      bgLight: skin.preview.light.canvas,
+      bgDark: skin.preview.dark.canvas,
+      darkOnly: skin.toneMode === 'dark',
+    }))
+  } catch {
+    // 本地存储受限时跳过启动外观提示，真实配置仍会在挂载前同步。
+  }
 }

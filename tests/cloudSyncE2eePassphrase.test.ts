@@ -157,7 +157,17 @@ describe('Zero-Knowledge Custom E2EE Passphrase & Downgrade Resistance', () => {
             keyMode: 'custom', passphrase: CUSTOM_PASS, legacyPassphrase: GOOGLE_DRIVE_APPLICATION_PASSPHRASE,
         });
 
-        // Device encrypted hold (for auto-sync)
+        // Device encrypted hold (for auto-sync), including scope migration without re-entering passphrase
+        expect(await store.configure({mode: 'custom', rememberScope: 'device'})).toEqual({
+            mode: 'custom', hasStoredPassphrase: true, storageScope: 'device',
+        });
+        expect(session.map.has(cloudPassphraseSessionKey('webdav'))).toBe(false);
+        expect(device.map.get(cloudPassphraseDeviceKey('webdav'))).toEqual({version: 1, passphrase: CUSTOM_PASS});
+        expect(await store.configure({mode: 'custom', rememberScope: 'session'})).toEqual({
+            mode: 'custom', hasStoredPassphrase: true, storageScope: 'session',
+        });
+        expect(device.map.has(cloudPassphraseDeviceKey('webdav'))).toBe(false);
+        expect(session.map.get(cloudPassphraseSessionKey('webdav'))).toBe(CUSTOM_PASS);
         expect(await store.configure({mode: 'custom', passphrase: OTHER_PASS, rememberScope: 'device'})).toEqual({
             mode: 'custom', hasStoredPassphrase: true, storageScope: 'device',
         });

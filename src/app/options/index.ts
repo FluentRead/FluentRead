@@ -5,7 +5,7 @@
  * 模块边界：此文件只做 UI 依赖装配，不实现导航、设置保存或业务组件；OptionsApp 管理页面状态，各 feature 负责配置和词汇逻辑，WXT 入口决定启动时机。
  */
 import { createApp, type App, type Component } from 'vue'
-import {prepareInterfaceFont} from '@/src/ui/interfaceAppearance'
+import {persistPopupStartupAppearance, prepareInterfaceFont} from '@/src/ui/interfaceAppearance'
 import {
   ElButton,
   ElDialog,
@@ -50,7 +50,7 @@ import 'element-plus/es/components/color-picker/style/css'
 import '@/src/features/settings/ui/settings-page.css'
 import {createUiI18nPlugin} from '@/src/ui/i18n'
 import '@/src/ui/styles/interface-skins.css'
-import {config, configReady, getConfigHydrationStatus} from '@/src/services/config/store'
+import {config, configReady, getConfigHydrationStatus, subscribeConfig} from '@/src/services/config/store'
 import {ensureUiLanguageBundle} from '@/src/platform/i18n/uiLanguageBundles'
 
 const ELEMENT_COMPONENTS: Component[] = [
@@ -139,6 +139,9 @@ export async function mountOptionsApp(selector: string): Promise<void> {
     const app = createApp(OptionsApp)
     installOptionsApp(app)
     app.mount(selector)
+    app.onUnmount(subscribeConfig((nextConfig) => {
+      persistPopupStartupAppearance(nextConfig.interfaceSkin, nextConfig.theme)
+    }))
   } finally {
     target?.removeEventListener('pagehide', onPageHide)
   }

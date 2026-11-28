@@ -402,7 +402,7 @@
   opacity: 0.34;
 }
 
-/* === 12 套皮肤专属展台微缩材质特征 === */
+/* === 16 套皮肤专属展台微缩材质特征 === */
 .skin-card-stage[data-card-style="default"] {
   background-color: #eef1f6;
   background-image: radial-gradient(circle, rgba(23, 32, 51, 0.13) 1px, transparent 1px);
@@ -707,6 +707,96 @@
   box-shadow: 0 2px 10px rgba(212, 175, 55, 0.36);
 }
 
+.skin-card-stage[data-card-style="swiss-minimal"] {
+  background: #f2f3f5;
+}
+.skin-card-stage[data-card-style="swiss-minimal"][data-card-dark="true"] {
+  background: #08090c;
+}
+.skin-card-stage[data-card-style="swiss-minimal"] .skin-mini-popup {
+  border-color: #dde1e8;
+  box-shadow: 0 2px 8px -4px rgba(15, 17, 21, 0.12);
+}
+.skin-card-stage[data-card-style="swiss-minimal"][data-card-dark="true"] .skin-mini-popup {
+  border-color: #262a36;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.55);
+}
+.skin-card-stage[data-card-style="swiss-minimal"] .skin-mini-header {
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--mini-border);
+}
+.skin-card-stage[data-card-style="swiss-minimal"] .skin-mini-hero {
+  padding: 2px 0 3px;
+  border-bottom: 1px solid var(--mini-border);
+}
+.skin-card-stage[data-card-style="swiss-minimal"] .skin-mini-tiles > span {
+  border-color: transparent;
+  background: var(--mini-soft);
+}
+
+.skin-card-stage[data-card-style="golden-hour"] {
+  background:
+    radial-gradient(circle at 86% 14%, rgba(251, 146, 60, 0.72), transparent 52%),
+    radial-gradient(circle at 14% 24%, rgba(251, 113, 133, 0.56), transparent 52%),
+    linear-gradient(145deg, #fde4cc 0%, #fef0df 55%, #fde2e4 100%);
+}
+.skin-card-stage[data-card-style="golden-hour"][data-card-dark="true"] {
+  background:
+    radial-gradient(circle at 84% 12%, rgba(249, 115, 22, 0.42), transparent 54%),
+    radial-gradient(circle at 16% 90%, rgba(225, 29, 72, 0.34), transparent 54%),
+    #120a0e;
+}
+.skin-card-stage[data-card-style="golden-hour"] .skin-mini-popup {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 8px 20px -4px rgba(190, 36, 84, 0.24);
+}
+.skin-card-stage[data-card-style="golden-hour"] .skin-mini-cta {
+  box-shadow: 0 3px 10px rgba(207, 64, 14, 0.42);
+}
+.skin-card-stage[data-card-style="golden-hour"] .skin-mini-tiles > span:first-child > i { background: #ea580c; }
+.skin-card-stage[data-card-style="golden-hour"] .skin-mini-tiles > span:last-child > i { background: #e11d48; }
+
+.skin-card-stage[data-card-style="blueprint"] {
+  background-color: #051833;
+  background-image:
+    linear-gradient(rgba(186, 230, 253, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(186, 230, 253, 0.16) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+.skin-card-stage[data-card-style="blueprint"] .skin-mini-popup {
+  border: 1px solid rgba(186, 230, 253, 0.72);
+  border-bottom: 0;
+  border-radius: 2px 2px 0 0;
+  box-shadow: 0 0 14px rgba(14, 165, 233, 0.24);
+}
+.skin-card-stage[data-card-style="blueprint"] .skin-mini-tiles > span {
+  border-style: dashed;
+  border-color: rgba(147, 197, 253, 0.56);
+}
+.skin-card-stage[data-card-style="blueprint"] .skin-mini-cta {
+  box-shadow: 0 0 8px rgba(186, 230, 253, 0.42);
+}
+
+.skin-card-stage[data-card-style="starlight"] {
+  background:
+    radial-gradient(1.2px 1.2px at 18% 22%, rgba(255, 255, 255, 0.9) 50%, transparent 100%),
+    radial-gradient(1px 1px at 78% 18%, rgba(253, 230, 138, 0.9) 50%, transparent 100%),
+    radial-gradient(1.2px 1.2px at 86% 62%, rgba(196, 181, 253, 0.85) 50%, transparent 100%),
+    radial-gradient(circle at 22% 16%, rgba(99, 102, 241, 0.48), transparent 54%),
+    radial-gradient(circle at 82% 88%, rgba(139, 92, 246, 0.42), transparent 54%),
+    #050714;
+}
+.skin-card-stage[data-card-style="starlight"] .skin-mini-popup {
+  border: 1px solid rgba(165, 180, 252, 0.52);
+  border-bottom: 0;
+  box-shadow: inset 0 1px 0 rgba(224, 231, 255, 0.28), 0 8px 22px rgba(3, 5, 18, 0.72);
+}
+.skin-card-stage[data-card-style="starlight"] .skin-mini-cta {
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.55);
+}
+.skin-card-stage[data-card-style="starlight"] .skin-mini-tiles > span:first-child > i { background: #a5b4fc; }
+.skin-card-stage[data-card-style="starlight"] .skin-mini-tiles > span:last-child > i { background: #fde68a; }
+
 /* 微缩卡左上角保留品牌玫红原色，仅叠加各皮肤专属外缘趣味细节 */
 .skin-card-stage[data-card-style="liquid-glass"] .skin-mini-brand > i { box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.9); }
 .skin-card-stage[data-card-style="aurora"] .skin-mini-brand > i { box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.75); }
@@ -719,6 +809,10 @@
 .skin-card-stage[data-card-style="sakura"] .skin-mini-brand > i { box-shadow: 0 0 0 1px #fda4af; }
 .skin-card-stage[data-card-style="matcha"] .skin-mini-brand > i { box-shadow: 0 0 0 1px #4ade80; }
 .skin-card-stage[data-card-style="midnight-gold"] .skin-mini-brand > i { box-shadow: 0 0 0 1px #e5c372; }
+.skin-card-stage[data-card-style="swiss-minimal"] .skin-mini-brand > i { box-shadow: 0 0 0 1px rgba(15, 17, 21, 0.22); }
+.skin-card-stage[data-card-style="golden-hour"] .skin-mini-brand > i { box-shadow: 0 0 0 1px #fb923c; }
+.skin-card-stage[data-card-style="blueprint"] .skin-mini-brand > i { box-shadow: 0 0 0 1px #7dd3fc; }
+.skin-card-stage[data-card-style="starlight"] .skin-mini-brand > i { box-shadow: 0 0 0 1px #c4b5fd, 0 0 4px rgba(165, 180, 252, 0.65); }
 
 .skin-card-dark-badge {
   position: absolute;

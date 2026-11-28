@@ -761,26 +761,22 @@ describe('漫画推理阶段超时契约', () => {
         expect(vi.getTimerCount()).toBe(0);
     });
 
-    it('下载空闲满 120 秒才重建 CPU Worker，CPU 下载空闲也限 120 秒', async () => {
+    it('准备阶段下载空闲满 120 秒抛出资源错误，终止卡住 Worker 且不误判回退 CPU', async () => {
         const {client, workers} = harness();
         const pending = observe(client.prepare('inpaint'));
         await flush();
         workers[0].emit({stage: 'preparing'});
         await vi.advanceTimersByTimeAsync(119_999);
         expect(workers).toHaveLength(1);
+        expect(workers[0].terminate).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1);
-        expect(workers).toHaveLength(2);
-        expect(workers[1].latest.cpu).toBe(true);
-        workers[1].emit({stage: 'preparing', percent: 50});
-        await vi.advanceTimersByTimeAsync(119_999);
-        expect(workers[1].terminate).not.toHaveBeenCalled();
-        await vi.advanceTimersByTimeAsync(1);
-        await expect(pending).resolves.toMatchObject({status: 'rejected', reason: {message: expect.stringContaining('超时')}});
-        expect(workers[1].terminate).toHaveBeenCalledOnce();
-        expect(workers).toHaveLength(2);
+        await expect(pending).resolves.toMatchObject({status: 'rejected', reason: {name: 'MangaModelAssetError', message: expect.stringContaining('超时')}});
+        expect(workers[0].terminate).toHaveBeenCalledOnce();
+        expect(workers).toHaveLength(1);
+        expect(client.getDiagnostics().cpuFallback).toBe(false);
     });
 
-    it('旧请求阶段消息不能重置当前初始化看守期限', async () => {
+    it('旧请求阶段消息不能重置当前初始化看守期限，LaMa GPU 初始化允许 45 秒', async () => {
         const {client, workers} = harness();
         const prepared = client.prepare('ocr');
         await flush();
@@ -790,8 +786,9 @@ describe('漫画推理阶段超时契约', () => {
         const pending = client.prepare('inpaint');
         await flush();
         workers[0].emit({stage: 'initializing'});
-        await vi.advanceTimersByTimeAsync(14_999);
+        await vi.advanceTimersByTimeAsync(44_999);
         workers[0].emit({requestId: oldRequest, stage: 'preparing', percent: 50});
+        expect(workers[0].terminate).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1);
         expect(workers[0].terminate).toHaveBeenCalledOnce();
         expect(workers).toHaveLength(2);
@@ -1149,5 +1146,31 @@ describe('漫画推理协作取消与端口清理', () => {
         workers[1].emit(); await relPainter;
         expect(workers[1].terminate).toHaveBeenCalledOnce();
         expect(client.getDiagnostics().cpuFallback).toBe(false);
+    });
+
+    it('资源下载错误保留健康 GPU Worker 与执行后端，且同步维护下载状态快照', async () => {
+        const {client, workers} = harness();
+        expect(client.getDownloadState()).toBeUndefined();
+        const ocr = client.prepare('ocr'); await flush();
+        workers[0].emit({executionProviders: ['webgpu', 'wasm']});
+        workers[0].emit(); await ocr;
+        const snap = {phase: 'downloading' as const, file: 'lama-manga-dynamic.onnx', loaded: 50, total: 100, source: 'huggingface.co'};
+        const firstFail = observe(client.prepare('inpaint')); await flush();
+        workers[0].emit({download: snap});
+        expect(client.getDownloadState()).toEqual(snap);
+        expect(client.getDownloadState()).not.toBe(snap);
+        workers[0].emit({download: null});
+        expect(client.getDownloadState()).toBeUndefined();
+        workers[0].emit({success: false, errorKind: 'asset', error: '网络超时'});
+        await expect(firstFail).resolves.toMatchObject({status: 'rejected', reason: {name: 'MangaModelAssetError', message: '网络超时'}});
+        expect(workers).toHaveLength(1);
+        expect(workers[0].terminate).not.toHaveBeenCalled();
+        expect(client.getDiagnostics()).toMatchObject({cpuFallback: false, executionProviders: ['webgpu', 'wasm']});
+        const defaultMsgFail = observe(client.prepare('inpaint')); await flush();
+        workers[0].emit({download: snap});
+        workers[0].emit({success: false, errorKind: 'asset'});
+        await expect(defaultMsgFail).resolves.toMatchObject({status: 'rejected', reason: {name: 'MangaModelAssetError', message: expect.stringContaining('下载未完成')}});
+        client.dispose();
+        expect(client.getDownloadState()).toBeUndefined();
     });
 });

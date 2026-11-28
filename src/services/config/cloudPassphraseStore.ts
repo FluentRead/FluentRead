@@ -138,18 +138,23 @@ export function createCloudPassphraseStore(ports: CloudPassphraseStorePorts) {
         if (scope !== 'none' && scope !== 'session' && scope !== 'device') {
             throw new DriveEncryptionError('口令留存范围无效', 'unsupported');
         }
-        if (input.passphrase !== undefined) {
-            validateDrivePassphrase(input.passphrase);
+        let effectivePassphrase = input.passphrase;
+        if (effectivePassphrase !== undefined) {
+            validateDrivePassphrase(effectivePassphrase);
         } else if (scope !== 'none') {
-            throw new DriveEncryptionError('请输入至少 12 个字符的自定义端到端同步口令', 'invalid-passphrase');
+            const existing = await readStoredPassphrase();
+            if (!existing.passphrase) {
+                throw new DriveEncryptionError('请输入至少 12 个字符的自定义端到端同步口令', 'invalid-passphrase');
+            }
+            effectivePassphrase = existing.passphrase;
         }
         await ports.deviceStorage.setItem<StoredModeRecord>(modeKey, {version: 1, mode: 'custom'});
         if (scope === 'device') {
-            await ports.deviceStorage.setItem<StoredDevicePassphraseRecord>(deviceKey, {version: 1, passphrase: input.passphrase!});
+            await ports.deviceStorage.setItem<StoredDevicePassphraseRecord>(deviceKey, {version: 1, passphrase: effectivePassphrase!});
             await writeSessionPassphrase(null);
         } else if (scope === 'session') {
             await ports.deviceStorage.removeItem(deviceKey);
-            await writeSessionPassphrase(input.passphrase!);
+            await writeSessionPassphrase(effectivePassphrase!);
         } else {
             await ports.deviceStorage.removeItem(deviceKey);
             await writeSessionPassphrase(null);

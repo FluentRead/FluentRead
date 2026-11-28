@@ -193,71 +193,135 @@ function fullClient() {
 }
 
 describe('RemoteConfigSync upgraded E2EE, learning sync, and auto-sync UI & client contracts', () => {
-    it('configures custom E2EE passphrase with validation, strength feedback, forget, and auto-switches on passphraseRequired', async () => {
+    it('guides custom E2EE setup via dialog, supports unlocked retention switch, lock, inline unlock, and disable confirmation', async () => {
         const client = fullClient();
         const host = await mountRemote(client);
 
-        expect(host.querySelector('[data-testid="cloud-e2ee-status"]')?.textContent).toBe('settings.cloud.e2ee.statusLegacy');
+        // Default compatible mode is a single compact switch row
+        expect(host.querySelector('[data-testid="cloud-e2ee-status"]')?.textContent).toBe('settings.cloud.e2ee.badgeLegacy');
+        expect(host.querySelector('[data-testid="cloud-e2ee-toggle"]')?.getAttribute('aria-checked')).toBe('false');
+        expect(host.querySelector('[data-testid="cloud-e2ee-unlocked"]')).toBeNull();
+        expect(host.querySelector('[data-testid="cloud-e2ee-unlock-bar"]')).toBeNull();
 
-        // Switch to custom mode -> validate mismatch & strength -> apply -> forget
-        const customRadio = host.querySelector<HTMLInputElement>('[data-testid="cloud-e2ee-mode-custom"]')!;
-        customRadio.checked = true;
-        customRadio.dispatchEvent(new dom.window.Event('change', {bubbles: true}));
+        // Turning on opens setup dialog; cancelling leaves compatible mode untouched
+        await click(host, '[data-testid="cloud-e2ee-toggle"]');
+        expect(host.querySelector('[data-testid="cloud-e2ee-setup-passphrase"]')).not.toBeNull();
+        await click(host, '[data-testid="cloud-e2ee-setup-cancel"]');
+        expect(host.querySelector('[data-testid="cloud-e2ee-setup-passphrase"]')).toBeNull();
+        expect(host.querySelector('[data-testid="cloud-e2ee-toggle"]')?.getAttribute('aria-checked')).toBe('false');
+
+        // Reopen setup dialog -> validate strength, confirm hint, mismatch, risk ack -> enable
+        await click(host, '[data-testid="cloud-e2ee-toggle"]');
+        await typeInput(host, '[data-testid="cloud-e2ee-setup-passphrase"]', 'short');
+        expect(host.querySelector('[data-testid="cloud-e2ee-setup-strength"]')?.textContent).toBe('settings.cloud.e2ee.strength.too-short');
+        expect(host.querySelector<HTMLButtonElement>('[data-testid="cloud-e2ee-setup-confirm-btn"]')!.disabled).toBe(true);
+
+        await typeInput(host, '[data-testid="cloud-e2ee-setup-passphrase"]', 'StrongPassphrase!2026');
+        expect(host.querySelector('[data-testid="cloud-e2ee-setup-strength"]')?.textContent).toBe('settings.cloud.e2ee.strength.strong');
+        expect(host.querySelector('[data-testid="cloud-e2ee-setup-confirm-hint"]')?.textContent).toBe('settings.cloud.e2ee.confirmPlaceholder');
+        await typeInput(host, '[data-testid="cloud-e2ee-setup-confirm"]', 'DifferentPassphrase!2026');
+        expect(host.querySelector('[data-testid="cloud-e2ee-setup-mismatch"]')).not.toBeNull();
+        expect(host.querySelector<HTMLButtonElement>('[data-testid="cloud-e2ee-setup-confirm-btn"]')!.disabled).toBe(true);
+
+        await typeInput(host, '[data-testid="cloud-e2ee-setup-confirm"]', 'StrongPassphrase!2026');
+        expect(host.querySelector('[data-testid="cloud-e2ee-setup-mismatch"]')).toBeNull();
+        // Still disabled until risk acknowledgment checkbox is ticked
+        expect(host.querySelector<HTMLButtonElement>('[data-testid="cloud-e2ee-setup-confirm-btn"]')!.disabled).toBe(true);
+        const ack = host.querySelector<HTMLInputElement>('[data-testid="cloud-e2ee-setup-ack"]')!;
+        ack.checked = true;
+        ack.dispatchEvent(new dom.window.Event('change', {bubbles: true}));
         await settle();
 
-        await typeInput(host, '[data-testid="cloud-e2ee-passphrase"]', 'short');
-        expect(host.querySelector('[data-testid="cloud-e2ee-strength"]')?.textContent).toBe('settings.cloud.e2ee.strength.too-short');
-        expect(host.querySelector<HTMLButtonElement>('[data-testid="cloud-e2ee-apply"]')!.disabled).toBe(true);
-
-        await typeInput(host, '[data-testid="cloud-e2ee-passphrase"]', 'StrongPassphrase!2026');
-        expect(host.querySelector('[data-testid="cloud-e2ee-strength"]')?.textContent).toBe('settings.cloud.e2ee.strength.strong');
-        await typeInput(host, '[data-testid="cloud-e2ee-confirm"]', 'DifferentPassphrase!2026');
-        expect(host.querySelector('[data-testid="cloud-e2ee-mismatch"]')).not.toBeNull();
-        expect(host.querySelector<HTMLButtonElement>('[data-testid="cloud-e2ee-apply"]')!.disabled).toBe(true);
-
-        await typeInput(host, '[data-testid="cloud-e2ee-confirm"]', 'StrongPassphrase!2026');
-        expect(host.querySelector('[data-testid="cloud-e2ee-mismatch"]')).toBeNull();
-        await click(host, '[data-testid="cloud-e2ee-apply"]');
+        await click(host, '[data-testid="cloud-e2ee-setup-confirm-btn"]');
         expect(client.configurePassphrase).toHaveBeenCalledWith({
             mode: 'custom',
             rememberScope: 'session',
             passphrase: 'StrongPassphrase!2026',
         });
-        expect(host.querySelector('[data-testid="cloud-e2ee-status"]')?.textContent).toBe('settings.cloud.e2ee.statusSession');
+        expect(host.querySelector('[data-testid="cloud-e2ee-status"]')?.textContent).toBe('settings.cloud.e2ee.rememberSessionTitle');
+        expect(host.querySelector('[data-testid="cloud-e2ee-unlocked"]')).not.toBeNull();
+        expect(host.querySelector('[data-testid="cloud-e2ee-upgrade-hint"]')).not.toBeNull();
 
-        // One-click forget clears stored passphrase
+        // Adaptive sensitive consent dialog reflects custom E2EE protection
+        await click(host, '[data-testid="cloud-include-sensitive"]');
+        expect(host.querySelector('[data-testid="cloud-consent-risk-text"]')?.textContent).toBe('settings.cloud.e2ee.consentRisk');
+        await click(host, '[data-testid="cloud-consent-cancel"]');
+
+        // WebDAV auto-sync enabled while on session retention shows nudge with one-click switch to device
+        await click(host, '[data-testid="cloud-auto-sync-enabled"]');
+        expect(host.querySelector('[data-testid="cloud-e2ee-autosync-nudge"]')).not.toBeNull();
+        await click(host, '[data-testid="cloud-e2ee-autosync-fix"]');
+        expect(client.configurePassphrase).toHaveBeenLastCalledWith({mode: 'custom', rememberScope: 'device'});
+        expect(host.querySelector('[data-testid="cloud-e2ee-status"]')?.textContent).toBe('settings.cloud.e2ee.rememberDeviceTitle');
+        expect(host.querySelector('[data-testid="cloud-e2ee-autosync-nudge"]')).toBeNull();
+
+        // Lock clears stored passphrase -> inline single-input unlock bar appears
         await click(host, '[data-testid="cloud-e2ee-forget"]');
         expect(client.clearPassphrase).toHaveBeenCalledOnce();
-        expect(host.querySelector('[data-testid="cloud-e2ee-status"]')?.textContent).toBe('settings.cloud.e2ee.statusLocked');
+        expect(host.querySelector('[data-testid="cloud-e2ee-status"]')?.textContent).toBe('settings.cloud.e2ee.badgeLocked');
+        expect(host.querySelector('[data-testid="cloud-e2ee-unlock-bar"]')).not.toBeNull();
 
-        // Passphrase-required error when syncing in app mode switches mode to custom automatically
-        const appRadio = host.querySelector<HTMLInputElement>('[data-testid="cloud-e2ee-mode-app"]')!;
-        appRadio.checked = true;
-        appRadio.dispatchEvent(new dom.window.Event('change', {bubbles: true}));
-        await settle();
+        // Clicking sync while locked with empty input blocks network call and shows inline validation
+        await click(host, '[data-testid="webdav-sync-now"]');
+        expect(client.prepare).not.toHaveBeenCalled();
+        expect(host.querySelector('[data-testid="cloud-e2ee-validation-error"]')?.textContent).toBe('settings.cloud.e2ee.passphraseRequired');
+
+        // Direct sync from inline unlock bar verifies and auto-persists chosen retention on commit
+        await typeInput(host, '[data-testid="cloud-e2ee-passphrase"]', 'StrongPassphrase!2026');
+        await click(host, '[data-testid="webdav-sync-now"]');
+        expect(client.prepare).toHaveBeenCalledWith(false, expect.objectContaining({
+            keyMode: 'custom',
+            passphrase: 'StrongPassphrase!2026',
+        }));
+        await click(host, '[data-testid="webdav-confirm"]');
+        expect(client.configurePassphrase).toHaveBeenLastCalledWith({
+            mode: 'custom',
+            rememberScope: 'device',
+            passphrase: 'StrongPassphrase!2026',
+        });
+        expect(host.querySelector('[data-testid="cloud-e2ee-unlocked"]')).not.toBeNull();
+
+        // Toggling switch off opens disable confirmation dialog; confirm atomically switches back to legacy mode
+        await click(host, '[data-testid="cloud-e2ee-toggle"]');
+        expect(host.querySelector('[data-testid="cloud-e2ee-disable-confirm"]')).not.toBeNull();
+        await click(host, '[data-testid="cloud-e2ee-disable-confirm"]');
+        expect(client.configurePassphrase).toHaveBeenLastCalledWith({mode: 'app'});
+        expect(host.querySelector('[data-testid="cloud-e2ee-status"]')?.textContent).toBe('settings.cloud.e2ee.badgeLegacy');
+
+        // Passphrase-required error when syncing in legacy mode automatically opens inline single-input unlock bar
         client.prepare.mockRejectedValueOnce(new CloudBackupRequestError('locked', 'settings.cloud.e2ee.passphraseRequired'));
         await click(host, '[data-testid="webdav-sync-now"]');
-        expect(host.querySelector<HTMLInputElement>('[data-testid="cloud-e2ee-mode-custom"]')!.checked).toBe(true);
+        expect(host.querySelector('[data-testid="cloud-e2ee-toggle"]')?.getAttribute('aria-checked')).toBe('true');
+        expect(host.querySelector('[data-testid="cloud-e2ee-unlock-bar"]')).not.toBeNull();
+        expect(host.querySelector('[data-testid="cloud-e2ee-unlock-hint"]')?.textContent).toBe('settings.cloud.e2ee.passphraseRequired');
     });
 
-    it('toggles learning assets, displays per-category diff & E2EE upgrade banner, and controls WebDAV auto-sync', async () => {
+    it('merges learning assets into a single toggle placed right after basic settings, and controls WebDAV auto-sync', async () => {
         const client = fullClient();
         const host = await mountRemote(client);
 
-        // Learning toggles default OFF; enabling vocabulary reveals context sub-toggle
-        expect(host.querySelector('[data-testid="cloud-include-vocabulary-context"]')).toBeNull();
-        await click(host, '[data-testid="cloud-include-vocabulary"]');
-        expect(host.querySelector('[data-testid="cloud-include-vocabulary-context"]')).not.toBeNull();
-        await click(host, '[data-testid="cloud-include-corrections"]');
+        // Scope order: basic settings -> merged learning data -> sensitive settings
+        const scopeSwitchIds = [...host.querySelectorAll('[data-testid="cloud-sync-scope"] [role="switch"]')]
+            .map(el => el.getAttribute('data-testid'));
+        expect(scopeSwitchIds).toEqual([
+            'cloud-include-settings',
+            'cloud-include-learning',
+            'cloud-include-sensitive',
+        ]);
 
-        // Sync now sends learningScope and shows learning diff + E2EE upgrade banner in preview dialog
+        // Merged learning toggle defaults OFF; enabling reveals vocabulary context sub-toggle and enables all 3 categories
+        expect(host.querySelector('[data-testid="cloud-include-vocabulary-context"]')).toBeNull();
+        await click(host, '[data-testid="cloud-include-learning"]');
+        expect(host.querySelector('[data-testid="cloud-include-vocabulary-context"]')).not.toBeNull();
+
+        // Sync now sends all 3 learning categories enabled and shows per-category diff + E2EE upgrade banner in preview dialog
         await click(host, '[data-testid="webdav-sync-now"]');
         expect(client.prepare).toHaveBeenCalledWith(false, expect.objectContaining({
             learningScope: {
                 includeVocabulary: true,
                 includeVocabularyContext: false,
                 includePersonalCorrections: true,
-                includeReadingMaterials: false,
+                includeReadingMaterials: true,
             },
         }));
         expect(host.querySelector('[data-testid="cloud-e2ee-upgrade-notice"]')).not.toBeNull();
@@ -266,29 +330,40 @@ describe('RemoteConfigSync upgraded E2EE, learning sync, and auto-sync UI & clie
         await click(host, '[data-testid="webdav-confirm"]');
         expect(client.commit).toHaveBeenCalledWith('preview-upgrade-1', 'merge', {}, {keyMode: 'app'});
 
-        // WebDAV auto-sync toggle, interval change, and manual safe merge trigger
+        // Turning merged learning toggle off also clears vocabulary context sub-toggle
+        await click(host, '[data-testid="cloud-include-vocabulary-context"]');
+        await click(host, '[data-testid="cloud-include-learning"]');
+        expect(host.querySelector('[data-testid="cloud-include-vocabulary-context"]')).toBeNull();
+
+        // WebDAV auto-sync toggle, segmented interval change, and manual safe merge trigger
         await click(host, '[data-testid="cloud-auto-sync-enabled"]');
         expect(client.configureAutoSync).toHaveBeenCalledWith(expect.objectContaining({enabled: true}));
-        const select = host.querySelector<HTMLSelectElement>('[data-testid="cloud-auto-sync-interval"]')!;
-        Object.defineProperty(select, 'value', {configurable: true, value: '360'});
-        select.dispatchEvent(new dom.window.Event('change', {bubbles: true}));
-        await settle();
+        await click(host, '[data-testid="cloud-auto-sync-interval-360"]');
         expect(client.configureAutoSync).toHaveBeenLastCalledWith({intervalMinutes: 360});
         await click(host, '[data-testid="cloud-auto-sync-run-now"]');
         expect(client.runAutoSyncNow).toHaveBeenCalledOnce();
         expect(host.querySelector('[data-testid="cloud-auto-sync-status"]')?.textContent).toBe('settings.cloud.autoSync.statusSynced');
 
-        // Google Drive UI (without auto-sync) hides "(for auto-sync)" label in device retention option
+        // Google Drive UI (without auto-sync) shows no-auto-sync device retention hint and supports one-time setup
         const driveClient = fullClient();
         delete (driveClient as Partial<typeof driveClient>).autoSyncStatus;
         delete (driveClient as Partial<typeof driveClient>).configureAutoSync;
         delete (driveClient as Partial<typeof driveClient>).runAutoSyncNow;
         const driveHost = await mountRemote(driveClient, 'google-drive');
-        const driveCustom = driveHost.querySelector<HTMLInputElement>('[data-testid="cloud-e2ee-mode-custom"]')!;
-        driveCustom.checked = true;
-        driveCustom.dispatchEvent(new dom.window.Event('change', {bubbles: true}));
+        await click(driveHost, '[data-testid="cloud-e2ee-toggle"]');
+        await click(driveHost, '[data-testid="cloud-e2ee-setup-remember-device"]');
+        expect(driveHost.querySelector('[data-testid="cloud-e2ee-setup-remember-hint"]')?.textContent).toBe('settings.cloud.e2ee.rememberDeviceHint');
+        await click(driveHost, '[data-testid="cloud-e2ee-setup-remember-none"]');
+        await typeInput(driveHost, '[data-testid="cloud-e2ee-setup-passphrase"]', 'StrongPassphrase!2026');
+        await typeInput(driveHost, '[data-testid="cloud-e2ee-setup-confirm"]', 'StrongPassphrase!2026');
+        const driveAck = driveHost.querySelector<HTMLInputElement>('[data-testid="cloud-e2ee-setup-ack"]')!;
+        driveAck.checked = true;
+        driveAck.dispatchEvent(new dom.window.Event('change', {bubbles: true}));
         await settle();
-        expect(driveHost.querySelector('[data-testid="cloud-e2ee-remember"] option[value="device"]')?.textContent).toBe('settings.cloud.e2ee.rememberDeviceNoAutoSync');
+        await click(driveHost, '[data-testid="cloud-e2ee-setup-confirm-btn"]');
+        expect(driveClient.configurePassphrase).toHaveBeenCalledWith({mode: 'custom', rememberScope: 'none'});
+        expect(driveHost.querySelector('[data-testid="cloud-e2ee-ephemeral-ready"]')).not.toBeNull();
+        expect(driveHost.querySelector('[data-testid="cloud-e2ee-status"]')?.textContent).toBe('settings.cloud.e2ee.rememberNoneTitle');
     });
 
     it('sends extended passphrase, learningScope, and autoSync messages from typed clients', async () => {

@@ -14,7 +14,7 @@ import {
 } from '@/src/core/config/localTranslation';
 import {resolveLocalTranslationLanguageCode} from '@/src/core/language/localTranslation';
 import {createLocalTranslationDownloadManager} from './downloads';
-import type {LocalTranslationDownloadSnapshot} from '@/src/core/config/localTranslation';
+import type {LocalTranslationDownloadOptions, LocalTranslationDownloadSnapshot} from '@/src/core/config/localTranslation';
 import {readWorkerRequestId} from '@/src/core/messaging/validation';
 import {parseLocalTranslationWorkerResponse, type LocalTranslationWorkerCommand as WorkerCommand, type LocalTranslationWorkerResponse as WorkerResponse} from '../workerProtocol';
 
@@ -273,8 +273,11 @@ export async function translateLocalText(
     finally { activeTranslations--; scheduleIdleDispose(); }
 }
 
-export async function prepareLocalTranslationModel(modelValue: unknown): Promise<LocalTranslationDownloadSnapshot> {
-    return downloads.start(modelValue);
+export async function prepareLocalTranslationModel(
+    modelValue: unknown,
+    options?: LocalTranslationDownloadOptions,
+): Promise<LocalTranslationDownloadSnapshot> {
+    return options?.preference || options?.mirrorUrl ? downloads.start(modelValue, options) : downloads.start(modelValue);
 }
 
 export async function getLocalTranslationModelStatus(): Promise<{

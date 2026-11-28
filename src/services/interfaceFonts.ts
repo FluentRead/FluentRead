@@ -205,15 +205,15 @@ export function createInterfaceFontLoader(deps: Dependencies) {
         if (!assets.length) return true
         try {
           const cache = await deps.openCache()
-          const verified: Array<{asset: InterfaceFontAsset; data: ArrayBuffer}> = []
-          for (const asset of assets) {
+          const verified = await Promise.all(assets.map(async asset => {
             const response = await cache.match(cacheKey(asset))
-            if (!response) return false
+            if (!response) return null
             const data = await response.arrayBuffer()
             await verifyInterfaceFont(asset, data, deps.digest)
-            verified.push({asset, data})
-          }
-          for (const {asset, data} of verified) await install(asset, data, true)
+            return {asset, data}
+          }))
+          if (verified.some(item => item === null)) return false
+          await Promise.all(verified.map(item => install(item!.asset, item!.data, true)))
           return true
         } catch {
           return false

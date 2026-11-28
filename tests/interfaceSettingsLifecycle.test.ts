@@ -322,7 +322,7 @@ describe('实际界面字体设置与所属确认', () => {
       else delete globalThis.__FLUENTREAD_ICON_DATA__
     }
   })
-  it('全部 12 套皮肤完整保留原版官方图标，11 套工艺皮肤叠加专属趣味外缘装饰', async () => {
+  it('全部 16 套皮肤完整保留原版官方图标，15 套工艺皮肤叠加专属趣味外缘装饰', async () => {
     const component = PopupPreview as runtime.Component
     for (const skin of interfaceSkinOptions) {
       const previewApp = createTestRenderer().createApp({render: () => runtime.h(component, {skin})})

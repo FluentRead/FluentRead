@@ -1,7 +1,7 @@
 <!--
  * @file src/ui/components/PopupBrandIcon.vue
- * 文件职责：在完整保留 FluentRead 原版官方品牌图标（不改色、不替换、不加滤镜）的前提下，为 11 套工艺 Popup 皮肤叠加趣味边缘装饰（挂件、角标、相框与轻交互），让不同主题更具灵动个性。
- * 主要内容：始终渲染原始 32×32 官方 <img> 图标；默认皮肤不加装饰；其余 11 套皮肤通过独立指针穿透 SVG 图层与 useId() 隔离渐变 ID，在图标外缘叠加液态玻璃星芒、极光星轨、拟物硬件 LED、新粗野漫画贴纸框、赛博 HUD 瞄准角标、复古像素光标、终端闪烁提示符、画报书签角标、樱花花饰、抹茶茶芽与黑金皇冠。
+ * 文件职责：在完整保留 FluentRead 原版官方品牌图标（不改色、不替换、不加滤镜）的前提下，为 15 套工艺 Popup 皮肤叠加趣味边缘装饰（挂件、角标、相框与轻交互），让不同主题更具灵动个性。
+ * 主要内容：始终渲染原始 32×32 官方 <img> 图标；默认皮肤不加装饰；其余 15 套皮肤通过独立指针穿透 SVG 图层与 useId() 隔离渐变 ID，在图标外缘叠加液态玻璃星芒、极光星轨、拟物硬件 LED、新粗野漫画贴纸框、赛博 HUD 瞄准角标、复古像素光标、终端闪烁提示符、画报书签角标、樱花花饰、抹茶茶芽、黑金皇冠、极简取景角线、落日耀芒、蓝图准星与星穹弯月。
  * 模块边界：纯展示包装组件，不读取配置或存储、不触发网络请求，始终把原始图标完整呈现给用户。
  -->
 <template>
@@ -132,6 +132,52 @@
         <g class="charm-accent" transform="translate(27.5 0.5) rotate(16)">
           <path d="M-5.5 3.5L-6.8 -3L-2.5 0.2L0 -4.8L2.5 0.2L6.8 -3L5.5 3.5Z" :fill="`url(#${uid}-mg)`" stroke="#140f05" stroke-width="1" stroke-linejoin="round" />
         </g>
+      </template>
+
+      <!-- 12. 素净极简：瑞士取景器极细四角裁切线 -->
+      <template v-else-if="skin === 'swiss-minimal'">
+        <path d="M-2.5 3.5V-2.5H3.5M28.5 -2.5H34.5V3.5M34.5 28.5V34.5H28.5M3.5 34.5H-2.5V28.5" stroke="currentColor" stroke-opacity="0.46" stroke-width="1.15" stroke-linecap="square" />
+      </template>
+
+      <!-- 13. 落日熔金：暖金日落光环 + 右上跃出微日耀芒 -->
+      <template v-else-if="skin === 'golden-hour'">
+        <defs>
+          <linearGradient :id="`${uid}-gh`" x1="0" y1="32" x2="34" y2="-2" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#f97316" />
+            <stop offset="55%" stop-color="#fbbf24" />
+            <stop offset="100%" stop-color="#f43f5e" />
+          </linearGradient>
+        </defs>
+        <path d="M-2 22A19 19 0 0 0 28 33" :stroke="`url(#${uid}-gh)`" stroke-opacity="0.72" stroke-width="1.5" stroke-linecap="round" />
+        <g class="charm-accent" transform="translate(30 2)">
+          <circle cx="0" cy="0" r="4.2" :fill="`url(#${uid}-gh)`" stroke="#fffbf5" stroke-width="1.1" />
+          <path d="M0 -6.8v1.4M0 5.4v1.4M-6.8 0h1.4M5.4 0h1.4M-4.7 -4.7l1 1M3.7 3.7l1 1M4.7 -4.7l-1 1M-3.7 3.7l-1 1" stroke="#f97316" stroke-width="1.1" stroke-linecap="round" />
+        </g>
+      </template>
+
+      <!-- 14. 建筑蓝图：工程制图尺寸标线 + 右上精密准星 -->
+      <template v-else-if="skin === 'blueprint'">
+        <rect x="-2" y="-2" width="36" height="36" rx="2" stroke="#7dd3fc" stroke-opacity="0.78" stroke-width="1.1" stroke-dasharray="3 2" />
+        <path d="M-4.5 16h3M33.5 16h3M16 -4.5v3M16 33.5v3" stroke="#bae6fd" stroke-width="1.1" />
+        <g class="charm-accent" transform="translate(31 1)">
+          <circle cx="0" cy="0" r="3.6" fill="#061a38" stroke="#bae6fd" stroke-width="1.1" />
+          <path d="M-5.2 0h10.4M0 -5.2v10.4" stroke="#7dd3fc" stroke-width="1" />
+        </g>
+      </template>
+
+      <!-- 15. 星穹漫游：星轨弯月 + 四芒星尘 -->
+      <template v-else-if="skin === 'starlight'">
+        <defs>
+          <linearGradient :id="`${uid}-sl`" x1="-2" y1="32" x2="34" y2="-2" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#818cf8" />
+            <stop offset="60%" stop-color="#c4b5fd" />
+            <stop offset="100%" stop-color="#fde68a" />
+          </linearGradient>
+        </defs>
+        <path d="M-3 23.5C3.5 34 19 36.5 31 28" :stroke="`url(#${uid}-sl)`" stroke-opacity="0.78" stroke-width="1.5" stroke-linecap="round" />
+        <path class="charm-accent" d="M31.8 -2.8a4.8 4.8 0 1 0 3.4 7.4 3.6 3.6 0 1 1-3.4-7.4Z" fill="#fde68a" stroke="#6366f1" stroke-width="0.75" stroke-linejoin="round" />
+        <path d="M2 29l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1Z" fill="#e0e7ff" />
+        <circle cx="34.5" cy="22" r="1.3" fill="#a5b4fc" />
       </template>
     </svg>
   </span>

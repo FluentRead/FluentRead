@@ -945,7 +945,7 @@ describe('userscript browser shim injection', () => {
         expect(localTranslationKeys).toContain('settings.localTranslation.hunyuan3');
         const sidepanelKeys = ['title', 'openCenter', 'keyboardHint', 'openError', 'settingsError', 'startupError',
             'scope.label', 'scope.tab', 'scope.window', 'scope.description'].map(name => `sidepanel.${name}`);
-        const toolbarKeys = ['click.label', 'click.description', 'click.popup', 'click.translate', 'openPopup'].map(name => `toolbar.${name}`);
+        const toolbarKeys = ['click.label', 'click.description', 'click.popup', 'click.translate', 'openPopup', 'title.default', 'title.translate'].map(name => `toolbar.${name}`);
         expect(Object.keys(extension).filter(key => key.startsWith('toolbar.')).sort()).toEqual([...toolbarKeys].sort());
         const popupLayoutEditingKeys = Object.keys(extension).filter(key => key.startsWith('settings.interface.popupLayout.')
             && key !== 'settings.interface.popupLayout.label' && !key.startsWith('settings.interface.popupLayout.modules.'));
@@ -986,7 +986,13 @@ describe('userscript browser shim injection', () => {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
-        const retainedKeys = Object.keys(extension).filter(key => !extensionOnlyUndoKeys.includes(key) && !cloudUpgradeKeys.includes(key) && !key.startsWith('informationHighlight.') && !key.startsWith('dictionary.') && !key.startsWith('scenarioPresets.') && !key.startsWith('commandPalette.')
+        const privacyLogKeys = Object.keys(extension).filter(key => key.startsWith('privacy.log.'));
+        expect(privacyLogKeys.length).toBeGreaterThan(0);
+        for (const key of privacyLogKeys) {
+            expect(extension[key]).toBeTruthy();
+            expect(Object.hasOwn(projected, key)).toBe(false);
+        }
+        const retainedKeys = Object.keys(extension).filter(key => !extensionOnlyUndoKeys.includes(key) && !cloudUpgradeKeys.includes(key) && !privacyLogKeys.includes(key) && !key.startsWith('informationHighlight.') && !key.startsWith('dictionary.') && !key.startsWith('scenarioPresets.') && !key.startsWith('commandPalette.')
             && (!key.startsWith('learning.collection.speech') || key === 'learning.collection.speechFailed')
             && !noticeKeys.includes(key) && !learningKeys.includes(key) && !readingAnnotationKeys.includes(key) && !subtitleAppearanceKeys.includes(key) && !learningAppearanceKeys.includes(key) && !subtitleExportKeys.includes(key) && !videoAsrKeys.includes(key) && !subtitleModeShortcutKeys.includes(key) && !readerRecoveryKeys.includes(key)
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)
@@ -2927,7 +2933,7 @@ describe('userscript appearance registry data owner', () => {
         expect(ordered(api.interfaceFontOptions)).toEqual(ordered(originalAppearance.interfaceFontOptions));
         expect(ordered(api.popupModuleOptions)).toEqual(ordered(originalAppearance.popupModuleOptions));
         expect(ordered(api.popupQuickFeatureOptions)).toEqual(ordered(originalAppearance.popupQuickFeatureOptions));
-        expect(api.interfaceSkinOptions).toHaveLength(12);expect(api.interfaceFontOptions).toHaveLength(10);
+        expect(api.interfaceSkinOptions).toHaveLength(16);expect(api.interfaceFontOptions).toHaveLength(10);
         for(const skin of api.interfaceSkinOptions){expect(api.getInterfaceSkinOption(skin.value)).toBe(skin);expect(api.normalizeInterfaceSkin(skin.value)).toBe(skin.value);expect(api.interfaceSkinUsesContentHeight(skin.value)).toBe(originalAppearance.interfaceSkinUsesContentHeight(skin.value));}
         for(const font of api.interfaceFontOptions){expect(api.getInterfaceFontOption(font.value)).toBe(font);expect(api.normalizeInterfaceFont(font.value)).toBe(font.value);}
         for(const value of ['cheese','ocean','matcha','sakura','emoji','midnight','paper','aurora','arcade','sunset','unknown',null,1]){

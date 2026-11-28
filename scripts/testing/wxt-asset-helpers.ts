@@ -152,6 +152,7 @@ export function resolveExtensionBuildBudget(
         60_000, // mangaTranslationOptimizationBudget
         100_000, // popupSkinStudioBudget
         isChromium ? 650_000 : 1_100_000, // roadmapVideoDocWritingSyncOnboardingZhTwBudget
+        15_000, // localTranslationMirrorAndUiBudget
     ];
 
     return featureAdjustments.reduce((total, delta) => total + delta, baseBudget);

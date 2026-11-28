@@ -1227,6 +1227,7 @@ export default defineConfig({
                 'src/app/content/youtubeEmbedBootstrap.ts',
                 'src/features/video-subtitle/content/youtubeEmbedUrl.ts',
                 'src/features/video-subtitle/frameProtocol.ts',
+                'src/core/i18n/messages/toolbarAction.ts',
             ],
             exclude: ['**/*.d.ts'],
             thresholds: {

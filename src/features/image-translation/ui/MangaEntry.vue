@@ -1,22 +1,22 @@
 <!--
  * @file src/features/image-translation/ui/MangaEntry.vue
  * 文件职责：提供安静的漫画入口、实时进度遥测、按住对照原图按钮以及按需资源首次下载说明。
- * 主要内容：普通悬浮球不可见时在视口右侧停靠连贯悬浮操作坞，内置主入口（含进度计数徽标与上下文提示）、按住对照原图按钮及次级文字面板入口；唯一文字面板与入口共享打开状态与主题；弹窗配有柔和遮罩层并遵循显式深浅主题，按源语言说明资源，圈选页使用区域入口，路由、语言、服务或会话变化关闭旧阅读内容并释放对照原图态。
+ * 主要内容：普通悬浮球不可见时在视口左右侧停靠可按住拖动并贴边持久化的连贯悬浮操作坞，内置主入口（含进度计数徽标与上下文提示）、按住对照原图按钮及次级文字面板入口，活跃/处理期间保持按钮可见；唯一文字面板与入口共享打开状态与主题；弹窗配有柔和遮罩层并遵循显式深浅主题，按源语言说明资源，圈选页使用区域入口，路由、语言、服务或会话变化关闭旧阅读内容并释放对照原图态。
  * 模块边界：不自动展开阅读面板，不下载资源、不扫描图片；单页进度属于图片运行时，所有动作通过注入端口和可信事件执行，界面只属于 closed Shadow UI。
  -->
 <template>
-  <div v-if="standalone" ref="dock" class="fr-manga-dock" :class="{'is-expanded': dockExpanded}" :data-theme="resolvedTheme" :data-animated="settings.animations" @mouseenter="reveal" @mouseleave="retract" @focusin="reveal" @focusout="retract">
-    <button ref="launcher" class="fr-manga-launcher" :class="{'is-expanded': expanded || alwaysExpanded, 'is-touch': touchCapable, 'has-progress': !!progressPill}" type="button" :data-animated="settings.animations" :aria-label="actionLabel" :title="buttonTitle" :aria-pressed="status.active" :aria-busy="busy || status.pending" @mouseenter="reveal" @pointerdown="noteTouch" @pointermove="pointerReveal" @mouseleave="retract" @focusin="reveal" @focusout="retract" @keydown.esc.stop="collapseLauncher" @click="activate" @contextmenu.prevent="openSettings">
+  <div v-if="standalone" ref="dock" class="fr-manga-dock" :class="{'is-expanded': dockExpanded, 'is-dragging': isDragging}" :data-position="dockSide" :data-theme="resolvedTheme" :data-animated="settings.animations" :style="dockStyle" @mouseenter="reveal" @mouseleave="retract" @focusin="reveal" @focusout="retract">
+    <button ref="launcher" class="fr-manga-launcher" :class="{'is-expanded': expanded || alwaysExpanded || status.active || busy, 'is-touch': touchCapable, 'has-progress': !!progressPill}" type="button" :data-animated="settings.animations" :aria-label="actionLabel" :title="buttonTitle" :aria-pressed="status.active" :aria-busy="busy || status.pending" @mouseenter="reveal" @pointerdown="startDrag" @lostpointercapture="cancelDrag" @pointermove="pointerReveal" @mouseleave="retract" @focusin="reveal" @focusout="retract" @keydown.esc.stop="collapseLauncher" @click="activate" @contextmenu.prevent="openSettings">
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1m0-14c3-2 6-2 9-1v14c-3-1-6-1-9 1V6Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /><path d="M5.5 8.5h4v4h-2l-1.5 1v-1h-.5v-4Zm9.5.5h3m-3 3h3m-3 3h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
       <span v-if="progressPill" class="fr-manga-progress-pill" aria-hidden="true">{{ progressPill }}</span>
       <span v-if="busy || status.pending" class="fr-manga-spinner" aria-hidden="true" />
       <span v-else-if="status.errors" class="fr-manga-badge fr-manga-error-badge" aria-hidden="true">{{ errorBadge }}</span>
       <span v-else-if="status.active && completedCount > 0" class="fr-manga-badge" aria-hidden="true">✓</span>
     </button>
-    <button v-if="status.active && !status.areaFallback && completedCount > 0 && onPeekOriginal" ref="peekLauncher" class="fr-manga-peek-launcher" :class="{'is-expanded': expanded || alwaysExpanded || peeking, 'is-peeking': peeking, 'is-touch': touchCapable}" type="button" :aria-label="t('按住对照原图')" :aria-pressed="peeking" :title="t('按住对照原图')" @mouseenter="reveal" @pointerdown.stop="startPeek($event)" @pointerup.stop="stopPeek" @pointercancel.stop="stopPeek" @pointerleave="stopPeek" @blur="stopPeek" @mouseleave="retract" @focusin="reveal" @focusout="retract" @contextmenu.prevent @keydown="onPeekKeydown($event)" @keyup="onPeekKeyup($event)">
+    <button v-if="status.active && !status.areaFallback && completedCount > 0 && onPeekOriginal" ref="peekLauncher" class="fr-manga-peek-launcher is-expanded" :class="{'is-peeking': peeking, 'is-touch': touchCapable}" type="button" :aria-label="t('按住对照原图')" :aria-pressed="peeking" :title="t('按住对照原图')" @mouseenter="reveal" @pointerdown.stop="startPeek($event)" @pointerup.stop="stopPeek" @pointercancel.stop="stopPeek" @pointerleave="stopPeek" @blur="stopPeek" @mouseleave="retract" @focusin="reveal" @focusout="retract" @contextmenu.prevent @keydown="onPeekKeydown($event)" @keyup="onPeekKeyup($event)">
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" /><circle cx="12" cy="12" r="2.75" stroke="currentColor" stroke-width="1.7" /></svg>
     </button>
-    <button v-if="status.active && !status.areaFallback && readManga" ref="readingLauncher" class="fr-manga-reading-launcher" :class="{'is-expanded': expanded || readingOpen || readingState?.open, 'is-touch': touchCapable}" type="button" :aria-label="t(readingOpen || readingState?.open ? '关闭漫画文字' : '查看漫画文字')" :aria-expanded="!!(readingOpen || readingState?.open)" :title="t(readingOpen || readingState?.open ? '关闭漫画文字' : '查看漫画文字')" @mouseenter="reveal" @pointerdown="noteTouch" @mouseleave="retract" @focusin="reveal" @focusout="retract" @keydown.esc.stop="collapseLauncher" @click.stop="readManga($event)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 5h12M6 9.5h12M6 14h12M6 18.5h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /></svg></button>
+    <button v-if="status.active && !status.areaFallback && readManga" ref="readingLauncher" class="fr-manga-reading-launcher is-expanded" :class="{'is-touch': touchCapable}" type="button" :aria-label="t(readingOpen || readingState?.open ? '关闭漫画文字' : '查看漫画文字')" :aria-expanded="!!(readingOpen || readingState?.open)" :title="t(readingOpen || readingState?.open ? '关闭漫画文字' : '查看漫画文字')" @mouseenter="reveal" @pointerdown="noteTouch" @mouseleave="retract" @focusin="reveal" @focusout="retract" @keydown.esc.stop="collapseLauncher" @click.stop="readManga($event)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 5h12M6 9.5h12M6 14h12M6 18.5h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /></svg></button>
   </div>
   <MangaReadingPanel v-if="reading" ref="reader" :list="reading.list" :read="reading.read" :observe="reading.observe" :copy="reading.copy" :theme="reading.theme" :translate="t" @opened="readingChanged?.(true)" @closed="readingChanged?.(false)" />
   <div v-if="visible" class="fr-manga-backdrop" :data-theme="resolvedTheme" aria-hidden="true" @click="close" />
@@ -47,6 +47,7 @@ import type {MangaReadingList, MangaReadingResult} from '../content/mangaReading
 const props = defineProps<{
   status: MangaTranslationStatus; page: {site: string; route: string};
   settings: {sourceLanguage?: string; to?:string; service?:string; promptEnabled: boolean; floatingBallVisible: boolean; downloadConfirmed: boolean; animations: boolean; toolsDisplay?: string};
+  dockPosition?: {side: 'left' | 'right'; verticalPosition: number | null};
   toggle: () => void; inspectResources: () => Promise<boolean>; persist: (patch: Record<string, unknown>) => Promise<unknown>; openSettings: () => void;
   startAreaTranslation: () => Promise<boolean>;
   onPeekOriginal?: (peeking: boolean) => void;
@@ -94,15 +95,95 @@ const buttonTitle = computed(() => {
       : `${t('已翻译')} ${completedCount.value}/${pageCount.value} ${t('页')}`)
     : '';
   const ahead = props.status.active && (props.status.ahead ?? 0) > 0 ? `${t('已预译')} ${props.status.ahead} ${t('页')}` : '';
-  return [t('漫画翻译'), message, pct, summary, ahead, actionLabel.value].filter(Boolean).join(' · ');
+  return [t('漫画翻译'), message, pct, summary, ahead, actionLabel.value, t('按住拖动调整位置')].filter(Boolean).join(' · ');
 });
 let disposed = false, request = 0;
+const DRAG_THRESHOLD = 6;
 const dock = ref<HTMLElement | null>(null), dialog = ref<HTMLElement | null>(null), launcher = ref<HTMLButtonElement | null>(null), peekLauncher = ref<HTMLButtonElement | null>(null), readingLauncher = ref<HTMLButtonElement | null>(null), expanded = ref(false);
-const dockExpanded = computed(() => expanded.value || alwaysExpanded.value || peeking.value || !!props.readingOpen || !!props.readingState?.open);
+const dockSide = ref<'left' | 'right'>(props.dockPosition?.side === 'left' ? 'left' : 'right');
+const dockVertical = ref<number | null>(typeof props.dockPosition?.verticalPosition === 'number' ? props.dockPosition.verticalPosition : null);
+const isDragging = ref(false), dragX = ref(0), dragY = ref(0);
+const dockExpanded = computed(() => !isDragging.value && (expanded.value || alwaysExpanded.value || props.status.active || busy.value || peeking.value || !!props.readingOpen || !!props.readingState?.open));
+const dockStyle = computed(() => {
+  if (isDragging.value) return {left: `${dragX.value}px`, top: `${dragY.value}px`, right: 'auto', transform: 'none'};
+  const vertical = dockVertical.value;
+  if (vertical === null) return undefined;
+  const clamped = Math.max(0.06, Math.min(0.94, vertical));
+  return {top: `${(clamped * 100).toFixed(1)}%`};
+});
 const touchCapable = ref((typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0)
   || (typeof window !== 'undefined' && window.matchMedia?.('(any-pointer: coarse)').matches === true));
 const reader = ref<{open:(event:Event,from?:HTMLElement|null)=>Promise<boolean>;close:()=>void}|null>(null);
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
+interface DragGesture {id: number; startX: number; startY: number; offsetX: number; offsetY: number; width: number; height: number; moved: boolean}
+let dragGesture: DragGesture | undefined;
+let suppressDragClick = false;
+function clamp(value: number, min: number, max: number) {return Math.max(min, Math.min(max, value));}
+function releaseDrag() {
+  const current = dragGesture;
+  if (!current) return;
+  dragGesture = undefined;
+  if (launcher.value?.hasPointerCapture?.(current.id)) launcher.value.releasePointerCapture(current.id);
+  window.removeEventListener('pointermove', handleDragMove, true);
+  window.removeEventListener('pointerup', finishDrag, true);
+  window.removeEventListener('pointercancel', cancelDrag, true);
+  window.removeEventListener('blur', cancelActiveDrag);
+  isDragging.value = false;
+}
+function cancelActiveDrag() {suppressDragClick = true; releaseDrag();}
+function cancelDrag(event?: PointerEvent) {if (dragGesture && (!event || dragGesture.id === event.pointerId)) cancelActiveDrag();}
+function updateDragPoint(current: DragGesture, clientX: number, clientY: number) {
+  const maxX = Math.max(0, window.innerWidth - current.width);
+  const maxY = Math.max(0, window.innerHeight - current.height);
+  dragX.value = clamp(clientX - current.offsetX, 0, maxX);
+  dragY.value = clamp(clientY - current.offsetY, 0, maxY);
+}
+function handleDragMove(event: PointerEvent) {
+  const current = dragGesture!;
+  if (current.id !== event.pointerId) return;
+  if (!current.moved) {
+    if (Math.hypot(event.clientX - current.startX, event.clientY - current.startY) <= DRAG_THRESHOLD) return;
+    current.moved = true;
+    suppressDragClick = true;
+    clearIdle();
+    launcher.value?.setPointerCapture?.(current.id);
+    isDragging.value = true;
+  }
+  updateDragPoint(current, event.clientX, event.clientY);
+}
+function finishDrag(event: PointerEvent) {
+  const current = dragGesture!;
+  if (current.id !== event.pointerId) return;
+  if (current.moved || Math.hypot(event.clientX - current.startX, event.clientY - current.startY) > DRAG_THRESHOLD) {
+    suppressDragClick = true;
+    updateDragPoint(current, event.clientX, event.clientY);
+    const nextSide: 'left' | 'right' = dragX.value + current.width / 2 < window.innerWidth / 2 ? 'left' : 'right';
+    const nextVertical = clamp((dragY.value + current.height / 2) / Math.max(1, window.innerHeight), 0.06, 0.94);
+    dockSide.value = nextSide;
+    dockVertical.value = nextVertical;
+    void props.persist({floatingBallPosition: nextSide, floatingBallVerticalPosition: nextVertical}).catch(() => undefined);
+  }
+  releaseDrag();
+}
+function startDrag(event: PointerEvent) {
+  noteTouch(event);
+  if (dragGesture || event.button !== 0 || event.isPrimary === false || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY) || typeof window === 'undefined') return;
+  const target = launcher.value;
+  if (!target?.getBoundingClientRect) return;
+  const rect = target.getBoundingClientRect();
+  const width = rect.width || 36, height = rect.height || 36;
+  suppressDragClick = false;
+  dragGesture = {
+    id: event.pointerId, startX: event.clientX, startY: event.clientY,
+    offsetX: clamp(event.clientX - rect.left, 0, width),
+    offsetY: clamp(event.clientY - rect.top, 0, height),
+    width, height, moved: false,
+  };
+  window.addEventListener('pointermove', handleDragMove, {capture: true, passive: true});
+  window.addEventListener('pointerup', finishDrag, true);
+  window.addEventListener('pointercancel', cancelDrag, true);
+  window.addEventListener('blur', cancelActiveDrag);
+}
 function hasVisibleFocus() {return [launcher.value, peekLauncher.value, readingLauncher.value].some(el => !!el?.matches(':focus-visible'));}
 function clearIdle() {if (idleTimer !== null) clearTimeout(idleTimer);idleTimer = null;}
 function reveal() {
@@ -143,7 +224,10 @@ function stopPeek() {
   props.onPeekOriginal?.(false);
 }
 function collapseLauncher() {stopPeek();launcher.value?.blur();peekLauncher.value?.blur();readingLauncher.value?.blur();clearIdle();expanded.value = false;}
-function activate(event: MouseEvent) {void start();if (event.detail > 0) launcher.value?.blur();reveal();}
+function activate(event: MouseEvent) {
+  if (suppressDragClick) {suppressDragClick = false; return;}
+  void start();if (event.detail > 0) launcher.value?.blur();reveal();
+}
 function close() {request++;busy.value = false;consent.value = false;error.value = '';}
 async function start() {
   if (busy.value || !props.status.available) return;
@@ -181,8 +265,10 @@ watch(() => [props.settings.to,props.settings.service], closeReading);
 watch(() => props.status.active, active => {close();if (!active) {stopPeek();closeReading();}}, {flush:'sync'});
 watch(() => props.status.areaFallback, () => {stopPeek();close();closeReading();}, {flush:'sync'});
 watch(() => props.status.available, available => {if (!available) {stopPeek();close();closeReading();}}, {flush:'sync'});
-watch(standalone, () => {stopPeek();clearIdle();expanded.value = false;});
+watch(() => props.dockPosition?.side, side => {if (side === 'left' || side === 'right') {releaseDrag(); dockSide.value = side;}});
+watch(() => props.dockPosition?.verticalPosition, vertical => {if (vertical === null || typeof vertical === 'number') {releaseDrag(); dockVertical.value = vertical;}});
+watch(standalone, () => {releaseDrag();stopPeek();clearIdle();expanded.value = false;});
 watch(visible, async shown => {if (!shown) return;await nextTick();if (!disposed && visible.value) dialog.value?.focus({preventScroll: true});});
-onBeforeUnmount(() => {disposed = true;stopPeek();clearIdle();close();});
+onBeforeUnmount(() => {disposed = true;releaseDrag();stopPeek();clearIdle();close();});
 defineExpose({open: start, openReading:(event:Event,from?:HTMLElement|null) => props.status.active && props.status.available && !props.status.areaFallback ? reader.value?.open(event,from) ?? Promise.resolve(false) : Promise.resolve(false), closeReading});
 </script>

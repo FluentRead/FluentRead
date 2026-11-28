@@ -349,6 +349,46 @@ it('漫画源字号在修补前用原文字观察，译文长度与源框/清字
     expect(canvases[0].context.getImageData).toHaveBeenCalledOnce();expect(mocks.sampleManga.mock.invocationCallOrder[0]).toBeLessThan(mocks.repair.mock.invocationCallOrder[0]);
 });
 
+it('漫画修补模型资源失败时回退确定性清字，非资源错误或已取消时继续抛出',async()=>{
+    const {MangaModelAssetError}=await import('@/src/features/image-translation/services/mangaOcrAssets');
+    const source={text:'SOURCE',bbox:{x0:40,y0:40,x1:160,y1:64},fontSize:24,sourceBoxes:[{x0:40,y0:40,x1:160,y1:64}]};
+    const makePixels=()=>new Uint8ClampedArray(240*120*4).fill(255);
+    // 1. 复杂背景模型下载失败时回退确定性 inpaintTextRegions 并正常渲染译文
+    ordinaryAlphaCanvas(240,120,makePixels());
+    mocks.mangaRecognize.mockResolvedValueOnce([source]);
+    mocks.sampleManga.mockReturnValueOnce([{uniform:false,color:'rgb(255,255,255)'}]);
+    mocks.repair.mockRejectedValueOnce(new MangaModelAssetError('LaMa 下载超时'));
+    const fallbackPixels=makePixels();
+    mocks.inpaint.mockReturnValueOnce(fallbackPixels);
+    const complexResult=await translateImageInOffscreen('asset-fallback-complex','en','Page',undefined,'asset-fallback-complex',true);
+    expect(complexResult.mangaPatches).toBeDefined();
+    expect(mocks.inpaint).toHaveBeenCalledOnce();
+    expect(mocks.mangaDraw).toHaveBeenCalledOnce();
+    // 2. 全均匀背景在修补抛出资产错误时跳过确定性复杂清字，仍正常出图
+    mocks.inpaint.mockClear();mocks.mangaDraw.mockClear();
+    ordinaryAlphaCanvas(240,120,makePixels());
+    mocks.mangaRecognize.mockResolvedValueOnce([source]);
+    mocks.sampleManga.mockReturnValueOnce([{uniform:true,color:'rgb(255,255,255)'}]);
+    mocks.repair.mockRejectedValueOnce(new MangaModelAssetError('LaMa 下载超时'));
+    const uniformResult=await translateImageInOffscreen('asset-fallback-uniform','en','Page',undefined,'asset-fallback-uniform',true);
+    expect(uniformResult.mangaPatches).toBeDefined();
+    expect(mocks.inpaint).not.toHaveBeenCalled();
+    expect(mocks.mangaDraw).toHaveBeenCalledOnce();
+    // 3. 普通运行错误继续抛出
+    ordinaryAlphaCanvas(240,120,makePixels());
+    mocks.mangaRecognize.mockResolvedValueOnce([source]);
+    mocks.sampleManga.mockReturnValueOnce([{uniform:false,color:'rgb(255,255,255)'}]);
+    mocks.repair.mockRejectedValueOnce(new Error('GPU boom'));
+    await expect(translateImageInOffscreen('asset-rethrow-generic','en','Page',undefined,'asset-rethrow-generic',true)).rejects.toThrow('GPU boom');
+    // 4. 已取消时即使收到资产错误也继续抛出
+    const abort=new AbortController();
+    ordinaryAlphaCanvas(240,120,makePixels());
+    mocks.mangaRecognize.mockResolvedValueOnce([source]);
+    mocks.sampleManga.mockReturnValueOnce([{uniform:false,color:'rgb(255,255,255)'}]);
+    mocks.repair.mockImplementationOnce(async()=>{abort.abort();throw new MangaModelAssetError('aborted asset');});
+    await expect(translateImageInOffscreen('asset-rethrow-aborted','en','Page',abort.signal,'asset-rethrow-aborted',true)).rejects.toThrow('aborted asset');
+});
+
 it.each(['clear','art','retained','retained-physical','far-retained','fits','wrap'] as const)('普通图源色与空白行高的实际编排：%s',async mode=>{
     const width=240,height=120,pixels=new Uint8ClampedArray(width*height*4).fill(255);
     for(let y=45;y<60;y++)for(let x=50;x<100;x++)pixels.set([25,48,75,255],(y*width+x)*4);

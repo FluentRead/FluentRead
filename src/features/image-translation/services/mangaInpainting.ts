@@ -256,6 +256,12 @@ function planNearFlatBubbleRepair(pixels: Uint8ClampedArray, width: number, heig
 export function createMangaInpaintingRuntime(create: (signal?: AbortSignal,progress?:(percent?:number,initializing?:boolean)=>void) => Promise<InpaintPort>) {
     let service: InpaintPort | undefined, idle: ReturnType<typeof setTimeout> | undefined;
     let tail: Promise<void> = Promise.resolve();
+    let lastPreparing: [percent?: number, initializing?: boolean] | undefined;
+    const preparingListeners = new Set<(percent?: number, initializing?: boolean) => void>();
+    function emitPreparing(...args: [percent?: number, initializing?: boolean]) {
+        lastPreparing = args;
+        for (const listener of preparingListeners) listener(...args);
+    }
     function queue<T>(operation:()=>Promise<T>) {const result=tail.then(operation);tail=result.then(()=>undefined,()=>undefined);return result;}
     async function release() {clearTimeout(idle);idle=undefined;const current=service;service=undefined;await current?.release();}
     return {
@@ -299,6 +305,13 @@ export function createMangaInpaintingRuntime(create: (signal?: AbortSignal,progr
                         simpleRepairs.forEach(repair=>repair?.(result));return result;
                     });
                 }
+                const stopListening = onPreparing ? (() => {
+                    preparingListeners.add(onPreparing);
+                    if (lastPreparing) onPreparing(...lastPreparing);
+                    const remove = () => { preparingListeners.delete(onPreparing); };
+                    signal?.addEventListener('abort', remove, {once: true});
+                    return () => { remove(); signal?.removeEventListener('abort', remove); };
+                })() : undefined;
                 return queue(async()=>{
                 assertMangaOcrActive(signal); clearTimeout(idle);
                 try {
@@ -311,7 +324,12 @@ export function createMangaInpaintingRuntime(create: (signal?: AbortSignal,progr
                         let completed = 0;
                         for (const region of pending) {
                             assertMangaOcrActive(signal);
-                            if (!service) {onPreparing?.();service=await create(signal,onPreparing);}
+                            if (!service) {
+                                emitPreparing();
+                                try { service = await create(signal, emitPreparing); }
+                                finally { lastPreparing = undefined; }
+                            }
+                            stopListening?.();
                             assertMangaOcrActive(signal);
                             onRepair?.(completed,pending.length);
                             const mapping=createMangaPatch(pixels,width,height,region,options?.protection);
@@ -326,7 +344,7 @@ export function createMangaInpaintingRuntime(create: (signal?: AbortSignal,progr
                         await Promise.resolve().then(()=>current?.release()).catch(()=>undefined);
                         throw error;
                     });
-                } finally {idle=setTimeout(()=>{void queue(release).catch(()=>undefined);},180000);}
+                } finally {stopListening?.();idle=setTimeout(()=>{void queue(release).catch(()=>undefined);},180000);}
                 });
             });
         },

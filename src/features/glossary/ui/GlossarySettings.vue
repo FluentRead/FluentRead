@@ -397,10 +397,16 @@ async function saveMetadata(field: MetadataTextField, patch: Partial<GlossaryLib
   await patchLibrary(patch);
   if (!disposed && metadataDrafts.value[field] === draft) delete metadataDrafts.value[field];
 }
+const baseLanguageOptions = computed(() => [
+  ...new Map(
+    [...options.to, {value: 'de', label: 'Deutsch'}, {value: 'pt', label: 'Português'}, {value: 'it', label: 'Italiano'}]
+      .map(item => [item.value.toLowerCase(), {value: item.value.toLowerCase(), label: getMultilingualTargetLanguageLabel(item.value, item.label, language.value)}]),
+  ).values(),
+]);
 function languageOptions(current: string): {value: string; label: string}[] {
-  const values = [...new Map([...options.to, {value: 'de', label: 'Deutsch'}, {value: 'pt', label: 'Português'}, {value: 'it', label: 'Italiano'}].map(item => [item.value.toLowerCase(), {value: item.value.toLowerCase(), label: getMultilingualTargetLanguageLabel(item.value, item.label, language.value)}])).values()];
-  if (current && !values.some(item => item.value === current)) values.push({value: current, label: current});
-  return values;
+  const base = baseLanguageOptions.value;
+  if (!current || base.some(item => item.value === current)) return base;
+  return [...base, {value: current, label: current}];
 }
 function languageLabel(value: string): string {
   return value ? languageOptions(value).find(item => item.value === value)?.label.split(' / ')[0] || value : t('glossary.anyLanguage');

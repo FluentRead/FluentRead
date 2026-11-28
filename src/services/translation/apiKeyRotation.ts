@@ -59,7 +59,7 @@ function scopeFor(source: KeyConfig, service: string, model?: string): string {
     }
     selected.proxy = getApiKeyRequestProxy(service, (fields.proxy as Record<string, unknown> | undefined)?.[service]);
     selected.signingCredentials = getApiKeySigningCredentials(source, service);
-    selected.apiKeyRotationEnabled = (fields.apiKeyRotationEnabled as Record<string, unknown> | undefined)?.[service] === true;
+    selected.apiKeyRotationEnabled = (fields.apiKeyRotationEnabled as Record<string, unknown> | undefined)?.[service] !== false;
     const routeFields: Record<string, readonly string[]> = {
         custom: ['custom'], deeplx: ['deeplx'], deepL: ['deeplApiPlan'], newapi: ['newApiUrl'],
         azureOpenai: ['azureOpenaiEndpoint'], minimax: ['minimaxRegion', 'minimaxBillingPlan'],

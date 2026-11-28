@@ -65,6 +65,7 @@ export function openMangaReading(_event: MouseEvent): boolean { return false; }
 export function subscribeMangaReading(listener:(open:boolean)=>void):()=>void {listener(false);return ()=>undefined;}
 export function isMangaReaderPage(): boolean { return false; }
 export function isImageTranslatorNeeded(): boolean { return false; }
+export function isImageTranslatorMounted(): boolean { return false; }
 export async function mountMangaEntry(): Promise<void> {}
 export function unmountMangaEntry(): void {}
 export function subscribeMangaTranslation(listener: (status: {available: boolean; active: boolean; pending: boolean; errors: number}) => void): () => void {

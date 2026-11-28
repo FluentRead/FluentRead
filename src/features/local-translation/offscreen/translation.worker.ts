@@ -214,6 +214,23 @@ async function translate(request: Extract<WorkerRequest, {type: 'translate'}>): 
     }
 }
 
+const NON_RETRYABLE_SINGLE_THREAD_ERRORS = new Set([
+    'LOCAL_TRANSLATION_NOT_DOWNLOADED',
+    'LOCAL_TRANSLATION_INTEGRITY',
+    'LOCAL_TRANSLATION_INVALID_REQUEST',
+    'LOCAL_TRANSLATION_TIMEOUT',
+    'LOCAL_TRANSLATION_OUTPUT_LIMIT',
+    'LOCAL_TRANSLATION_BROWSER_UNSUPPORTED',
+    'LOCAL_TRANSLATION_OUTPUT_EMPTY',
+    'LOCAL_TRANSLATION_OUTPUT_CORRUPTED',
+]);
+
+function shouldOfferSingleThreadRetry(request: WorkerRequest, errorMessage: string): boolean {
+    if (request.type !== 'translate' || localWasmThreads() <= 1) return false;
+    if (getLocalTranslationModel(request.model).engine !== 'opus') return false;
+    return !NON_RETRYABLE_SINGLE_THREAD_ERRORS.has(errorMessage);
+}
+
 export function startLocalTranslationWorker(): void {
     configureEnvironment();
     const post = (response: WorkerResponse) => self.postMessage(response);
@@ -231,7 +248,13 @@ export function startLocalTranslationWorker(): void {
                 const result = await translate(request);
                 post({requestId: request.requestId, success: true, result, ...(backend === undefined ? {} : {backend}), elapsedMs: performance.now() - started});
             } catch (error) {
-                post({requestId: request.requestId, success: false, error: error instanceof Error ? error.message : 'LOCAL_TRANSLATION_FAILED', ...(localWasmThreads()>1?{retrySingleThread:true}:{})});
+                const message = error instanceof Error ? error.message : 'LOCAL_TRANSLATION_FAILED';
+                post({
+                    requestId: request.requestId,
+                    success: false,
+                    error: message,
+                    ...(shouldOfferSingleThreadRetry(request, message) ? {retrySingleThread: true} : {}),
+                });
             }
         };
         taskQueue = taskQueue.then(run, run);

@@ -59,6 +59,9 @@ function finishMountAttempt(): void {
 
 export function mountTranslationProgressPanel(ctx?: ContentScriptContext) {
   if (ctx) contentScriptContext = ctx;
+  if (progressPanelUi?.shadowHost && !progressPanelUi.shadowHost.isConnected) {
+    unmountTranslationProgressPanel();
+  }
   mountRequested = config.on !== false && config.translationProgressPanelEnabled === true;
   if (progressPanelUi || progressPanelInstance || mountingPromise || !mountRequested) {
     return mountingPromise;

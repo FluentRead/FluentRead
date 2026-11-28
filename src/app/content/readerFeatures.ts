@@ -10,6 +10,7 @@ import type {ContentFeatureDefinition} from './featureRegistry';
 import {
     isAreaTranslatorMounted,
     isFloatingBallAllowedOnPage,
+    isImageTranslatorMounted,
     isImageTranslatorNeeded,
     isMangaReaderPage,
     mountAreaTranslator,
@@ -53,7 +54,7 @@ export function createReaderContentFeatures(ctx: ContentScriptContext, config: C
             isMounted: isAreaTranslatorMounted,
         },
         {id: 'image-translator', requiredCapability: 'imageTranslation', isEnabled: isImageTranslatorNeeded,
-            mount: () => mountImageTranslator(), unmount: unmountImageTranslator},
+            mount: () => mountImageTranslator(), unmount: unmountImageTranslator, isMounted: isImageTranslatorMounted},
         {id: 'manga-entry', requiredCapability: 'imageTranslation',
             isEnabled: () => config.on && config.imageTranslationMangaEnabled && isMangaReaderPage(),
             mount: () => mountMangaEntry(ctx, {startAreaTranslation: startAreaTranslationFromContextMenu, onPeekOriginal: setMangaPeekOriginal}), unmount: unmountMangaEntry},

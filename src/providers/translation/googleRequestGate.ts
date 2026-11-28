@@ -50,10 +50,11 @@ export function createGoogleRequestGate() {
         // 任一等待者的预算都独立生效；短预算不能被前方较长的等待者遮住。
         for (let index = pending.length - 1; index >= 0; index--) {
             const entry = pending[index]!;
-            if (entry.deadlineAt <= now || (retryAt > now && retryAt >= entry.deadlineAt)) {
+            const blockedByRateLimit = retryAt > now && retryAt >= entry.deadlineAt;
+            if (entry.deadlineAt <= now || blockedByRateLimit) {
                 pending.splice(index, 1);
                 entry.cleanup();
-                entry.reject(failures > 0 ? rateLimitError() : googleRequestDeadlineError());
+                entry.reject(blockedByRateLimit ? rateLimitError() : googleRequestDeadlineError());
             }
         }
         while (pending.length && active < 2 && !probing && Math.max(nextStartAt, retryAt) <= now) {

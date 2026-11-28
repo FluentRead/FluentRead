@@ -233,6 +233,7 @@ export class SelectionTtsPlayer {
         try {
             // 启动失败由 PLAY 的 rejected Promise 返回；后台仍拥有请求并决定页面回退。
             // 在启动成功前不另发 error 终态，否则它会抢先释放所有权、被误判为 STOP。
+            const version = playback.stateVersion;
             await audio.play();
             if (this.active === playback) {
                 audio.onerror = () => {
@@ -241,7 +242,9 @@ export class SelectionTtsPlayer {
                     this.release(playback);
                     this.dependencies.notify(request, 'error', new Error('扩展音频解码或播放失败'));
                 };
-                this.startProgressTimer(playback);
+                if (playback.stateVersion === version && playback.audio.paused !== true) {
+                    this.startProgressTimer(playback);
+                }
             }
         } catch (error) {
             // 步骤 3：启动失败只走 PLAY 响应；被替换/停止的迟到失败不能释放新资源。

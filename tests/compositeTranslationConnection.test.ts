@@ -224,4 +224,14 @@ describe('组合翻译连接检查', () => {
         await expect(runTranslationServiceConnectionTest(group, {config: nested})).rejects.toThrow('没有可用的成员');
         expect(google).not.toHaveBeenCalled();
     });
+
+    it('组合检查跳过全局关闭的成员服务，全部关闭时明确报错', async () => {
+        const partial = createTranslationProviderConfigSnapshot({...source(), disabledTranslationServices: ['google']});
+        await expect(runTranslationServiceConnectionTest(group, {config: partial})).resolves.toEqual({durationMs: expect.any(Number)});
+        expect(google).not.toHaveBeenCalled();
+        expect(microsoft).toHaveBeenCalledOnce();
+
+        const allDisabled = createTranslationProviderConfigSnapshot({...source(), disabledTranslationServices: ['google', 'microsoft']});
+        await expect(runTranslationServiceConnectionTest(group, {config: allDisabled})).rejects.toThrow('所有成员都已关闭');
+    });
 });

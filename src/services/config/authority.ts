@@ -135,6 +135,7 @@ export function createConfigAuthority(dependencies: ConfigAuthorityDependencies)
     }
 
     function notifyListeners(nextConfig: Config): void {
+        if (listeners.size === 0) return;
         const snapshot = normalizeConfig(nextConfig);
         // UI/副作用订阅失败不能被 initializeConfig 误判为迁移失败，也不能阻止落盘。
         listeners.forEach((listener) => notifyListener(listener, snapshot));
@@ -608,7 +609,7 @@ export function createConfigAuthority(dependencies: ConfigAuthorityDependencies)
             }
         }
 
-        const operation = (async () => {
+        const operationPromise = writeQueue.catch(() => undefined).then(async () => {
             await configReady;
             // 请求可能早于首次 local:config 读取完成；初始化水合后必须再次检查，
             // 否则后台重启期间的同一 operationId 仍会被重复累加。
@@ -625,23 +626,26 @@ export function createConfigAuthority(dependencies: ConfigAuthorityDependencies)
             }
             const nextCount = config.count + normalizedDelta;
             if (!Number.isSafeInteger(nextCount)) throw new RangeError('翻译计数超过安全整数范围');
+            const beforeSerialized = serializeConfig(config);
             const nextConfig = normalizeConfig({...config, count: nextCount});
             const nextOperation = normalizedOperationId
                 ? {id: normalizedOperationId, delta: normalizedDelta, count: nextConfig.count}
                 : undefined;
             const persistedOperations = getPersistedCountOperations(nextOperation);
-            // count 与 operationId 同属一个 storage 记录；后台在响应前退出后，新实例仍能识别已提交操作。
+            // count 与 operationId 同属一个 storage 记录；串行接入 writeQueue，
+            // 避免与并发 saveConfig 竞态导致凭据写入被跳过或计数被旧快照覆盖。
             await storage.setItem(
                 CONFIG_STORAGE_KEY,
                 createStoredConfigRecord(nextConfig, persistedConfigRevision, persistedOperations),
             );
-            writeRevision += 1;
-            lastPersistedSerialized = serializeConfig(nextConfig);
+            if (lastPersistedSerialized === beforeSerialized) {
+                lastPersistedSerialized = serializeConfig(nextConfig);
+            }
             rememberCommittedConfig(nextConfig);
             applyConfig(nextConfig);
             return {count: nextConfig.count, persistedOperations};
         });
-        const operationPromise = operation();
+        writeQueue = operationPromise.then(() => undefined, () => undefined);
         if (!normalizedOperationId) return operationPromise.then((result) => result.count);
 
         const promise = operationPromise.then((result) => {

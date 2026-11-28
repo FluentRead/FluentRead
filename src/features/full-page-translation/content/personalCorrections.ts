@@ -192,6 +192,7 @@ export function watchPersonalCorrectionContext(signal: AbortSignal): () => void 
     if (signal.aborted) return () => {};
     const headings = 'h1,h2,h3,h4,h5,h6';
     const observer = new MutationObserver(mutations => {
+        if (metadataOwnerRefs.size === 0) return;
         let closedOwners: readonly HTMLElement[] | undefined;
         const readClosedOwners = () => closedOwners ??= closedCorrectionOwners();
         const relevant = mutations.some(mutation => {
@@ -236,7 +237,7 @@ export function readPersonalCorrectionPair(element: Element): PersonalCorrection
         // 开启后允许校订已经显示的服务译文；沿用该次请求语言，只准备当前指向段落，不查询记忆或重译整页。
         const core = getCurrentTranslationCore(state.scope);
         const skeleton = createTranslationSourceSnapshot(node, core.shouldStayOriginal, state.syntheticSegment ? node : undefined,
-            {protectedElement: node, ...(state.allowTopLevelApplicationShell ? {allowTopLevelApplicationShell: true} : {})}, core.shouldOmitFromTranslation);
+            core.textOptions({protectedElement: node, ...(state.allowTopLevelApplicationShell ? {allowTopLevelApplicationShell: true} : {})}), core.shouldOmitFromTranslation);
         const replay = state.bilingualReplay;
         const preserveNewlines = typeof getComputedStyle === 'function' && /^(?:pre|break-spaces)/u.test(getComputedStyle(node).whiteSpace);
         const source = skeleton.slots.length === replay.sources.length && skeleton.slots.every((slot, index) => slot.source === replay.sources[index])

@@ -2,10 +2,17 @@
 import {defineConfig} from 'vitest/config';
 import base from '../../vitest.config';
 export default defineConfig({...base, test: {...base.test,
-    include: ['tests/privacyProtection.test.ts', 'tests/translationPrivacy.test.ts', 'tests/privacySettingsLifecycle.test.ts'],
+    include: ['tests/privacyProtection.test.ts', 'tests/translationPrivacy.test.ts', 'tests/privacySettingsLifecycle.test.ts', 'tests/privacyActivityRepository.test.ts'],
     coverage: {provider: 'v8', enabled: true, reportOnFailure: true,
         reportsDirectory: 'coverage/privacy', reporter: ['text', 'json-summary', 'json'],
-        include: ['src/core/privacy/*.ts', 'src/services/translation/privacyProtection.ts', 'src/features/settings/ui/PrivacyProtectionSettings.vue'],
+        include: [
+            'src/core/privacy/*.ts',
+            'src/services/translation/privacyProtection.ts',
+            'src/platform/storage/privacyActivityRepository.ts',
+            'src/app/background/handlers/privacyActivity.ts',
+            'src/features/settings/ui/PrivacyProtectionSettings.vue',
+            'src/features/settings/ui/PrivacyActivityLog.vue',
+        ],
         thresholds: {statements: 100, branches: 100, functions: 100, lines: 100},
     },
 }});

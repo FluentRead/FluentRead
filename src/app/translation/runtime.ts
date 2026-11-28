@@ -16,6 +16,7 @@ import {buildTranslationCacheKey, translationCache} from '@/src/services/transla
 import {createTranslationCachePolicyBinding} from '@/src/services/translation/cachePolicyBinding';
 import {getModelUsageRepository} from '@/src/platform/storage/modelUsageRepository';
 import {getTranslationStatsRepository} from '@/src/platform/storage/translationStatsRepository';
+import {getPrivacyActivityRepository} from '@/src/platform/storage/privacyActivityRepository';
 import {createTranslationRequestScheduler} from '@/src/services/translation/requestScheduler';
 import {createTranslationAvailability} from '@/src/services/translation/availability';
 
@@ -72,6 +73,12 @@ const broker = createTranslationBroker({
             : 0,
         recordTranslationRequest: (event, generation) => {
             if (isExtensionModelUsageRuntime()) getTranslationStatsRepository().record(event, generation);
+        },
+        capturePrivacyActivityGeneration: () => isExtensionModelUsageRuntime()
+            ? getPrivacyActivityRepository().captureGeneration()
+            : 0,
+        recordPrivacyActivity: (event, generation) => {
+            if (isExtensionModelUsageRuntime()) void getPrivacyActivityRepository().record(event, generation);
         },
     }),
     requestScheduler: translationRequestScheduler,

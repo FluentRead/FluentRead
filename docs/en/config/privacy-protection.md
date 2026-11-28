@@ -17,7 +17,8 @@ Enable under **Advanced settings → Translation privacy shield** (off by defaul
 
 - **Built-in rules:** Email addresses, phone numbers, ID numbers, bank cards & IBANs, passwords & API keys, and IPv4 addresses (IPv4 is off by default). Cards and select IDs use format/checksum validation so ordinary dates or short numbers are not falsely flagged.
 - **Custom sensitive terms:** Click **Manage** to enter one exact case-sensitive name, internal code, or address per line (up to **128 entries**, **256 characters** each, plain text rather than regex). Stored in local credential storage and excluded from settings history and basic cloud backups.
-- **Local preview:** The built-in preview updates live with sample text and sends zero network requests.
+- **Local preview:** The built-in preview updates live with sample text to show the `***` redacted format for active rules and sends zero network requests.
+- **Collapsible redaction & block log:** Collapsed by default at the bottom of the card, displaying summary counts (masked, blocked, protected items) right on the header. Expand to filter by action or category and inspect irreversible `***` summaries (such as `d***@e***.test`, `138****00`, `sk-***`) confirming protection actually triggered. Stored locally only with zero raw text or full secrets, never recorded in private windows, and clearable anytime.
 
 ## Scope & limitations
 

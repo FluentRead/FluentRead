@@ -25,6 +25,8 @@ import {createImageOcrLanguageRepository} from './handlers/imageTranslation';
 import {createImageTranslationRuntime} from './imageTranslationRuntime';
 import {createInputBoxTranslationHandler} from './handlers/inputTranslation';
 import {createLocalInsightsHandlers} from './localInsightsHandlers';
+import {createPrivacyActivityHandler} from './handlers/privacyActivity';
+import {getPrivacyActivityRepository} from '@/src/platform/storage/privacyActivityRepository';
 import {createFreeTranslationWeightsHandler} from './handlers/freeTranslationWeights';
 import {createPopupNavigationHandlers} from './popupNavigation';
 import {createDownloadProgressHandler, createDownloadProgressQueryHandler} from './handlers/downloadProgress';
@@ -80,6 +82,10 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             warn: (message, error) => console.warn(message, error),
         })),
         ...createLocalInsightsHandlers<BackgroundRuntimeContext>((url) => url.startsWith(browser.runtime.getURL('/options.html'))),
+        createPrivacyActivityHandler(
+            getPrivacyActivityRepository(),
+            (url) => url.startsWith(browser.runtime.getURL('/options.html')),
+        ),
         createFreeTranslationWeightsHandler({
             ready: configReady,
             getSnapshot: getFreeTranslationWeightSnapshot,

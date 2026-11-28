@@ -1,9 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
 import {Config} from '@/src/core/config/model';
-import {normalizePrivacyPolicy} from '@/src/core/privacy/policy';
+import type {PrivacyActivityInput} from '@/src/core/privacy/activity';
+import {MAX_PRIVACY_TEXT_LENGTH, normalizePrivacyPolicy} from '@/src/core/privacy/policy';
 import {preparePrivacyRequest} from '@/src/services/translation/privacyProtection';
 import {createTranslationBroker} from '@/src/services/translation/broker';
-import {attachTranslationImageInput, createTranslationProviderConfigSnapshot, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
+import {attachTranslationGlossaryContext, attachTranslationImageInput, createTranslationProviderConfigSnapshot, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import {prepareGlossaryRequest} from '@/src/services/translation/glossaryProtection';
 import {commonMsgTemplate} from '@/src/services/translation/templates';
 import {serializeTranslationSlots, parseTranslationSlots} from '@/src/core/translation/slotProtocol';
@@ -15,7 +16,15 @@ function current() {
   return config;
 }
 const translated = (text: string) => text.replaceAll('Contact', '请联系').replaceAll('Hello', '你好').replaceAll('Name', '姓名');
-function setup(config = current(), implementation?: (request: TranslationProviderRequest) => unknown) {
+function setup(
+  config = current(),
+  implementation?: (request: TranslationProviderRequest) => unknown,
+  activity?: {
+    capturePrivacyActivityGeneration?: () => number;
+    recordPrivacyActivity?: (event: PrivacyActivityInput, generation: number) => void;
+    logger?: Pick<Console, 'warn'>;
+  },
+) {
   const provider = vi.fn(async (request: TranslationProviderRequest) => implementation ? implementation(request)
     : Array.isArray(request.origin) ? request.origin.map(translated) : translated(request.origin));
   const cache = {get: vi.fn(async () => null), set: vi.fn(async () => true), clear: vi.fn(async () => {}), cleanup: vi.fn(async () => {})};
@@ -27,6 +36,7 @@ function setup(config = current(), implementation?: (request: TranslationProvide
     getMissingCredentialMessage: () => null,
     getTranslationLanguages: override => ({sourceLanguage: override?.sourceLanguage ?? config.from, targetLanguage: override?.targetLanguage ?? config.to}),
     resolveConfiguredModel: (selected, custom) => custom || selected || '', buildTranslationCacheKey: identity => JSON.stringify(identity),
+    ...activity,
   });
   return {broker, provider, cache, config};
 }
@@ -203,5 +213,99 @@ describe('translation broker privacy enforcement', () => {
     await vi.waitFor(() => expect(provider).toHaveBeenCalledTimes(2));
     release(); expect(await first).toBe('请联系 demo@example.test'); expect(await second).toBe('请联系 demo@example.test');
     expect(provider.mock.calls[0][0].origin).not.toContain('@'); expect(provider.mock.calls[1][0].origin).toContain('@');
+  });
+  it('emits irreversible masked activity records for masked, blocked, image-blocked, restore-failed, capacity-exceeded, and skips private tabs', async () => {
+    const events: Array<{event: PrivacyActivityInput; generation: number}> = [];
+    const recordPrivacyActivity = vi.fn((event: PrivacyActivityInput, generation: number) => {events.push({event, generation});});
+    const config = current();
+    const {broker} = setup(config, undefined, {capturePrivacyActivityGeneration: () => 7, recordPrivacyActivity});
+
+    // 普通文本不产生脱敏记录
+    await broker.translateWithCache({origin: 'Hello'});
+    expect(events).toHaveLength(0);
+
+    // 命中脱敏并成功还原
+    await broker.translateWithCache({origin: 'Contact demo@example.test 13800138000'});
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      generation: 7,
+      event: {
+        action: 'masked',
+        serviceId: 'google',
+        hitCount: 2,
+        categoryCounts: {email: 1, phone: 1},
+        samples: [
+          {category: 'email', masked: 'd***@e***.test'},
+          {category: 'phone', masked: '138****00'},
+        ],
+      },
+    });
+    expect(JSON.stringify(events[0])).not.toContain('demo@example.test');
+    expect(JSON.stringify(events[0])).not.toContain('13800138000');
+
+    // 无痕标签页不记录活动
+    await broker.translateWithCache(attachTranslationGlossaryContext({origin: 'Contact demo@example.test'}, {privateContext: true}));
+    expect(events).toHaveLength(1);
+
+    // 检测后拦截
+    config.privacyProtection = normalizePrivacyPolicy({enabled: true, mode: 'block'});
+    await expect(broker.translateWithCache({origin: 'Contact demo@example.test'})).rejects.toMatchObject({code: 'PRIVACY_CONTENT_BLOCKED'});
+    expect(events.at(-1)?.event).toMatchObject({
+      action: 'blocked',
+      serviceId: 'google',
+      hitCount: 1,
+      samples: [{category: 'email', masked: 'd***@e***.test'}],
+    });
+
+    // 原图阻止
+    await expect(broker.translateWithCache(attachTranslationImageInput({origin: 'Hello'}, 'data:image/png;base64,AAAA')))
+      .rejects.toMatchObject({code: 'PRIVACY_IMAGE_BLOCKED'});
+    expect(events.at(-1)?.event).toMatchObject({action: 'image-blocked', serviceId: 'google', hitCount: 1});
+
+    // 标记破坏导致恢复失败
+    config.privacyProtection = normalizePrivacyPolicy({enabled: true, mode: 'mask'});
+    const broken = setup(config, () => '损坏的译文', {capturePrivacyActivityGeneration: () => 9, recordPrivacyActivity});
+    await expect(broken.broker.translateWithCache({origin: 'Contact demo@example.test'})).rejects.toMatchObject({code: 'PRIVACY_RESTORE_FAILED'});
+    expect(events.at(-1)).toMatchObject({
+      generation: 9,
+      event: {action: 'restore-failed', serviceId: 'google', hitCount: 1},
+    });
+
+    // 直接调用 preparePrivacyRequest 覆盖超限、网络失败后 dispose 上报及 observer 异常隔离
+    const directEvents: PrivacyActivityInput[] = [];
+    const snapshot = createTranslationProviderConfigSnapshot(config);
+    expect(() => preparePrivacyRequest({origin: 'a'.repeat(MAX_PRIVACY_TEXT_LENGTH + 1)}, snapshot, event => directEvents.push(event)))
+      .toThrowError(expect.objectContaining({code: 'PRIVACY_CAPACITY_EXCEEDED'}));
+    expect(directEvents.at(-1)?.action).toBe('capacity-exceeded');
+
+    expect(() => preparePrivacyRequest(attachTranslationImageInput({origin: 'Hello'}, 'data:image/png;base64,AAAA'), snapshot, event => directEvents.push(event)))
+      .toThrowError(expect.objectContaining({code: 'PRIVACY_IMAGE_BLOCKED'}));
+    expect(directEvents.at(-1)?.action).toBe('image-blocked');
+
+    const packet = preparePrivacyRequest({origin: 'Contact demo@example.test'}, snapshot, event => directEvents.push(event));
+    packet.dispose();
+    packet.dispose();
+    expect(directEvents.filter(item => item.action === 'masked')).toHaveLength(1);
+
+    const throwingObserver = preparePrivacyRequest({origin: 'Contact demo@example.test'}, snapshot, () => {throw new Error('observer boom');});
+    expect(throwingObserver.restore(translated(throwingObserver.message.origin as string))).toBe('请联系 demo@example.test');
+    throwingObserver.dispose();
+
+    vi.stubGlobal('crypto', {getRandomValues() {throw new Error('unavailable');}});
+    try {
+      expect(() => preparePrivacyRequest({origin: 'Contact demo@example.test'}, snapshot, event => directEvents.push(event)))
+        .toThrowError(expect.objectContaining({code: 'PRIVACY_SESSION_UNAVAILABLE'}));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    const warn = vi.fn();
+    const throwingBroker = setup(config, undefined, {
+      recordPrivacyActivity: () => {throw new Error('broker observer boom');},
+      logger: {warn},
+    });
+    await expect(throwingBroker.broker.translateWithCache(attachTranslationImageInput({origin: 'Hello'}, 'data:image/png;base64,AAAA')))
+      .rejects.toMatchObject({code: 'PRIVACY_IMAGE_BLOCKED'});
+    expect(warn).toHaveBeenCalled();
   });
 });

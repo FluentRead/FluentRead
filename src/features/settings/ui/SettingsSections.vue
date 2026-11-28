@@ -484,7 +484,11 @@
     <!-- 高级与隐私 -->
     <section v-if="hasVisitedSection('settings-advanced')" v-show="props.activeSection === 'settings-advanced'" id="settings-advanced" class="settings-section">
       <SettingsPanel name="privacy" :active="props.activePanel">
-        <PrivacyProtectionSettings id="privacy-protection-settings" :config="config" :active="viewActive && props.activeSection === 'settings-advanced' && (!props.activePanel || props.activePanel === 'privacy')" />
+        <PrivacyProtectionSettings id="privacy-protection-settings" :config="config" :active="viewActive && props.activeSection === 'settings-advanced' && (!props.activePanel || props.activePanel === 'privacy')">
+          <template v-if="PrivacyActivityLog" #activity>
+            <PrivacyActivityLog :config="config" :active="viewActive && props.activeSection === 'settings-advanced' && (!props.activePanel || props.activePanel === 'privacy')" />
+          </template>
+        </PrivacyProtectionSettings>
       </SettingsPanel>
       <SettingsPanel name="requests" :active="props.activePanel">
         <SettingsGroup :title="t('settings.requestLimits.globalTitle')" :description="t('settings.requestLimits.globalHelp')">
@@ -740,6 +744,7 @@ const ConfigManagement = defineAsyncComponent(() => import('./ConfigManagement.v
 const QuickTranslationProfiles = defineAsyncComponent(() => import('./QuickTranslationProfiles.vue'));
 const ContextMenuSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./ContextMenuSettings.vue'));
 const PrivacyProtectionSettings = defineAsyncComponent(() => import('./PrivacyProtectionSettings.vue'));
+const PrivacyActivityLog = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./PrivacyActivityLog.vue'));
 import {useTranslationShortcutSettings} from './useTranslationShortcutSettings';
 import {useSettingsActionContext} from '../model/useSettingsActionContext';
 import {useConfigEditor} from '../model/useConfigEditor';

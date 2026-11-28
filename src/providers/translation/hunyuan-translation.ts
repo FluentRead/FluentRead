@@ -11,7 +11,7 @@ import { method } from "@/src/core/config/constants";
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import { mergeCustomBody } from "@/src/core/config/customBody";
 import {resolveConfiguredModel, services} from "@/src/core/config/catalog";
-import {getTranslationProviderLanguages, requireTranslationProviderConfig, reportTranslationModelUsage, reportTranslationModelUsageFailure} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderLanguages, requireTranslationProviderConfig, observeTranslationHttpResponse, reportTranslationModelUsage, reportTranslationModelUsageFailure} from '@/src/services/translation/requestSnapshot';
 import {createHttpStatusError, createProviderCodeError, readJsonResponse} from '@/src/platform/http/errors';
 import {cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
 import type {TranslationProviderRequest} from '@/src/services/translation/types';
@@ -140,6 +140,7 @@ async function hunyuanTranslation(message: TranslationProviderRequest<string>) {
             body: requestBodyStr,
             signal: message.abortSignal,
         });
+        observeTranslationHttpResponse(message, response);
 
         if (!response.ok) {
             reportTranslationModelUsageFailure(message, undefined, startedAt, requestModel, response.status);

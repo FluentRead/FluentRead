@@ -36,6 +36,7 @@ type TranslationIdentityPorts = Pick<TranslationBrokerDependencies,
 
 /** 纯策略的组装只保存端口，不保存请求、配置快照或计算结果。 */
 export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) {
+    const endpointMemo = new WeakMap<TranslationProviderConfigSnapshot, Map<string, string>>();
     function getSelectedModel(
         current: TranslationProviderConfigSnapshot,
         service: string,
@@ -81,7 +82,7 @@ export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) 
         );
     }
 
-    function getProviderEndpoint(current: TranslationProviderConfigSnapshot, service: string): string {
+    function computeProviderEndpoint(current: TranslationProviderConfigSnapshot, service: string): string {
         // 这些路径固定使用匿名端点，残留代理不能分裂缓存或在途去重。
         if (service === 'freeTranslation' || service === 'myMemory' || service === 'bilibili' || service === services.chatgptPlan) return '';
         if (deps.serviceTypes.isAiSdk(service)) {
@@ -103,6 +104,19 @@ export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) 
         if (current.proxy[service]) return current.proxy[service];
         if (service === 'deeplx') return current.deeplx;
         return '';
+    }
+
+    function getProviderEndpoint(current: TranslationProviderConfigSnapshot, service: string): string {
+        let byService = endpointMemo.get(current);
+        if (!byService) {
+            byService = new Map();
+            endpointMemo.set(current, byService);
+        }
+        const cached = byService.get(service);
+        if (cached !== undefined) return cached;
+        const resolved = computeProviderEndpoint(current, service);
+        byService.set(service, resolved);
+        return resolved;
     }
 
     function buildCacheKey(

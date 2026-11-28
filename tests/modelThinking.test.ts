@@ -259,6 +259,20 @@ describe('模型 Thinking 协议映射', () => {
             .toMatchObject({reasoning_effort: 'low'});
         expect(apply('openai-chat', services.openai, 'gpt-6-astra', false))
             .toMatchObject({effect: 'minimum', payload: {reasoning_effort: 'low'}});
+        expect(apply('openai-chat', services.openai, 'gpt-6.2-astra', false))
+            .toMatchObject({effect: 'minimum', payload: {reasoning_effort: 'low'}});
+        expect(apply('openai-chat', services.zhipu, 'glm-5.3-flash', false))
+            .toMatchObject({effect: 'minimum', payload: {reasoning_effort: 'low'}});
+        expect(apply('openai-chat', services.zhipu, 'glm-5.3', true))
+            .toMatchObject({effect: 'toggle', payload: {reasoning_effort: 'high'}});
+        expect(apply('openai-chat', services.zhipu, 'glm-4.5-flash', false))
+            .toMatchObject({effect: 'toggle', payload: {thinking: {type: 'disabled'}}});
+        expect(apply('openai-chat', services.zhipu, 'glm-5.2', true))
+            .toMatchObject({effect: 'toggle', payload: {thinking: {type: 'enabled'}}});
+        expect(apply('openai-chat', services.jieyue, 'step-3.7-flash', false))
+            .toMatchObject({effect: 'minimum', payload: {reasoning_effort: 'low'}});
+        expect(apply('openai-chat', services.jieyue, 'step-3.7-flash', true))
+            .toMatchObject({effect: 'toggle', payload: {reasoning_effort: 'medium'}});
         expect(apply('openai-chat', services.openai, 'gpt-5.6-luna', true).payload)
             .toMatchObject({reasoning_effort: 'low'});
         expect(apply('openai-chat', services.azureOpenai, 'gpt-5.1', false).payload)

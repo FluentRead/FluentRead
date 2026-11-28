@@ -377,10 +377,19 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         }
 
         const request = useCache ? (async () => {
-            const itemKeys = message.origin.map((origin, index) => cacheStore.buildBatchItemCacheKey(
-                execution, origin, index, batchFingerprint, context, pageContext, cacheMode, message.modelOverride,
-                message.subtitleContext,
-            ));
+            const keyByOrigin = cacheMode === 'batch' ? new Map<string, string>() : undefined;
+            const itemKeys = message.origin.map((origin, index) => {
+                if (keyByOrigin) {
+                    const existingKey = keyByOrigin.get(origin);
+                    if (existingKey !== undefined) return existingKey;
+                }
+                const built = cacheStore.buildBatchItemCacheKey(
+                    execution, origin, index, batchFingerprint, context, pageContext, cacheMode, message.modelOverride,
+                    message.subtitleContext,
+                );
+                keyByOrigin?.set(origin, built);
+                return built;
+            });
             // 步骤 1：分项批量读取缓存，单次 IndexedDB 事务读取全部未命中热层的键。
             const cached = await runWithinDeadline(
                 () => cacheStore.readCacheBatchWithPendingValues(requestGeneration, itemKeys),

@@ -66,7 +66,11 @@ export class CourseCaptionSource {
                 } catch { return false; }
             });
             const id = request.id.split(':')[0];
-            const url = signed || `https://api.bilibili.com/x/player/v2?cid=${cid}&${id.startsWith('av') ? `aid=${id.slice(2)}` : `bvid=${id}`}`;
+            const queryKey = id.startsWith('av') ? `aid=${id.slice(2)}`
+                : id.startsWith('ep') ? `ep_id=${id.slice(2)}`
+                : id.startsWith('ss') ? `season_id=${id.slice(2)}`
+                : `bvid=${id}`;
+            const url = signed || `https://api.bilibili.com/x/player/v2?cid=${cid}&${queryKey}`;
             const response = await json(url);
             if (response.code !== 0) throw new Error('无法读取平台字幕');
             const data = captionRecord(response.data);

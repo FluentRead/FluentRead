@@ -4,7 +4,7 @@
  * 主要内容：复用播放器身份桥，禁止跨站重定向，在下载前核对接口时长，限制体积与等待时间并丢弃迟到解码。
  * 模块边界：不修改可见播放器、不读取登录凭据、不上传音频；只读取当前账号可播放的普通视频。
  */
-import {captionRecord} from './courseCaptionData';
+import {captionRecord, isBilibiliBangumiPart} from './courseCaptionData';
 import {readVideoCaptionText} from './subtitleTransport';
 import {readBoundedMediaResponse} from './hlsAudio';
 import {resampleToWhisperAudio} from '../transcription';
@@ -37,7 +37,8 @@ export interface BilibiliAudioPorts {
 }
 
 export async function readBilibiliAudio(part: string, video: HTMLMediaElement, signal: AbortSignal, ports: BilibiliAudioPorts): Promise<Float32Array> {
-    if (!/^(?:BV[\dA-Za-z]{10}|av\d+):[1-9]\d*$/.test(part)) throw new Error('无法确定当前视频分 P');
+    const bangumi = isBilibiliBangumiPart(part);
+    if (!bangumi && !/^(?:BV[\dA-Za-z]{10}|av\d+):[1-9]\d*$/.test(part)) throw new Error('无法确定当前视频分 P');
     const duration = video.duration;
     if (!Number.isFinite(duration) || duration <= 0 || duration > MAX_BILIBILI_AUDIO_SECONDS) throw new Error('本地 AI 字幕仅支持 20 分钟以内的视频');
     const controller = new AbortController();
@@ -49,14 +50,19 @@ export async function readBilibiliAudio(part: string, video: HTMLMediaElement, s
         controller.signal.throwIfAborted();
         if (!Number.isSafeInteger(cid) || cid <= 0) throw new Error('无效的视频分 P 身份');
         const id = part.split(':')[0];
-        const url = new URL('https://api.bilibili.com/x/player/playurl');
-        url.search = new URLSearchParams({cid: String(cid), [id.startsWith('av') ? 'avid' : 'bvid']: id.startsWith('av') ? id.slice(2) : id,
-            fnval: '16', fnver: '0', qn: '16', fourk: '0'}).toString();
+        const url = new URL(bangumi ? 'https://api.bilibili.com/pgc/player/web/playurl' : 'https://api.bilibili.com/x/player/playurl');
+        const idParam = bangumi
+            ? {[id.startsWith('ep') ? 'ep_id' : 'season_id']: id.slice(2)}
+            : {[id.startsWith('av') ? 'avid' : 'bvid']: id.startsWith('av') ? id.slice(2) : id};
+        url.search = new URLSearchParams({cid: String(cid), ...idParam, fnval: '16', fnver: '0', qn: '16', fourk: '0'}).toString();
         const response = captionRecord(JSON.parse(await readVideoCaptionText(url.href,
             (input, init) => ports.fetch(input, {...init, redirect: 'error'}),
             {signal: controller.signal, credentials: 'include', maxBytes: 2_000_000})));
         if (response.code !== 0) throw new Error('无法读取当前视频音轨，请确认视频可播放后重试');
-        const payload = captionRecord(response.data);
+        const payload = bangumi && response.result ? captionRecord(response.result) : captionRecord(response.data);
+        if (Boolean(payload.is_drm) || Boolean(payload.drm_tech_type)) {
+            throw new Error('当前番剧受 DRM 保护，无法读取独立音轨');
+        }
         const declaredDuration = typeof payload.timelength === 'number' ? payload.timelength / 1000 : captionRecord(payload.dash).duration;
         if (typeof declaredDuration !== 'number' || !Number.isFinite(declaredDuration) || declaredDuration <= 0
             || declaredDuration > MAX_BILIBILI_AUDIO_SECONDS || Math.abs(declaredDuration - duration) > 2) {

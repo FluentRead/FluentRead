@@ -8,6 +8,7 @@
  */
 import {collectMangaDetectionRefinementCores,createMangaDetectionRefinementBudget,MANGA_DETECTION_REFINEMENT_LIMITS,
     type MangaDetectionRefinement,type MangaDetectionRefinementCore,type MangaDetectionRefinementSource} from './mangaDetectionRefinement';
+import {SINGLE_TILE_MAX_SIDE} from './mangaOcrTiles';
 type Rect={x0:number;y0:number;x1:number;y1:number};
 type Box={x:number;y:number;width:number;height:number};
 type TensorShape={dims:readonly number[]};
@@ -22,8 +23,8 @@ function rectKey(rect:Rect):string|undefined {
 function boxKey(box:Box):string|undefined {return rectKey({x0:box.x,y0:box.y,x1:box.x+box.width,y1:box.y+box.height});}
 const shape=(dims:readonly number[]|undefined,channels:number,width:number,height:number)=>Array.isArray(dims)&&dims.length===4&&dims[0]===1&&dims[1]===channels&&dims[2]===height&&dims[3]===width;
 
-function originalFrame(source:MangaDetectionRefinementSource|undefined,width:number,height:number):MangaDetectionRefinementSource|undefined {
-    if(!source||width>1536||height>1536)return;
+function originalFrame(source:MangaDetectionRefinementSource|undefined,width:number,height:number,maxSide:number):MangaDetectionRefinementSource|undefined {
+    if(!source||width>maxSide||height>maxSide)return;
     const {pageWidth,pageHeight,x,y}=source;
     if(![pageWidth,pageHeight,x,y].every(Number.isSafeInteger)||pageWidth<=0||pageHeight<=0||pageWidth>8192||pageHeight>8192||pageWidth*pageHeight>16_777_216
         ||x<0||y<0||source.width!==width||source.height!==height||x+width>pageWidth||y+height>pageHeight)return;
@@ -44,12 +45,12 @@ export function createMangaDetectionCore(observeRegionPixels?:(data:Float32Array
             // 不支持交错检测帧；一旦所有权不明，本页保持原行为。
             if(frame){active=false;frame=undefined;negative=new WeakMap();return;}
             if(![sourceWidth,sourceHeight].every(value=>Number.isSafeInteger(value)&&value!>0&&value!<=8192)
-                ||sourceWidth!*sourceHeight!>16_777_216||maxSide!==1536)return;
+                ||sourceWidth!*sourceHeight!>16_777_216||(maxSide!==1536&&maxSide!==SINGLE_TILE_MAX_SIDE))return;
             const ratio=Math.min(1,maxSide/Math.max(sourceWidth!,sourceHeight!));
             const width=Math.ceil(Math.round(sourceWidth!*ratio)/32)*32,height=Math.ceil(Math.round(sourceHeight!*ratio)/32)*32;
             if(!width||!height)return;
             const ticket={};frame={ticket,sourceWidth:sourceWidth!,sourceHeight:sourceHeight!,width,height,observed:false,disabled:false,scores:new Map(),
-                refinementSource:originalFrame(source,sourceWidth!,sourceHeight!),refinements:new Map()};return ticket;
+                refinementSource:originalFrame(source,sourceWidth!,sourceHeight!,maxSide),refinements:new Map()};return ticket;
         },
         get ticket(){return frame?.ticket;},
         observe(ticket:object|undefined,input:TensorShape|undefined,output:Output|undefined){

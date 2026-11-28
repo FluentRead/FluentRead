@@ -2,7 +2,7 @@
  * @file src/features/image-translation/services/imageParagraphGapEvidence.ts
  * 文件职责：用同次图片 OCR 已读取的原始RGBA，为少量紧邻小字和大行距物理行提供私有、可撤回的布局续行关系。
  * 小字续行：狭窄走廊保留至少两行实测像素，中心对齐的未完句同时验证两端前景与完整平滑间隙；相邻关系不受更早或更晚的段内行干扰。已被像素证明选中的空格视图可通过内部原对象来历保留几何关系，克隆、坐标或非空格文字变化仍拒绝。
- * 主要内容：先限定横排字号、列投影和邻接范围，再按页预扣128次/1Mi源观察面积、每ROI64Ki预算；H8唯一静区、完整横向空白走廊和左右行单元共同排除边线与控件附件；不透明精确平色间隙还须证明两行处于同一封闭matte owner；原始对象及完整快照随同页graph跨Worker，实际去重采用后绑定数组、原图及尺寸，整段包络仍受所有物理行和数值guard阻挡。
+ * 主要内容：先限定横排字号、列投影和邻接范围，再按页预扣128次/1Mi源观察面积、每ROI64Ki预算；H8唯一静区、完整横向空白走廊和左右行单元共同排除边线与控件附件，其中横向邻列裁剪限定在候选行带内并探至同行控件缘外2px以捕捉下拉框边线；锐角矩形UI弹窗内若同行对端存在边线/底色台阶或受保护数字，不借flat-owner同气泡跳过侧窗复核；无气泡普通图片模式下，若无控件/行分隔对端，flat-owner仍允许未完句短间距续行以保护多行卡片正文；不透明精确平色间隙还须证明两行处于同一封闭matte owner；原始对象及完整快照随同页graph跨Worker，实际去重采用后绑定数组、原图及尺寸，整段包络仍受所有物理行和数值guard阻挡。
  * 样式边界：逐列渐变候选的行高差超过20%时，最多额外观察262,144像素面积并复用同页源色；两个已确认墨色的对比达到3时撤回额外续行，避免大标题与副标题因同底色被并成一种样式。未知字色沿用原规则，这项观察只撤回关系，不授予写入或新增合段权限。
  * 墨迹间距：两端完整静区已经提供真实字形边界时，常规续行的2.5倍行距还须按较小实测字高核对，OCR留白不能放大可接受间隙；明确过远的原字形不借平色回退再次合段。消费者对实际墨迹证明执行相同限制，虚拟profile边界不冒充实测字形；大面积透明页的已授权长间距路径仍独立核对。
  * 背景归属：以实际墨迹静区外角作为seed，避免OCR框外伸笔画占据旧起点；矩形证明之后可沿四邻封闭外轮廓取得owner边界，第二seed仍须有实色路径连到已验证边界，不能用包络包含代替连通。每个读取tile仍按原1Mi预算预付并进入receipt，失败不发布部分轮廓，内孔或过长边界仍沿用原洪泛路径。
@@ -100,9 +100,9 @@ function alphaLongPotential(a:Box,b:Box):boolean {
     return gap>small*2.5&&gap<=small*3.4&&Math.max(ah,bh)<=small*1.12
         &&Math.abs(a.x0-b.x0)<=small*.15&&overlap>=Math.min(a.x1-a.x0,b.x1-b.x0)*.88;
 }
-function owner(item:MangaOcrItem,page:ImageParagraphPage):object|undefined {
+function owner(item:MangaOcrItem,page:ImageParagraphPage):{bbox:Box}|undefined {
     const b=boxOf(item),x=(b.x0+b.x1)/2,y=(b.y0+b.y1)/2;
-    let selected:object|undefined,size=Infinity;
+    let selected:{bbox:Box}|undefined,size=Infinity;
     for(const candidate of [...(page.bubbles??[]),...(page.layoutBubbles??[])]){
         const c=candidate.bbox,measure=area(c);
         if(x>=c.x0&&x<c.x1&&y>=c.y0&&y<c.y1&&measure<size){selected=candidate;size=measure;}
@@ -120,9 +120,15 @@ function validGeometry(g:ImageMatteGeometry,source:Box,width:number,height:numbe
 function layout(a:Box,b:Box,ga:ImageMatteGeometry,gb:ImageMatteGeometry,items:MangaOcrItem[],width:number,height:number):Box[]|undefined {
     if(!ga.background.every((v,i)=>v===gb.background[i]))return;
     const small=Math.min(a.y1-a.y0,b.y1-b.y0),envelope={x0:Math.min(a.x0,b.x0),x1:Math.max(a.x1,b.x1),y0:a.y0,y1:b.y1};
-    let left=0,right=width;
-    for(const item of items){const c=boxOf(item);if(c.x1<envelope.x0-small)left=Math.max(left,Math.ceil((envelope.x0+c.x1)/2));if(c.x0>envelope.x1+small)right=Math.min(right,Math.floor((envelope.x1+c.x0)/2));}
     const pitch=(b.y0+b.y1-a.y0-a.y1)/2;
+    const bandTop=a.y0-pitch/2,bandBottom=b.y1+pitch/2;
+    let left=0,right=width;
+    for(const item of items){
+        const c=boxOf(item);
+        if(c.y1<=bandTop||c.y0>=bandBottom)continue;
+        if(c.x1<envelope.x0-small)left=Math.max(left,Math.ceil(c.x1)+2);
+        if(c.x0>envelope.x1+small)right=Math.min(right,Math.floor(c.x0)-2);
+    }
     const windows=[{x0:Math.floor(envelope.x0),x1:Math.ceil(envelope.x1),y0:Math.ceil(ga.supportBox.y1),y1:Math.floor(gb.supportBox.y0)}];
     for(const [box,g] of [[a,ga],[b,gb]] as const){
         const center=(box.y0+box.y1)/2,y0=Math.max(0,Math.floor(center-pitch/2)-2),y1=Math.min(height,Math.ceil(center+pitch/2)+2);
@@ -131,6 +137,88 @@ function layout(a:Box,b:Box,ga:ImageMatteGeometry,gb:ImageMatteGeometry,items:Ma
     return windows.every(box=>validBox(box,width,height)&&area(box)<=MAX_ROI)?windows:undefined;
 }
 const packed=(p:Uint8ClampedArray,i:number)=>(p[i]|p[i+1]<<8|p[i+2]<<16|p[i+3]<<24)>>>0;
+const channelStep=(a:number,b:number)=>Math.max(Math.abs((a&255)-(b&255)),Math.abs(((a>>>8)&255)-((b>>>8)&255)),Math.abs(((a>>>16)&255)-((b>>>16)&255)));
+function sameRowOverlap(row:Box,candidate:Box):boolean {
+    const overlap=Math.min(row.y1,candidate.y1)-Math.max(row.y0,candidate.y0);
+    return overlap>=Math.min(row.y1-row.y0,candidate.y1-candidate.y0)*.35;
+}
+function alignedPeerColumn(pa:Box,pb:Box):boolean {
+    const tol=Math.min(pa.y1-pa.y0,pb.y1-pb.y0)*.8;
+    const overlap=Math.min(pa.x1,pb.x1)-Math.max(pa.x0,pb.x0);
+    return Math.min(Math.abs(pa.x0-pb.x0),Math.abs(pa.x1-pb.x1))<=tol||overlap>=Math.min(pa.x1-pa.x0,pb.x1-pb.x0)*.5;
+}
+function findDistinctPeerPair(a:Box,b:Box,physical:MangaOcrItem[],own:Set<MangaOcrItem>):[MangaOcrItem,MangaOcrItem]|undefined {
+    const envelopeX0=Math.min(a.x0,b.x0),envelopeX1=Math.max(a.x1,b.x1);
+    let rightA:MangaOcrItem|undefined,rightAX=Infinity,rightB:MangaOcrItem|undefined,rightBX=Infinity;
+    let leftA:MangaOcrItem|undefined,leftAX=-Infinity,leftB:MangaOcrItem|undefined,leftBX=-Infinity;
+    for(const item of physical){
+        if(own.has(item))continue;
+        const c=boxOf(item);
+        if(c.x0>envelopeX1){
+            if(sameRowOverlap(a,c)&&c.x0<rightAX){rightA=item;rightAX=c.x0;}
+            if(sameRowOverlap(b,c)&&c.x0<rightBX){rightB=item;rightBX=c.x0;}
+        }else if(c.x1<envelopeX0){
+            if(sameRowOverlap(a,c)&&c.x1>leftAX){leftA=item;leftAX=c.x1;}
+            if(sameRowOverlap(b,c)&&c.x1>leftBX){leftB=item;leftBX=c.x1;}
+        }
+    }
+    if(rightA&&rightB&&rightA!==rightB&&alignedPeerColumn(boxOf(rightA),boxOf(rightB)))return [rightA,rightB];
+    if(leftA&&leftB&&leftA!==leftB&&alignedPeerColumn(boxOf(leftA),boxOf(leftB)))return [leftA,leftB];
+    return;
+}
+/** 区分锐角矩形UI弹窗与曲边漫画气泡：仅用于撤回同气泡flat-owner，不授予合段权限。 */
+function isSharpRectangularBubble(box:Box,pixels:Uint8ClampedArray,width:number,height:number,expected:number,check:()=>void):boolean {
+    const x0=Math.max(0,Math.floor(box.x0)),y0=Math.max(0,Math.floor(box.y0));
+    const x1=Math.min(width,Math.ceil(box.x1)),y1=Math.min(height,Math.ceil(box.y1));
+    const bw=x1-x0,bh=y1-y0,xSamples=Math.max(1,Math.min(bw,32));
+    const rowFlatRatio=(y:number)=>{
+        let matched=0;
+        for(let i=0;i<xSamples;i++){
+            const x=x0+Math.floor(i*(bw-1)/Math.max(1,xSamples-1));
+            if(channelStep(packed(pixels,(y*width+x)*4),expected)<=8)matched++;
+        }
+        return matched/xSamples;
+    };
+    check();
+    if(Math.max(rowFlatRatio(y0),rowFlatRatio(y0+1))>=.85&&Math.max(rowFlatRatio(y1-1),rowFlatRatio(y1-2))>=.85)return true;
+    const grid=12;let interior=0;
+    for(let gy=0;gy<grid;gy++){
+        check();const y=y0+Math.floor((gy+.5)*bh/grid);
+        for(let gx=0;gx<grid;gx++){
+            const x=x0+Math.floor((gx+.5)*bw/grid);
+            if(channelStep(packed(pixels,(y*width+x)*4),expected)<=24)interior++;
+        }
+    }
+    return interior/(grid*grid)>.92;
+}
+function peersHaveWidgetOrRowBoundary(a:Box,b:Box,peerA:MangaOcrItem,peerB:MangaOcrItem,pixels:Uint8ClampedArray,width:number,height:number,expected:number,check:()=>void):boolean {
+    const pa=boxOf(peerA),pb=boxOf(peerB);
+    const gapY0=Math.ceil(pa.y1),gapY1=Math.floor(pb.y0);
+    const overlapX0=Math.floor(Math.max(pa.x0,pb.x0)),overlapX1=Math.ceil(Math.min(pa.x1,pb.x1));
+    if(gapY1>gapY0&&overlapX1>overlapX0){
+        for(const t of [.25,.5,.75]){
+            check();const x=Math.min(overlapX1-1,overlapX0+Math.floor((overlapX1-overlapX0)*t));
+            let prev=packed(pixels,(gapY0*width+x)*4);
+            if(channelStep(prev,expected)>=8)return true;
+            for(let y=gapY0+1;y<gapY1;y++){
+                const curr=packed(pixels,(y*width+x)*4);
+                if(channelStep(curr,expected)>=8||channelStep(curr,prev)>=8)return true;
+                prev=curr;
+            }
+        }
+    }
+    for(const [label,peer] of [[a,pa],[b,pb]] as const){
+        const onRight=peer.x0>label.x1;
+        const gx0=onRight?Math.ceil(label.x1)+2:Math.ceil(peer.x1)+2;
+        const gx1=onRight?Math.floor(peer.x0)-2:Math.floor(label.x0)-2;
+        const midY=Math.min(height-1,Math.floor((peer.y0+peer.y1)/2));
+        if(gx1>gx0){
+            check();
+            for(let x=gx0;x<gx1;x++)if(channelStep(packed(pixels,(midY*width+x)*4),expected)>=8)return true;
+        }
+    }
+    return false;
+}
 function clearWindow(pixels:Uint8ClampedArray,width:number,box:Box,bg:number,side:boolean,check:()=>void,outside:(seed:number)=>boolean):boolean {
     const w=box.x1-box.x0,h=box.y1-box.y0,colors=new Uint32Array(w*h);
     for(let y=0;y<h;y++){check();for(let x=0;x<w;x++){const value=packed(pixels,((box.y0+y)*width+box.x0+x)*4);if(!side&&value!==bg)return false;colors[y*w+x]=value;}}
@@ -164,7 +252,6 @@ function observeGapEvidence(pixels:Uint8ClampedArray,width:number,box:Box,profil
         minimum[1]=Math.min(minimum[1],green);maximum[1]=Math.max(maximum[1],green);
         minimum[2]=Math.min(minimum[2],blue);maximum[2]=Math.max(maximum[2],blue);
     };
-    const channelStep=(a:number,b:number)=>Math.max(Math.abs((a&255)-(b&255)),Math.abs(((a>>>8)&255)-((b>>>8)&255)),Math.abs(((a>>>16)&255)-((b>>>16)&255)));
     for(let x=0;x<w;x++){
         const value=packed(pixels,(box.y0*width+box.x0+x)*4),alpha=value>>>24;if(alpha<128)return;
         profile[x]=previousRow[x]=value;update(value);
@@ -385,21 +472,36 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         }
         const own=new Set([previous,next]),envelope={x0:Math.min(a.x0,b.x0),x1:Math.max(a.x1,b.x1),y0:a.y0,y1:b.y1};
         if(physical.some(item=>!own.has(item)&&!intersects(boxOf(item),a)&&!intersects(boxOf(item),b)&&intersects(boxOf(item),envelope)))return false;
+        if(profile.mode==='tight-field'){
+            const expected=(profile.background[0]|profile.background[1]<<8|profile.background[2]<<16|profile.background[3]<<24)>>>0;
+            const peers=findDistinctPeerPair(a,b,physical,own);
+            if(peers&&peersHaveWidgetOrRowBoundary(a,b,peers[0],peers[1],pixels,width,height,expected,checkActive))return false;
+        }
         if(profile.mode==='column-profile'&&Math.max(a.y1-a.y0,b.y1-b.y0)>Math.min(a.y1-a.y0,b.y1-b.y0)*1.2){
             const first=styleColor(previous,oa),second=styleColor(next,ob);
             if(!sameItem(previous,previousSnapshot)||!sameItem(next,nextSnapshot)||first&&second&&getImageRgbContrast(first,second)>=3)return false;
         }
         if(profile.mode==='flat-owner'){
-            const previousOwner=owner(previous,page),nextOwner=owner(next,page),sameBubble=previousOwner!==undefined&&previousOwner===nextOwner;
+            const previousOwner=owner(previous,page),nextOwner=owner(next,page);
+            let sameBubble=previousOwner!==undefined&&previousOwner===nextOwner;
+            const noBubbleMode=!(page.bubbles?.length)&&!(page.layoutBubbles?.length);
+            const expected=(profile.background[0]|profile.background[1]<<8|profile.background[2]<<16|profile.background[3]<<24)>>>0;
+            let formVetoed=false;
+            if(sameBubble||noBubbleMode){
+                const peers=findDistinctPeerPair(a,b,physical,own);
+                if(peers&&(!sameBubble||isSharpRectangularBubble(previousOwner!.bbox,pixels,width,height,expected,checkActive))
+                    &&peersHaveWidgetOrRowBoundary(a,b,peers[0],peers[1],pixels,width,height,expected,checkActive)){
+                    sameBubble=false;formVetoed=true;
+                }
+            }
             const lineHeight=Math.min(a.y1-a.y0,b.y1-b.y0),lineGap=b.y0-a.y1;
             const sentencePair=/[.!?。！？…]$/u.test(previous.text.trim())&&/[.!?。！？…]$/u.test(next.text.trim());
-            const shortContinuation=sameBubble&&!/[.!?。！？…]$/u.test(previous.text.trim())&&lineGap<=lineHeight*1.2;
-            const gapQualifies=sameBubble?lineGap>lineHeight*1.5||shortContinuation:sentencePair&&lineGap>lineHeight*.8||alphaLongContinuation&&page.largeAlphaHoles===true&&alphaLongPotential(a,b);
+            const shortContinuation=(sameBubble||(noBubbleMode&&!formVetoed))&&!/[.!?。！？…]$/u.test(previous.text.trim())&&lineGap<=lineHeight*1.2;
+            const gapQualifies=sameBubble?lineGap>lineHeight*1.5||shortContinuation:shortContinuation||sentencePair&&lineGap>lineHeight*.8||alphaLongContinuation&&page.largeAlphaHoles===true&&alphaLongPotential(a,b);
             if(!allowFlatOwner||!gapQualifies)return false;
             const anchorY=Math.floor(a.y0)-2,targetY=Math.floor(b.y0)-2,profileWidth=profileBox.x1-profileBox.x0;
             if(anchorY<0||targetY<0||anchorY>=height||targetY>=height)return false;
             if(!reserve(profileWidth*2))return 'budget';
-            const expected=(profile.background[0]|profile.background[1]<<8|profile.background[2]<<16|profile.background[3]<<24)>>>0;
             let bestStart=-1,bestEnd=-1,runStart=-1;
             for(let offset=0;offset<=profileWidth;offset++){
                 const x=profileBox.x0+offset,matched=offset<profileWidth&&gapProfile[offset]===expected
@@ -432,6 +534,8 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         if(++comparisons>MAX_COMPARISONS||attempts>=MAX_PAIRS)break enumerate;
         const alphaLongContinuation=page.largeAlphaHoles===true&&alphaLongPotential(a,b);
         if((!potential(a,b)&&!alphaLongContinuation)||owner(previous,page)!==owner(next,page))continue;
+        const peers=findDistinctPeerPair(a,b,physical,new Set([previous,next]));
+        if(peers&&(numericProtection(peers[0].text)||numericProtection(peers[1].text)))continue;
         const ordinal=++attempts,previousSnapshot=snapshot(previous),nextSnapshot=snapshot(next),oa=imageMatteObservationBox(width,height,a),ob=imageMatteObservationBox(width,height,b);
         if(!oa||!ob)continue;
         const endpointArea=oa.width*oa.height+ob.width*ob.height;

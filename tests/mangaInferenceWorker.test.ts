@@ -93,8 +93,8 @@ describe('漫画推理 Worker 消息处理器', () => {
     it('普通图片可请求真实检测侧车，仅转移owned bit bytes，不把模型Float32概率张量转移',async()=>{
         const bits=new Uint8Array([1,2]),originalProbability=new Float32Array([.9,.1]);
         ocr.recognize.mockResolvedValue({results:[],imageDetectionFrames:[{pageWidth:4,pageHeight:4,x:0,y:0,width:4,height:4,bits}]});
-        const result=await send({requestId:44,type:'recognize',image:'image',imageDetectionEvidence:true});
-        expect(ocr.recognize).toHaveBeenCalledWith('image',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
+        const result=await send({requestId:44,type:'recognize',image:'image',profile:'image',imageDetectionEvidence:true});
+        expect(ocr.recognize).toHaveBeenCalledWith('image',{flatten:true,noCache:true,strategy:'per-box',profile:'image',imageDetectionEvidence:true});
         const [,transfer]=scope.postMessage.mock.calls.find(([message])=>message===result)!;
         expect(transfer).toEqual([bits.buffer]);expect(transfer).not.toContain(originalProbability.buffer);
     });

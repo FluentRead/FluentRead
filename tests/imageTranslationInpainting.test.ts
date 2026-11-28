@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {createHash} from 'node:crypto';
-import {imageMaskBoxes,inpaintTextRegions,planImageGradientRepair} from '@/src/features/image-translation/services/inpainting';
+import {getInpaintDirtyRects,imageMaskBoxes,inpaintTextRegions,planImageGradientRepair} from '@/src/features/image-translation/services/inpainting';
 import {IMAGE_DIRECTIONAL_REPAIR_BUDGET,repairDirectionalImageBackground} from '@/src/features/image-translation/services/directionalTextRepair';
 import {ImageAlphaProtectionUnavailableError,type MangaAlphaProtection} from '@/src/features/image-translation/services/mangaAlphaProtection';
 import {rotatedSpineFixture} from './helpers/rotatedSpineFixture';
@@ -646,5 +646,62 @@ describe('图片文字背景修复', () => {
         // 只依据实际紧邻边界，第二簇的快填不会抹去第一簇边界旁的黑色残字影响。
         expect(first[(22 * 60 + 15) * 4]).toBeLessThan(180);
         expect(inpaintTextRegions(source.slice(), 60, 60, boxes, true)).toEqual(first);
+    });
+
+    it('边框感知夹紧覆盖透明内边、靠边延伸、左右图标与竖向紧凑控件、退化夹紧与脏矩形校验', () => {
+        // 1. 内边下/左/右存在透明像素时退出边框夹紧走常规扩散
+        for (const [px, py] of [[15, 19], [10, 15], [29, 15]] as const) {
+            const img = solidPixels(60, 40, [255, 255, 255, 255]);
+            img[(py * 60 + px) * 4 + 3] = 200;
+            expect(inpaintTextRegions(img, 60, 40, [line(10, 10, 30, 20)]).length).toBe(60 * 40 * 4);
+        }
+
+        // 2. 紧贴图左沿的 1px 水平细边框（isDiff 越界 + 右延触发）与左侧独立图标（sawCleanLeft）
+        const edgeImg = solidPixels(80, 50, [255, 255, 255, 255]);
+        for (let x = 0; x < 35; x++) edgeImg.set([180, 180, 180, 255], (14 * 80 + x) * 4);
+        for (let y = 15; y < 35; y++) edgeImg.set([180, 180, 180, 255], (y * 80 + 34) * 4);
+        const edgeOut = inpaintTextRegions(edgeImg, 80, 50, [line(0, 15, 25, 27)]);
+        expect(edgeOut[(14 * 80 + 10) * 4]).toBe(180);
+
+        const leftIconImg = solidPixels(80, 50, [255, 255, 255, 255]);
+        for (let y = 18; y < 26; y++) leftIconImg.set([30, 30, 30, 255], (y * 80 + 18) * 4); // x=18 图标，x=19 白缝，bbox x0=20
+        for (let y = 18; y < 28; y++) leftIconImg.set([180, 180, 180, 255], (y * 80 + 50) * 4); // x=50 仅向下延展的 1px 边框
+        leftIconImg.set([180, 180, 180, 255], (29 * 80 + 50) * 4);
+        leftIconImg.set([180, 180, 180, 255], (30 * 80 + 50) * 4);
+        const iconOut = inpaintTextRegions(leftIconImg, 80, 50, [line(20, 15, 49, 29)]);
+        expect(iconOut[(20 * 80 + 18) * 4]).toBe(30);
+        expect(iconOut[(20 * 80 + 50) * 4]).toBe(180);
+
+        // 3. 左右 1px 竖边框（左侧仅向下延展触发 baseBottom+1，右侧上下延展）
+        const lrBorderImg = solidPixels(80, 50, [255, 255, 255, 255]);
+        for (let y = 15; y < 36; y++) lrBorderImg.set([180, 180, 180, 255], (y * 80 + 18) * 4);
+        for (let y = 10; y < 36; y++) lrBorderImg.set([180, 180, 180, 255], (y * 80 + 51) * 4);
+        const lrOut = inpaintTextRegions(lrBorderImg, 80, 50, [line(19, 15, 50, 29)]);
+        expect(lrOut[(20 * 80 + 18) * 4]).toBe(180);
+        expect(lrOut[(20 * 80 + 51) * 4]).toBe(180);
+
+        // 4. 紧凑控件：上下均匀 + 左右触及边框（planCompactInteriorFill 的 tb 分支）、弱跳变回退及左右外周含透明跳过
+        const tbPill = solidPixels(80, 60, [255, 255, 255, 255]);
+        for (let y = 10; y < 50; y++) for (let x = 20; x < 60; x++) tbPill.set([0, 174, 66, 255], (y * 80 + x) * 4);
+        for (let y = 24; y < 36; y++) for (let x = 25; x < 55; x++) tbPill.set([255, 255, 255, 255], (y * 80 + x) * 4);
+        const tbRepaired = inpaintTextRegions(tbPill, 80, 60, [line(20, 22, 60, 38)]);
+        expect(Array.from(tbRepaired.slice((30 * 80 + 40) * 4, (30 * 80 + 40) * 4 + 4))).toEqual([0, 174, 66, 255]);
+
+        const tbWeak = solidPixels(80, 60, [255, 255, 255, 255]);
+        for (let y = 20; y < 40; y++) tbWeak.set([250, 250, 250, 255], (y * 80 + 17) * 4);
+        expect(inpaintTextRegions(tbWeak, 80, 60, [line(20, 22, 60, 38)]).length).toBe(80 * 60 * 4);
+
+        const tbAlpha = tbPill.slice();
+        tbAlpha[(30 * 80 + 19) * 4 + 3] = 128;
+        expect(inpaintTextRegions(tbAlpha, 80, 60, [line(20, 22, 60, 38)]).length).toBe(80 * 60 * 4);
+
+        // 5. getInpaintDirtyRects 与退化夹紧边界
+        expect(getInpaintDirtyRects([], 60, 40)).toEqual([]);
+        expect(getInpaintDirtyRects([line(10, 10, 20, 20)], 0, 40)).toEqual([]);
+        expect(getInpaintDirtyRects([line(NaN, 10, 20, 20)], 60, 40)).toEqual([]);
+        const item = line(10, 10, 20, 20);
+        const disjoint = new Map([[item, {x0: 40, y0: 40, x1: 50, y1: 50}]]);
+        expect(getInpaintDirtyRects([item], 60, 40, disjoint)).toEqual([]);
+        expect(inpaintTextRegions(solidPixels(60, 40), 60, 40, [item], false, undefined, disjoint)).toEqual(solidPixels(60, 40));
     });
 });

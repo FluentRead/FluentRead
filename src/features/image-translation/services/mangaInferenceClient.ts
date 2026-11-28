@@ -12,7 +12,7 @@ import {isImageTextSegmentationSource,type ImageTextSegmentationSource} from './
 export interface MangaPatch {image: Float32Array; mask: Float32Array; width: number; height: number}
 
 export type MangaInferenceProgress = (stage: 'preparing' | 'initializing' | 'recognizing', percent?: number) => void;
-export type MangaInferenceRequest = {type: 'prepare-ocr' | 'recognize' | 'prepare-inpaint' | 'inpaint' | 'dispose-ocr' | 'dispose-inpaint' | 'prepare-seg' | 'segment' | 'dispose-seg'; image?: string; patch?: MangaPatch;imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true; source?:ImageTextSegmentationSource};
+export type MangaInferenceRequest = {type: 'prepare-ocr' | 'recognize' | 'prepare-inpaint' | 'inpaint' | 'dispose-ocr' | 'dispose-inpaint' | 'prepare-seg' | 'segment' | 'dispose-seg'; image?: string; patch?: MangaPatch; profile?: 'manga' | 'image'; imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true; source?:ImageTextSegmentationSource};
 export type MangaInferenceMessage = MangaInferenceRequest & {requestId: number; cpu: boolean};
 export interface MangaInferenceResponse {requestId: number; stage?: Parameters<MangaInferenceProgress>[0]; percent?: number; executionProviders?: Array<'webgpu' | 'wasm'>; success?: boolean; result?: MangaOcrPage | Float32Array | Uint8Array | boolean; error?: string; errorKind?:'protocol'|'execution'}
 export interface MangaInferenceDiagnostics {

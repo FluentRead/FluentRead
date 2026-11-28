@@ -330,7 +330,7 @@ describe('E2 real runtime removal admission', () => {
         sdk.recognize.mockImplementationOnce(async () => {await gpu.run(); return {results: []};});
         const port = await createBrowserMangaOcr();
         expect(sdk.detectors).toHaveLength(1); expect(sdk.detectors[0].session).toBe(gpu);
-        expect(sdk.detectors[0].options).toEqual({maxSideLength: 1536, paddingVertical: .1, paddingHorizontal: .2});
+        expect(sdk.detectors[0].options).toEqual({maxSideLength: 1728, paddingVertical: .1, paddingHorizontal: .2});
         const decodedImage = {naturalWidth: 32, naturalHeight: 32, src: 'borrowed-source'} as HTMLImageElement;
         try {await expect(port.recognize('fixture', {flatten: true, noCache: true, strategy: 'per-box', signal: abort.signal, decodedImage})).rejects.toMatchObject({name: 'AbortError'});}
         finally {await port.destroy();}

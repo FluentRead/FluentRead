@@ -21,6 +21,7 @@ vi.mock('@/src/app/content/pageLifecycle', () => ({waitForContentDocument: ports
     ports.actions = actions; return {isSuspended: () => ports.suspended};
 }}));
 import {startHtmlMediaFrameApp} from '@/src/app/content/htmlMediaFrame';
+import {VIDEO_SUBTITLE_FRAME_STARTED_KEY} from '@/src/features/video-subtitle/frameProtocol';
 const ctx = () => ({isInvalid: false}) as unknown as ContentScriptContext;
 function page(url = 'https://podcast.example/embed', top = false) {const win = {location: new URL(url), top: {} as unknown}; if (top) win.top = win; vi.stubGlobal('window', win); vi.stubGlobal('document', {});}
 const changed = () => ports.listeners.forEach(callback => callback());
@@ -131,8 +132,26 @@ it('does not report a module rejection after its media owner has already closed'
 });
 
 
+it('clears the started marker and cleans up if hydration rejects during startup', async () => {
+    ports.language.mockRejectedValueOnce(new Error('i18n load failed'));
+    await expect(startHtmlMediaFrameApp(ctx())).rejects.toThrow('i18n load failed');
+    expect((window as unknown as Record<string, unknown>)[VIDEO_SUBTITLE_FRAME_STARTED_KEY]).toBeUndefined();
+    await startHtmlMediaFrameApp(ctx());
+    expect(ports.activate).toBeDefined();
+});
+
 it('respects a disabled embedding site as well as the media frame site', async () => {
     vi.stubGlobal('document', {referrer: 'https://school.example/lesson'}); ports.config.disabledExtensionDomains = ['school.example'];
     await startHtmlMediaFrameApp(ctx()); expect(ports.activate).toBeUndefined();
     ports.config.disabledExtensionDomains = []; changed(); expect(ports.activate).toBeDefined();
+});
+
+it('ignores duplicate runtime startup in the same isolated frame world until disposed', async () => {
+    await startHtmlMediaFrameApp(ctx());
+    expect(ports.listeners.size).toBe(1);
+    await startHtmlMediaFrameApp(ctx());
+    expect(ports.listeners.size).toBe(1);
+    ports.actions!.dispose();
+    await startHtmlMediaFrameApp(ctx());
+    expect(ports.listeners.size).toBe(1);
 });

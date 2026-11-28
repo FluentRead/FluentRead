@@ -1218,6 +1218,10 @@ export default defineConfig({
                 'src/services/translation/broker/telemetry.ts',
                 'src/ui/i18n/localizeServiceOptions.ts',
                 'src/ui/i18n/useUiI18n.ts',
+                'src/app/background/handlers/videoSubtitleFrame.ts',
+                'src/app/content/youtubeEmbedBootstrap.ts',
+                'src/features/video-subtitle/content/youtubeEmbedUrl.ts',
+                'src/features/video-subtitle/frameProtocol.ts',
             ],
             exclude: ['**/*.d.ts'],
             thresholds: {

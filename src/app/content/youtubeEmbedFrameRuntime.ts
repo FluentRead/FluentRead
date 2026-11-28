@@ -10,14 +10,17 @@ import {config, configReady, subscribeConfig} from '@/src/services/config/store'
 import {ensureUiLanguageBundle} from '@/src/platform/i18n/uiLanguageBundles';
 import {isExtensionDisabledOnSite} from '@/src/features/site-rules/domain';
 import {isYouTubeEmbedPage, mountVideoSubtitleTranslation} from '@/src/features/video-subtitle/public';
+import {VIDEO_SUBTITLE_FRAME_STARTED_KEY} from '@/src/features/video-subtitle/frameProtocol';
 import {setMainWorldBridgesEnabled} from './mainWorldBridgeLifecycle';
 import {installContentPageLifecycle} from './pageLifecycle';
 
 export async function startYoutubeEmbedContentApp(ctx: ContentScriptContext): Promise<void> {
     // X loads its share card and the YouTube player in nested frames. The regular
     // content entrypoint is top-frame only, so keep this bootstrap scoped to embeds.
-    if (window.top === window || ctx.isInvalid) return;
+    const frameState = window as unknown as Record<string, unknown>;
+    if (window.top === window || ctx.isInvalid || frameState[VIDEO_SUBTITLE_FRAME_STARTED_KEY] === true) return;
     if (!isYouTubeEmbedPage(window.location)) return startHtmlMediaFrameApp(ctx);
+    frameState[VIDEO_SUBTITLE_FRAME_STARTED_KEY] = true;
 
     const lifetime = new AbortController();
     let disposed = false;
@@ -27,6 +30,7 @@ export async function startYoutubeEmbedContentApp(ctx: ContentScriptContext): Pr
     const setBridgeEnabled = (enabled: boolean) => setMainWorldBridgesEnabled(document, enabled);
     const cleanup = () => {
         disposed = true;
+        delete frameState[VIDEO_SUBTITLE_FRAME_STARTED_KEY];
         stopVideo();
         setBridgeEnabled(false);
         unsubscribe?.();
@@ -50,13 +54,18 @@ export async function startYoutubeEmbedContentApp(ctx: ContentScriptContext): Pr
         if (!unmountVideo) unmountVideo = mountVideoSubtitleTranslation();
     };
 
-    await configReady;
-    if (disposed || ctx.isInvalid) { cleanup(); return; }
-    await ensureUiLanguageBundle(config.uiLanguage);
-    if (disposed || ctx.isInvalid) { cleanup(); return; }
-    unsubscribe = subscribeConfig(nextConfig => {
+    try {
+        await configReady;
+        if (disposed || ctx.isInvalid) { cleanup(); return; }
+        await ensureUiLanguageBundle(config.uiLanguage);
+        if (disposed || ctx.isInvalid) { cleanup(); return; }
+        unsubscribe = subscribeConfig(nextConfig => {
+            reconcile();
+            void ensureUiLanguageBundle(nextConfig.uiLanguage).then(reconcile);
+        });
         reconcile();
-        void ensureUiLanguageBundle(nextConfig.uiLanguage).then(reconcile);
-    });
-    reconcile();
+    } catch (error) {
+        cleanup();
+        throw error;
+    }
 }

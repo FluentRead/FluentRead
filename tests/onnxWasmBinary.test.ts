@@ -5,7 +5,11 @@
  * 模块边界：只验证共享加载器，不启动真实模型或浏览器 Worker。
  */
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {readFileSync} from 'node:fs';
+import {readFileSync, realpathSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {build as viteBuild} from 'vite';
+import {kokoroTransformersBuildPlugin} from '../scripts/wasm/kokoro-transformers-build';
+import {sharedOnnxBuildPlugin} from '../scripts/wasm/manga-onnx-build';
 import {
     assertOnnxWasmRuntimeSupported,
     configureOnnxWasmBackend,
@@ -222,4 +226,233 @@ describe('compressed ONNX WASM loader', () => {
             .rejects.toThrow('ONNX_WASM_BINARY_LOAD_FAILED:wasm.gz');
         expect(fetchImpl).toHaveBeenCalledTimes(1);
     });
+});
+
+describe('kokoro modular transformers build plugin', () => {
+    it('仅重定向 Kokoro 专用 transformers 入口与内部浏览器空桩，不影响 v3.8.1 Worker', () => {
+        const plugin = kokoroTransformersBuildPlugin();
+        const resolveId = plugin.resolveId as (source: string, importer?: string) => string | null;
+        const load = plugin.load as (id: string) => string | null;
+
+        const directId = resolveId('@huggingface/transformers-kokoro', '/repo/src/features/local-tts/offscreen/tts.worker.ts');
+        const kokoroJsId = resolveId('@huggingface/transformers', '/repo/node_modules/@uzen/kokoro-js/dist/kokoro.js');
+        const pnpmKokoroId = resolveId('@huggingface/transformers', '/repo/node_modules/.pnpm/@uzen+kokoro-js@1.2.4/node_modules/@uzen/kokoro-js/dist/kokoro.js');
+        expect(directId).toBeTruthy();
+        expect(kokoroJsId).toBe(directId);
+        expect(pnpmKokoroId).toBe(directId);
+
+        // 其他 Worker 使用 @huggingface/transformers v3.8.1，绝不能被拦截。
+        expect(resolveId('@huggingface/transformers', '/repo/src/features/local-translation/offscreen/translation.worker.ts')).toBeNull();
+        expect(resolveId('@huggingface/transformers', '/repo/src/features/video-subtitle/offscreen/transcription.worker.ts')).toBeNull();
+        expect(resolveId('@huggingface/transformers', '/repo/src/features/information-highlight/offscreen/worker.ts')).toBeNull();
+
+        const entryCode = load(directId!);
+        expect(entryCode).toContain('StyleTextToSpeech2Model');
+        expect(entryCode).toContain('AutoTokenizer');
+        expect(entryCode).toContain('MODEL_TYPE_MAPPING');
+        expect(entryCode).toContain('registerTaskMappings');
+
+        const kokoroSrcImporter = resolve(
+            realpathSync(resolve(process.cwd(), 'node_modules/@huggingface/transformers-kokoro')),
+            'src/env.js',
+        );
+        const emptyStub = resolveId('node:fs', kokoroSrcImporter);
+        const streamStub = resolveId('node:stream', kokoroSrcImporter);
+        const streamPromisesStub = resolveId('node:stream/promises', kokoroSrcImporter);
+        const jinjaStub = resolveId('@huggingface/jinja', kokoroSrcImporter);
+        expect(emptyStub).toBeTruthy();
+        expect(resolveId('onnxruntime-node', kokoroSrcImporter)).toBe(emptyStub);
+        expect(load(emptyStub!)).toContain('export default {}');
+        expect(load(streamStub!)).toContain('Readable');
+        expect(load(streamPromisesStub!)).toContain('pipeline');
+        expect(load(jinjaStub!)).toContain('export class Template');
+
+        // 浏览器空桩仅限 @huggingface/transformers@4.2.0/src/ 内部使用。
+        expect(resolveId('node:fs', '/repo/src/features/local-tts/offscreen/tts.worker.ts')).toBeNull();
+        expect(resolveId('@huggingface/jinja', '/repo/src/features/local-translation/offscreen/translation.worker.ts')).toBeNull();
+        expect(load('\0unrelated-virtual-id')).toBeNull();
+    });
+
+    it('在真实 Vite/Rolldown 构建中裁剪无关模型架构并端到端运行 KokoroTTS 推理与释放', async () => {
+        const virtualEntry = '\0test-kokoro-runtime-entry';
+        const virtualOrt = '\0test-kokoro-fake-ort';
+        const virtualOrtCommon = '\0test-kokoro-fake-ort-common';
+        const virtualPhonemizer = '\0test-kokoro-fake-phonemizer';
+        const virtualPinyin = '\0test-kokoro-fake-pinyin';
+
+        const bundleWith = async (extraPlugins: ReturnType<typeof kokoroTransformersBuildPlugin>[], fakeRuntime: boolean) => {
+            const result = await viteBuild({
+                configFile: false,
+                logLevel: 'error',
+                plugins: [
+                    {
+                        name: 'test-kokoro-harness',
+                        enforce: 'pre',
+                        resolveId(id) {
+                            if (id === virtualEntry) return id;
+                            if (!fakeRuntime) return null;
+                            if (id === 'onnxruntime-web' || id === 'onnxruntime-web/webgpu') return virtualOrt;
+                            if (id === 'onnxruntime-common') return virtualOrtCommon;
+                            if (id === 'phonemizer') return virtualPhonemizer;
+                            if (id === 'pinyin-pro') return virtualPinyin;
+                            return null;
+                        },
+                        load(id) {
+                            if (id === virtualEntry) {
+                                return [
+                                    'import {KokoroTTS, env as kokoroEnv} from "@uzen/kokoro-js";',
+                                    'import {env as tfEnv, StyleTextToSpeech2Model, AutoTokenizer, Tensor, RawAudio} from "@huggingface/transformers-kokoro";',
+                                    'export {KokoroTTS, kokoroEnv, tfEnv, StyleTextToSpeech2Model, AutoTokenizer, Tensor, RawAudio};',
+                                ].join('\n');
+                            }
+                            if (id === virtualOrtCommon) {
+                                return 'export class Tensor { constructor(type, data, dims) { this.type = type; this.data = data; this.dims = dims; } dispose() {} }';
+                            }
+                            if (id === virtualOrt) {
+                                return [
+                                    'import {Tensor} from "onnxruntime-common";',
+                                    'export {Tensor};',
+                                    'export const env = {wasm: {numThreads: 1, wasmPaths: undefined}, webgpu: {}, logLevel: "warning"};',
+                                    'export const InferenceSession = {',
+                                    '  async create(buffer, options) {',
+                                    '    globalThis.__kokoroTestOrtCalls.push({kind: "create", byteLength: buffer.byteLength, options});',
+                                    '    return {',
+                                    '      inputNames: ["input_ids", "style", "speed"],',
+                                    '      outputNames: ["waveform"],',
+                                    '      async run(feeds) {',
+                                    '        globalThis.__kokoroTestOrtCalls.push({kind: "run", feedKeys: Object.keys(feeds), inputIds: Array.from(feeds.input_ids.data, Number), styleDims: feeds.style.dims, speed: Array.from(feeds.speed.data)});',
+                                    '        return {waveform: new Tensor("float32", new Float32Array([0.25, -0.25, 0.5]), [3])};',
+                                    '      },',
+                                    '      async release() { globalThis.__kokoroTestOrtCalls.push({kind: "release"}); },',
+                                    '    };',
+                                    '  },',
+                                    '};',
+                                    'export default {env, InferenceSession, Tensor};',
+                                ].join('\n');
+                            }
+                            if (id === virtualPhonemizer) return 'export const phonemize = async (text) => [text];';
+                            if (id === virtualPinyin) return 'export const pinyin = (text) => [text];';
+                            return null;
+                        },
+                    },
+                    ...(fakeRuntime ? [] : [sharedOnnxBuildPlugin()]),
+                    ...extraPlugins,
+                ],
+                build: {
+                    write: false,
+                    target: 'chrome137',
+                    minify: true,
+                    rolldownOptions: {
+                        input: virtualEntry,
+                        preserveEntrySignatures: 'strict',
+                        external: fakeRuntime ? [] : ['onnxruntime-web', 'onnxruntime-web/webgpu', 'onnxruntime-common', 'phonemizer', 'pinyin-pro'],
+                        output: {format: 'es', codeSplitting: false},
+                    },
+                },
+            });
+            const first = Array.isArray(result) ? result[0]! : result;
+            if (!('output' in first)) throw new Error('Expected RollupOutput from viteBuild');
+            const chunk = first.output.find((item): item is Extract<typeof item, {type: 'chunk'}> => item.type === 'chunk');
+            if (!chunk) throw new Error('Missing entry chunk from viteBuild');
+            return chunk.code;
+        };
+
+        const baselineCode = await bundleWith([], false);
+        const modularCode = await bundleWith([kokoroTransformersBuildPlugin()], false);
+        expect(Buffer.byteLength(baselineCode, 'utf8') - Buffer.byteLength(modularCode, 'utf8')).toBeGreaterThan(250_000);
+        for (const removedSymbol of ['BertModel', 'GPT2Model', 'WhisperModel', 'CLIPModel', 'ImageFeatureExtractor']) {
+            expect(baselineCode).toContain(removedSymbol);
+            expect(modularCode).not.toContain(removedSymbol);
+        }
+        expect(modularCode).toContain('StyleTextToSpeech2Model');
+
+        const runnableCode = await bundleWith([kokoroTransformersBuildPlugin()], true);
+        const ortCalls: Array<Record<string, unknown>> = [];
+        const savedProcess = globalThis.process;
+        const savedSelf = (globalThis as {self?: unknown}).self;
+        const savedDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'constructor');
+        const savedFetch = globalThis.fetch;
+        (globalThis as Record<string, unknown>).__kokoroTestOrtCalls = ortCalls;
+        (globalThis as {self?: unknown}).self = globalThis;
+        Object.defineProperty(globalThis, 'constructor', {value: {name: 'DedicatedWorkerGlobalScope'}, configurable: true});
+        Object.defineProperty(globalThis, 'process', {value: undefined, configurable: true, writable: true});
+
+        let mod: Record<string, any>;
+        try {
+            mod = await import(`data:text/javascript;base64,${Buffer.from(runnableCode, 'utf8').toString('base64')}`);
+        } finally {
+            Object.defineProperty(globalThis, 'process', {value: savedProcess, configurable: true, writable: true});
+            if (savedDescriptor) Object.defineProperty(globalThis, 'constructor', savedDescriptor);
+            else delete (globalThis as {constructor?: unknown}).constructor;
+            if (savedSelf === undefined) delete (globalThis as {self?: unknown}).self;
+            else (globalThis as {self?: unknown}).self = savedSelf;
+        }
+
+        try {
+            mod.tfEnv.allowLocalModels = false;
+            mod.kokoroEnv.allowLocalModels = true;
+            expect(mod.tfEnv.allowLocalModels).toBe(true);
+            mod.tfEnv.allowLocalModels = false;
+            mod.tfEnv.allowRemoteModels = true;
+            mod.tfEnv.useBrowserCache = false;
+            mod.tfEnv.useWasmCache = false;
+            mod.kokoroEnv.wasmPaths = {mjs: 'ort.mjs', wasm: 'ort.wasm'};
+            expect(mod.tfEnv.backends.onnx.wasm.wasmPaths).toEqual({mjs: 'ort.mjs', wasm: 'ort.wasm'});
+
+            const voiceBytes = new Float32Array(512 * 256).fill(0.1).buffer;
+            const mockFiles: Record<string, string> = {
+                'config.json': JSON.stringify({model_type: 'style_text_to_speech_2', architectures: ['StyleTextToSpeech2Model']}),
+                'tokenizer_config.json': JSON.stringify({tokenizer_class: 'PreTrainedTokenizer', model_max_length: 512}),
+                'tokenizer.json': JSON.stringify({
+                    version: '1.0',
+                    truncation: null,
+                    padding: null,
+                    added_tokens: [],
+                    normalizer: null,
+                    pre_tokenizer: {type: 'Split', pattern: {Regex: ''}, behavior: 'Isolated', invert: false},
+                    post_processor: {
+                        type: 'TemplateProcessing',
+                        single: [{SpecialToken: {id: '$', type_id: 0}}, {Sequence: {id: 'A', type_id: 0}}, {SpecialToken: {id: '$', type_id: 0}}],
+                        pair: [],
+                        special_tokens: {$: {id: '$', ids: [0], tokens: ['$']}},
+                    },
+                    decoder: null,
+                    model: {type: 'WordLevel', vocab: {$: 0, h: 1, i: 2}, unk_token: '$'},
+                }),
+            };
+            const fakeFetch = async (input: RequestInfo | URL) => {
+                const url = String(input);
+                for (const [name, body] of Object.entries(mockFiles)) {
+                    if (url.endsWith(`/${name}`)) return new Response(body, {status: 200, headers: {'content-type': 'application/json'}});
+                }
+                if (url.endsWith('.onnx')) return new Response(new Uint8Array([1, 2, 3, 4]), {status: 200});
+                if (url.endsWith('.bin')) return new Response(voiceBytes, {status: 200});
+                return new Response('not found', {status: 404});
+            };
+            mod.tfEnv.fetch = fakeFetch;
+            globalThis.fetch = fakeFetch as typeof fetch;
+
+            const tts = await mod.KokoroTTS.from_pretrained('hexgrad/Kokoro-82M-v1.1-zh', {
+                dtype: 'fp32',
+                device: 'wasm',
+                model_file_name: 'model',
+                voicePath: 'https://example.test/voices',
+            });
+            const audio = await tts.generate('hi', {voice: 'af_maple', speed: 1.25});
+            expect(audio.sampling_rate).toBe(24_000);
+            expect(Array.from(audio.audio)).toEqual([0.25, -0.25, 0.5]);
+            expect(() => tts.tokenizer.apply_chat_template([], {chat_template: '{{ messages }}'}))
+                .toThrow('Chat templates are not bundled in the Kokoro TTS runtime.');
+            await tts.model.dispose();
+
+            expect(ortCalls).toEqual([
+                {kind: 'create', byteLength: 4, options: {logSeverityLevel: 3, executionProviders: ['wasm']}},
+                {kind: 'run', feedKeys: ['input_ids', 'style', 'speed'], inputIds: [0, 1, 2, 0], styleDims: [1, 256], speed: [1.25]},
+                {kind: 'release'},
+            ]);
+        } finally {
+            globalThis.fetch = savedFetch;
+            delete (globalThis as Record<string, unknown>).__kokoroTestOrtCalls;
+        }
+    }, 30_000);
 });

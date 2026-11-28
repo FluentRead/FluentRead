@@ -29,6 +29,7 @@ import {createFreeTranslationWeightsHandler} from './handlers/freeTranslationWei
 import {createPopupNavigationHandlers} from './popupNavigation';
 import {createDownloadProgressHandler, createDownloadProgressQueryHandler} from './handlers/downloadProgress';
 import {createUiLanguageBaseHandler} from './handlers/uiLanguageBase';
+import {createBrowserVideoSubtitleFrameExecutor, createVideoSubtitleFrameHandler} from './handlers/videoSubtitleFrame';
 import {createTranslationCancelHandler, createTranslationRequestFallback, createTranslationRequestRegistry} from './handlers/translation';
 import {createSelectionWordLookupHandler} from './handlers/selectionWordLookup';
 import {isBrowserTabId} from './tabTranslationState';
@@ -121,6 +122,11 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             logOperationFailure: (error) => console.error('[FluentRead] vocabulary book operation failed:', error),
         }),
         ...createVideoSubtitleBackgroundRuntime(),
+        createVideoSubtitleFrameHandler({
+            runtimeId: browser.runtime.id,
+            isTabId: isBrowserTabId,
+            executeScript: createBrowserVideoSubtitleFrameExecutor(browser as unknown as Parameters<typeof createBrowserVideoSubtitleFrameExecutor>[0]),
+        }),
         ...createLocalModelMessageHandlers<BackgroundRuntimeContext>(),
         createDownloadProgressHandler({runtimeId: browser.runtime.id, offscreenUrl: browser.runtime.getURL('/offscreen.html'), storage: browser.storage.local}), createDownloadProgressQueryHandler({runtimeId: browser.runtime.id, storage: browser.storage.local}), createUiLanguageBaseHandler({runtimeId: browser.runtime.id}),
     ];

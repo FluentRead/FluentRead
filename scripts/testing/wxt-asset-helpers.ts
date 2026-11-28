@@ -1,8 +1,9 @@
 /**
  * @file scripts/testing/wxt-asset-helpers.ts
- * 文件职责：封装 WXT 扩展构建中的产物打包收尾、Unicode 非字符转义、体积预算计算与静态公共资源收集逻辑。
+ * 文件职责：封装 WXT 扩展构建中的产物打包收尾、快速本地打包开关、Unicode 非字符转义、体积预算计算与静态公共资源收集逻辑。
  * 主要内容：
- * - 提供 `finalizeExtensionZip` 校验 Chrome ZIP 固定身份并清理旧命名包；
+ * - 提供 `finalizeExtensionZip` 使用原生标准 ZIP 校验（并在非常规流式/ZIP64 包时回退 JSZip）验证 Chrome ZIP 全量 CRC32 与固定身份并清理旧命名包；
+ * - 提供 `isFastZipEnabled` 判断是否通过 `FLUENTREAD_ZIP_FAST=1` 启用本地快速打包模式；
  * - 提供 `escapeExtensionNoncharacters` 插件在 chunk 写出前将 U+FFFE/U+FFFF 转为 ASCII 转义；
  * - 提供 `resolveExtensionBuildBudget` 按浏览器与开发/生产模式计算精确磁盘体积预算；
  * - 提供 `collectStaticExtensionPublicAssets` 收集第三方许可、语言包、PDF.js/wllama/Tesseract 静态资产。
@@ -10,9 +11,9 @@
  */
 import fs from 'node:fs';
 import {resolve} from 'node:path';
-import JSZip from 'jszip';
 import {createExtensionMetadataLocaleFiles} from '../../src/core/i18n/bundles';
 import {createExtensionUiLanguageBundleFiles} from '../i18n/extensionLanguageBundles';
+import {parseStandardZip, readStandardZipEntry, type StandardZipLayout} from '../wasm/compact-extension-zip';
 import {packageTesseractWasm, packageTesseractWorker, resolveTesseractSources} from '../wasm/package-diagnostics';
 import {dictionaryScriptAssets} from './dictionary-script-build';
 import {hypothesisAssets} from './hypothesis-assets';
@@ -23,14 +24,40 @@ export type ExtensionPublicAsset =
     | {absoluteSrc: string; relativeDest: string}
     | {relativeDest: string; contents: string};
 
+/** 本地开发按需启用快速打包模式（FLUENTREAD_ZIP_FAST=1）；CI 环境始终强制关闭以防发布未最高压缩的商店包。 */
+export function isFastZipEnabled(env: Readonly<Record<string, string | undefined>> = process.env): boolean {
+    if (env.CI && env.CI !== '0' && env.CI !== 'false') return false;
+    return env.FLUENTREAD_ZIP_FAST === '1';
+}
+
 /** Chrome 只交付保留固定身份的原 ZIP；验证成功后清理同版本旧商店包。 */
 export async function finalizeExtensionZip(browser: string, zipPath: string): Promise<void> {
     if (browser !== 'chrome') return;
     if (!zipPath.endsWith('.zip')) throw new Error('Chrome 安装包路径必须以 .zip 结尾');
-    const archive = await JSZip.loadAsync(fs.readFileSync(zipPath), {checkCRC32: true});
-    const entry = archive.file('manifest.json');
-    if (!entry) throw new Error('Chrome 安装包缺少 manifest.json');
-    const manifest = JSON.parse(await entry.async('string'));
+    const bytes = fs.readFileSync(zipPath);
+    let manifestText: string | undefined;
+    let standardLayout: StandardZipLayout | undefined;
+    try {
+        standardLayout = parseStandardZip(bytes);
+    } catch (error) {
+        // 仅在合法但超出标准单盘子集的格式（数据描述符或 ZIP64）时回退至 JSZip，结构损坏直接拒绝。
+        const code = (error as {code?: unknown})?.code;
+        if (code !== 'DATA_DESCRIPTOR' && code !== 'ZIP64') throw error;
+        standardLayout = undefined;
+    }
+    if (standardLayout) {
+        for (const entry of standardLayout.entries) {
+            const content = readStandardZipEntry(bytes, entry);
+            if (entry.name === 'manifest.json') manifestText = content.toString('utf8');
+        }
+    } else {
+        const {default: JSZip} = await import('jszip');
+        const archive = await JSZip.loadAsync(bytes, {checkCRC32: true});
+        const entry = archive.file('manifest.json');
+        manifestText = entry ? await entry.async('string') : undefined;
+    }
+    if (manifestText === undefined) throw new Error('Chrome 安装包缺少 manifest.json');
+    const manifest = JSON.parse(manifestText);
     if (typeof manifest.key !== 'string' || !manifest.key.trim()) {
         throw new Error('Chrome 安装包缺少固定扩展 ID 的 key');
     }

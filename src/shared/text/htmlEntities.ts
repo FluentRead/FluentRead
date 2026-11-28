@@ -4,7 +4,7 @@
  * 主要内容：使用完整 HTML 字符引用表，并复现 textarea 片段解析与 value 的换行、空字符规范化。
  * 模块边界：只解码文本，不解析输入为标签、不加载资源，也不替代既有无 DOM 环境的降级规则。
  */
-import {decodeHTML} from 'entities';
+import {decodeHTML} from 'entities/lib/decode.js';
 
 /** 按 textarea.innerHTML 后读取 value 的文本语义执行一次 HTML 字符引用解码。 */
 export function decodeTextareaHtml(value: string, ownerDocument?: Document): string {

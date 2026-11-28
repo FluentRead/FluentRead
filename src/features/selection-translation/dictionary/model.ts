@@ -5,7 +5,7 @@
  * 模块边界：纯数据转换，不读取配置、不加载词库、不渲染 HTML 或调用 Anki。
  */
 import {DICTIONARY_FIELDS, dictionaryText, type DictionaryFields, type DictionaryRecipe, type DictionaryWorkspace} from '@/src/core/config/dictionaryWorkspace';
-import {decodeHTML} from 'entities';
+import {decodeHTML} from 'entities/lib/decode.js';
 
 export interface DictionaryEntry extends DictionaryFields {word: string; html?: string; css?: string; webUrl?: string; source: string; sourceUrl: string}
 export interface DictionaryCardFields extends DictionaryFields {word: string; ai_explanation: string; context_sentence: string; source: string; source_url: string}

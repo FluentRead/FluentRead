@@ -1,16 +1,15 @@
 /**
  * @file scripts/wasm/compact-extension-zip.ts
- * 文件职责：在 WXT 完成扩展 ZIP 后，无损重压三个固定 WASM 条目的 DEFLATE 流。
- * 主要内容：解析标准单盘 ZIP 的公开目录及本地记录，原样复制非目标跨度与元数据；隔离 worker 使用锁定 Zopfli 参数，按原文摘要缓存并复验，逐条校验 CRC/解压字节后原子替换更小的完整 ZIP。
- * 模块边界：仅供构建 hook，不改变 WASM、模型、文件名或运行时解码方式；不支持 ZIP64、加密、数据描述符或多盘，所有拒绝均在替换原 ZIP 之前。
+ * 文件职责：在 WXT 完成扩展 ZIP 后，无损重压三个固定 WASM 条目的 DEFLATE 流，并提供标准 ZIP 的原生快速解析与 CRC32 校验工具。
+ * 主要内容：使用 Node 原生 zlib（inflateRawSync 与 crc32）解析标准单盘 ZIP 的中央目录及本地记录，校验全量条目完整性，原样复制非目标跨度与元数据；隔离 worker 使用锁定 Zopfli 参数，按原文摘要缓存并复验，逐条校验 CRC/解压字节后原子替换更小的完整 ZIP。
+ * 模块边界：仅供构建 hook 与构建期产物校验复用，不改变 WASM、模型、文件名或运行时解码方式；不支持 ZIP64、加密、数据描述符或多盘，所有拒绝均在替换原 ZIP 之前。
  */
 import {createHash, randomUUID} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {readFile, open, mkdir, rename, rm, stat} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {Worker} from 'node:worker_threads';
-import {inflateRawSync} from 'node:zlib';
-import JSZip from 'jszip';
+import {crc32 as nativeCrc32, inflateRawSync} from 'node:zlib';
 
 const ONNX_WASM_CANDIDATES = [
     'fluent-read-ai/ort-wasm-simd-threaded.jspi.wasm',
@@ -32,16 +31,24 @@ function resolveTargetWasmFiles(entries: readonly {name: string}[]): readonly st
 const COMPRESSOR_VERSION = '1.0.15';
 const CACHE_FORMAT = `sha256-zopfli-${COMPRESSOR_VERSION}-deflate-iterations-1`;
 
-interface ZipEntry {
+export interface StandardZipEntry {
     name: string;
     central: Buffer;
+    method: number;
+    crc32: number;
     localOffset: number;
     dataOffset: number;
     compressedSize: number;
     originalSize: number;
     spanEnd: number;
 }
-interface ZipLayout {entries: ZipEntry[]; targetWasmFiles: readonly string[]; centralOffset: number; endOffset: number; localStart: number}
+export interface StandardZipLayout {
+    entries: StandardZipEntry[];
+    centralOffset: number;
+    endOffset: number;
+    localStart: number;
+}
+interface ZipLayout extends StandardZipLayout {targetWasmFiles: readonly string[]}
 export interface CompactExtensionZipResult {
     beforeBytes: number;
     afterBytes: number;
@@ -49,19 +56,31 @@ export interface CompactExtensionZipResult {
     entries: Array<{name: string; originalBytes: number; beforeBytes: number; afterBytes: number; sha256: string; cacheHit: boolean}>;
 }
 
-function requireZip(condition: boolean, message: string): asserts condition {
-    if (!condition) throw new Error(`无法无损压缩扩展 ZIP：${message}`);
+function computeCrc32(bytes: Buffer): number {
+    return nativeCrc32(bytes) >>> 0;
+}
+
+export type StandardZipUnsupportedCode = 'DATA_DESCRIPTOR' | 'ZIP64';
+
+function requireZip(condition: boolean, message: string, code?: StandardZipUnsupportedCode): asserts condition {
+    if (!condition) {
+        const error = new Error(`无法无损压缩扩展 ZIP：${message}`) as Error & {code?: StandardZipUnsupportedCode};
+        if (code) error.code = code;
+        throw error;
+    }
 }
 function inspectExtra(extra: Buffer): void {
     for (let offset = 0; offset < extra.length;) {
         requireZip(offset + 4 <= extra.length, '附加字段不完整');
         const tag = extra.readUInt16LE(offset), size = extra.readUInt16LE(offset + 2);
         requireZip(offset + 4 + size <= extra.length, '附加字段长度无效');
-        requireZip(tag !== 1, '不支持 ZIP64');
+        requireZip(tag !== 1, '不支持 ZIP64', 'ZIP64');
         offset += 4 + size;
     }
 }
-function parseZip(bytes: Buffer): ZipLayout {
+
+/** 严格解析标准单盘非加密 ZIP 的目录与本地条目跨度；不依赖目标文件名，供构建校验与重压共用。 */
+export function parseStandardZip(bytes: Buffer): StandardZipLayout {
     let endOffset = -1;
     for (let offset = bytes.length - 22; offset >= Math.max(0, bytes.length - 65_557); offset -= 1) {
         if (bytes.readUInt32LE(offset) === 0x06054b50 && offset + 22 + bytes.readUInt16LE(offset + 20) === bytes.length) {
@@ -73,22 +92,23 @@ function parseZip(bytes: Buffer): ZipLayout {
     const centralOffset = bytes.readUInt32LE(endOffset + 16);
     requireZip(bytes.readUInt16LE(endOffset + 4) === 0 && bytes.readUInt16LE(endOffset + 6) === 0 &&
         bytes.readUInt16LE(endOffset + 8) === count, '不支持多盘 ZIP');
-    requireZip(count !== 0xffff && centralSize !== 0xffffffff && centralOffset !== 0xffffffff, '不支持 ZIP64');
+    requireZip(count !== 0xffff && centralSize !== 0xffffffff && centralOffset !== 0xffffffff, '不支持 ZIP64', 'ZIP64');
     requireZip(centralOffset + centralSize === endOffset, '目录位置或长度无效');
-    const entries: ZipEntry[] = [], names = new Set<string>();
+    const entries: StandardZipEntry[] = [], names = new Set<string>();
     let cursor = centralOffset;
     for (let index = 0; index < count; index += 1) {
         requireZip(cursor + 46 <= endOffset, '目录记录不完整');
         requireZip(bytes.readUInt32LE(cursor) === 0x02014b50, '目录签名无效');
-        const flags = bytes.readUInt16LE(cursor + 8), compressedSize = bytes.readUInt32LE(cursor + 20);
+        const flags = bytes.readUInt16LE(cursor + 8), method = bytes.readUInt16LE(cursor + 10);
+        const crc32 = bytes.readUInt32LE(cursor + 16), compressedSize = bytes.readUInt32LE(cursor + 20);
         const originalSize = bytes.readUInt32LE(cursor + 24), localOffset = bytes.readUInt32LE(cursor + 42);
         const nameLength = bytes.readUInt16LE(cursor + 28), extraLength = bytes.readUInt16LE(cursor + 30);
         const length = 46 + nameLength + extraLength + bytes.readUInt16LE(cursor + 32);
         requireZip(cursor + length <= endOffset, '目录可变字段不完整');
         requireZip((flags & 0x41) === 0, '不支持加密 ZIP');
-        requireZip((flags & 8) === 0, '不支持数据描述符');
+        requireZip((flags & 8) === 0, '不支持数据描述符', 'DATA_DESCRIPTOR');
         requireZip(bytes.readUInt16LE(cursor + 34) === 0, '不支持多盘条目');
-        requireZip(compressedSize !== 0xffffffff && originalSize !== 0xffffffff && localOffset !== 0xffffffff, '不支持 ZIP64');
+        requireZip(compressedSize !== 0xffffffff && originalSize !== 0xffffffff && localOffset !== 0xffffffff, '不支持 ZIP64', 'ZIP64');
         const nameBytes = bytes.subarray(cursor + 46, cursor + 46 + nameLength), name = nameBytes.toString('utf8');
         requireZip(Buffer.from(name, 'utf8').equals(nameBytes) && !names.has(name), '文件名编码无效或重复');
         names.add(name);
@@ -99,13 +119,13 @@ function parseZip(bytes: Buffer): ZipLayout {
         const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
         requireZip(dataOffset + compressedSize <= centralOffset, '本地数据越过目录');
         requireZip(bytes.readUInt16LE(localOffset + 6) === flags &&
-            bytes.readUInt16LE(localOffset + 8) === bytes.readUInt16LE(cursor + 10) &&
-            bytes.readUInt32LE(localOffset + 14) === bytes.readUInt32LE(cursor + 16) &&
+            bytes.readUInt16LE(localOffset + 8) === method &&
+            bytes.readUInt32LE(localOffset + 14) === crc32 &&
             bytes.readUInt32LE(localOffset + 18) === compressedSize && bytes.readUInt32LE(localOffset + 22) === originalSize,
         '本地记录与目录不一致');
         requireZip(bytes.subarray(localOffset + 30, localOffset + 30 + localNameLength).equals(nameBytes), '本地文件名不一致');
         inspectExtra(bytes.subarray(localOffset + 30 + localNameLength, dataOffset));
-        entries.push({name, central: bytes.subarray(cursor, cursor + length), localOffset, dataOffset,
+        entries.push({name, central: bytes.subarray(cursor, cursor + length), method, crc32, localOffset, dataOffset,
             compressedSize, originalSize, spanEnd: 0});
         cursor += length;
     }
@@ -115,8 +135,44 @@ function parseZip(bytes: Buffer): ZipLayout {
         entry.spanEnd = localOrder[index + 1]?.localOffset ?? centralOffset;
         requireZip(entry.dataOffset + entry.compressedSize <= entry.spanEnd, '本地条目重叠');
     });
-    const targetWasmFiles = resolveTargetWasmFiles(entries);
-    return {entries, targetWasmFiles, centralOffset, endOffset, localStart: localOrder[0]!.localOffset};
+    return {entries, centralOffset, endOffset, localStart: localOrder[0]?.localOffset ?? centralOffset};
+}
+
+/** 使用 Node 原生 zlib 解压单个标准 ZIP 条目并校验其长度与 CRC32（支持 STORE=0 与 DEFLATE=8）。 */
+export function readStandardZipEntry(bytes: Buffer, entry: StandardZipEntry): Buffer {
+    const payload = bytes.subarray(entry.dataOffset, entry.dataOffset + entry.compressedSize);
+    let data: Buffer;
+    if (entry.method === 0) {
+        requireZip(entry.compressedSize === entry.originalSize, `STORE 条目长度不一致：${entry.name}`);
+        data = payload;
+    } else if (entry.method === 8) {
+        try {
+            data = inflateRawSync(payload, {maxOutputLength: entry.originalSize + 1});
+        } catch {
+            throw new Error(`ZIP 条目 DEFLATE 解压或 CRC32 校验失败：${entry.name}`);
+        }
+        if (data.length !== entry.originalSize) {
+            throw new Error(`ZIP 条目解压长度或 CRC32 校验失败：${entry.name}`);
+        }
+    } else {
+        throw new Error(`无法无损压缩扩展 ZIP：不支持的压缩方法 ${entry.method}：${entry.name}`);
+    }
+    if (computeCrc32(data) !== entry.crc32) {
+        throw new Error(`ZIP 条目 CRC32 校验失败：${entry.name}`);
+    }
+    return data;
+}
+
+/** 使用原生 zlib 校验标准 ZIP 中全部条目的解压字节与 CRC32。 */
+export function verifyStandardZipCrc32(bytes: Buffer, layout: StandardZipLayout = parseStandardZip(bytes)): StandardZipLayout {
+    for (const entry of layout.entries) readStandardZipEntry(bytes, entry);
+    return layout;
+}
+
+function parseZip(bytes: Buffer): ZipLayout {
+    const standard = parseStandardZip(bytes);
+    const targetWasmFiles = resolveTargetWasmFiles(standard.entries);
+    return {...standard, targetWasmFiles};
 }
 
 async function compressInWorker(data: Buffer, root: string, timeoutMs: number): Promise<Buffer> {
@@ -202,14 +258,17 @@ function repack(bytes: Buffer, layout: ZipLayout, replacements: Map<string, Buff
     return Buffer.concat(chunks);
 }
 
-/** 独立验证完整 ZIP 的保留契约，也可用于构建产物复核；只允许压缩大小与记录偏移变化。 */
-export async function verifyExtensionZipPreservation(original: Buffer, output: Buffer): Promise<void> {
-    const layout = parseZip(original), next = parseZip(output);
+function verifyPreservationInternal(
+    original: Buffer,
+    output: Buffer,
+    verifiedOriginal?: {layout: ZipLayout; targetBuffers: Map<string, Buffer>},
+): void {
+    const layout = verifiedOriginal?.layout ?? parseZip(original);
+    const next = parseZip(output);
     requireZip(next.entries.length === layout.entries.length, '重打包改变了条目数量');
     const end = Buffer.from(output.subarray(next.endOffset)); end.writeUInt32LE(layout.centralOffset, 16);
     requireZip(end.equals(original.subarray(layout.endOffset)), '重打包改变了 EOCD 元数据');
     requireZip(original.subarray(0, layout.localStart).equals(output.subarray(0, next.localStart)), '重打包改变了 ZIP 前缀');
-    const before = await JSZip.loadAsync(original, {checkCRC32: true}), after = await JSZip.loadAsync(output, {checkCRC32: true});
     const targetSet = new Set(layout.targetWasmFiles);
     for (let index = 0; index < layout.entries.length; index += 1) {
         const entry = layout.entries[index]!, rebuilt = next.entries[index]!;
@@ -221,37 +280,59 @@ export async function verifyExtensionZipPreservation(original: Buffer, output: B
             requireZip(
                 original.subarray(entry.localOffset, entry.spanEnd).equals(output.subarray(rebuilt.localOffset, rebuilt.spanEnd)),
                 '重打包改变了非 WASM 条目字节');
+            if (!verifiedOriginal) readStandardZipEntry(original, entry);
             continue;
         }
         requireZip(original.subarray(entry.dataOffset + entry.compressedSize, entry.spanEnd).equals(
             output.subarray(rebuilt.dataOffset + rebuilt.compressedSize, rebuilt.spanEnd)), '重打包改变了条目尾部字节');
-        requireZip(Buffer.from(await after.files[entry.name]!.async('uint8array')).equals(Buffer.from(await before.files[entry.name]!.async('uint8array'))),
-            `重打包改变了解压内容：${entry.name}`);
+        const beforeBytes = verifiedOriginal?.targetBuffers.get(entry.name) ?? readStandardZipEntry(original, entry);
+        const sameStream = output === original || (
+            rebuilt.compressedSize === entry.compressedSize &&
+            output.subarray(rebuilt.dataOffset, rebuilt.dataOffset + rebuilt.compressedSize).equals(
+                original.subarray(entry.dataOffset, entry.dataOffset + entry.compressedSize),
+            )
+        );
+        if (!sameStream) {
+            const afterBytes = readStandardZipEntry(output, rebuilt);
+            requireZip(afterBytes.equals(beforeBytes), `重打包改变了解压内容：${entry.name}`);
+        }
     }
+}
+
+/** 独立验证完整 ZIP 的保留契约，也可用于构建产物复核；只允许压缩大小与记录偏移变化。 */
+export async function verifyExtensionZipPreservation(original: Buffer, output: Buffer): Promise<void> {
+    verifyPreservationInternal(original, output);
 }
 
 /** WXT zip:extension:done 调用；返回体积测量，不增加运行时依赖或更改任何条目的解压内容。 */
 export async function compactExtensionZip(zipPath: string, root: string,
     options: {cacheDirectory?: string; workerTimeoutMs?: number} = {}): Promise<CompactExtensionZipResult> {
     const original = await readFile(zipPath), layout = parseZip(original);
-    const before = await JSZip.loadAsync(original, {checkCRC32: true});
     const require = createRequire(resolve(root, 'package.json'));
     const version = JSON.parse(await readFile(require.resolve('@gfx/zopfli/package.json'), 'utf8')).version;
     requireZip(version === COMPRESSOR_VERSION, '压缩器版本与缓存格式不一致');
+    const targetSet = new Set(layout.targetWasmFiles);
+    for (const name of layout.targetWasmFiles) {
+        const entry = layout.entries.find(candidate => candidate.name === name)!;
+        requireZip(entry.method === 8, `固定 WASM 条目不是 DEFLATE：${name}`);
+    }
+    const targetBuffers = new Map<string, Buffer>();
+    for (const entry of layout.entries) {
+        const decoded = readStandardZipEntry(original, entry);
+        if (targetSet.has(entry.name)) targetBuffers.set(entry.name, decoded);
+    }
     const cache = options.cacheDirectory ?? resolve(root, '.wxt/zip-wasm-deflate', CACHE_FORMAT);
     const replacements = new Map<string, Buffer>(), entries: CompactExtensionZipResult['entries'] = [];
     for (const name of layout.targetWasmFiles) {
         const entry = layout.entries.find(candidate => candidate.name === name)!;
-        requireZip(entry.central.readUInt16LE(10) === 8, `固定 WASM 条目不是 DEFLATE：${name}`);
-        const file = before.files[name]; requireZip(Boolean(file), 'ZIP 解码后的文件名发生变化');
-        const bytes = await file.async('nodebuffer');
+        const bytes = targetBuffers.get(name)!;
         const {compact, sha256, cacheHit} = await cachedDeflate(bytes, root, cache, options.workerTimeoutMs ?? 180_000);
         if (compact.length < entry.compressedSize) replacements.set(name, compact);
         entries.push({name, originalBytes: bytes.length, beforeBytes: entry.compressedSize,
             afterBytes: Math.min(compact.length, entry.compressedSize), sha256, cacheHit});
     }
     const output = replacements.size > 0 ? repack(original, layout, replacements) : original;
-    await verifyExtensionZipPreservation(original, output);
+    verifyPreservationInternal(original, output, {layout, targetBuffers});
     const validate = async () => requireZip((await readFile(zipPath)).equals(original), '压缩期间 ZIP 已被其他任务改写');
     if (output !== original) {
         const mode = (await stat(zipPath)).mode;

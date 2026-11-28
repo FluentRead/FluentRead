@@ -1469,19 +1469,21 @@ describe('extension manifest capability contract', () => {
         }
     });
 
-    it('只为扩展页面拆分 Vue 与域名算法，不覆盖显式分包配置', () => {
+    it('只为扩展页面拆分 Vue、域名算法与简体中文目录，不覆盖显式分包配置', () => {
         const config: InlineConfig = {};
         configureExtensionUiChunks([{type: 'popup'}, {type: 'options'}, {type: 'unlisted-page'}, {type: 'sidepanel'}], config);
         const output = config.build!.rolldownOptions!.output!;
         expect(Array.isArray(output)).toBe(false);
         const groups = (output as {codeSplitting: {groups: {name: string; test: RegExp}[]}}).codeSplitting.groups;
-        expect(groups.map(group => group.name)).toEqual(['vue-runtime', 'domain-parser']);
+        expect(groups.map(group => group.name)).toEqual(['vue-runtime', 'domain-parser', 'zh-cn-catalog']);
         const choose = (id: string) => groups.find(group => group.test.test(id))?.name;
         expect(choose('/app/node_modules/vue/dist/vue.runtime.esm-bundler.js')).toBe('vue-runtime');
         expect(choose('/app/node_modules/.pnpm/@vue+shared@3.5.45/node_modules/@vue/shared/dist/shared.esm-bundler.js')).toBe('vue-runtime');
         expect(choose(String.raw`C:\app\node_modules\@vue\reactivity\dist\reactivity.esm-bundler.js`)).toBe('vue-runtime');
         expect(choose('/app/node_modules/tldts/dist/es6/src/data/trie.js')).toBe('domain-parser');
         expect(choose('/app/node_modules/tldts-core/dist/es6/index.js')).toBe('domain-parser');
+        expect(choose('/app/src/core/i18n/messages/zh-CN.ts')).toBe('zh-cn-catalog');
+        expect(choose(String.raw`C:\app\src\core\i18n\messages\settings-copy\zh-CN.json`)).toBe('zh-cn-catalog');
         expect(choose('/app/node_modules/vue-router/index.js')).toBeUndefined();
         expect(choose('/app/src/core/i18n/index.ts')).toBeUndefined();
         const explicit: InlineConfig = {build: {rolldownOptions: {output: [{codeSplitting: false}, {}]}}};
@@ -1513,7 +1515,7 @@ describe('extension manifest capability contract', () => {
         expect(plugin.resolveId('./readableExtractor', resolve(PROJECT_ROOT, 'src/services/translation/other.ts'))).toBeNull();
         expect(plugin.resolveId(resolve(PROJECT_ROOT, 'src/services/translation/context/browser.ts'))).toBeNull();
 
-        for (const name of ['youtubeEmbed', 'supportedFrame', 'neteaseMailFrame']) {
+        for (const name of ['youtubeEmbed', 'videoSubtitleFrame', 'supportedFrame', 'neteaseMailFrame']) {
             const config: {plugins?: unknown[]} = {plugins: ['existing']};
             extendSubframePageContextBuildConfig([{type: 'content-script', name}], config);
             expect(config.plugins).toEqual(['existing', expect.objectContaining({name: 'fluentread-subframe-page-context'})]);
@@ -1590,13 +1592,15 @@ describe('extension manifest capability contract', () => {
             'escape-extension-noncharacters',
         ]);
 
-        const subframeConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
-        pruneEntrypointVitePlugins([{type: 'content-script', name: 'youtubeEmbed'}], subframeConfig);
-        expect((subframeConfig.plugins as {name: string}[]).map(plugin => plugin.name)).toEqual([
-            'vite:vue',
-            'fluentread-deferred-franc-models',
-            'escape-extension-noncharacters',
-        ]);
+        for (const name of ['youtubeEmbed', 'videoSubtitleFrame']) {
+            const subframeConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
+            pruneEntrypointVitePlugins([{type: 'content-script', name}], subframeConfig);
+            expect((subframeConfig.plugins as {name: string}[]).map(plugin => plugin.name)).toEqual([
+                'vite:vue',
+                'fluentread-deferred-franc-models',
+                'escape-extension-noncharacters',
+            ]);
+        }
 
         const pageConfig: {plugins?: unknown[]} = {plugins: [...samplePlugins]};
         pruneEntrypointVitePlugins([{type: 'options', name: 'options'}], pageConfig);

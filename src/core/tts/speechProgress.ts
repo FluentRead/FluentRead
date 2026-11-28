@@ -74,9 +74,9 @@ export function audioSpeechProgress(text: string, time: number, duration: number
     return {start:wordStart,end:wordEnd,fraction:Math.min(1,Math.max(0,(reached-wordStart)/(wordEnd-wordStart))),estimated:true};
 }
 
-export function boundarySpeechProgress(text: string, start: number, _length: number): SpeechProgress | null {
+export function boundarySpeechProgress(text: string, start: number, _length: number, tokens?: readonly SpeechTextToken[]): SpeechProgress | null {
     if (!Number.isSafeInteger(start) || start < 0 || start >= text.length) return null;
     // 某些声音只报告词的一部分或整句长度，显示仍锁定 charIndex 所在的完整词。
-    const word = speechTextTokens(text).find(token => token.word && token.end > start);
+    const word = (tokens ?? speechTextTokens(text)).find(token => token.word && token.end > start);
     return word ? {start:word.start,end:word.end,fraction:1,estimated:false} : null;
 }

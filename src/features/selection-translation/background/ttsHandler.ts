@@ -1,10 +1,13 @@
 /**
  * @file src/features/selection-translation/background/ttsHandler.ts
- * 文件职责：编排划词朗读的后台消息路由，按标签页、frame、document 与客户端请求编号管理当前播放所有权，把本地 AbortSignal 贯穿播放传输，在 Edge、Google 与页面回退之间传递音频或状态。
- * 主要内容：定义 TTS 消息与音频契约，解析标签页、文本、语言及媒体时钟，编排播放、停止、5 秒跳转及状态转发；持续进度不释放路由，终态按精确请求清理。
- * 模块边界：本文件不操作页面 Audio 或 speechSynthesis，也不实现 Edge SSML；具体合成由 services 注入，Offscreen 播放由 adapter 注入，内容页控制器负责忽略迟到状态。
+ * 文件职责：编排划词朗读的后台消息路由，按标签页、frame、document 与客户端请求编号管理当前播放所有权，把本地 AbortSignal 贯穿播放传输，在多源在线、本地、Google 与页面回退之间传递音频、来源元数据或播放控制。
+ * 主要内容：定义 TTS 消息与音频契约，解析标签页、文本、语言、语速及媒体时钟，采用分块 Base64 编码减少大音频 GC；编排播放、停止、5 秒跳转、暂停、继续、实时变速及状态转发；持续进度不释放路由，终态按精确请求清理。
+ * 模块边界：本文件不操作页面 Audio 或 speechSynthesis，也不实现具体 TTS 供应商协议；合成由 services 注入，Offscreen 播放由 adapter 注入，内容页控制器负责忽略迟到状态。
  */
 import {parseSpeechProgress, parseSpeechPlaybackPosition, type SpeechCue} from '@/src/core/tts/speechProgress';
+import type {TtsSourceId} from '@/src/core/tts/backoff';
+import {normalizeLocalTtsMode, type LocalTtsMode} from '@/src/core/config/localTts';
+import {normalizeSelectionTtsRate, SELECTION_TTS_RATE_LIMITS} from '@/src/core/config/selectionTts';
 import {
     parseSelectionTtsClientRequestId,
     parseSelectionTtsPlaybackState,
@@ -17,6 +20,9 @@ import {
 export const SELECTION_TTS_PLAYBACK_STATE_MESSAGE_TYPE = 'selectionTtsPlaybackState' as const;
 export const SELECTION_TTS_STOP_MESSAGE_TYPE = 'selectionTtsStop' as const;
 export const SELECTION_TTS_SEEK_MESSAGE_TYPE = 'selectionTtsSeek' as const;
+export const SELECTION_TTS_PAUSE_MESSAGE_TYPE = 'selectionTtsPause' as const;
+export const SELECTION_TTS_RESUME_MESSAGE_TYPE = 'selectionTtsResume' as const;
+export const SELECTION_TTS_SET_RATE_MESSAGE_TYPE = 'selectionTtsSetRate' as const;
 export const SELECTION_TTS_MESSAGE_TYPE = 'selectionTts' as const;
 export const SELECTION_TTS_GOOGLE_MESSAGE_TYPE = 'selectionTtsGoogle' as const;
 
@@ -37,6 +43,9 @@ export interface SelectionTtsAudio {
     audio: ArrayBuffer;
     contentType: string;
     voice: string;
+    source?: TtsSourceId;
+    cached?: boolean;
+    fallbackFrom?: TtsSourceId;
 }
 
 export interface SelectionTtsPlaybackStateMessage {
@@ -55,6 +64,22 @@ export interface SelectionTtsSeekMessage {
     offsetSeconds?: unknown;
 }
 
+export interface SelectionTtsPauseMessage {
+    type: typeof SELECTION_TTS_PAUSE_MESSAGE_TYPE;
+    clientRequestId?: unknown;
+}
+
+export interface SelectionTtsResumeMessage {
+    type: typeof SELECTION_TTS_RESUME_MESSAGE_TYPE;
+    clientRequestId?: unknown;
+}
+
+export interface SelectionTtsSetRateMessage {
+    type: typeof SELECTION_TTS_SET_RATE_MESSAGE_TYPE;
+    clientRequestId?: unknown;
+    rate?: unknown;
+}
+
 export interface SelectionTtsStopMessage {
     type: typeof SELECTION_TTS_STOP_MESSAGE_TYPE;
     clientRequestId?: unknown;
@@ -65,6 +90,8 @@ export interface SelectionTtsMessage {
     text?: unknown;
     language?: unknown;
     clientRequestId?: unknown;
+    rate?: unknown;
+    modeOverride?: unknown;
 }
 
 export interface SelectionTtsGoogleMessage {
@@ -72,12 +99,16 @@ export interface SelectionTtsGoogleMessage {
     text?: unknown;
     language?: unknown;
     clientRequestId?: unknown;
+    rate?: unknown;
 }
 
 export type SelectionTtsRuntimeMessage =
     | SelectionTtsPlaybackStateMessage
     | SelectionTtsStopMessage
     | SelectionTtsSeekMessage
+    | SelectionTtsPauseMessage
+    | SelectionTtsResumeMessage
+    | SelectionTtsSetRateMessage
     | SelectionTtsMessage
     | SelectionTtsGoogleMessage;
 
@@ -86,26 +117,35 @@ export interface SelectionTtsPlayAudioRequest extends SelectionTtsRoute {
     timings?: SpeechCue[];
     audioBase64: string;
     contentType: string;
+    rate?: number;
 }
 
 export interface SelectionTtsPlaySourceRequest extends SelectionTtsRoute {
     text?: string;
     sourceUrl: string;
+    rate?: number;
 }
 
 export interface SelectionTtsBackgroundDependencies {
     /** 生产组合根必须注入；省略时保留既有独立 handler 端口契约。 */
     readonly playbackStateSender?: {readonly runtimeId: string; readonly url: string};
     readonly getPreferredVoices: () => unknown;
+    readonly getMode?: () => unknown;
+    readonly getDefaultRate?: () => unknown;
     readonly synthesize: (
         text: string,
         language: string,
         preferredVoices: unknown,
         signal?: AbortSignal,
+        rate?: number,
+        modeOverride?: LocalTtsMode,
     ) => Promise<SelectionTtsAudio>;
     readonly playWithOffscreen: (request: SelectionTtsPlayAudioRequest | SelectionTtsPlaySourceRequest, signal?: AbortSignal) => Promise<void>;
     readonly stopWithOffscreen: (route: SelectionTtsRoute) => Promise<void>;
     readonly seekWithOffscreen: (route: SelectionTtsRoute, offsetSeconds: -5 | 5) => Promise<boolean>;
+    readonly pauseWithOffscreen?: (route: SelectionTtsRoute) => Promise<boolean>;
+    readonly resumeWithOffscreen?: (route: SelectionTtsRoute) => Promise<boolean>;
+    readonly setRateWithOffscreen?: (route: SelectionTtsRoute, rate: number) => Promise<boolean>;
     readonly offscreenPlaybackEnabled?: boolean;
     /** 扩展页面没有 tab 路由时，下载 Google 音频并返回调用页面播放。 */
     readonly fetchPageAudio?: (url: string, signal: AbortSignal) => Promise<{audio: ArrayBuffer; contentType: string}>;
@@ -114,8 +154,8 @@ export interface SelectionTtsBackgroundDependencies {
 }
 
 export type SelectionTtsResponse =
-    | {success: true; transport: 'offscreen'; voice?: string}
-    | {success: true; transport: 'page'; audioBase64: string; contentType: string; voice: string; timings?: SpeechCue[]}
+    | {success: true; transport: 'offscreen'; voice?: string; source?: TtsSourceId; cached?: boolean; fallbackFrom?: TtsSourceId; synthesizedRate?: number}
+    | {success: true; transport: 'page'; audioBase64: string; contentType: string; voice: string; timings?: SpeechCue[]; source?: TtsSourceId; cached?: boolean; fallbackFrom?: TtsSourceId; synthesizedRate?: number}
     | {success: false; error: string};
 
 export interface SelectionTtsBackgroundHandler<TMessage extends SelectionTtsRuntimeMessage = SelectionTtsRuntimeMessage> {
@@ -180,10 +220,34 @@ function parseLanguage(value: unknown): string {
     return typeof value === 'string' && value.trim() ? value : 'en-US';
 }
 
+function parseOptionalRate(value: unknown): number | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value !== 'number' || !Number.isFinite(value)
+        || value < SELECTION_TTS_RATE_LIMITS.min || value > SELECTION_TTS_RATE_LIMITS.max) {
+        throw new TypeError('TTS 语速必须在 0.5 到 2.0 之间');
+    }
+    return Math.round(value * 100) / 100;
+}
+
+function parsePlaybackRate(value: unknown): number {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0.25 || value > 4) {
+        throw new TypeError('TTS 播放倍速必须在 0.25 到 4.0 之间');
+    }
+    return Math.round(value * 100) / 100;
+}
+
+function parsePreviewModeOverride(value: unknown, isExtensionPage: boolean): LocalTtsMode | undefined {
+    if (!isExtensionPage || (value !== 'online-only' && value !== 'local-only')) return undefined;
+    return value;
+}
+
+/** 分块编码大音频缓冲，避免逐字节拼接字符串造成的 GC 抖动，同时不超过参数上限。 */
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
     const bytes = new Uint8Array(buffer);
     let binary = '';
-    for (const byte of bytes) binary += String.fromCharCode(byte);
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    }
     return btoa(binary);
 }
 
@@ -193,6 +257,14 @@ export function googleSelectionTtsUrl(text: string, language: string): string {
 
 function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+function responseMeta(result: SelectionTtsAudio): {source?: TtsSourceId; cached?: boolean; fallbackFrom?: TtsSourceId} {
+    return {
+        ...(result.source === undefined ? {} : {source: result.source}),
+        ...(result.cached === true ? {cached: true} : {}),
+        ...(result.fallbackFrom === undefined ? {} : {fallbackFrom: result.fallbackFrom}),
+    };
 }
 
 /**
@@ -295,6 +367,43 @@ export function createSelectionTtsBackgroundHandlers(
         },
     };
 
+    const pauseHandler: SelectionTtsBackgroundHandler<SelectionTtsPauseMessage> = {
+        type: SELECTION_TTS_PAUSE_MESSAGE_TYPE,
+        async handle(message, context) {
+            const tabId = parseTabId(context);
+            if (tabId === null || dependencies.offscreenPlaybackEnabled === false || !dependencies.pauseWithOffscreen) {
+                return {success: false};
+            }
+            const route = senderRoute(context, tabId, parseSelectionTtsClientRequestId(message.clientRequestId));
+            return {success: await dependencies.pauseWithOffscreen(route)};
+        },
+    };
+
+    const resumeHandler: SelectionTtsBackgroundHandler<SelectionTtsResumeMessage> = {
+        type: SELECTION_TTS_RESUME_MESSAGE_TYPE,
+        async handle(message, context) {
+            const tabId = parseTabId(context);
+            if (tabId === null || dependencies.offscreenPlaybackEnabled === false || !dependencies.resumeWithOffscreen) {
+                return {success: false};
+            }
+            const route = senderRoute(context, tabId, parseSelectionTtsClientRequestId(message.clientRequestId));
+            return {success: await dependencies.resumeWithOffscreen(route)};
+        },
+    };
+
+    const setRateHandler: SelectionTtsBackgroundHandler<SelectionTtsSetRateMessage> = {
+        type: SELECTION_TTS_SET_RATE_MESSAGE_TYPE,
+        async handle(message, context) {
+            const tabId = parseTabId(context);
+            if (tabId === null || dependencies.offscreenPlaybackEnabled === false || !dependencies.setRateWithOffscreen) {
+                return {success: false};
+            }
+            const route = senderRoute(context, tabId, parseSelectionTtsClientRequestId(message.clientRequestId));
+            const rate = parsePlaybackRate(message.rate);
+            return {success: await dependencies.setRateWithOffscreen(route, rate)};
+        },
+    };
+
     const stopHandler: SelectionTtsBackgroundHandler<SelectionTtsStopMessage> = {
         type: SELECTION_TTS_STOP_MESSAGE_TYPE,
         async handle(message, context) {
@@ -325,7 +434,9 @@ export function createSelectionTtsBackgroundHandlers(
                 const text = parseText(message.text);
                 const language = parseLanguage(message.language);
                 const clientRequestId = parseSelectionTtsClientRequestId(message.clientRequestId);
+                const requestedRate = parseOptionalRate(message.rate);
                 const tabId = parseTabId(context);
+                const modeOverride = parsePreviewModeOverride(message.modeOverride, tabId === null);
 
                 // Content tabs retain one offscreen playback owner. A page
                 // request owns only its URL/UUID synthesis and returns page audio.
@@ -338,17 +449,16 @@ export function createSelectionTtsBackgroundHandlers(
                 // 能立即使本次失效，避免旧等待恢复后覆盖已经开始的下一次朗读。
                 await stopping;
                 if ((active && activeSelectionTts !== active) || (pageRequest && !isCurrentPageRequest(pageRequest))) {
-                    if (pageRequest) releasePageRequest(pageRequest);
                     return {success: false, error: '语音合成已取消'};
                 }
                 let result: SelectionTtsAudio;
+                const signal = active?.controller.signal ?? pageRequest?.controller.signal;
                 try {
-                    result = await dependencies.synthesize(
-                        text,
-                        language,
-                        dependencies.getPreferredVoices(),
-                        active?.controller.signal ?? pageRequest?.controller.signal,
-                    );
+                    result = modeOverride !== undefined
+                        ? await dependencies.synthesize(text, language, dependencies.getPreferredVoices(), signal, requestedRate, modeOverride)
+                        : requestedRate === undefined
+                            ? await dependencies.synthesize(text, language, dependencies.getPreferredVoices(), signal)
+                            : await dependencies.synthesize(text, language, dependencies.getPreferredVoices(), signal, requestedRate);
                 } catch (synthesisError) {
                     if (active && activeSelectionTts === active) {
                         activeSelectionTts = null;
@@ -363,12 +473,28 @@ export function createSelectionTtsBackgroundHandlers(
                     return {success: false, error: '语音合成已取消'};
                 }
 
+                // 仅编码一次 Base64，若 Offscreen 播放失败回退到 page 时直接复用。
+                const audioBase64 = arrayBufferToBase64(result.audio);
+                const effectiveRate = requestedRate ?? (
+                    dependencies.getDefaultRate !== undefined
+                        ? normalizeSelectionTtsRate(dependencies.getDefaultRate())
+                        : undefined
+                );
+                // Edge / Local Kokoro / OpenAI 已在合成阶段按语速生成波形，不能再叠加 playbackRate（避免 rate²）。
+                const speedAppliedInAudio = result.source !== 'youdao' && result.source !== 'google';
+                const playbackRate = !speedAppliedInAudio ? effectiveRate : undefined;
+                const synthesizedRateMeta = effectiveRate !== undefined
+                    ? {synthesizedRate: speedAppliedInAudio ? effectiveRate : 1}
+                    : {};
+
                 if (tabId !== null && active && dependencies.offscreenPlaybackEnabled !== false) {
                     active.playbackStarted = true;
                     try {
                         await dependencies.playWithOffscreen({
-                            audioBase64: arrayBufferToBase64(result.audio),
-                            text, ...(result.timings === undefined ? {} : {timings: result.timings}),
+                            audioBase64,
+                            text,
+                            ...(result.timings === undefined ? {} : {timings: result.timings}),
+                            ...(playbackRate === undefined ? {} : {rate: playbackRate}),
                             contentType: result.contentType,
                             ...parseSelectionTtsRoute(active),
                         }, active.controller.signal);
@@ -376,7 +502,7 @@ export function createSelectionTtsBackgroundHandlers(
                             // 步骤 2：STOP 可能早于 PLAY 生效；PLAY 成功返回后必须二次 STOP 清理 late playback。
                             return stopLatePlayback(active);
                         }
-                        return {success: true, transport: 'offscreen', voice: result.voice};
+                        return {success: true, transport: 'offscreen', voice: result.voice, ...responseMeta(result), ...synthesizedRateMeta};
                     } catch (offscreenError) {
                         const stillCurrent = activeSelectionTts === active;
                         if (stillCurrent) {
@@ -391,11 +517,13 @@ export function createSelectionTtsBackgroundHandlers(
 
                 return {
                     success: true,
-                    audioBase64: arrayBufferToBase64(result.audio),
+                    audioBase64,
                     contentType: result.contentType,
                     voice: result.voice,
                     transport: 'page',
                     ...(result.timings === undefined ? {} : {timings: result.timings}),
+                    ...responseMeta(result),
+                    ...synthesizedRateMeta,
                 };
         },
     };
@@ -406,6 +534,11 @@ export function createSelectionTtsBackgroundHandlers(
                 const text = parseText(message.text);
                 const language = parseLanguage(message.language);
                 const clientRequestId = parseSelectionTtsClientRequestId(message.clientRequestId);
+                const requestedRate = parseOptionalRate(message.rate);
+                // 仅本地模式作为后台硬隐私边界，阻止来自陈旧标签页配置的 Google 外发请求。
+                if (dependencies.getMode !== undefined && normalizeLocalTtsMode(dependencies.getMode()) === 'local-only') {
+                    return {success: false, error: '当前处于仅本地朗读模式'};
+                }
                 const tabId = parseTabId(context);
                 if (tabId === null) {
                     const owner = pageSenderOwner(context);
@@ -439,6 +572,7 @@ export function createSelectionTtsBackgroundHandlers(
                     await dependencies.playWithOffscreen({
                         sourceUrl: googleSelectionTtsUrl(text, language),
                         text,
+                        ...(requestedRate === undefined ? {} : {rate: requestedRate}),
                         ...parseSelectionTtsRoute(active),
                     }, active.controller.signal);
                     if (activeSelectionTts !== active) return stopLatePlayback(active);
@@ -457,5 +591,5 @@ export function createSelectionTtsBackgroundHandlers(
         },
     };
 
-    return [playbackStateHandler, stopHandler, seekHandler, edgeTtsHandler, googleTtsHandler];
+    return [playbackStateHandler, stopHandler, seekHandler, pauseHandler, resumeHandler, setRateHandler, edgeTtsHandler, googleTtsHandler];
 }

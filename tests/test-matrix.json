@@ -899,6 +899,8 @@
       "tests/siteAdaptationRuntime.test.ts",
       "tests/sitePreferencesLifecycle.test.ts",
       "tests/speechProgress.test.ts",
+      "tests/ttsBackoffAndCache.test.ts",
+      "tests/ttsMultiSourceAndControls.test.ts",
       "tests/targetLanguageReadingHoldout.test.ts",
       "tests/targetLanguageReleaseCorpus.test.ts",
       "tests/testSuiteAuditCli.test.ts",

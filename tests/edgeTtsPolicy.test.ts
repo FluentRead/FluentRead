@@ -89,7 +89,7 @@ describe('Edge TTS pure policy', () => {
         expect(sentenceChunks[0]?.endsWith('.')).toBe(true);
         expect(sentenceChunks.join(' ')).toBe(sentenceBoundary);
 
-        const multibyte = '中'.repeat(1_000);
+        const multibyte = `${'é'.repeat(300)}${'中'.repeat(600)}${'😀'.repeat(200)}`;
         const multibyteChunks = splitEdgeTtsText(multibyte);
         expect(multibyteChunks.length).toBeGreaterThan(1);
         expect(multibyteChunks.join('')).toBe(multibyte);

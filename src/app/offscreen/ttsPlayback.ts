@@ -1,8 +1,8 @@
 /**
  * @file src/app/offscreen/ttsPlayback.ts
- * 文件职责：管理 Offscreen 中划词 TTS 的单播放所有权，确保新旧请求、停止、结束、错误和 Blob URL 释放按精确 route 隔离。
- * 主要内容：解析路由及音频输入，给每次播放绑定独立回调与可选 object URL；支持播放、停止和按秒跳转，按真实媒体时钟发送跟读进度与时长，启动失败只由 PLAY 响应返回，已开始播放的终态通过通知回传；释放时清理计时器。
- * 模块边界：播放器不合成语音、不发送后台请求，也不决定 voice/rate；音频构造和状态传输由依赖注入，网络 TTS 与跨上下文路由属于 selection-translation feature。
+ * 文件职责：管理 Offscreen 中划词 TTS 的单播放所有权，确保新旧请求、暂停/继续、调速、停止、结束、错误和 Blob URL 释放按精确 route 隔离。
+ * 主要内容：解析路由、可选倍速及音频输入，为每次播放预分词并绑定独立回调与可选 object URL；支持播放、暂停、继续、实时调速、停止和按秒跳转，按真实媒体时钟发送跟读进度与时长，启动失败只由 PLAY 响应返回，已开始播放的终态通过通知回传；释放时清理计时器。
+ * 模块边界：播放器不合成语音、不发送后台请求，也不决定默认 voice/rate；音频构造和状态传输由依赖注入，网络 TTS 与跨上下文路由属于 selection-translation feature。
  */
 import {
     parseSelectionTtsRoute,
@@ -10,7 +10,16 @@ import {
     type SelectionTtsPlaybackRequest,
     type SelectionTtsPlaybackState,
 } from '@/src/features/selection-translation/protocol';
-import {audioSpeechProgress, parseSpeechCues, parseSpeechPlaybackPosition, seekSpeechTime, type SpeechProgress, type SpeechPlaybackPosition} from '@/src/core/tts/speechProgress';
+import {
+    audioSpeechProgress,
+    parseSpeechCues,
+    parseSpeechPlaybackPosition,
+    seekSpeechTime,
+    speechTextTokens,
+    type SpeechPlaybackPosition,
+    type SpeechProgress,
+    type SpeechTextToken,
+} from '@/src/core/tts/speechProgress';
 
 export type {
     SelectionTtsPlaybackRequest,
@@ -20,6 +29,8 @@ export type {
 export interface SelectionAudioPort {
     currentTime?: number;
     readonly duration?: number;
+    playbackRate?: number;
+    readonly paused?: boolean;
     preload: string;
     src: string;
     onended: ((event: Event) => void) | null;
@@ -47,12 +58,21 @@ interface PreparedPlayback {
     readonly request: SelectionTtsPlaybackRequest;
     readonly audio: SelectionAudioPort;
     readonly objectUrl: string;
+    readonly tokens?: readonly SpeechTextToken[];
+    stateVersion: number;
     timer?: ReturnType<typeof setInterval>;
 }
 
 function parseOptionalString(value: unknown, field: string): string | undefined {
     if (value === undefined) return undefined;
     if (typeof value !== 'string' || !value.trim()) throw new TypeError(`TTS ${field} 必须是非空字符串`);
+    return value;
+}
+
+function parseSelectionTtsRate(value: unknown): number {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0.25 || value > 4) {
+        throw new TypeError('TTS rate 无效');
+    }
     return value;
 }
 
@@ -71,6 +91,7 @@ export function parseSelectionTtsPlaybackRequest(value: unknown): SelectionTtsPl
         sourceUrl,
         audioBase64,
         ...(record.text === undefined ? {} : {text: parseOptionalString(record.text, 'text'), timings: parseSpeechCues(record.timings)}),
+        ...(record.rate === undefined ? {} : {rate: parseSelectionTtsRate(record.rate)}),
         contentType: parseOptionalString(record.contentType, 'contentType'),
         ...route,
     };
@@ -104,6 +125,15 @@ export class SelectionTtsPlayer {
         return true;
     }
 
+    private startProgressTimer(playback: PreparedPlayback): void {
+        clearInterval(playback.timer);
+        playback.timer = undefined;
+        if (!playback.request.text || !this.dependencies.notifyProgress) return;
+        const tick = () => this.publishProgress(playback);
+        playback.timer = setInterval(tick, 100);
+        tick();
+    }
+
     stop(value: unknown, notify = true): boolean {
         const route = parseSelectionTtsRoute(value);
         if (!this.active || !sameSelectionTtsRoute(this.active.request, route)) {
@@ -112,11 +142,42 @@ export class SelectionTtsPlayer {
         return this.stopActive(notify);
     }
 
+    pause(value: unknown): boolean {
+        const route = parseSelectionTtsRoute(value);
+        const active = this.active;
+        if (!active || !sameSelectionTtsRoute(active.request, route)) return false;
+        active.stateVersion += 1;
+        clearInterval(active.timer);
+        active.timer = undefined;
+        active.audio.pause();
+        return true;
+    }
+
+    async resume(value: unknown): Promise<boolean> {
+        const route = parseSelectionTtsRoute(value);
+        const active = this.active;
+        if (!active || !sameSelectionTtsRoute(active.request, route)) return false;
+        const version = ++active.stateVersion;
+        await active.audio.play();
+        if (this.active !== active || active.stateVersion !== version || active.audio.paused === true) return false;
+        this.startProgressTimer(active);
+        return true;
+    }
+
+    setRate(value: unknown): boolean {
+        const route = parseSelectionTtsRoute(value);
+        const rate = parseSelectionTtsRate((value as {rate?: unknown}).rate);
+        const active = this.active;
+        if (!active || !sameSelectionTtsRoute(active.request, route)) return false;
+        active.audio.playbackRate = rate;
+        return true;
+    }
+
     private publishProgress(playback: PreparedPlayback): void {
         if (this.active !== playback || !playback.request.text || !this.dependencies.notifyProgress) return;
         const {audio, request} = playback;
         const position = parseSpeechPlaybackPosition({currentTime: audio.currentTime, duration: audio.duration});
-        const progress = audioSpeechProgress(request.text!, audio.currentTime ?? NaN, audio.duration ?? NaN, request.timings);
+        const progress = audioSpeechProgress(request.text!, audio.currentTime ?? NaN, audio.duration ?? NaN, request.timings, playback.tokens);
         if (position && progress) this.dependencies.notifyProgress(request, progress, position);
     }
 
@@ -154,10 +215,12 @@ export class SelectionTtsPlayer {
             if (objectUrl) this.dependencies.revokeObjectUrl(objectUrl);
             throw error;
         }
+        if (request.rate !== undefined) audio.playbackRate = request.rate;
 
         // 步骤 1：新资源完整准备成功后才停止旧播放，非法 payload 不打断用户当前语音。
         this.stopActive(true);
-        const playback: PreparedPlayback = {request, audio, objectUrl};
+        const tokens = request.text ? speechTextTokens(request.text) : undefined;
+        const playback: PreparedPlayback = {request, audio, objectUrl, tokens, stateVersion: 0};
         this.active = playback;
 
         // 步骤 2：回调只允许结束创建它的那一轮，过期事件不能污染当前状态。
@@ -178,11 +241,7 @@ export class SelectionTtsPlayer {
                     this.release(playback);
                     this.dependencies.notify(request, 'error', new Error('扩展音频解码或播放失败'));
                 };
-                if (request.text && this.dependencies.notifyProgress) {
-                    const tick = () => this.publishProgress(playback);
-                    playback.timer = setInterval(tick, 100);
-                    tick();
-                }
+                this.startProgressTimer(playback);
             }
         } catch (error) {
             // 步骤 3：启动失败只走 PLAY 响应；被替换/停止的迟到失败不能释放新资源。

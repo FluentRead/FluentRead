@@ -10,7 +10,7 @@ import {createChatGPTPlanHandler} from './chatgptPlanRuntime';
 import {config, configReady} from '@/src/services/config/store';
 import {lookupSelectionDictionary, createDictionaryRuntimeHandler} from './dictionaryRuntime';
 import {createSelectionPageZoomBrowserPort, createSelectionPageZoomHandler} from '@/src/features/selection-translation/background/pageZoomHandler';
-import {synthesizeEdgeTts} from '@/src/features/selection-translation/services/edgeTts';
+import {createSelectionTtsRuntimeHandlers} from './selectionTtsRuntime';
 import {vocabularyBook} from '@/src/features/vocabulary/repository';
 import {createBrowserMaterialHandler} from './handlers/vocabulary';
 import {clearTranslationCache, getTranslationCacheStats, translateWithCache} from '@/src/app/translation/runtime';
@@ -30,21 +30,17 @@ import {createFreeTranslationWeightsHandler} from './handlers/freeTranslationWei
 import {createPopupNavigationHandlers} from './popupNavigation';
 import {createDownloadProgressHandler, createDownloadProgressQueryHandler} from './handlers/downloadProgress';
 import {createTranslationCancelHandler, createTranslationRequestFallback, createTranslationRequestRegistry} from './handlers/translation';
-import {createSelectionTtsBackgroundHandlers} from './handlers/selectionTts';
 import {createSelectionWordLookupHandler} from './handlers/selectionWordLookup';
 import {isBrowserTabId} from './tabTranslationState';
 import {createBrowserVocabularyBookChangedBroadcaster, createBrowserVocabularyUndoOptions, createVocabularyBackgroundHandlers} from './handlers/vocabulary';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {installExtensionPageMessageListener, type ExtensionPageMessageTarget} from '@/src/platform/offscreen/extensionPageMessaging';
-import {selectionTtsOffscreenAdapter} from '@/src/features/selection-translation/background/offscreenAdapter';
-import {createCapabilityGatedBackgroundHandlers, createCapabilityGatedSelectionTtsTransport} from './capabilityRegistry';
+import {createCapabilityGatedBackgroundHandlers} from './capabilityRegistry';
 import {createConfigBackgroundHandlers} from './configMessageHandlers';
 import {createConfigImageOcrLanguageStorage, installBrowserConfigStorageBroadcast, installBrowserTabBroadcastRuntime} from './configStorageRuntime';
 import {releaseVideoSubtitleOwnerForTab} from '@/src/features/video-subtitle/background/handlers';
 import {createVideoSubtitleBackgroundRuntime} from '@/src/features/video-subtitle/background/runtime';
 import {createLocalModelMessageHandlers} from './localModelMessageRuntime';
-import {localTtsOffscreenAdapter} from '@/src/features/local-tts/background/offscreenAdapter';
-import {createSelectionTtsSynthesizer} from '@/src/features/selection-translation/background/selectionTtsSynthesis';
 import {installWritingBackgroundRuntime} from './writingRuntime';
 import {installHarnessBackgroundRuntime} from './harnessRuntime';
 import {installMaterialRuntimes} from './materialRuntimes';
@@ -61,15 +57,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
     const tabBroadcast = installBrowserTabBroadcastRuntime(capabilities.browser);
     const translationRequestRegistry = createTranslationRequestRegistry();
     const imageOcrLanguageRepository = createImageOcrLanguageRepository(createConfigImageOcrLanguageStorage());
-    const selectionTtsTransport = createCapabilityGatedSelectionTtsTransport(capabilities, selectionTtsOffscreenAdapter);
     const selectionPageZoom = createSelectionPageZoomBrowserPort(browser.tabs);
-    const selectionTtsSynthesizer = createSelectionTtsSynthesizer({
-        getMode: () => config.selectionTtsMode,
-        getLocalVoice: () => config.selectionTtsLocalVoice,
-        getOnlineVoices: () => config.selectionTtsVoices,
-        synthesizeOnline: synthesizeEdgeTts,
-        synthesizeLocal: (text, language, voice, signal) => localTtsOffscreenAdapter.synthesize(text, language, voice, signal),
-    });
     const imageGlossaryContext = createImageGlossaryContext<BackgroundRuntimeContext>({
         ready: configReady,
         offscreenUrl: browser.runtime.getURL('/offscreen.html'),
@@ -121,18 +109,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             areaTranslation: () => createAreaTranslationRuntime(imageOcrLanguageRepository.assertDownloaded),
             imageTranslation: () => createImageTranslationRuntime(imageOcrLanguageRepository),
         })),
-        ...createSelectionTtsBackgroundHandlers({
-            playbackStateSender: {runtimeId: browser.runtime.id, url: browser.runtime.getURL('/offscreen.html')},
-            getPreferredVoices: () => config.selectionTtsVoices,
-            synthesize: selectionTtsSynthesizer,
-            fetchPageAudio: selectionTtsOffscreenAdapter.fetchPageAudio,
-            playWithOffscreen: selectionTtsTransport.play,
-            stopWithOffscreen: selectionTtsTransport.stop,
-            seekWithOffscreen: selectionTtsOffscreenAdapter.seek,
-            offscreenPlaybackEnabled: capabilities.selectionTtsExtensionPlayback,
-            sendTabMessage: (tabId, message, options) => browser.tabs.sendMessage(tabId, message, options),
-            warn: (message, error) => console.warn(message, error),
-        }),
+        ...createSelectionTtsRuntimeHandlers(capabilities),
         createBrowserMaterialHandler({ready: configReady, config, vocabularyBook}),
         ...createVocabularyBackgroundHandlers({
             configReady, vocabularyBook,

@@ -1196,7 +1196,7 @@ describe('运行期反馈文案资源', () => {
     const sampleOf = (pattern: string) => pattern.slice(1, -1)
       .replaceAll('(\\d+(?:\\.\\d+)?)', '12')
       .replaceAll('(\\d+)', '12')
-      .replaceAll('(PDF|ePub|DOCX)', 'PDF')
+      .replaceAll('(PDF|ePub|DOCX|PPTX|XLSX)', 'PDF')
       .replaceAll('(主网页 RPC|备用网页 RPC)', '主网页 RPC')
       .replaceAll('[：:]\\s*', '：')
       .replaceAll('([^：]+)', 'https://example.test/model.onnx')

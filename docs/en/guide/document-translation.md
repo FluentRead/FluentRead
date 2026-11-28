@@ -10,7 +10,7 @@ Choose **Document translation** in the extension menu, then drop a file onto the
 
 For an online PDF, choose **Open PDF reader** from the extension menu or paste its direct link on the document start page. FluentRead opens the original in its own reader. If a link requires a login and cannot be opened, download the file first and import it.
 
-Supported formats are PDF, ePub, Word DOCX, HTML, TXT, Markdown, JSON, CSV, TSV, and SRT, VTT, ASS, SSA, or LRC subtitles. The limit is **50 MB for a PDF** and **10 MB for other formats**. Convert older `.doc` files to `.docx` first.
+Supported formats (17 in total) are PDF, ePub, Word DOCX, PowerPoint PPTX, Excel XLSX, HTML, TXT, Markdown, LaTeX (`.tex`), JSON, CSV, TSV, and SRT, VTT, ASS, SSA, or LRC subtitles. The limit is **50 MB for PDF and PPTX** and **10 MB for other formats**. Convert older `.doc`, `.ppt`, and `.xls` files to `.docx`, `.pptx`, and `.xlsx` first.
 
 Text imports support UTF-8 and UTF-16 files with a byte order mark. Text exports use UTF-8. If you get an encoding error, save the source file as UTF-8 and import it again.
 
@@ -46,6 +46,8 @@ The selected version is independent of the reading view. Partial downloads requi
 EPUB exports reuse translated chapter headings, including your edits, in the reader’s table of contents. **Bilingual** shows the heading translation after the original label. **Translation only** shows the heading translation by itself. An entry keeps its existing label if it points to an untranslated heading or cannot be matched to a heading.
 
 Word exports preserve hyperlinks and character formatting such as bold and italics in ordinary paragraphs. Keep formatting markers such as `<g1>…</g1>` when editing translations. Paragraphs containing fields, drawings, or incomplete formatting markers keep their original content and place the translation immediately after it.
+
+PowerPoint (`.pptx`) extracts slide paragraphs and speaker notes in numeric slide order while preserving shapes, tables, images, animations, and run formatting. Bilingual exports append a styled translated paragraph; translation-only exports replace text in place. Excel (`.xlsx`) reads multiple worksheets in workbook order, handles both shared-string and inline-string cells, and strictly preserves formulas, numbers, dates, and styles, placing bilingual translations on a new line inside each cell. LaTeX (`.tex`) preserves preamble directives, comments, math environments, and `verbatim`/`lstlisting`/`minted`/`tikzpicture` blocks while protecting inline math, citations, and formatting commands with numbered markers so exported source stays compilable.
 
 The panel opens beside the toolbar. PDF versions include a small layout illustration. Expand **PDF layout** to choose **Original** or **Reflow** without changing the reading view. If generation fails, your translation and edits are kept. Use **Retry download**, or expand **Technical details** to inspect the cause.
 

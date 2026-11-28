@@ -109,6 +109,22 @@ export function documentSourceLocators(snapshot: SourceSnapshot): Array<Document
                 assign(paragraph.segmentIndex, `docx:${part.path}`, `paragraph:${paragraph.paragraphIndex}`);
             }
         }
+    } else if (binary?.kind === 'pptx' && Array.isArray(binary.parts)) {
+        for (const part of binary.parts) {
+            if (!part || typeof part.path !== 'string' || !Array.isArray(part.paragraphSegments)) continue;
+            for (const paragraph of part.paragraphSegments) {
+                if (!paragraph || !Number.isInteger(paragraph.paragraphIndex) || paragraph.paragraphIndex < 0) continue;
+                assign(paragraph.segmentIndex, `pptx:${part.path}`, `paragraph:${paragraph.paragraphIndex}`);
+            }
+        }
+    } else if (binary?.kind === 'xlsx' && Array.isArray(binary.sheets)) {
+        for (const sheet of binary.sheets) {
+            if (!sheet || typeof sheet.path !== 'string' || !Array.isArray(sheet.cellSegments)) continue;
+            for (const cell of sheet.cellSegments) {
+                if (!cell || typeof cell.cellRef !== 'string' || !cell.cellRef) continue;
+                assign(cell.segmentIndex, `xlsx:${sheet.path}`, `cell:${cell.cellRef}`);
+            }
+        }
     }
     locators.forEach((locator, index) => {
         if (!locator) return;

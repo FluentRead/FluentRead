@@ -6,6 +6,7 @@
  * Markdown 表格使用解析器的行范围，对照文字放在各自单元格。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
+import {stripDocumentInlineMarkers} from '@/src/core/translation/documentInlineMarkers';
 import {
     inspectMarkdownLine,
     parseDocument,
@@ -271,7 +272,7 @@ export function createDocumentPreviewHtml(
     translations: readonly string[],
     mode: DocumentPreviewMode,
 ): string {
-    const previewTranslations = mode !== 'source' && ['markdown', 'txt'].includes(document.format)
+    const previewTranslations = mode !== 'source' && ['markdown', 'txt', 'tex'].includes(document.format)
         ? Array.from({length: document.segments.length}, (_, index) => {
             const translation = translations[index];
             return translation === undefined
@@ -293,6 +294,17 @@ export function createDocumentPreviewHtml(
             previewTranslations,
             mode,
         );
+    }
+    if (document.format === 'tex') {
+        const body = document.segments.map((segment, index) => {
+            const kind = segment.role === 'title' || segment.role === 'heading'
+                ? 'heading'
+                : segment.role === 'list-item' ? 'list-item' : 'paragraph';
+            const sourceText = stripDocumentInlineMarkers(segment.source);
+            const translatedText = mode === 'source' ? '' : stripDocumentInlineMarkers(previewTranslations[index] || segment.source);
+            return pairedUnit(sourceText, translatedText, mode, kind, segment.role === 'title' ? 1 : 2);
+        }).join('');
+        return readerShell(`<article class="text-article" data-reader-mode="${mode}">${body}</article>`);
     }
     throw new Error(`不支持为 ${document.format} 生成富文档预览`);
 }

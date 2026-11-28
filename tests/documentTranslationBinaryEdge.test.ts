@@ -537,8 +537,8 @@ describe('binary document low-level contracts', () => {
 
     it('公共入口拒绝错误格式，并覆盖文本下载与二进制状态不变量', async () => {
         const bytes = new Uint8Array();
-        await expect(parseBinaryDocument('notes.txt', bytes)).rejects.toThrow('不是 PDF、ePub 或 DOCX');
-        await expect(parseBinaryDocument('unknown.bin', bytes)).rejects.toThrow('不是 PDF、ePub 或 DOCX');
+        await expect(parseBinaryDocument('notes.txt', bytes)).rejects.toThrow('不是 PDF、ePub、DOCX、PPTX 或 XLSX');
+        await expect(parseBinaryDocument('unknown.bin', bytes)).rejects.toThrow('不是 PDF、ePub、DOCX、PPTX 或 XLSX');
         await expect(parseDocumentFile({
             name: 'unknown.bin',
             text: async () => '',

@@ -240,7 +240,7 @@
         </section>
         <article class="document-reading-pane" aria-label="文档内容">
         <DocumentSegmentEditor v-if="editorRequested" :key="activeDocumentId ?? 0" v-show="readerTab === 'edit'" :document="parsedDocument" :translations="translatedSegments" :scope-ids="columnScope" :retained-revisions="documentQueue.find(item => item.id === activeDocumentId)?.retainedRevisions" :disabled="queueBusy" @update="editSegment" @source-edit="openSourceEditor" />
-        <div v-show="readerTab === 'read'" ref="readingContent" class="reading-content" :class="{'reading-pdf': isPdfDocument}" :data-fluentread-material-fingerprint="activeTask?.historyId || undefined" :data-fluentread-material-title="parsedDocument.fileName" :data-fluentread-material-source="activeTask?.sourceUrl || undefined" :data-fluentread-material-page="isPdfDocument ? pdfPage : readerPage" :data-fluentread-material-section="isEpubDocument ? `epub:${epubChapterIndex}` : isDocxDocument ? `docx:${docxPartIndex}` : undefined" :data-reader-zoom="isPdfDocument ? undefined : readerScale" :tabindex="isPdfDocument || isRichDocument ? undefined : 0" @pointerdown="materialReadingPointerDown" @wheel.passive="markMaterialReadingIntent" @keydown.capture="markMaterialReadingIntent">
+        <div v-show="readerTab === 'read'" ref="readingContent" class="reading-content" :class="{'reading-pdf': isPdfDocument}" :data-fluentread-material-fingerprint="activeTask?.historyId || undefined" :data-fluentread-material-title="parsedDocument.fileName" :data-fluentread-material-source="activeTask?.sourceUrl || undefined" :data-fluentread-material-page="isPdfDocument ? pdfPage : readerPage" :data-fluentread-material-section="isEpubDocument ? `epub:${epubChapterIndex}` : isDocxDocument ? `docx:${docxPartIndex}` : isXlsxDocument ? `xlsx:${xlsxSheetIndex}` : undefined" :data-reader-zoom="isPdfDocument ? undefined : readerScale" :tabindex="isPdfDocument || isRichDocument ? undefined : 0" @pointerdown="materialReadingPointerDown" @wheel.passive="markMaterialReadingIntent" @keydown.capture="markMaterialReadingIntent">
         <PdfReader
           ref="materialPdfReader"
           v-if="isPdfDocument"
@@ -347,6 +347,35 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section
+          v-else-if="isXlsxDocument"
+          class="json-document-reader delimited-document-reader xlsx-document-reader"
+          data-document-reader="xlsx"
+          :data-segment-count="parsedDocument.segments.length"
+          :aria-label="t('document.delimited.cells')"
+        >
+          <nav v-if="xlsxSheets.length > 1" class="reader-native-toolbar" :aria-label="t('document.xlsx.sheets')">
+            <button
+              v-for="(sheet, index) in xlsxSheets"
+              :key="sheet.path"
+              type="button"
+              :class="{ selected: xlsxSheetIndex === index }"
+              data-i18n-ignore
+              @click="xlsxSheetIndex = index"
+            >
+              {{ sheet.name }}
+            </button>
+          </nav>
+          <div :style="readerZoomStyle" data-native-zoom-content>
+            <div class="json-table-header" :class="{ single: effectivePreviewMode !== 'bilingual' }"><span>{{ t('document.delimited.cell') }}</span><span v-if="effectivePreviewMode !== 'translated'">原字符串</span><span v-if="effectivePreviewMode !== 'source'">译文</span></div>
+            <article v-for="row in currentXlsxRows" :key="row.index" class="json-table-row" :class="{ single: effectivePreviewMode !== 'bilingual' || (row.translation && !hasDistinctTranslation(row.source, row.translation)) }">
+              <code data-i18n-ignore>{{ row.cellRef }}</code>
+              <p v-if="effectivePreviewMode !== 'translated' || (row.translation && !hasDistinctTranslation(row.source, row.translation))" class="json-source document-source" data-i18n-ignore>{{ row.source }}</p>
+              <p v-if="effectivePreviewMode !== 'source' && (!row.translation || hasDistinctTranslation(row.source, row.translation))" class="json-translation document-translation" data-i18n-ignore>{{ row.translation || translateLegacy('等待翻译…') }}</p>
+            </article>
           </div>
         </section>
 
@@ -812,6 +841,7 @@ const importProgress = ref('');
 const importRatio = ref(0);
 const epubChapterIndex = ref(0);
 const docxPartIndex = ref(0);
+const xlsxSheetIndex = ref(0);
 const hydrated = ref(false);
 type GlossaryRetranslation = {document: ParsedDocument; fingerprint: string; pending: Set<number>};
 const glossaryRetranslation = shallowRef<GlossaryRetranslation | null>(null);
@@ -870,6 +900,7 @@ function activateDocument(item: DocumentQueueItem): void {
   readerTab.value = 'read';
   epubChapterIndex.value = 0;
   docxPartIndex.value = 0;
+  xlsxSheetIndex.value = 0;
 }
 
 function queueProgress(item: DocumentQueueItem): number {
@@ -1267,7 +1298,7 @@ async function downloadBatch(): Promise<void> {
 
 const accept = getDocumentAcceptAttribute();
 const megabytes = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
-const maxFileSizeLabel = `${megabytes(DOCUMENT_MAX_BYTES)} (PDF ${megabytes(PDF_MAX_BYTES)})`;
+const maxFileSizeLabel = `${megabytes(DOCUMENT_MAX_BYTES)} (PDF / PPTX ${megabytes(PDF_MAX_BYTES)})`;
 const sourceLanguageOptions = options.from;
 const translationSettingsSummary = computed(() => {
   const label = (items: typeof options.from, value: string) => items.find(item => item.value === value)?.label || value;
@@ -1285,12 +1316,15 @@ const originalDownloadSource = computed<OriginalDocumentDownloadSource | null>((
 const formatCards = [
   {code: 'PDF', label: '论文 / 资料', tone: 'coral'},
   {code: 'EPUB', label: '电子书', tone: 'teal'},
+  {code: 'DOCX', label: 'Word 文档', tone: 'slate'},
+  {code: 'PPTX', label: 'PowerPoint', tone: 'coral'},
+  {code: 'XLSX', label: 'Excel', tone: 'teal'},
   {code: 'HTML', label: '网页', tone: 'coral'},
   {code: 'JSON', label: '语言文件', tone: 'teal'},
   {code: 'CSV', label: 'CSV / TSV', tone: 'teal'},
   {code: 'TXT', label: '纯文本', tone: 'slate'},
-  {code: 'DOCX', label: 'Word 文档', tone: 'slate'},
   {code: 'MD', label: 'Markdown', tone: 'sand'},
+  {code: 'TEX', label: 'LaTeX', tone: 'sand'},
   {code: 'SUB', label: '字幕 / 歌词', tone: 'violet'},
 ];
 
@@ -1496,6 +1530,7 @@ const hasUnsavedWork = computed(() => translating.value || batchRunning.value ||
 const isPdfDocument = computed(() => parsedDocument.value?.binary?.kind === 'pdf');
 const isEpubDocument = computed(() => parsedDocument.value?.binary?.kind === 'epub');
 const isDocxDocument = computed(() => parsedDocument.value?.binary?.kind === 'docx');
+const isXlsxDocument = computed(() => parsedDocument.value?.binary?.kind === 'xlsx');
 const isSubtitleDocument = computed(() => isSubtitleDocumentFormat(parsedDocument.value?.format));
 const isJsonDocument = computed(() => parsedDocument.value?.format === 'json');
 const isRichDocument = computed(() => isRichDocumentFormat(parsedDocument.value?.format));
@@ -1516,7 +1551,7 @@ const richPreviewDocument = computed<ParsedDocument | null>(() => {
     const chapter = currentEpubChapter.value;
     return chapter ? parseDocument('chapter.html', chapter.source) : null;
   }
-  return ['html', 'markdown', 'txt'].includes(document.format) ? document : null;
+  return ['html', 'markdown', 'txt', 'tex'].includes(document.format) ? document : null;
 });
 /** 富文本预览的完整 HTML：直接读取逐段写入的译文，翻译进行中也能反映最新进度。 */
 function buildRichPreview(): string {
@@ -1795,9 +1830,27 @@ const currentDocxBlocks = computed(() => {
   for (const block of blocks) if (block.table) block.table = block.table.filter(Boolean).map(cells => Array.from(cells, cell => cell ?? []));
   return blocks;
 });
+const xlsxSheets = computed(() => parsedDocument.value?.binary?.kind === 'xlsx'
+  ? parsedDocument.value.binary.sheets
+  : []);
+const currentXlsxSheet = computed(() => xlsxSheets.value[xlsxSheetIndex.value]);
+const currentXlsxRows = computed(() => {
+  const document = parsedDocument.value;
+  const sheet = currentXlsxSheet.value;
+  if (!document || !sheet) return [];
+  return pageRows(sheet.cellSegments).map(({cellRef, segmentIndex}) => {
+    const segment = document.segments[segmentIndex];
+    return {
+      index: segmentIndex,
+      cellRef,
+      source: segment?.source || '',
+      translation: translatedSegments.value[segmentIndex] || '',
+    };
+  });
+});
 const subtitleRows = computed(() => previewRows.value);
 const emptyReaderHint = computed(() => isPdfDocument.value ? t(parsedDocument.value?.segments.length ? 'document.pdfReading.startHint' : 'document.pdfReading.selectableSource') : getDocumentEmptyReaderHint(parsedDocument.value));
-const readerPageCount = computed(() => isPdfDocument.value || isRichDocument.value ? 1 : Math.max(1, Math.ceil((isDocxDocument.value ? currentDocxPart.value?.paragraphSegments.length || 0 : activeSegments.value.length) / READER_PAGE_SIZE)));
+const readerPageCount = computed(() => isPdfDocument.value || isRichDocument.value ? 1 : Math.max(1, Math.ceil((isDocxDocument.value ? currentDocxPart.value?.paragraphSegments.length || 0 : isXlsxDocument.value ? currentXlsxSheet.value?.cellSegments.length || 0 : activeSegments.value.length) / READER_PAGE_SIZE)));
 
 const pdfSegmentPages = computed(() => {
   const binary = parsedDocument.value?.binary;
@@ -1823,7 +1876,9 @@ function readingPriorityKey(): ReadingPrioritySnapshot {
     const offset = (readerPage.value - 1) * READER_PAGE_SIZE;
     const chapter = currentEpubChapter.value;
     const anchor = chapter?.segmentOffset
-      ?? (currentDocxPart.value ? currentDocxPart.value.paragraphSegments[offset]?.segmentIndex ?? 0 : isRichDocument.value ? 0 : activeSegments.value[offset]?.id ?? 0);
+      ?? (currentDocxPart.value ? currentDocxPart.value.paragraphSegments[offset]?.segmentIndex ?? 0
+        : currentXlsxSheet.value ? currentXlsxSheet.value.cellSegments[offset]?.segmentIndex ?? 0
+          : isRichDocument.value ? 0 : activeSegments.value[offset]?.id ?? 0);
     const scrolled = isRichDocument.value ? Math.floor(richPreviewPosition(richFrame.value) * (chapter ? chapter.segmentCount : total)) : 0;
     start = anchor + scrolled;
   }
@@ -1908,7 +1963,7 @@ watch(() => translating.value ? null : [...translatedSegments.value], (translati
   if (!translations) return;
   settledTranslations.value = translations;
 });
-watch(docxPartIndex, () => { readerPage.value = 1; });
+watch([docxPartIndex, xlsxSheetIndex], () => { readerPage.value = 1; });
 
 function openFilePicker(): void {
   fileInput.value?.click();
@@ -1981,6 +2036,7 @@ function resetDocument(): void {
   preparingDownload.value = false;
   epubChapterIndex.value = 0;
   docxPartIndex.value = 0;
+  xlsxSheetIndex.value = 0;
 }
 
 function changeDocument(): void {

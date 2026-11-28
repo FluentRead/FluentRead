@@ -9,6 +9,7 @@ import {TranslationRequestError, serializeTranslationError} from '@/src/services
 import DocumentApp from '@/src/app/document-translation/DocumentApp.vue';
 import {documentRetryBackoff} from '@/src/app/document-translation/runtime';
 import DocumentSegmentEditor from '@/src/app/document-translation/DocumentSegmentEditor.vue';
+import PdfSourceEditor from '@/src/app/document-translation/PdfSourceEditor.vue';
 const defaultDocumentRetryWaitMs = documentRetryBackoff.maxWaitMs;
 const defaultDocumentRetryDurationMs = documentRetryBackoff.maxDurationMs;
 
@@ -83,6 +84,7 @@ function host(tag: string): Host {
         tag, tagName: tag.toUpperCase(), type: '', props: {} as Record<string, any>, children: [] as Host[],
         text: '', style: {}, value: '', checked: false, open: false, click: vi.fn(),
         getAttribute: (name: string) => entry.props[name],
+        getRootNode: () => ({activeElement: null}),
         showModal: () => {entry.open = true;},
         close: () => {if (entry.open) {entry.open = false; void fire(entry, 'close');}},
     });
@@ -217,6 +219,8 @@ beforeEach(async () => {
         }},
     });
     vi.stubGlobal('window', win);
+    vi.stubGlobal('Document', class {});
+    vi.stubGlobal('ShadowRoot', class {});
     vi.stubGlobal('document', {activeElement: null});
     vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => {blobs.push(blob as Blob); return `blob:actions-${blobs.length}`;});
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(url => {revoked.push(url);});
@@ -838,6 +842,221 @@ describe('document user actions: real editor events and parent consumers', () =>
         await fire(button('下一页', pagination), 'click');
         await selectFile('short.srt'); await selectFile('long.srt');
         expect(textOf(labelled('文档阅读分页'))).toContain('第 1 / 2 页');
+    });
+
+    it('formats LRC single timestamps without undefined, styles collapsed reveal, clears search, emits locate-segment and tracks progress', async () => {
+        apps.pop()!.unmount();
+        const lrc = parseDocument('song.lrc', '[00:12.34]First line\n[00:18.50]Second line');
+        const srt = parseDocument('clip.srt', '1\n00:00:01,000 --> 00:00:02,000\nSubtitle line');
+        const current = ref<ParsedDocument>(lrc);
+        const translations = ref<string[]>(['First line', '']);
+        const locate = vi.fn();
+        mount({setup: () => () => h(DocumentSegmentEditor, {
+            document: current.value,
+            translations: translations.value,
+            disabled: false,
+            'onLocate-segment': locate,
+        })});
+        await flush();
+        expect(textOf(editor())).toContain('00:12.34');
+        expect(textOf(editor())).not.toContain('undefined');
+        expect(textOf(editor())).toContain('document.pdfReading.editorSummary {"completed":1,"total":2}');
+        const reveal = find(node => node.tag === 'button' && textOf(node) === '校订译文', editor());
+        expect(String(reveal.props.class)).toContain('ghost-button');
+        expect(String(reveal.props.class)).toContain('compact-action');
+        expect(walk(editor()).some(node => node.props['aria-label'] === 'document.pdfReading.clearSearch')).toBe(false);
+        await fire(search(), 'input', {value: 'Second'});
+        expect(walk(editor()).filter(node => node.tag === 'textarea')).toHaveLength(1);
+        await fire(button('document.pdfReading.clearSearch', editor()), 'click');
+        expect(search().value).toBe('');
+        expect(walk(editor()).filter(node => node.props['data-segment-id'] !== undefined)).toHaveLength(2);
+        await fire(button('document.pdfReading.locateInReader', editor()), 'click');
+        expect(locate).toHaveBeenCalledWith(0);
+        current.value = srt;
+        translations.value = ['字幕译文'];
+        await flush();
+        expect(textOf(editor())).toContain('00:00:01,000 → 00:00:02,000');
+        current.value = {
+            ...parseDocument('section.txt', 'Body line'),
+            segments: [{id: 0, source: 'Body line', contextLabel: 'Section 1'}],
+        };
+        translations.value = ['正文译文'];
+        await flush();
+        expect(textOf(editor())).toContain('Section 1');
+    });
+
+    it('short-circuits work while active is false, preserves page across visibility toggles, bounds large page selectors and focuses requested segments', async () => {
+        apps.pop()!.unmount();
+        const huge = parseDocument('huge.json', JSON.stringify(Array.from({length: 4040}, (_, i) => `Item ${i}`)));
+        const active = ref(true);
+        const focusSegmentId = ref<number | null>(null);
+        const focusHandled = vi.fn();
+        const editorInstance = ref<{focusSegment?: (id: number) => Promise<void>} | null>(null);
+        const translations = ref<string[]>(Array.from({length: 4040}, (_, i) => i === 45 ? `Item ${i}` : ''));
+        mount({setup: () => () => h(DocumentSegmentEditor, {
+            ref: editorInstance,
+            document: huge,
+            translations: translations.value,
+            disabled: false,
+            active: active.value,
+            focusSegmentId: focusSegmentId.value,
+            'onFocus-handled': focusHandled,
+        })});
+        await flush();
+        const pageSelect = labelled('校订页码');
+        const options = walk(pageSelect).filter(node => node.tag === 'option');
+        expect(options.length).toBeLessThan(101);
+        expect(options[0].props.value).toBe(1);
+        expect(options.at(-1)!.props.value).toBe(101);
+
+        await fire(button('下一页', labelled('校订分页')), 'click');
+        expect(textOf(labelled('校订分页'))).toContain('第 2 / 101 页');
+
+        active.value = false;
+        await flush();
+        expect(walk(editor()).filter(node => node.props['data-segment-id'] !== undefined)).toHaveLength(0);
+        expect(textOf(editor())).toContain('document.pdfReading.editorSummary {"completed":0,"total":4040}');
+
+        active.value = true;
+        await flush();
+        expect(textOf(labelled('校订分页'))).toContain('第 2 / 101 页');
+        expect(walk(editor()).some(node => node.props['data-segment-id'] === 40)).toBe(true);
+
+        // Focus an identical-translation segment while a filter hides it (covers filter reset + reveal + focus without DOM focus fn).
+        await fire(search(), 'input', {value: 'Item 0'});
+        expect(walk(editor()).filter(node => node.props['data-segment-id'] !== undefined)).toHaveLength(1);
+        focusSegmentId.value = 45;
+        await flush();
+        expect(search().value).toBe('');
+        expect(textOf(labelled('校订分页'))).toContain('第 2 / 101 页');
+        expect(textarea(45).value).toBe('Item 45');
+        expect(focusHandled).toHaveBeenCalledTimes(1);
+
+        // Switching away and back while focusSegmentId is still 45 must NOT re-trigger stale focus or clear user's search.
+        await fire(search(), 'input', {value: 'Item 45'});
+        active.value = false; await flush();
+        active.value = true; await flush();
+        expect(search().value).toBe('Item 45');
+        expect(focusHandled).toHaveBeenCalledTimes(1);
+
+        // Resetting focusSegmentId to null and setting the same ID again repeats focus cleanly.
+        focusSegmentId.value = null; await flush();
+        focusSegmentId.value = 42;
+        await flush();
+        expect(search().value).toBe('');
+        expect(textOf(labelled('校订分页'))).toContain('第 2 / 101 页');
+        expect(focusHandled).toHaveBeenCalledTimes(2);
+        const focusSpy = vi.fn();
+        (textarea(42) as any).focus = focusSpy;
+        focusSegmentId.value = null; await flush();
+        focusSegmentId.value = 42;
+        await flush();
+        expect(focusSpy).toHaveBeenCalledTimes(1);
+        expect(focusHandled).toHaveBeenCalledTimes(3);
+
+        // Exposed focusSegment() also works directly without mutating props.
+        await editorInstance.value!.focusSegment!(42);
+        expect(focusSpy).toHaveBeenCalledTimes(2);
+
+        // Abort mid-flight after first nextTick (filter clear) when superseded by a newer focusSegment call.
+        await fire(search(), 'input', {value: 'Item 0'});
+        const superseded = editorInstance.value!.focusSegment!(45);
+        const latest = editorInstance.value!.focusSegment!(42);
+        await Promise.all([superseded, latest]);
+        await flush();
+        expect(textOf(labelled('校订分页'))).toContain('第 2 / 101 页');
+
+        // Abort mid-flight after second nextTick when active flips to false before focus completes.
+        const interrupted = editorInstance.value!.focusSegment!(42);
+        await nextTick();
+        active.value = false;
+        await interrupted;
+        active.value = true;
+        await flush();
+
+        // Suppress stale focus-handled emit if active flips to false before watcher finishes.
+        focusSegmentId.value = null; await flush();
+        focusSegmentId.value = 42;
+        await nextTick();
+        active.value = false;
+        await flush();
+        expect(focusHandled).toHaveBeenCalledTimes(3);
+
+        // Missing segment ID is ignored cleanly while still acknowledging focus-handled.
+        active.value = true;
+        focusSegmentId.value = 99999;
+        await flush();
+        expect(textOf(labelled('校订分页'))).toContain('第 2 / 101 页');
+        expect(focusHandled).toHaveBeenCalledTimes(4);
+    });
+
+    it('supports Ctrl/Cmd+Enter save and Escape close shortcuts with shortcut hint in PdfSourceEditor', async () => {
+        apps.pop()!.unmount();
+        const base = parseDocument('scan.txt', 'Recognized line');
+        const pdfDoc: ParsedDocument = {
+            ...base,
+            format: 'pdf',
+            binary: {
+                kind: 'pdf',
+                bytes: new Uint8Array([1, 2, 3]),
+                pages: [{
+                    pageNumber: 1,
+                    width: 612,
+                    height: 792,
+                    scanned: false,
+                    ocrRecognized: true,
+                    blocks: [{
+                        segmentIndex: 0,
+                        x: 10, y: 10, width: 200, height: 20,
+                        source: 'Recognized line',
+                        lines: [{text: 'Recognized line', x: 10, y: 10, width: 200, height: 20}],
+                    }],
+                }],
+            } as any,
+        };
+        const apply = vi.fn();
+        const close = vi.fn();
+        const disabled = ref(false);
+        mount({setup: () => () => h(PdfSourceEditor, {
+            document: pdfDoc,
+            pageNumber: 1,
+            blockIndex: 0,
+            disabled: disabled.value,
+            onApply: apply,
+            onClose: close,
+        })});
+        await flush();
+        expect(textOf(root)).toContain('document.pdfReading.saveShortcutHint');
+        const field = find(node => node.tag === 'textarea');
+        const keydown = (props: {key: string; ctrlKey?: boolean; metaKey?: boolean; isComposing?: boolean}) => {
+            const event = Object.assign(new Event('keydown', {cancelable: true}), {ctrlKey: false, metaKey: false, isComposing: false, ...props});
+            field.props.onKeydown(event);
+            return event;
+        };
+        const plain = keydown({key: 'a'});
+        expect(plain.defaultPrevented).toBe(false);
+        expect(apply).not.toHaveBeenCalled();
+
+        const imeEsc = keydown({key: 'Escape', isComposing: true});
+        expect(imeEsc.defaultPrevented).toBe(false);
+        expect(close).not.toHaveBeenCalled();
+
+        const ctrlSave = keydown({key: 'Enter', ctrlKey: true});
+        expect(ctrlSave.defaultPrevented).toBe(true);
+        expect(apply).toHaveBeenCalledWith(0, ['Recognized line']);
+
+        const cmdSave = keydown({key: 'Enter', metaKey: true});
+        expect(cmdSave.defaultPrevented).toBe(true);
+        expect(apply).toHaveBeenCalledTimes(2);
+
+        disabled.value = true;
+        await flush();
+        keydown({key: 'Enter', ctrlKey: true});
+        expect(apply).toHaveBeenCalledTimes(2);
+
+        const esc = keydown({key: 'Escape'});
+        expect(esc.defaultPrevented).toBe(true);
+        expect(close).toHaveBeenCalledOnce();
     });
 });
 

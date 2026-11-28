@@ -104,16 +104,22 @@ describe('PDF reader visible page scheduling and memory bounds', () => {
         expect(keyed(regions)).not.toBe(keyed([{...regions[0], id: 'changed'}, regions[1]]));
         expect(keyed(regions)).not.toBe(keyed([{...regions[0], sourceRect: {...regions[0].sourceRect, width: 31}}, regions[1]]));
         expect(keyed([])).not.toBe(pdfReaderPageKey(page, 1, 'bilingual', 'readable'));
-        expect(pdfReaderPageKey(page, 1, 'bilingual', 'layout', regions)).toBe(JSON.stringify(['bilingual']));
+        expect(pdfReaderPageKey(page, 1, 'bilingual', 'layout', regions)).toBe('layout');
     });
     it('keys readable source work by scale, mode, blocks and preserved regions only, and maps all preserved-region rotations', () => {
         const page = pageModel(1);
-        expect(pdfReaderPageKey(page, 1, 'bilingual', 'readable')).toBe(JSON.stringify([1, 'bilingual', 'readable', page.blocks, undefined]));
-        expect(pdfReaderPageKey(page, 1, 'bilingual', 'readable')).toBe(pdfReaderPageKey(pageModel(1), 1, 'bilingual', 'readable'));
-        expect(pdfReaderPageKey(page, 1.5, 'bilingual', 'readable')).not.toBe(pdfReaderPageKey(page, 1, 'bilingual', 'readable'));
-        expect(pdfReaderPageKey(page, 1, 'translated', 'readable')).not.toBe(pdfReaderPageKey(page, 1, 'bilingual', 'readable'));
-        expect(pdfReaderPageKey(pageModel(2), 1, 'bilingual', 'readable')).not.toBe(pdfReaderPageKey(page, 1, 'bilingual', 'readable'));
-        expect(pdfReaderPageKey({...page, preservedRegions: [{id: 'graph', kind: 'figure', x: 1, y: 2, width: 3, height: 4}]}, 1, 'bilingual', 'readable')).not.toBe(pdfReaderPageKey(page, 1, 'bilingual', 'readable'));
+        const key1 = pdfReaderPageKey(page, 1, 'bilingual', 'readable');
+        expect(key1).toBe(pdfReaderPageKey(page, 1, 'bilingual', 'readable'));
+        expect(key1).toBe(pdfReaderPageKey(pageModel(1), 1, 'bilingual', 'readable'));
+        expect(pdfReaderPageKey(page, 1.5, 'bilingual', 'readable')).not.toBe(key1);
+        expect(pdfReaderPageKey(page, 1, 'translated', 'readable')).not.toBe(key1);
+        expect(pdfReaderPageKey(pageModel(2), 1, 'bilingual', 'readable')).not.toBe(key1);
+        const withPreserveFlag = {...page, blocks: [{...page.blocks[0], kind: 'heading' as const, preserveSource: true}]};
+        expect(pdfReaderPageKey(withPreserveFlag, 1, 'bilingual', 'readable')).not.toBe(key1);
+        const withPreserved = {...page, preservedRegions: [{id: 'graph', kind: 'figure' as const, x: 1, y: 2, width: 3, height: 4}]};
+        const preservedKey = pdfReaderPageKey(withPreserved, 1, 'bilingual', 'readable');
+        expect(preservedKey).toBe(pdfReaderPageKey(withPreserved, 1, 'bilingual', 'readable'));
+        expect(preservedKey).not.toBe(key1);
         expect(pdfReaderPageKey(page, 1, 'bilingual', 'readable')).not.toBe(pdfReaderPageKey(page, 1, 'bilingual', 'layout'));
         const rect = {x: 10, y: 20, width: 30, height: 40};
         expect(pdfReaderDisplayRect(rect, page)).toBe(rect);
@@ -146,15 +152,15 @@ describe('PDF reader visible page scheduling and memory bounds', () => {
         expect(() => pdfReaderCanvasSize(600, 800, 2, 1, NaN)).toThrow('像素预算不足');
     });
 
-    it('keys original-layout pages by mode, so translation and display scale changes can reuse the ready page', async () => {
+    it('decouples original-layout page keys from mode so source, bilingual and translated toggles reuse rendered source canvases and text layers', async () => {
         const first = pageModel(1); const second = pageModel(2);
-        expect(pdfReaderPageKey(first, 1, 'bilingual')).toBe(JSON.stringify(['bilingual']));
-        expect(pdfReaderPageKey(first, 1, 'bilingual', 'layout')).toBe(JSON.stringify(['bilingual']));
-        expect(pdfReaderPageKey(second, 1, 'bilingual', 'layout')).toBe(pdfReaderPageKey(first, 1, 'bilingual', 'layout'));
-        expect(pdfReaderPageKey({...first, blocks: []}, 1, 'bilingual', 'layout')).toBe(pdfReaderPageKey(first, 1, 'bilingual', 'layout'));
-        expect(pdfReaderPageKey(first, 1.5, 'bilingual', 'layout')).toBe(pdfReaderPageKey(first, 1, 'bilingual', 'layout'));
-        expect(pdfReaderPageKey(first, 1, 'translated', 'layout')).toBe(JSON.stringify(['translated']));
-        expect(pdfReaderPageKey(first, 1, 'source', 'layout')).toBe(JSON.stringify(['source']));
+        expect(pdfReaderPageKey(first, 1, 'bilingual')).toBe('layout');
+        expect(pdfReaderPageKey(first, 1, 'bilingual', 'layout')).toBe('layout');
+        expect(pdfReaderPageKey(second, 1, 'bilingual', 'layout')).toBe('layout');
+        expect(pdfReaderPageKey({...first, blocks: []}, 1, 'bilingual', 'layout')).toBe('layout');
+        expect(pdfReaderPageKey(first, 1.5, 'bilingual', 'layout')).toBe('layout');
+        expect(pdfReaderPageKey(first, 1, 'translated', 'layout')).toBe('layout');
+        expect(pdfReaderPageKey(first, 1, 'source', 'layout')).toBe('layout');
         // 译文在阅读器外部流式变化；调度器每次拿到的页面键相同，已就绪的页不得重绘或释放。
         const outputs: PdfReaderRenderedPage[] = [];
         const render = vi.fn(async () => {const value = output(); outputs.push(value); return value;});
@@ -163,11 +169,193 @@ describe('PDF reader visible page scheduling and memory bounds', () => {
         scheduler.update([0, 1], keyed(1, 'bilingual')); await settle(); expect(render).toHaveBeenCalledTimes(2);
         scheduler.update([0, 1], keyed(1, 'bilingual')); scheduler.update([1, 0], keyed(1, 'bilingual')); await settle();
         expect(render).toHaveBeenCalledTimes(2); expect(outputs.every(value => vi.mocked(value.dispose).mock.calls.length === 0)).toBe(true);
+        // 模拟输出没有画布时切换模式仍安全淘汰重绘。
         scheduler.update([0, 1], keyed(1, 'translated')); await settle();
         expect(render).toHaveBeenCalledTimes(4); expect(outputs[0].dispose).toHaveBeenCalledOnce(); expect(outputs[1].dispose).toHaveBeenCalledOnce();
         // 端口只返回页面文字时没有可补绘的画布，即使页面进入视口也复用结果。
         scheduler.update([0, 1], index => ({...keyed(1.25, 'translated')(index), refine: true})); await settle(); expect(render).toHaveBeenCalledTimes(4);
         scheduler.dispose();
+
+        // 真实渲染端口在 source <-> bilingual <-> translated 间切换时复用已就绪原页画布与文字层，并在回到 source 时释放译文画布。
+        const doc = model(2);
+        const port = createPdfReaderRenderPort(doc);
+        const states = new Map<number, PdfReaderPageState | undefined>();
+        const docPages = doc.binary?.kind === 'pdf' ? doc.binary.pages : [];
+        const realScheduler = new PdfReaderScheduler(docPages, port, (page, state) => states.set(page, state));
+        const liveKeyed = (mode: PdfReaderSettings['mode']) => (): PdfReaderSettings => ({scale: 1, mode, presentation: 'layout', key: pdfReaderPageKey(first, 1, mode, 'layout')});
+        realScheduler.update([0], liveKeyed('source'));
+        await vi.waitFor(() => expect(states.get(1)?.status).toBe('ready'));
+        const initialRenders = pdfPage.render.mock.calls.length;
+        const readySource = states.get(1)!;
+        expect(readySource.status).toBe('ready');
+        const originalSourceCanvas = readySource.status === 'ready' ? readySource.output.sourceCanvas : undefined;
+        const originalSourceText = readySource.status === 'ready' ? readySource.output.sourceText : undefined;
+        expect(originalSourceCanvas).toBeTruthy(); expect(originalSourceText).toBeTruthy();
+
+        // source -> bilingual: 仅复制原页像素为译文画布，不重新调用 PDF.js render。
+        realScheduler.update([0], liveKeyed('bilingual')); await settle();
+        expect(pdfPage.render).toHaveBeenCalledTimes(initialRenders);
+        const afterBilingual = states.get(1)!;
+        expect(afterBilingual.status).toBe('ready');
+        if (afterBilingual.status === 'ready') {
+            expect(afterBilingual.output.sourceCanvas).toBe(originalSourceCanvas);
+            expect(afterBilingual.output.sourceText).toBe(originalSourceText);
+            expect(afterBilingual.output.translatedCanvas).toBeTruthy();
+            expect(afterBilingual.output.translatedCanvas).not.toBe(originalSourceCanvas);
+        }
+
+        // bilingual -> translated -> bilingual: 复用已有画布，零重绘。
+        realScheduler.update([0], liveKeyed('translated')); await settle();
+        expect(pdfPage.render).toHaveBeenCalledTimes(initialRenders);
+        realScheduler.update([0], liveKeyed('bilingual')); await settle();
+        expect(pdfPage.render).toHaveBeenCalledTimes(initialRenders);
+
+        // bilingual -> source: 释放译文画布以满足 sourceOnly 限制，保留原页画布与文字层。
+        const translatedRef = afterBilingual.status === 'ready' ? afterBilingual.output.translatedCanvas! : undefined;
+        realScheduler.update([0], liveKeyed('source')); await settle();
+        expect(pdfPage.render).toHaveBeenCalledTimes(initialRenders);
+        expect(translatedRef).toMatchObject({width: 0, height: 0});
+        const backToSource = states.get(1)!;
+        if (backToSource.status === 'ready') {
+            expect(backToSource.output.sourceCanvas).toBe(originalSourceCanvas);
+            expect(backToSource.output.sourceText).toBe(originalSourceText);
+            expect(backToSource.output.translatedCanvas).toBeUndefined();
+        }
+        // source -> translated: 直接复制原页画布。
+        realScheduler.update([0], liveKeyed('translated')); await settle();
+        expect(pdfPage.render).toHaveBeenCalledTimes(initialRenders);
+        realScheduler.dispose();
+    });
+
+    it('handles mode adaptation edge cases (loading eviction, missing sourceText, oversized canvas, clone failure, active refine abort) and recovers from pixel-budget starvation', async () => {
+        // 1. 仍在加载或仅译文模式（无 sourceText）切换模式时淘汰重绘；在途清晰度补绘切换模式时中止。
+        const pages = Array.from({length: 5}, (_, index) => pageModel(index + 1, 1000, 2000));
+        const pendingFirst = deferred<PdfReaderRenderedPage>();
+        const refinePending = deferred<PdfReaderRenderedPage>();
+        let refineSignal: AbortSignal | undefined;
+        const makeCanvas = (width: number, height: number) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = width; canvas.height = height;
+            return canvas;
+        };
+        const render = vi.fn(async (_page: PdfDocumentPage, modeSettings: PdfReaderSettings, signal: AbortSignal, refresh?: {pixelBudget: number}) => {
+            if (refresh) {refineSignal = signal; return refinePending.promise;}
+            if (render.mock.calls.length === 1) return pendingFirst.promise;
+            return {
+                sourceCanvas: modeSettings.mode === 'translated' ? undefined : makeCanvas(100, 100),
+                sourceText: modeSettings.mode === 'translated' ? undefined : {element: document.createElement('div'), dispose: vi.fn()},
+                translatedCanvas: modeSettings.mode === 'source' ? undefined : makeCanvas(100, 100),
+                dispose: vi.fn(),
+            };
+        });
+        const scheduler = new PdfReaderScheduler(pages, {render, dispose: vi.fn()}, () => undefined);
+        scheduler.update([0], () => ({scale: 1, mode: 'source', presentation: 'layout', key: 'layout'}));
+        // 加载中切换模式 -> 淘汰重绘
+        scheduler.update([0], () => ({scale: 1, mode: 'translated', presentation: 'layout', key: 'layout'}));
+        pendingFirst.resolve(output());
+        await settle();
+        // translated（无 sourceCanvas/sourceText）-> source 与 -> bilingual 均需淘汰重绘
+        scheduler.update([0], () => ({scale: 1, mode: 'source', presentation: 'layout', key: 'layout'}));
+        await settle();
+        scheduler.update([0], () => ({scale: 1, mode: 'translated', presentation: 'layout', key: 'layout'}));
+        await settle();
+        scheduler.update([0], () => ({scale: 1, mode: 'bilingual', presentation: 'layout', key: 'layout'}));
+        await settle();
+        // 触发清晰度补绘后立即切回 source -> 中止补绘并复用原页画布
+        scheduler.update([0], () => ({scale: 2, mode: 'bilingual', presentation: 'layout', refine: true, key: 'layout'}));
+        expect(refineSignal?.aborted).toBe(false);
+        scheduler.update([0], () => ({scale: 2, mode: 'source', presentation: 'layout', key: 'layout'}));
+        expect(refineSignal?.aborted).toBe(true);
+        refinePending.reject(new Error('aborted'));
+        await settle();
+
+        // sourceCanvas 复制初始化失败时回退到重绘
+        const create = vi.mocked(document.createElement).getMockImplementation()!;
+        vi.mocked(document.createElement).mockImplementationOnce(tag => {
+            const el = create(tag);
+            if (tag === 'canvas') Object.assign(el, {getContext: () => null});
+            return el;
+        });
+        const callsBeforeFail = render.mock.calls.length;
+        scheduler.update([0], () => ({scale: 1, mode: 'bilingual', presentation: 'layout', key: 'layout'}));
+        await settle();
+        expect(render.mock.calls.length).toBeGreaterThan(callsBeforeFail);
+        // 已有 sourceCanvas/sourceText 但无 translatedCanvas 的模拟输出切回 source 时安全跳过释放分支。
+        const noTranslatedPort = {
+            render: vi.fn(async () => ({sourceCanvas: makeCanvas(100, 100), sourceText: {element: document.createElement('div'), dispose: vi.fn()}, dispose: vi.fn()})),
+            dispose: vi.fn(),
+        };
+        const noTransScheduler = new PdfReaderScheduler([pages[0]], noTranslatedPort, () => undefined);
+        noTransScheduler.update([0], () => ({scale: 1, mode: 'bilingual', presentation: 'layout', key: 'layout'}));
+        await settle();
+        noTransScheduler.update([0], () => ({scale: 1, mode: 'source', presentation: 'layout', key: 'layout'}));
+        expect(noTranslatedPort.render).toHaveBeenCalledOnce();
+        noTransScheduler.dispose();
+        scheduler.dispose();
+
+        // 2. 像素预算紧张/饥饿恢复：未渲染页面优先于补绘，且在 budget < 8M 或零预算时淘汰低优先级非可见预取页。
+        const heavyPages = Array.from({length: 6}, (_, index) => pageModel(index + 1, 1000, 2000));
+        const heavyOutputs = heavyPages.map((_, index) => ({...output(), sourceCanvas: {width: index === 0 ? 1500 : 2000, height: index === 0 ? 3000 : 4000} as HTMLCanvasElement}));
+        const heavyPending = deferred<PdfReaderRenderedPage>();
+        let abortedRefine: AbortSignal | undefined;
+        const budgets: Array<number | undefined> = [];
+        const heavyRender = vi.fn(async (page: PdfDocumentPage, _s: PdfReaderSettings, signal: AbortSignal, refresh?: {pixelBudget: number}) => {
+            budgets.push(refresh?.pixelBudget);
+            if (refresh && page.pageNumber === 1) {abortedRefine = signal; return heavyPending.promise;}
+            return heavyOutputs[page.pageNumber - 1];
+        });
+        const heavyStates = new Map<number, PdfReaderPageState | undefined>();
+        const starveScheduler = new PdfReaderScheduler(heavyPages, {render: heavyRender, dispose: vi.fn()}, (p, st) => heavyStates.set(p, st));
+        // 先渲染 4 页（4.5M + 8M + 8M + 8M = 28.5M），然后触发第 1 页 refine（预留 8M -> 剩余 3.5M < 8M）
+        starveScheduler.update([0, 1, 2, 3], () => settings('layout', 1, 'source'));
+        await settle(); await settle();
+        starveScheduler.update([0, 1, 2, 3], idx => ({...settings('layout', 2, 'source'), refine: idx === 0}));
+        expect(abortedRefine?.aborted).toBe(false);
+        // 第 5 页（index 4）进入视口：中止低优先级 refine 并以可用预算 3.5M 立即开始渲染（不再饿死空白）！
+        starveScheduler.update([4, 0, 1, 2, 3], idx => ({...settings('layout', 2, 'source'), refine: idx === 4}));
+        expect(abortedRefine?.aborted).toBe(true);
+        expect(budgets.at(-1)).toBe(3_500_000);
+        heavyPending.reject(new Error('cancelled'));
+        await settle();
+        expect(heavyStates.get(5)?.status).toBe('ready');
+
+        // 全部 5 页满载 40M 且无可用预算时，新可见页淘汰非可见预取页以腾出像素；若所有低优先级页都标记可见则等待不超限。
+        heavyOutputs[3].sourceCanvas.height = 4000;
+        heavyOutputs[4].sourceCanvas.height = 4000;
+        // 5 页合计 40M，尝试渲染第 6 页（index 5）且将前 4 页标为可见（无预取可淘汰）时先跳过；随后允许淘汰末尾非可见预取页并成功渲染第 6 页。
+        const fullScheduler = new PdfReaderScheduler(heavyPages, {render: vi.fn(async () => ({...output(), sourceCanvas: {width: 2000, height: 4000} as HTMLCanvasElement})), dispose: vi.fn()}, (p, st) => heavyStates.set(p, st));
+        // 先填满 4 页各 8M + 1 页（index 4）8M = 40M
+        fullScheduler.update([0, 1, 2, 3, 4], () => settings('layout', 1, 'source'));
+        await settle(); await settle(); await settle();
+        // 把 index 5 加入窗口（与 [0,1,2,3] 同在 5 页内，先移除 index 4 会释放 8M，改用 5 页满载后模拟 10M 单页超额以覆盖零预算淘汰路径）
+        const tinyOutputs = heavyPages.map(() => ({...output(), sourceCanvas: {width: 4000, height: 2500} as HTMLCanvasElement})); // 10M each -> 4 pages = 40M!
+        const evictStates = new Map<number, PdfReaderPageState | undefined>();
+        const evictScheduler = new PdfReaderScheduler(heavyPages, {render: vi.fn(async p => tinyOutputs[p.pageNumber - 1]), dispose: vi.fn()}, (p, st) => evictStates.set(p, st));
+        evictScheduler.update([0, 1, 2, 3], () => settings('layout', 1, 'source'));
+        await settle(); await settle();
+        // 4 页已占 40M（budget = 0）。若全部标记 refine: true 则无法淘汰，新页暂不启动。
+        evictScheduler.update([4, 0, 1, 2, 3], () => ({...settings('layout', 1, 'bilingual'), refine: true}));
+        await settle();
+        // 注意：mode 从 source 变 bilingual 无法复用 mock canvas，改用同 mode 'source' 测零预算：
+        const zeroStates = new Map<number, PdfReaderPageState | undefined>();
+        const zeroScheduler = new PdfReaderScheduler(heavyPages, {render: vi.fn(async p => tinyOutputs[p.pageNumber - 1]), dispose: vi.fn()}, (p, st) => zeroStates.set(p, st));
+        zeroScheduler.update([0, 1, 2, 3], () => settings('layout', 1, 'source'));
+        await settle(); await settle();
+        // 全部 refine: true -> 不可淘汰，第 5 页跳过（覆盖 budget < minBudget 分支）
+        zeroScheduler.update([4, 0, 1, 2, 3], () => ({...settings('layout', 1, 'source'), refine: true}));
+        expect(zeroStates.get(5)).toBeUndefined();
+        // 仅第 5 页为可见（refine: true），其余为非可见预取 -> 淘汰最远预取页 index 3，第 5 页立即开始渲染！
+        zeroScheduler.update([4, 0, 1, 2, 3], idx => ({...settings('layout', 1, 'source'), refine: idx === 4}));
+        await settle();
+        expect(zeroStates.get(4)).toBeUndefined();
+        expect(zeroStates.get(5)?.status).toBe('ready');
+        // 覆盖 readable 模式的 minPixelsFor 分支（有无 regionEntries）
+        const readableScheduler = new PdfReaderScheduler([heavyPages[0]], {render: vi.fn(async () => output()), dispose: vi.fn()}, () => undefined);
+        readableScheduler.update([0], () => ({scale: 1, mode: 'bilingual', presentation: 'readable', key: 'r1'}));
+        await settle();
+        readableScheduler.update([0], () => ({scale: 1, mode: 'bilingual', presentation: 'readable', regionEntries: [], key: 'r2'}));
+        await settle();
+        readableScheduler.dispose(); zeroScheduler.dispose(); evictScheduler.dispose(); fullScheduler.dispose(); starveScheduler.dispose();
     });
 
     it('preempts obsolete work on a far jump, releases stale late output, and keeps two renders concurrent', async () => {
@@ -507,7 +695,7 @@ function mountReader(value: ParsedDocument, mode = 'source' as PdfReaderSettings
     const currentDocument = ref(value); const currentMode = ref(mode); const currentTranslations = ref(translations);
     // 不传 presentation 时使用组件默认的原版排版。
     const currentPresentation = ref<'readable' | 'layout' | undefined>(options.presentation); const presentations: string[] = [];
-    const currentTranslating = ref(options.translating ?? false); const pageChanges: number[] = [];
+    const currentTranslating = ref(options.translating ?? false); const pageChanges: number[] = []; const sourceEdits: Array<number | undefined> = [];
     const currentInformation = ref(options.information);
     const renderer = createRenderer<any, any>({
         querySelector: selector => document.querySelector(selector),
@@ -525,12 +713,12 @@ function mountReader(value: ParsedDocument, mode = 'source' as PdfReaderSettings
     });
     const root = document.createElement('div'); document.body.append(root);
     mountedApp = renderer.createApp({setup: () => () => h(PdfReader, {document: currentDocument.value, translations: currentTranslations.value, mode: currentMode.value, presentation: currentPresentation.value, translating: currentTranslating.value, outlineTarget: options.outlineTarget ?? null,
-        'onUpdate:presentation': (value: 'readable' | 'layout') => {presentations.push(value); currentPresentation.value = value;}, onPageChange: (page: number) => {pageChanges.push(page);}, sourceUrl: 'https://arxiv.org/pdf/1706.03762', informationHighlight: currentInformation.value})});
+        'onUpdate:presentation': (value: 'readable' | 'layout') => {presentations.push(value); currentPresentation.value = value;}, onPageChange: (page: number) => {pageChanges.push(page);}, onSourceEdit: (segmentIndex?: number) => {sourceEdits.push(segmentIndex);}, sourceUrl: 'https://arxiv.org/pdf/1706.03762', informationHighlight: currentInformation.value})});
     mountedApp.mount(root);
     const state = mountedApp._instance.subTree.component.setupState;
     const viewport = root.querySelector('[data-pdf-scroll]') as HTMLElement;
     Object.defineProperties(viewport, {clientWidth: {value: 920, writable: true}, clientHeight: {value: 600, writable: true}});
-    return {root, viewport, state, currentDocument, currentMode, currentTranslations, currentPresentation, currentTranslating, presentations, pageChanges, currentInformation};
+    return {root, viewport, state, currentDocument, currentMode, currentTranslations, currentPresentation, currentTranslating, presentations, pageChanges, sourceEdits, currentInformation};
 }
 async function componentFlush(): Promise<void> {for (let index = 0; index < 12; index += 1) {await nextTick(); await Promise.resolve();}}
 const click = (element: Element | null | undefined): void => {element!.dispatchEvent(new document.defaultView!.Event('click'));};
@@ -1540,7 +1728,9 @@ describe('PDF reader actual Vue component reading interaction', () => {
         mountedApp.unmount(); mountedApp = undefined; key('Escape'); press(document.body);
     });
 
-    it('searches source and translation text case-insensitively, steps through hits with wrap-around, jumps to the hit and highlights it while the panel is open', async () => {
+    it('searches source and translation text case-insensitively with debounce, steps through hits with wrap-around, and keeps highlight active until cleared', async () => {
+        vi.useFakeTimers();
+        try {
         const {root, viewport, state, pageChanges} = mountReader(model(3), 'bilingual', ['Alpha 译文', 'beta ALPHA', '']); await componentFlush();
         const s = (920 - 36) / 2 / 612; const rowTop = (index: number) => 12 + index * (792 * s + 12);
         const tool = root.querySelector('.pdf-search .pdf-tool-button') as HTMLElement;
@@ -1548,12 +1738,16 @@ describe('PDF reader actual Vue component reading interaction', () => {
         click(tool); await componentFlush();
         const panel = root.querySelector('.pdf-search-panel[role="dialog"]') as HTMLElement; const input = panel.querySelector('input') as HTMLInputElement;
         const [previous, next] = Array.from(panel.querySelectorAll('button')); const count = () => panel.querySelector('.pdf-search-count')!.textContent;
-        const type = async (value: string) => {input.value = value; input.dispatchEvent(new document.defaultView!.Event('input')); await componentFlush(); flushFrames(); await componentFlush();};
+        const type = async (value: string) => {input.value = value; input.dispatchEvent(new document.defaultView!.Event('input')); await vi.advanceTimersByTimeAsync(150); await componentFlush(); flushFrames(); await componentFlush();};
         const enter = async (shiftKey = false) => {const event = Object.assign(new document.defaultView!.Event('keydown'), {key: 'Enter', shiftKey, preventDefault: vi.fn()}); input.dispatchEvent(event); await componentFlush(); return event;};
         const marks = (page: number) => [...root.querySelectorAll(`.pdf-page-row[data-page-number="${page}"] .pdf-source-highlight.search`)] as HTMLElement[];
         expect(count()).toBe(''); expect(previous.hasAttribute('disabled')).toBe(true); expect(next.hasAttribute('disabled')).toBe(true);
         click(next); await enter(); expect(viewport.scrollTop).toBe(0); expect(root.querySelector('.pdf-source-highlight')).toBeNull();
-        await type('zzz'); expect(count()).toBe('0'); expect(next.hasAttribute('disabled')).toBe(true); expect(classes(tool)).toContain('active');
+        // 输入防抖：150ms 前不立即触发搜索，满 150ms 后命中结果。
+        input.value = 'zzz'; input.dispatchEvent(new document.defaultView!.Event('input')); await componentFlush();
+        expect(count()).toBe('');
+        await vi.advanceTimersByTimeAsync(150); await componentFlush();
+        expect(count()).toBe('0'); expect(next.hasAttribute('disabled')).toBe(true); expect(classes(tool)).toContain('active');
         await type('   '); expect(count()).toBe('');
         // “alpha” 只出现在第 1、2 页的译文里；命中段落位于页内 y=70，跳转停在其上方 24px。
         await type('alpha');
@@ -1573,17 +1767,23 @@ describe('PDF reader actual Vue component reading interaction', () => {
         await type('SOURCE'); expect(count()).toBe('1 / 3'); expect(state.currentPage).toBe(1);
         await enter(true); expect(count()).toBe('3 / 3'); expect(state.currentPage).toBe(3); expect(viewport.scrollTop).toBeCloseTo(rowTop(2) + 70 * s - 24, 8); expect(marks(3)).toHaveLength(2);
         await type('source 2'); expect(count()).toBe('1 / 1'); expect(state.currentPage).toBe(2); await enter(); expect(count()).toBe('1 / 1'); expect(marks(2)).toHaveLength(2);
-        // 收起面板后不再标出命中位置，工具按钮仍提示有搜索结果。
+        // 收起面板后高亮保持可见方便继续阅读，直到用户清空搜索词。
         document.dispatchEvent(Object.assign(new document.defaultView!.Event('keydown', {bubbles: true}), {key: 'Escape'})); await componentFlush();
-        expect(root.querySelector('.pdf-search-panel')).toBeNull(); expect(root.querySelector('.pdf-source-highlight')).toBeNull(); expect(classes(tool)).toContain('active');
+        expect(root.querySelector('.pdf-search-panel')).toBeNull(); expect(marks(2)).toHaveLength(2); expect(classes(tool)).toContain('active');
         click(tool); await componentFlush(); expect(root.querySelector('.pdf-search-count')!.textContent).toBe('1 / 1'); expect(marks(2)).toHaveLength(2);
+        const reopenedInput = root.querySelector('.pdf-search-panel input') as HTMLInputElement;
+        reopenedInput.value = ''; reopenedInput.dispatchEvent(new document.defaultView!.Event('input')); await componentFlush();
+        expect(root.querySelector('.pdf-source-highlight')).toBeNull();
+        } finally {vi.useRealTimers();}
     });
 
     it('keeps the selected search paragraph stable as live translations add and remove earlier matches', async () => {
+        vi.useFakeTimers();
+        try {
         const {root, state, currentTranslations} = mountReader(model(3), 'bilingual', ['', 'match second', 'match third']); await componentFlush();
         click(root.querySelector('.pdf-search .pdf-tool-button')); await componentFlush();
         const input = root.querySelector('.pdf-search-panel input') as HTMLInputElement;
-        input.value = 'match'; input.dispatchEvent(new document.defaultView!.Event('input')); await componentFlush();
+        input.value = 'match'; input.dispatchEvent(new document.defaultView!.Event('input')); await vi.advanceTimersByTimeAsync(150); await componentFlush();
         click(root.querySelector('.pdf-search-panel button:last-child')); await componentFlush();
         const count = () => root.querySelector('.pdf-search-count')!.textContent;
         expect(count()).toBe('2 / 2'); expect(state.currentPage).toBe(3);
@@ -1594,6 +1794,7 @@ describe('PDF reader actual Vue component reading interaction', () => {
         currentTranslations.value = ['', '', '']; await componentFlush(); expect(count()).toBe('0'); expect(state.searchHighlight).toBeUndefined();
         currentTranslations.value = ['', 'match restored', '']; await componentFlush();
         expect(count()).toBe('1 / 1'); expect(state.currentPage).toBe(2); expect(state.searchHighlight.pageNumber).toBe(2);
+        } finally {vi.useRealTimers();}
     });
 
     it('scales and restyles overlay translation text from the style panel without redrawing pages, and restores the stored choice on the next mount', async () => {
@@ -1733,7 +1934,9 @@ describe('PDF full passage access', () => {
         click(root.querySelector('.pdf-search > button')); await componentFlush();
         const search = root.querySelector<HTMLInputElement>('.pdf-search input')!;
         expect(search.getAttribute('dir')).toBe('auto'); search.value = 'מחקר';
-        search.dispatchEvent(new document.defaultView!.Event('input')); await componentFlush();
+        search.dispatchEvent(new document.defaultView!.Event('input'));
+        search.dispatchEvent(Object.assign(new document.defaultView!.Event('keydown'), {key: 'Enter', preventDefault: vi.fn()}));
+        await componentFlush();
         expect(root.querySelector('.pdf-search-count')!.textContent).toBe('1 / 1');
         click(root.querySelector('.pdf-full-passage-button')); await componentFlush();
         const original = root.querySelector('.pdf-full-passage-source p')!, target = root.querySelector('.pdf-full-passage-translation')!;
@@ -2069,5 +2272,339 @@ describe('PDF Hypothesis control lifecycle', () => {
         expect(view.root.querySelector('.pdf-hypothesis-feedback a')?.getAttribute('href')).toBe('https://via.hypothes.is/https://arxiv.org/pdf/1706.03762');
         expect(view.root.querySelector('.pdf-hypothesis-feedback a')?.getAttribute('rel')).toBe('noopener noreferrer');
         expect(toggle(view.root)?.hasAttribute('disabled')).toBe(false);
+    });
+});
+
+describe('PDF reader performance, blank-viewport fixes and UX upgrades', () => {
+    it('ignores zero-size ResizeObserver callbacks when hidden by v-show so switching tabs never resets page or viewport', async () => {
+        const {viewport, state} = mountReader(model(10));
+        await componentFlush(); flushFrames(); await componentFlush();
+        state.jumpTo(6); await componentFlush(); flushFrames(); await componentFlush();
+        expect(state.currentPage).toBe(6);
+        const beforeWidth = state.viewportWidth, beforeHeight = state.viewportHeight, beforeTop = viewport.scrollTop;
+        Object.assign(viewport, {clientWidth: 0, clientHeight: 0});
+        resizeCallback!([], {} as ResizeObserver); await componentFlush(); flushFrames(); await componentFlush();
+        expect(state.currentPage).toBe(6);
+        expect(state.viewportWidth).toBe(beforeWidth);
+        expect(state.viewportHeight).toBe(beforeHeight);
+        expect(viewport.scrollTop).toBe(beforeTop);
+        Object.assign(viewport, {clientWidth: beforeWidth, clientHeight: beforeHeight});
+        resizeCallback!([], {} as ResizeObserver); await componentFlush(); flushFrames(); await componentFlush();
+        expect(state.currentPage).toBe(6);
+    });
+
+    it('loads native PDF /Outlines bookmarks with translated heading matching and falls back cleanly when absent', async () => {
+        const doc = model(3);
+        doc.segments = [{id: 0, source: '1 Overview'}, {id: 1, source: '1.1 Details'}, {id: 2, source: '2 Conclusion'}];
+        if (doc.binary?.kind === 'pdf') {
+            doc.binary.pages[0].blocks[0].kind = 'heading';
+            doc.binary.pages[1].blocks[0].kind = 'heading';
+            doc.binary.pages[2].blocks[0].kind = 'heading';
+        }
+        ports.getDocument.mockReturnValueOnce({
+            promise: Promise.resolve({
+                getPage: vi.fn(async () => pdfPage),
+                getOutline: vi.fn(async () => [
+                    {title: '1 Overview', dest: 'named-overview', items: [{title: '1.1 Details', dest: [{ref: 'p2'}, {name: 'XYZ'}, 0, 700, null]}]},
+                    {title: '2 Conclusion', dest: [2]},
+                ]),
+                getDestination: vi.fn(async (name: string) => name === 'named-overview' ? [0] : null),
+                getPageIndex: vi.fn(async (ref: {ref?: string}) => ref?.ref === 'p2' ? 1 : 0),
+            }),
+            destroy,
+        });
+        const {root} = mountReader(doc, 'bilingual', ['1 概览', '1.1 细节', '2 结论']);
+        await componentFlush(); flushFrames(); await componentFlush();
+        click(root.querySelector('.pdf-outline-toggle')); await componentFlush(); flushFrames(); await componentFlush();
+        await vi.waitFor(() => expect(root.querySelectorAll('.pdf-outline-item')).toHaveLength(3));
+        const items = [...root.querySelectorAll<HTMLElement>('.pdf-outline-item')];
+        expect(items.map(item => item.querySelector('span')!.textContent)).toEqual(['1 概览', '1.1 细节', '2 结论']);
+        expect(items.map(item => item.style.getPropertyValue('paddingLeft'))).toEqual(['12px', '26px', '12px']);
+        expect(items.map(item => item.querySelector('small')!.textContent)).toEqual(['1', '2', '3']);
+    });
+
+    it('supports reflow jumpToPosition to exact paragraphs, reflow search highlight and optional 2-column split bilingual layout', async () => {
+        const doc = model(2);
+        doc.segments = [{id: 0, source: 'First reflow passage'}, {id: 1, source: 'Second reflow target'}];
+        const {root, viewport, state} = mountReader(doc, 'bilingual', ['第一段重排译文', '第二段重排目标'], {presentation: 'readable'});
+        await componentFlush(); flushFrames(); await componentFlush();
+        // 宽屏 >=1100px 切换为左右分栏重排并持久化偏好。
+        Object.assign(viewport, {clientWidth: 1200});
+        resizeCallback!([], {} as ResizeObserver); await componentFlush(); flushFrames(); await componentFlush();
+        click(root.querySelector('.pdf-style > button')); await componentFlush();
+        const layoutButtons = [...root.querySelectorAll('.pdf-reflow-layout-toggle button')];
+        expect(layoutButtons).toHaveLength(2);
+        click(layoutButtons[1]); await componentFlush();
+        expect(state.reflowBilingualLayout).toBe('split');
+        expect(state.reflowSplitActive).toBe(true);
+        expect(classes(root.querySelector('.pdf-reading-sheet'))).toContain('pdf-reflow-split');
+        expect(JSON.parse(storage.get('fluentread.pdfReader.readingStyle')!).bilingualLayout).toBe('split');
+
+        // 重排模式搜索命中段落高亮并精确定位到段落节点。
+        const paragraph = root.querySelector<HTMLElement>('.pdf-reading-paragraph[data-pdf-segment-index="1"]')!;
+        viewport.getBoundingClientRect = () => ({top: 0, bottom: 600, height: 600} as DOMRect);
+        paragraph.getBoundingClientRect = () => ({top: 420 - viewport.scrollTop, bottom: 460 - viewport.scrollTop, height: 40} as DOMRect);
+        state.searchQuery = '重排目标'; await componentFlush(); flushFrames(); await componentFlush();
+        expect(classes(paragraph)).toContain('pdf-reading-search-hit');
+        expect(viewport.scrollTop).toBeGreaterThan(0);
+    });
+
+    it('emits source-edit when clicking OCR review corner button, supports Cmd/Ctrl+F and ArrowLeft/Right, shows pre-translation hint, and handles empty pages & right-anchored annotations clamping', async () => {
+        const doc = model(3);
+        if (doc.binary?.kind !== 'pdf') throw new Error('PDF required');
+        doc.binary.pages[0].ocrReviewRegions = [{x: 55, y: 75, width: 40, height: 14}];
+        const {root, viewport, state, sourceEdits, currentTranslations, currentTranslating} = mountReader(doc, 'bilingual', ['', '', '']);
+        await componentFlush(); flushFrames(); await componentFlush();
+
+        // 译前双语提示浮标在无译文且未翻译时显示，有译文或开始翻译时隐藏。
+        expect(root.querySelector('.pdf-pre-translation-hint')?.textContent).toBe('document.pdfReading.waitingTranslation');
+        currentTranslating.value = true; await componentFlush();
+        expect(root.querySelector('.pdf-pre-translation-hint')).toBeNull();
+        currentTranslating.value = false; await componentFlush();
+        expect(root.querySelector('.pdf-pre-translation-hint')).toBeTruthy();
+        currentTranslations.value = ['已有译文', '', '']; await componentFlush();
+        expect(root.querySelector('.pdf-pre-translation-hint')).toBeNull();
+
+        // 点击 OCR 核对角标直接触发 source-edit 事件并传出对应段落索引。
+        const editBtn = root.querySelector('.pdf-ocr-review-edit') as HTMLButtonElement;
+        expect(editBtn).toBeTruthy();
+        click(editBtn); await componentFlush();
+        expect(sourceEdits).toEqual([0]);
+
+        // Cmd/Ctrl+F 打开搜索面板，ArrowRight/ArrowLeft 翻页（在输入框内按方向键不翻页）。
+        const ctrlF = Object.assign(new document.defaultView!.Event('keydown', {bubbles: true, cancelable: true}), {key: 'f', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false});
+        document.dispatchEvent(ctrlF); await componentFlush();
+        expect(ctrlF.defaultPrevented).toBe(true);
+        expect(state.openMenu).toBe('search');
+        // 关闭菜单后测试左右键翻页
+        state.openMenu = null; await componentFlush();
+        const right = Object.assign(new document.defaultView!.Event('keydown', {bubbles: true, cancelable: true}), {key: 'ArrowRight', ctrlKey: false, metaKey: false, altKey: false, shiftKey: false});
+        document.body.dispatchEvent(right); await componentFlush();
+        expect(state.currentPage).toBe(2);
+        const left = Object.assign(new document.defaultView!.Event('keydown', {bubbles: true, cancelable: true}), {key: 'ArrowLeft', ctrlKey: false, metaKey: false, altKey: false, shiftKey: false});
+        document.body.dispatchEvent(left); await componentFlush();
+        expect(state.currentPage).toBe(1);
+        // 在输入框中按 ArrowRight 不翻页
+        const pageInput = root.querySelector('.pdf-page-navigation input') as HTMLInputElement;
+        const inputRight = Object.assign(new document.defaultView!.Event('keydown', {bubbles: true, cancelable: true}), {key: 'ArrowRight', ctrlKey: false, metaKey: false, altKey: false, shiftKey: false});
+        pageInput.dispatchEvent(inputRight); await componentFlush();
+        expect(state.currentPage).toBe(1);
+
+        // 窄屏 390px 下右对齐批注面板通过 marginRight 收回视口内，不溢出左边界。
+        Object.assign(document.defaultView!, {innerWidth: 390, innerHeight: 700});
+        click(root.querySelector('.pdf-annotations > .pdf-menu-button')); await componentFlush();
+        const annPanel = root.querySelector('.pdf-annotations .pdf-menu-panel') as HTMLElement;
+        annPanel.parentElement!.getBoundingClientRect = () => ({top: 40} as DOMRect);
+        annPanel.getBoundingClientRect = () => ({left: -30, right: 290, top: 80, height: 220} as DOMRect);
+        win.dispatchEvent(new Event('resize'));
+        expect(annPanel.style.marginRight).toBe('-38px');
+
+        // 快速跨页滚动节流：连续跨越 >2 页时不立即渲染瞬时中间页，停下 80ms 后渲染目标页。
+        mountedApp.unmount(); mountedApp = undefined; await componentFlush();
+        vi.useFakeTimers();
+        try {
+            const rapid = mountReader(model(20));
+            await componentFlush(); flushFrames(); await componentFlush();
+            const rendersBefore = pdfPage.render.mock.calls.length;
+            // 第一次 scroll 记录时间戳，第二次 20ms 后跳过 10 页触发 80ms 节流门。
+            rapid.viewport.scrollTop = rapid.state.layouts[1].top;
+            rapid.viewport.dispatchEvent(new document.defaultView!.Event('scroll')); flushFrames();
+            await vi.advanceTimersByTimeAsync(20);
+            const rendersAfterStep1 = pdfPage.render.mock.calls.length;
+            rapid.viewport.scrollTop = rapid.state.layouts[12].top;
+            rapid.viewport.dispatchEvent(new document.defaultView!.Event('scroll')); flushFrames();
+            expect(rapid.state.currentPage).toBe(13);
+            expect(pdfPage.render).toHaveBeenCalledTimes(rendersAfterStep1);
+            await vi.advanceTimersByTimeAsync(80); await componentFlush();
+            expect(pdfPage.render.mock.calls.length).toBeGreaterThan(Math.max(rendersBefore, rendersAfterStep1));
+        } finally {vi.useRealTimers();}
+
+        // 空页面 PDF 展示空态占位而非白屏。
+        mountedApp?.unmount(); mountedApp = undefined; await componentFlush();
+        const emptyDoc = model(0);
+        const emptyView = mountReader(emptyDoc); await componentFlush();
+        expect(emptyView.root.querySelector('.pdf-empty-state')?.textContent).toBe('document.pdfReading.emptyPages');
+        expect(viewport).toBeTruthy();
+    });
+
+    it('blocks global shortcuts inside open dialogs, non-search editables, and ARIA arrow widgets, while preserving Cmd/Ctrl+F inside PDF search', async () => {
+        const {root, state} = mountReader(model(4), 'bilingual', ['一', '二', '三', '四']);
+        await componentFlush(); flushFrames(); await componentFlush();
+        const dispatchKey = (target: EventTarget, init: Record<string, unknown>, prePrevent = false) => {
+            const event = Object.assign(new document.defaultView!.Event('keydown', {bubbles: true, cancelable: true}), {
+                altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...init,
+            });
+            if (prePrevent) event.preventDefault();
+            target.dispatchEvent(event);
+            return event;
+        };
+
+        // defaultPrevented 事件不触发快捷键
+        expect(dispatchKey(document.body, {key: 'ArrowRight'}, true).defaultPrevented).toBe(true);
+        expect(state.currentPage).toBe(1);
+
+        // 原生 <dialog open> 打开时阻断 Cmd/Ctrl+F 与 ArrowRight
+        const modal = document.createElement('dialog');
+        modal.setAttribute('open', '');
+        document.body.append(modal);
+        try {
+            const findInModal = dispatchKey(document.body, {key: 'f', ctrlKey: true});
+            expect(findInModal.defaultPrevented).toBe(false);
+            expect(state.openMenu).toBeNull();
+            const arrowInModal = dispatchKey(document.body, {key: 'ArrowRight'});
+            expect(arrowInModal.defaultPrevented).toBe(false);
+            expect(state.currentPage).toBe(1);
+        } finally {
+            modal.remove();
+        }
+
+        // 在 PdfAnnotations 的 dialog 内按 Cmd/Ctrl+F 不劫持焦点
+        click(root.querySelector('.pdf-annotations > .pdf-menu-button')); await componentFlush();
+        const annDialog = root.querySelector('.pdf-annotations [role="dialog"]') as HTMLElement;
+        const annTextarea = document.createElement('textarea');
+        annDialog.append(annTextarea);
+        const findInAnn = dispatchKey(annTextarea, {key: 'f', ctrlKey: true});
+        expect(findInAnn.defaultPrevented).toBe(false);
+        expect(state.openMenu).toBe('annotations');
+        annTextarea.remove();
+
+        // 在 PDF 搜索面板内按 Cmd/Ctrl+F 允许重新聚焦搜索框
+        state.openMenu = 'search'; await componentFlush();
+        const searchInput = root.querySelector('.pdf-search-panel input') as HTMLInputElement;
+        const focusSpy = vi.spyOn(searchInput, 'focus');
+        const findInSearch = dispatchKey(searchInput, {key: 'f', metaKey: true});
+        expect(findInSearch.defaultPrevented).toBe(true);
+        await componentFlush();
+        expect(focusSpy).toHaveBeenCalled();
+
+        // 关闭菜单后，ARIA 方向键控件与 contenteditable 阻断左右翻页；contenteditable="false" 允许翻页
+        state.openMenu = null; await componentFlush();
+        for (const [role, ce] of [['tab', undefined], ['slider', undefined], ['listbox', undefined], ['radiogroup', undefined], [undefined, 'plaintext-only']] as const) {
+            const widget = document.createElement('div');
+            if (role) widget.setAttribute('role', role);
+            if (ce) widget.setAttribute('contenteditable', ce);
+            document.body.append(widget);
+            const ev = dispatchKey(widget, {key: 'ArrowRight'});
+            expect(ev.defaultPrevented).toBe(false);
+            expect(state.currentPage).toBe(1);
+            widget.remove();
+        }
+        const nonEditable = document.createElement('div');
+        nonEditable.setAttribute('contenteditable', 'false');
+        document.body.append(nonEditable);
+        const allowed = dispatchKey(nonEditable, {key: 'ArrowRight'});
+        expect(allowed.defaultPrevented).toBe(true);
+        await componentFlush();
+        expect(state.currentPage).toBe(2);
+        nonEditable.remove();
+    });
+
+    it('keeps current page and resident pages when selectionchange or updateViewport fires while hidden by v-show', async () => {
+        const {viewport, state} = mountReader(model(10));
+        await componentFlush(); flushFrames(); await componentFlush();
+        state.jumpTo(6); await componentFlush(); flushFrames(); await componentFlush();
+        expect(state.currentPage).toBe(6);
+        const residentBefore = [...state.residentIndexes];
+
+        // 切到编辑页签（display: none -> clientWidth/clientHeight=0，浏览器将 scrollTop 报告为 0）
+        Object.assign(viewport, {clientWidth: 0, clientHeight: 0});
+        viewport.scrollTop = 0;
+        resizeCallback!([], {} as ResizeObserver); await componentFlush();
+        frames.clear();
+
+        // 编辑页签内选区变化或直接调用 updateViewport 不得把页码重置为 1 或驱逐常驻页
+        selection = {rangeCount: 0, isCollapsed: true};
+        document.dispatchEvent(new document.defaultView!.Event('selectionchange'));
+        expect(frames.size).toBe(0);
+        state.updateViewport();
+        await componentFlush();
+        expect(state.currentPage).toBe(6);
+        expect(state.residentIndexes).toEqual(residentBefore);
+
+        // 恢复显示后清除隐藏标志，正常响应视口更新
+        Object.assign(viewport, {clientWidth: 920, clientHeight: 600});
+        viewport.scrollTop = state.layouts[5].top;
+        resizeCallback!([], {} as ResizeObserver); await componentFlush(); flushFrames(); await componentFlush();
+        expect(state.currentPage).toBe(6);
+    });
+
+    it('evicts out-of-window entries before adaptMode checks pixels, disposes scheduler-cloned canvases on mock ports, and retries refine after bilingual->source switch', async () => {
+        const pages = Array.from({length: 6}, (_, index) => pageModel(index + 1, 1000, 2000));
+        const makeCanvas = (width: number, height: number) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = width; canvas.height = height;
+            return canvas;
+        };
+        // 页 0、1 各占 2.56M，页 2、3、4 各占 11M -> 总占 38.12M（剩余仅 1.88M < 2.56M）
+        const mockOutputs = new Map<number, PdfReaderRenderedPage>();
+        const render = vi.fn(async (page: PdfDocumentPage, _s: PdfReaderSettings, _sig: AbortSignal, refresh?: {pixelBudget: number}) => {
+            if (refresh) {
+                if (_s.mode === 'bilingual') throw new Error('bilingual refine failed');
+                return {sourceCanvas: makeCanvas(2000, 3000), sourceText: {element: document.createElement('div'), dispose: vi.fn()}, dispose: vi.fn()};
+            }
+            const isSmall = page.pageNumber <= 2;
+            const out: PdfReaderRenderedPage = {
+                sourceCanvas: makeCanvas(isSmall ? 1600 : 4000, isSmall ? 1600 : 2750),
+                sourceText: {element: document.createElement('div'), dispose: vi.fn()},
+                // 故意不清理 translatedCanvas，验证调度器自行释放克隆画布
+                dispose: vi.fn(),
+            };
+            mockOutputs.set(page.pageNumber, out);
+            return out;
+        });
+        const states = new Map<number, PdfReaderPageState | undefined>();
+        const scheduler = new PdfReaderScheduler(pages, {render, dispose: vi.fn()}, (p, st) => states.set(p, st));
+        scheduler.update([0, 1, 2, 3, 4], () => settings('layout', 1, 'source'));
+        await settle(); await settle(); await settle();
+        expect(render).toHaveBeenCalledTimes(5);
+
+        // 同时把页 2、3、4 移出窗口并将页 0、1 从 source 切到 bilingual：
+        // 两阶段 update 先淘汰页 2、3、4 归还 33M 像素，使页 0、1 就地克隆而不重绘！
+        scheduler.update([0, 1], () => settings('layout', 1, 'bilingual'));
+        expect(render).toHaveBeenCalledTimes(5);
+        const page1State = states.get(1)!;
+        expect(page1State.status).toBe('ready');
+        const clonedCanvas = page1State.status === 'ready' ? page1State.output.translatedCanvas : undefined;
+        expect(clonedCanvas).toBeTruthy();
+        expect(clonedCanvas!.width).toBe(1600);
+
+        // 在 bilingual 下高倍率 refine 失败后，切回 source 清空 refreshError/failedScale 并允许单画布 refine 成功！
+        scheduler.update([0, 1], idx => ({...settings('layout', 2, 'bilingual'), refine: idx === 0}));
+        await settle();
+        expect(states.get(1)).toMatchObject({status: 'ready', refreshError: 'bilingual refine failed'});
+        const callsAfterFail = render.mock.calls.length;
+        scheduler.update([0, 1], idx => ({...settings('layout', 2, 'source'), refine: idx === 0}));
+        await settle();
+        expect(render.mock.calls.length).toBeGreaterThan(callsAfterFail);
+        const retried = states.get(1);
+        expect(retried).toMatchObject({status: 'ready'});
+        expect(retried?.status === 'ready' ? retried.refreshError : undefined).toBeUndefined();
+
+        // 再次 source -> bilingual 产生调度器克隆画布，然后 dispose：即使 mock output.dispose 不清理它，调度器也会显式归零释放。
+        scheduler.update([1], () => settings('layout', 1, 'bilingual'));
+        const page2State = states.get(2)!;
+        const page2Clone = page2State.status === 'ready' ? page2State.output.translatedCanvas : undefined;
+        expect(page2Clone?.width).toBe(1600);
+        scheduler.dispose();
+        expect(page2Clone).toMatchObject({width: 0, height: 0});
+    });
+
+    it('ignores non-integer PDF outline destinations cleanly', async () => {
+        ports.getDocument.mockReturnValueOnce({
+            promise: Promise.resolve({
+                getPage: vi.fn(async () => pdfPage),
+                getOutline: vi.fn(async () => [
+                    {title: 'Valid Chapter', dest: [0]},
+                    {title: 'Fractional Dest', dest: [1.5]},
+                    {title: 'NaN Dest', dest: [Number.NaN]},
+                ]),
+            }),
+            destroy,
+        });
+        const {root} = mountReader(model(2), 'source');
+        await componentFlush(); flushFrames(); await componentFlush();
+        click(root.querySelector('.pdf-outline-toggle')); await componentFlush();
+        await vi.waitFor(() => expect(root.querySelectorAll('.pdf-outline-item')).toHaveLength(1));
+        expect(root.querySelector('.pdf-outline-item span')?.textContent).toBe('Valid Chapter');
     });
 });

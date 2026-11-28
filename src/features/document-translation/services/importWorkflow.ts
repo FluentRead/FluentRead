@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/services/importWorkflow.ts
  * 文件职责：拥有文档文件、在线 PDF 与本地历史重新打开的导入生命周期。
- * 主要内容：在同一取消代次中校验格式和大小、读取格式、恢复 OCR 与人工校订历史以及当前任务的重译缓存策略；历史不可读取时标记任务以阻止旧记录被自动覆盖；取消后丢弃迟到读取，失败文件独立入队，不改写已有文档的译文或翻译错误。
+ * 主要内容：在同一取消代次中校验格式和大小、读取格式、恢复 OCR 与人工校订历史以及当前任务的重译缓存策略；历史重开采用字宽级 bytesEqual 校验原文件字节并直接复用当前版本快照，历史不可读取时标记任务以阻止旧记录被自动覆盖；取消后丢弃迟到读取，失败文件独立入队，不改写已有文档的译文或翻译错误。
  * 旧 Markdown 和 Word 快照从原文件恢复格式标记，按原文回填仍能匹配的校订；表格文件恢复上次选择的列。
  * 模块边界：不持有任务队列、当前选择、进度或历史提交副本；读取、任务提交和展示均经显式端口，历史保存仍由页面的 historyCommitter 负责。
  */
@@ -10,7 +10,7 @@ import {getDocumentFormat, getDocumentMaxBytes, normalizeDelimitedColumns, type 
 import {webArticleIdentityBytes} from '../core/webArticle';
 import type {parseDocumentFile} from './binary';
 import type {fetchOnlinePdf, PdfDownloadProgress} from './pdfSource';
-import {documentHistoryId, restoreDocumentHistoryPdfOcr, restoreDocumentHistoryRevisions, type DocumentHistory} from './history';
+import {bytesEqual, documentHistoryId, restoreDocumentHistoryPdfOcr, restoreDocumentHistoryRevisions, type DocumentHistory} from './history';
 import type {DocumentQueueItem} from '../ui/useDocumentTasks';
 
 export interface DocumentImportPorts {
@@ -141,7 +141,7 @@ export function createDocumentImportWorkflow(ports: DocumentImportPorts) {
             const pdf = snapshot?.binary?.kind === 'pdf' ? snapshot.binary : undefined;
             // 解析版本相同仍不足以复用 PDF：快照必须属于当前记录的原始文件，否则从记录字节重新读取。
             const invalidPdf = (record.format === 'pdf' || snapshot?.format === 'pdf' || pdf !== undefined) && (!pdf || !(pdf.bytes instanceof Uint8Array)
-                || pdf.bytes.length !== record.bytes.length || pdf.bytes !== record.bytes && pdf.bytes.some((byte, index) => byte !== record.bytes[index])
+                || !bytesEqual(pdf.bytes, record.bytes)
                 // 旧版把 OCR 空结果标成 scanned:false；重新检查原图，恢复这类历史记录的重试入口。
                 || !Array.isArray(pdf.pages) || pdf.pages.some(page => !page || !Array.isArray(page.blocks) || page.scanned === false && page.blocks.length === 0));
             const outdatedMarkdown = snapshot?.format === 'markdown' && !Array.isArray(snapshot.markdownTables);

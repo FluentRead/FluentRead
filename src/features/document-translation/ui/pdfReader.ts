@@ -2,7 +2,7 @@
  * @file src/features/document-translation/ui/pdfReader.ts
  * 重排边界：原文、双语与译文统一使用计划中的原图区域；裁剪后释放整页栅格且不创建隐藏文字层，正文由响应式 HTML 提供。
  * 文件职责：为 PDF 阅读器提供有界页面调度和浏览器原页渲染，使用锁定版本的 PDF.js TextLayer 让文字选择与原版面一致。
- * 主要内容：按可见页优先维护五页窗口与两项并发，同源 OCR 检查点更新模型并复用底图；原版阅读缩放复用已就绪的页面，可见页需要更高分辨率时在总像素预算内准备新画布并替换，原文文字层持续挂载；重排裁剪使用界面当前的原图区域，普通译文更新复用像素；译文页复制原页像素，译文文字由阅读器叠加；共享 PDF 加载租约，离屏和卸载释放资源，失败可重试。
+ * 主要内容：按可见页优先维护五页窗口与两项并发，同源 OCR 检查点更新模型并复用底图；原版阅读的页面键与模式和缩放解耦，切换原文、双语与译文时复用已就绪的原页画布和文字层并按需复制或释放译文画布，可见页需要更高分辨率时在总像素预算内准备新画布并替换，像素预算紧张时优先保障未渲染页并回收低优先级预取或补绘；重排模式用结构指纹替代整页 JSON 序列化，原图区域变更才重裁剪；共享 PDF 加载租约，离屏和卸载释放资源，失败可重试。
  * 模块边界：调度器只调用注入的渲染端口；浏览器渲染端口依赖 PDF.js 和文档预览资源，不发起翻译请求、不修改原始文件或负责入口挂载。
  */
 import type {PDFPageProxy, TextLayer} from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -81,14 +81,45 @@ export function pdfReaderCanvasSize(width: number, height: number, _devicePixelR
     return {width: Math.max(1, Math.floor(safeWidth * outputScale)), height: Math.max(1, Math.floor(safeHeight * outputScale)), outputScale};
 }
 
-/** 原图区域身份和坐标变更才重裁剪；键不含译文、角色或片段关联，区域插入顺序变化也不重绘原像素。 */
+const blockKeyCache = new WeakMap<readonly unknown[], {length: number; value: string}>();
+const preservedKeyCache = new WeakMap<readonly unknown[], {length: number; value: string}>();
+
+function blocksFingerprint(blocks: readonly PdfDocumentPage['blocks'][number][]): string {
+    const cached = blockKeyCache.get(blocks);
+    if (cached && cached.length === blocks.length) return cached.value;
+    let value = String(blocks.length);
+    for (const block of blocks) {
+        value += `|${block.segmentIndex},${block.x},${block.y},${block.width},${block.height},${block.kind ?? ''},${block.preserveSource ? 1 : 0}`;
+    }
+    blockKeyCache.set(blocks, {length: blocks.length, value});
+    return value;
+}
+
+function preservedFingerprint(regions: PdfDocumentPage['preservedRegions']): string {
+    if (!regions?.length) return '';
+    const cached = preservedKeyCache.get(regions);
+    if (cached && cached.length === regions.length) return cached.value;
+    let value = String(regions.length);
+    for (const region of regions) {
+        value += `|${region.id},${region.kind},${region.x},${region.y},${region.width},${region.height}`;
+    }
+    preservedKeyCache.set(regions, {length: regions.length, value});
+    return value;
+}
+
+/** 原图区域身份和坐标变更才重裁剪；键不含译文、角色或片段关联，原版模式与展示模式解耦以复用已就绪的原页画布与文字层。 */
 export function pdfReaderPageKey(page: PdfDocumentPage, scale: number, mode: PdfReaderMode, presentation?: PdfReadingPresentation, regionEntries?: readonly PdfReadingRegionEntry[]): string {
     if (presentation === 'readable') {
-        const regions = regionEntries?.map(entry => ({id: entry.id, rect: [entry.sourceRect.x, entry.sourceRect.y, entry.sourceRect.width, entry.sourceRect.height]}))
-            .sort((left, right) => left.id.localeCompare(right.id));
-        return JSON.stringify([scale, mode, presentation, page.blocks, (page as PdfDocumentPage & {preservedRegions?: unknown}).preservedRegions, ...(regions === undefined ? [] : [regions])]);
+        let regionsKey = '';
+        if (regionEntries !== undefined) {
+            regionsKey = `\x1e${regionEntries
+                .map(entry => `${entry.id}:${entry.sourceRect.x},${entry.sourceRect.y},${entry.sourceRect.width},${entry.sourceRect.height}`)
+                .sort()
+                .join('|')}`;
+        }
+        return `readable:${scale}:${mode}:${blocksFingerprint(page.blocks)}:${preservedFingerprint(page.preservedRegions)}${regionsKey}`;
     }
-    return JSON.stringify([mode]);
+    return 'layout';
 }
 
 /** 原坐标裁剪映射到实际展示旋转，不改变原画布或源文件。 */
@@ -158,7 +189,7 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
                 released = true;
                 renderTask?.cancel();
                 result.sourceText?.dispose();
-                for (const entry of [canvas, translatedCanvas, ...regions.values()]) {
+                for (const entry of new Set([canvas, translatedCanvas, result.sourceCanvas, result.translatedCanvas, ...regions.values()])) {
                     if (!entry) continue;
                     entry.width = entry.height = 0;
                     entry.remove();
@@ -276,8 +307,30 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
     };
 }
 
+function releaseCanvas(canvas?: HTMLCanvasElement): void {
+    if (!canvas) return;
+    canvas.width = canvas.height = 0;
+    canvas.remove();
+}
+
+function cloneSourceToTranslated(sourceCanvas: HTMLCanvasElement): HTMLCanvasElement | undefined {
+    const copy = globalThis.document.createElement('canvas');
+    copy.width = sourceCanvas.width;
+    copy.height = sourceCanvas.height;
+    copy.style.width = sourceCanvas.style.width;
+    copy.style.height = sourceCanvas.style.height;
+    copy.setAttribute('aria-hidden', 'true');
+    copy.setAttribute('data-pdf-resource', 'translation');
+    const context = copy.getContext('2d', {alpha: false, willReadFrequently: true});
+    if (!context) {copy.width = copy.height = 0; return undefined;}
+    context.drawImage(sourceCanvas, 0, 0);
+    return copy;
+}
+
 interface ReaderEntry {
     key: string;
+    mode: PdfReaderMode;
+    clonedTranslatedCanvas?: HTMLCanvasElement;
     failedScale?: number;
     controller?: AbortController;
     state: PdfReaderPageState;
@@ -306,8 +359,14 @@ export class PdfReaderScheduler {
         }
         this.pages = pages;
         this.wanted = new Map([...new Set(priorityIndexes)].filter(index => this.pages[index]).slice(0, PDF_READER_MAX_RESIDENT_PAGES).map(index => [index, settings(index)]));
+        // 第一遍先淘汰离窗或键已失效的条目以释放像素预算，再对留存页执行模式适配。
         for (const [index, entry] of this.entries) {
-            if (this.wanted.get(index)?.key !== entry.key) this.evict(index, entry);
+            const wanted = this.wanted.get(index);
+            if (!wanted || wanted.key !== entry.key) this.evict(index, entry);
+        }
+        for (const [index, entry] of this.entries) {
+            const wanted = this.wanted.get(index)!;
+            if (entry.mode !== wanted.mode) this.adaptMode(index, entry, wanted);
         }
         this.pump();
     }
@@ -334,8 +393,44 @@ export class PdfReaderScheduler {
     private evict(index: number, entry: ReaderEntry): void {
         this.entries.delete(index);
         entry.controller?.abort();
+        releaseCanvas(entry.clonedTranslatedCanvas);
+        entry.clonedTranslatedCanvas = undefined;
         if (entry.state.status === 'ready') entry.state.output.dispose();
         this.onChange(this.pages[index].pageNumber);
+    }
+
+    /** 切换原文、双语与译文时优先复用已就绪的原页画布和文字层，仅按需复制或释放译文画布。 */
+    private adaptMode(index: number, entry: ReaderEntry, settings: PdfReaderSettings): void {
+        if (entry.state.status !== 'ready') {this.evict(index, entry); return;}
+        if (entry.controller) {entry.controller.abort(); entry.controller = undefined;}
+        const output = entry.state.output;
+        if (settings.mode === 'source') {
+            if (!output.sourceCanvas || !output.sourceText) {this.evict(index, entry); return;}
+            releaseCanvas(output.translatedCanvas);
+            output.translatedCanvas = undefined;
+            entry.clonedTranslatedCanvas = undefined;
+            entry.mode = 'source';
+            // 从双画布降回单画布后清空之前的缩放失败状态，允许在更宽裕预算下重试清晰度补绘。
+            entry.failedScale = undefined;
+            entry.state = {status: 'ready', output};
+            this.onChange(this.pages[index].pageNumber, entry.state);
+            return;
+        }
+        if (settings.mode === 'bilingual' && (!output.sourceCanvas || !output.sourceText)) {this.evict(index, entry); return;}
+        if (!output.translatedCanvas) {
+            const source = output.sourceCanvas;
+            const pixels = source ? source.width * source.height : 0;
+            if (!source || pixels <= 0 || pixels * 2 > PDF_READER_MAX_PAGE_PIXELS || this.availablePixels() < pixels) {
+                this.evict(index, entry);
+                return;
+            }
+            const copied = cloneSourceToTranslated(source);
+            if (!copied) {this.evict(index, entry); return;}
+            output.translatedCanvas = copied;
+            entry.clonedTranslatedCanvas = copied;
+        }
+        entry.mode = settings.mode;
+        this.onChange(this.pages[index].pageNumber, entry.state);
     }
 
     private availablePixels(): number {
@@ -351,38 +446,76 @@ export class PdfReaderScheduler {
         return Math.min(PDF_READER_MAX_PAGE_PIXELS, available);
     }
 
+    private minPixelsFor(settings: PdfReaderSettings): number {
+        return settings.presentation === 'readable' ? (settings.regionEntries?.length ?? 0) + 1 : settings.mode === 'bilingual' ? 2 : 1;
+    }
+
+    private reclaimForUnrendered(neededIndex: number, minBudget: number, evicted: Set<number>): number {
+        let budget = this.availablePixels();
+        if (budget >= PDF_READER_MAX_PAGE_PIXELS) return budget;
+        // 像素不足时先中止低优先级的在途清晰度补绘。
+        for (const entry of this.entries.values()) {
+            if (entry.state.status === 'ready' && entry.controller) {
+                entry.controller.abort();
+                entry.controller = undefined;
+            }
+        }
+        if (budget >= minBudget) return budget;
+        // 若仍为零预算，淘汰优先级更低的非可见预取页，避免新进入视口的页面长期空白。
+        const priority = [...this.wanted.keys()];
+        const neededRank = priority.indexOf(neededIndex);
+        for (let i = priority.length - 1; i > neededRank && budget < minBudget; i -= 1) {
+            const candidateIndex = priority[i];
+            const candidate = this.entries.get(candidateIndex);
+            if (candidate && !this.wanted.get(candidateIndex)?.refine) {
+                evicted.add(candidateIndex);
+                this.evict(candidateIndex, candidate);
+                budget = this.availablePixels();
+            }
+        }
+        return budget;
+    }
+
     private pump(): void {
         if (this.disposed) return;
+        const evicted = new Set<number>();
+        // 优先启动尚未渲染的页面，避免清晰度补绘抢占并发槽位或像素预算导致空白页。
+        for (const [index, settings] of this.wanted) {
+            if (this.running >= PDF_READER_RENDER_CONCURRENCY) return;
+            if (this.entries.has(index) || evicted.has(index)) continue;
+            const minBudget = this.minPixelsFor(settings);
+            const budget = this.reclaimForUnrendered(index, minBudget, evicted);
+            if (budget < minBudget) continue;
+            this.start(index, settings, budget);
+        }
         for (const [index, settings] of this.wanted) {
             if (this.running >= PDF_READER_RENDER_CONCURRENCY) break;
             const entry = this.entries.get(index);
-            if (entry && (entry.controller || entry.state.status !== 'ready' || !settings.refine || entry.failedScale === settings.scale)) continue;
+            if (!entry || entry.controller || entry.state.status !== 'ready' || !settings.refine || entry.failedScale === settings.scale) continue;
             const page = this.pages[index];
             const budget = this.availablePixels();
-            if (entry?.state.status === 'ready') {
-                const previous = entry.state.output;
-                const canvas = previous.sourceCanvas ?? previous.translatedCanvas;
-                const canvasCount = settings.mode === 'bilingual' ? 2 : 1;
-                if (!canvas || budget < canvasCount) continue;
-                const size = pdfReaderCanvasSize(page.width * settings.scale, page.height * settings.scale, 1, canvasCount, budget);
-                if (size.width * size.height < canvas.width * canvas.height * MIN_RASTER_INCREASE ** 2) continue;
-                this.start(index, settings, budget, entry, previous);
-            } else if (budget >= PDF_READER_MAX_PAGE_PIXELS) {
-                this.start(index, settings, PDF_READER_MAX_PAGE_PIXELS);
-            }
+            const previous = entry.state.output;
+            const canvas = previous.sourceCanvas ?? previous.translatedCanvas;
+            const canvasCount = settings.mode === 'bilingual' ? 2 : 1;
+            if (!canvas || budget < canvasCount) continue;
+            const size = pdfReaderCanvasSize(page.width * settings.scale, page.height * settings.scale, 1, canvasCount, budget);
+            if (size.width * size.height < canvas.width * canvas.height * MIN_RASTER_INCREASE ** 2) continue;
+            this.start(index, settings, budget, entry, previous);
         }
     }
 
     private start(index: number, settings: PdfReaderSettings, budget: number, existing?: ReaderEntry, previous?: PdfReaderRenderedPage): void {
         const page = this.pages[index];
-        const entry: ReaderEntry = existing ?? {key: settings.key, state: {status: 'loading'}};
+        const entry: ReaderEntry = existing ?? {key: settings.key, mode: settings.mode, state: {status: 'loading'}};
         const controller = new AbortController();
         entry.controller = controller;
         this.entries.set(index, entry);
         this.running += 1;
         this.reservedPixels += budget;
         if (!previous) this.onChange(page.pageNumber, entry.state);
-        const rasterRefresh = previous ? {pixelBudget: budget, keepSourceText: Boolean(previous.sourceText)} : undefined;
+        const rasterRefresh = previous || budget < PDF_READER_MAX_PAGE_PIXELS
+            ? {pixelBudget: budget, keepSourceText: Boolean(previous?.sourceText)}
+            : undefined;
         const current = () => !this.disposed && !controller.signal.aborted && this.entries.get(index) === entry;
         void this.port.render(page, settings, controller.signal, rasterRefresh).then(output => {
             if (!current()) {output.dispose(); return;}
@@ -390,6 +523,8 @@ export class PdfReaderScheduler {
                 output.sourceText = previous.sourceText;
                 previous.sourceText = undefined;
             }
+            releaseCanvas(entry.clonedTranslatedCanvas);
+            entry.clonedTranslatedCanvas = undefined;
             previous?.dispose();
             entry.state = {status: 'ready', output};
             entry.controller = undefined;

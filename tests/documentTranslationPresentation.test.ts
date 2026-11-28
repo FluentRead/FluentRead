@@ -13,6 +13,7 @@ import {
     getDocumentGeneratedPositionLabels,
     isRichDocumentFormat,
     isSubtitleDocumentFormat,
+    parseSubtitleRichText,
 } from '@/src/features/document-translation/ui/presentation';
 
 function parsed(format: DocumentFormat, binary?: BinaryDocumentData): ParsedDocument {
@@ -118,6 +119,51 @@ describe('document translation presentation', () => {
         expect(formatDocumentReaderText('vtt', '今天我们搭一个 &lt;i&gt; 小 &lt;/i&gt; 气象站，温度 &lt; 5 度')).toBe('今天我们搭一个  小  气象站，温度 &lt; 5 度');
         expect(formatDocumentReaderText('epub', ' Read <a href="#n">the note</a> ')).toBe('Read the note');
         expect(formatDocumentReaderText('markdown', '阅读<g1>指南</g1>并运行<g2/>')).toBe('阅读指南并运行');
+        expect(formatDocumentReaderText('docx', 'Read <g1>guide</g1>.', true)).toBe('Read guide.');
         expect([hasDocumentPlaceholder('阅读<g1>指南</g1>'), hasDocumentPlaceholder('运行<g2/>'), hasDocumentPlaceholder('a < g1 > b'), hasDocumentPlaceholder(''), hasDocumentPlaceholder(undefined)]).toEqual([true, true, false, false, false]);
+    });
+
+    it('安全解析字幕的说话人标签与粗斜下划线样式片段', () => {
+        expect(parseSubtitleRichText('vtt', 'Plain line without speaker')).toEqual({
+            runs: [{text: 'Plain line without speaker'}],
+        });
+        expect(parseSubtitleRichText('vtt', '  <v.loud Alice>Hello <b>bold</b> <i>italic</i> <u>under</u></v>  ')).toEqual({
+            speaker: 'Alice',
+            runs: [
+                {text: 'Hello '},
+                {text: 'bold', bold: true},
+                {text: ' '},
+                {text: 'italic', italic: true},
+                {text: ' '},
+                {text: 'under', underline: true},
+            ],
+        });
+        expect(parseSubtitleRichText('vtt', '<v   ><i>Solo</i></v>')).toEqual({
+            runs: [{text: 'Solo', italic: true}],
+        });
+        expect(parseSubtitleRichText('srt', '&lt;i&gt;Hi&lt;/i&gt; <script>alert(1)</script> &lt;font color="red"&gt;safe&lt;/font&gt;')).toEqual({
+            runs: [
+                {text: 'Hi', italic: true},
+                {text: ' alert(1) safe'},
+            ],
+        });
+        expect(parseSubtitleRichText('ass', '{\\b1\\i1}Act\\hOne\\N{\\u1}Sub{\\b0\\i0\\u0} end{\\r} done')).toEqual({
+            runs: [
+                {text: 'Act One\n', bold: true, italic: true},
+                {text: 'Sub', bold: true, italic: true, underline: true},
+                {text: ' end done'},
+            ],
+        });
+        expect(parseSubtitleRichText('ass', '{\\i1\\r}Plain')).toEqual({
+            runs: [{text: 'Plain'}],
+        });
+        // ASS 滤镜/边框/裁切标签不得误判为 \b / \i / \u
+        expect(parseSubtitleRichText('ass', '{\\blur3\\bord2\\be1\\iclip(0,0,10,10)}Clean{\\b1}Bold')).toEqual({
+            runs: [{text: 'Clean'}, {text: 'Bold', bold: true}],
+        });
+        expect(parseSubtitleRichText('srt', '  <b> </b>  ')).toEqual({runs: []});
+        expect(parseSubtitleRichText('srt', '<b>A</b><b>B</b>')).toEqual({
+            runs: [{text: 'AB', bold: true}],
+        });
     });
 });

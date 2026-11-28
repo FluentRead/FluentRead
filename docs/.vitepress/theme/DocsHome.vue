@@ -31,7 +31,7 @@ const onboardingSteps = computed(() => [
   {
     num: '2',
     title: t('翻译第一篇网页', 'Translate your first page'),
-    desc: t('默认免费翻译池开箱即用，支持双语与局部翻译', 'Ready out of the box with free pool & section mode'),
+    desc: t('默认免费翻译池开箱即用，支持双语对照与局部翻译', 'Bilingual reading out of the box with free pool & section mode'),
     path: '/guide/webpage-translation',
   },
   {

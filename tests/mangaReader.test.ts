@@ -283,7 +283,7 @@ describe('漫画会话所有权与可见页调度', () => {
     });
 });
 
-function readerFixture(withIntersection = true, initialUrl = 'https://mangaplus.shueisha.co.jp/viewer/1024050', siteRules?: () => import('@/src/core/config/manga').MangaSiteRule[], prefetchPages?: () => number, warm?: (images:HTMLImageElement[])=>void, canvas?: Parameters<typeof createMangaReader>[0]['canvas'], cachePorts?: Pick<Parameters<typeof createMangaReader>[0], 'resetCache' | 'cachePages' | 'reuse' | 'background' | 'segments' | 'reading'>) {
+function readerFixture(withIntersection = true, initialUrl = 'https://mangaplus.shueisha.co.jp/viewer/1024050', siteRules?: () => import('@/src/core/config/manga').MangaSiteRule[], prefetchPages?: () => number, warm?: (images:HTMLImageElement[])=>void, canvas?: Parameters<typeof createMangaReader>[0]['canvas'], cachePorts?: Pick<Parameters<typeof createMangaReader>[0], 'resetCache' | 'cachePages' | 'reuse' | 'hasWarmable' | 'background' | 'segments' | 'reading'>) {
     const {document, window: dom} = parseHTML('<html><body><div class="zao-image-container"><img class="zao-image" src="blob:page-1"></div><img id="logo" src="https://site/logo.png"></body></html>');
     const image = document.querySelector('img')! as HTMLImageElement;
     Object.defineProperties(image, {complete: {writable: true, value: true}, naturalWidth: {writable: true, value: 800}, naturalHeight: {value: 1200}, currentSrc: {get: () => image.src}});
@@ -1603,6 +1603,142 @@ describe('漫画站点适配与 DOM 生命周期', () => {
         f.reader.schedule();
         f.run();
         expect(querySpy).toHaveBeenCalled();
+        f.reader.dispose();
+    });
+
+    it('session.retryFailed 与 reader.retryFailed 批量重试全部失败页并清理画布与旧阅读观察', async () => {
+        const one = {} as HTMLImageElement, two = {} as HTMLImageElement, three = {} as HTMLImageElement;
+        const ports = {
+            translate: vi.fn()
+                .mockRejectedValueOnce(new Error('fail-1'))
+                .mockRejectedValueOnce(new Error('fail-2'))
+                .mockResolvedValue(undefined),
+            restore: vi.fn(),
+            release: vi.fn(),
+            failed: vi.fn().mockReturnValue(false),
+            changed: vi.fn(),
+        };
+        const session = createMangaSession(ports);
+        const snapshot: MangaSnapshot = {
+            route: 'retry-all',
+            available: true,
+            pages: [
+                {image: one, identity: '1', visible: true, ordinal: 1},
+                {image: two, identity: '2', visible: true, ordinal: 2},
+                {image: three, identity: '3', visible: false, retain: true, ordinal: 3},
+            ],
+        };
+        // Inactive session returns 0
+        session.refresh(snapshot);
+        expect(session.retryFailed()).toBe(0);
+
+        session.toggle();
+        session.refresh(snapshot);
+        await flush();
+        expect(session.status()).toMatchObject({errors: 2, completed: 0, pending: false});
+
+        // Suspended returns 0
+        session.refresh({...snapshot, suspended: true});
+        expect(session.retryFailed()).toBe(0);
+
+        // Resume & defer scheduling: retryFailed unblocks scheduling and retries both failed pages
+        session.refresh({...snapshot, suspended: false, deferNewWork: true});
+        const retriedSurfaces: HTMLImageElement[] = [];
+        expect(session.retryFailed(img => retriedSurfaces.push(img))).toBe(2);
+        expect(retriedSurfaces).toEqual([one, two]);
+        await flush();
+        expect(session.status()).toMatchObject({errors: 0, completed: 2, pending: false});
+        // No failed pages left -> returns 0
+        expect(session.retryFailed()).toBe(0);
+        session.dispose();
+        expect(session.retryFailed()).toBe(0);
+
+        // Reader-level retryFailed invalidates failed canvas and opened reading observation (even if invalid() throws)
+        const {document, window} = parseHTML('<html><body><div class="images-container"><div class="view-container"><div class="image-container"><canvas></canvas></div></div></div></body></html>');
+        const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+        Object.defineProperties(canvas, {width: {value: 400}, height: {value: 600}});
+        canvas.getBoundingClientRect = () => ({left: 0, top: 0, right: 400, bottom: 600, width: 400, height: 600} as DOMRect);
+        vi.stubGlobal('document', document);
+        vi.stubGlobal('window', Object.assign(window, {
+            innerWidth: 1000, innerHeight: 800,
+            location: {href: 'https://manga.bilibili.com/mc30124/595886'},
+            requestAnimationFrame: vi.fn(() => 1), cancelAnimationFrame: vi.fn(),
+        }));
+        vi.stubGlobal('getComputedStyle', () => ({display: 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible'}));
+        vi.stubGlobal('IntersectionObserver', undefined);
+        vi.stubGlobal('MutationObserver', class { observe() {} disconnect() {} });
+        const invalidate = vi.fn();
+        const versionObj = {};
+        const canvasTranslate = vi.fn().mockRejectedValueOnce(new Error('canvas fail')).mockResolvedValue(undefined);
+        const reader = createMangaReader({
+            enabled: () => true,
+            identity: () => 'img',
+            translate: vi.fn().mockResolvedValue(undefined),
+            restore: vi.fn(),
+            release: vi.fn(),
+            failed: () => false,
+            changed: vi.fn(),
+            reading: {
+                live: () => true,
+                load: async () => ({status: 'ready', lines: []}),
+                version: () => versionObj,
+            },
+            canvas: {
+                identity: () => 'canvas-1',
+                translate: canvasTranslate,
+                reuse: () => false,
+                restore: vi.fn(),
+                release: vi.fn(),
+                failed: () => false,
+                update: vi.fn(),
+                invalidate,
+            },
+        });
+        reader.toggle();
+        await flush();
+        expect(reader.status().errors).toBe(1);
+        const list = reader.readingCandidates();
+        expect(list.status).toBe('ready');
+        const onInvalid = vi.fn(() => { throw new Error('observer err'); });
+        reader.observeReadingCandidate(list.status === 'ready' ? list.items[0].token : {}, onInvalid);
+        expect(reader.retryFailed()).toBe(1);
+        expect(invalidate).toHaveBeenCalledWith(canvas);
+        expect(onInvalid).toHaveBeenCalledOnce();
+        await flush();
+        expect(reader.status().errors).toBe(0);
+        reader.dispose();
+
+        // Image-based reader retryFailed (non-canvas surface, no opened reading)
+        const imgFixture = readerFixture();
+        imgFixture.ports.translate.mockRejectedValueOnce(new Error('img fail')).mockResolvedValue(undefined);
+        imgFixture.reader.toggle();
+        await flush();
+        expect(imgFixture.reader.status().errors).toBe(1);
+        expect(imgFixture.reader.retryFailed()).toBe(1);
+        await flush();
+        expect(imgFixture.reader.status().errors).toBe(0);
+        imgFixture.reader.dispose();
+    });
+
+    it('hasWarmable 返回 false 时跳过刷新后的全章几何重测，返回 true 时正常执行预热', () => {
+        let warmable = false;
+        const warm = vi.fn();
+        const f = readerFixture(true, 'https://mangaplus.shueisha.co.jp/viewer/1024050', undefined, undefined, warm, undefined, {hasWarmable: () => warmable});
+        const rectSpy = vi.spyOn(f.image, 'getBoundingClientRect');
+        rectSpy.mockClear();
+        warm.mockClear();
+        f.reader.scheduleLayout();
+        f.run();
+        // Measured once in frameRects during candidate construction, NOT measured a second time in warm loop
+        expect(rectSpy).toHaveBeenCalledTimes(1);
+        expect(warm).not.toHaveBeenCalled();
+
+        warmable = true;
+        rectSpy.mockClear();
+        f.reader.scheduleLayout();
+        f.run();
+        expect(rectSpy).toHaveBeenCalledTimes(2);
+        expect(warm).toHaveBeenCalledOnce();
         f.reader.dispose();
     });
 });

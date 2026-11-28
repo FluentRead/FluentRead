@@ -1,7 +1,7 @@
 <!--
  * @file src/features/image-translation/ui/MangaReadingPanel.vue
  * 文件职责：提供用户主动打开的漫画可见目标选择和文字阅读面板。
- * 主要内容：单候选打开时直接进入阅读视图并保留返回列表入口；复用 FluentRead 品牌色与控件语义显示完整文字、条目数量徽标、面板内即时搜索、上下页候选切换与键盘左右键导航、保留会话内原文对照开关、单条悬停复制与 2.5 秒状态复位，以及待处理/失效/错误时的就地刷新；可在既有快照中筛选未绘制译文，有界分页与当前部分复制跟随筛选，全文复制保留原顺序，关闭时清理计时器并撤销读取。
+ * 主要内容：单候选打开时直接进入阅读视图并保留返回列表入口；复用 FluentRead 品牌色与控件语义显示完整文字、条目数量徽标、面板内即时搜索、上下页候选切换与键盘左右键导航、保留会话内原文对照开关、单条悬停复制与 2.5 秒状态复位，以及待处理/失效/错误时的就地刷新与待处理页译完后无抢焦自动刷新；可在既有快照中筛选未绘制译文，有界分页与当前部分复制跟随筛选，全文复制保留原顺序，关闭时清理计时器并撤销读取。
  * 模块边界：由漫画入口管理挂载与生命周期，仅使用注入的只读候选、读取、复制及本地化端口，不扫描页面、不执行 OCR、不访问网络或保存结果。
  -->
 <template>
@@ -98,11 +98,14 @@ const feedback = ref(''), feedbackState = ref<'copied' | 'error' | undefined>(un
 type Status = MangaReadingResult['status'] | 'loading' | 'noCandidates' | '';
 const status = ref<Status>('');
 let controller: AbortController | null = null, revision = 0, copyRevision = 0, lineCopyRevision = 0, focusRevision = 0, trigger: HTMLElement | null = null, disposed = false, stopObservation: (() => void) | undefined;
-let feedbackTimer: ReturnType<typeof setTimeout> | null = null, lineCopyTimer: ReturnType<typeof setTimeout> | null = null;
+let feedbackTimer: ReturnType<typeof setTimeout> | null = null, lineCopyTimer: ReturnType<typeof setTimeout> | null = null, pendingRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 const MAX_PAGE_CHARS = 16000, MAX_PAGE_LINES = 32, MAX_LINES = 512, MAX_TOTAL_CHARS = 524288, COPY_RESET_MS = 2500;
 function clearCopyTimers() {
   if (feedbackTimer !== null) {clearTimeout(feedbackTimer);feedbackTimer = null;}
   if (lineCopyTimer !== null) {clearTimeout(lineCopyTimer);lineCopyTimer = null;}
+}
+function clearPendingRefresh() {
+  if (pendingRefreshTimer !== null) {clearTimeout(pendingRefreshTimer);pendingRefreshTimer = null;}
 }
 function clearCopyState() {
   clearCopyTimers();
@@ -150,7 +153,7 @@ function message(value: Status): string {
   const messages: Record<Status, string> = {'':'',ready:'',loading:'正在读取已有文字',pending:'当前页面正在处理',empty:'未检测到文字',error:'无法读取当前结果',unavailable:'当前结果不可用',stale:'页面已变化，请重新选择',cancelled:'读取已取消',overBudget:'内容过大，暂时无法完整显示',noCandidates:'当前没有可查看的页面'};
   return t(messages[value]);
 }
-function cancel() {revision++;focusRevision++;controller?.abort();controller = null;stopObservation?.();stopObservation = undefined;skippedOnly.value = false;searchQuery.value = '';pageIndex.value = 0;clearCopyState();}
+function cancel() {clearPendingRefresh();revision++;focusRevision++;controller?.abort();controller = null;stopObservation?.();stopObservation = undefined;skippedOnly.value = false;searchQuery.value = '';pageIndex.value = 0;clearCopyState();}
 function refresh() {
   if (!opened.value || disposed) return;
   cancel();selected.value = null;lines.value = [];pageIndex.value = 0;
@@ -255,6 +258,27 @@ function retrySelected(event: MouseEvent) {
   if (!event.isTrusted || !opened.value || !selected.value) return;
   void select(selected.value, event);
 }
+function refreshPending(allowDefer = true) {
+  if (!opened.value || disposed) return;
+  const current = selected.value;
+  if (current && status.value !== 'pending' && status.value !== 'stale') return;
+  if (!current && status.value !== 'unavailable' && status.value !== 'noCandidates' && status.value !== 'stale') return;
+  let list: MangaReadingList;
+  try { list = props.list(); } catch { return; }
+  if (list.status !== 'ready') {
+    if (allowDefer && list.status === 'unavailable' && pendingRefreshTimer === null) {
+      pendingRefreshTimer = setTimeout(() => { pendingRefreshTimer = null; refreshPending(false); }, 50);
+    }
+    return;
+  }
+  const match = current
+    ? list.items.find(item => item.ordinal === current.ordinal && item.kind === current.kind)
+      ?? (list.items.length === 1 ? list.items[0] : undefined)
+    : (list.items.length === 1 ? list.items[0] : undefined);
+  items.value = list.items;
+  if (match) void select(match, {isTrusted: true} as Event, null);
+  else { selected.value = null; lines.value = []; status.value = list.items.length ? '' : 'noCandidates'; }
+}
 function toggleSkipped(event: MouseEvent) {
   if (!event.isTrusted || !opened.value || status.value !== 'ready' || !skippedTranslations.value.length) return;
   skippedOnly.value = !skippedOnly.value;
@@ -348,5 +372,5 @@ async function copyLine(line: MangaReadingLine, key: string, event: MouseEvent) 
 function copyPage(event: MouseEvent) {if (event.isTrusted) void copyText(textFor(pages.value[pageIndex.value] ?? []), event);}
 function copyAll(event: MouseEvent) {if (event.isTrusted) void copyText(textFor(lines.value), event);}
 onBeforeUnmount(() => {disposed = true;cancel();trigger = null;lines.value = [];items.value = [];});
-defineExpose({open, close, invalidate});
+defineExpose({open, close, invalidate, refreshPending});
 </script>

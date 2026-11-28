@@ -1,15 +1,15 @@
 /**
  * @file src/features/image-translation/services/imageEncoding.ts
- * 文件职责：将网页图片读取、普通译图、漫画局部译图及圈选/OCR 预处理画布异步编码成无损 PNG，避免同步压缩阻塞网页或 Offscreen 的取消和进度消息。
- * 主要内容：沿用现有 data URL 消息协议；默认 30 秒等待预算，也可使用调用链路剩余预算及错误文案，调用开始时复制预算值；取消或失败时释放监听与读取器，丢弃迟到结果。
+ * 文件职责：将网页图片读取、普通译图、漫画局部译图及圈选/OCR 预处理画布异步编码为 data URL，避免同步压缩阻塞网页或 Offscreen 的取消和进度消息。
+ * 主要内容：沿用现有 data URL 消息协议，默认无损 PNG，支持调用方为已验证不透明的漫画输入选用高画质 JPEG 以显著压缩编码耗时与 IPC 载荷；默认 30 秒等待预算，也可使用调用链路剩余预算及错误文案，调用开始时复制预算值；取消或失败时释放监听与读取器，丢弃迟到结果。
  * 模块边界：只处理调用方画布，不修改网页、图片内容、模型或消息入口；调用方负责最终释放 Canvas。
  */
 export function encodeImageCanvas(
     canvas: HTMLCanvasElement,
     signal?: AbortSignal,
-    budget: {readonly timeoutMs: number; readonly message: string; readonly onPhysicalSettled?: () => void} = {timeoutMs: 30_000, message: '图片翻译超时'},
+    budget: {readonly timeoutMs: number; readonly message: string; readonly onPhysicalSettled?: () => void; readonly mimeType?: 'image/png' | 'image/jpeg'; readonly quality?: number} = {timeoutMs: 30_000, message: '图片翻译超时'},
 ): Promise<string> {
-    const {timeoutMs, message} = budget;
+    const {timeoutMs, message, mimeType, quality} = budget;
     return new Promise((resolve, reject) => {
         let settled = false;
         let physicalSettled = false;
@@ -33,7 +33,7 @@ export function encodeImageCanvas(
         signal?.addEventListener('abort', abort, {once: true});
         if (signal?.aborted) {settlePhysical();abort();return;}
         try {
-            canvas.toBlob(blob => {
+            const onBlob: BlobCallback = blob => {
                 // 取消 Promise 不会终止浏览器内的编码；仅回调到达才算物理编码结束。
                 settlePhysical();
                 if (settled) return;
@@ -47,7 +47,9 @@ export function encodeImageCanvas(
                     reader.onerror = () => finish(new Error('图片数据读取失败'));
                     reader.readAsDataURL(blob);
                 } catch (error) {finish(error as Error);}
-            }, 'image/png');
+            };
+            if (mimeType === 'image/jpeg') canvas.toBlob(onBlob, 'image/jpeg', quality ?? 0.92);
+            else canvas.toBlob(onBlob, 'image/png');
         } catch (error) {settlePhysical();finish(error as Error);}
     });
 }

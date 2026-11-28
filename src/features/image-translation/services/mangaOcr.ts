@@ -831,22 +831,27 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                         }finally{tileCanvas.width=0;tileCanvas.height=0;}
                     }
                     const bubbles:NonNullable<MangaOcrPage['bubbles']>=[];
-                    for(const bbox of boxes){
-                        assertMangaOcrActive(options.signal);
-                        if(shouldSkipMangaBubbleReOcr(bbox,page.results,pixels.data,canvas.width,canvas.height))continue;
-                        const width=bbox.x1-bbox.x0,height=bbox.y1-bbox.y0;
-                        const scale=Math.min(3,1536/Math.max(width,height));
-                        const crop=createOcrCanvas();crop.width=Math.round(width*scale);crop.height=Math.round(height*scale);
-                        try {
-                            const ctx=crop.getContext('2d', {willReadFrequently: true});if(!ctx)throw new Error('浏览器不支持图片处理');
-                            ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-                            ctx.drawImage(canvas,bbox.x0,bbox.y0,width,height,0,0,crop.width,crop.height);
-                            const result=await service.recognizeManga(crop,sdkOptions);
-                            const sx=crop.width/width,sy=crop.height/height;
+                    let bubbleCanvas:ReturnType<typeof createOcrCanvas>|undefined,bubbleCtx:CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D|null=null;
+                    try {
+                        for(const bbox of boxes){
+                            assertMangaOcrActive(options.signal);
+                            if(shouldSkipMangaBubbleReOcr(bbox,page.results,pixels.data,canvas.width,canvas.height))continue;
+                            const width=bbox.x1-bbox.x0,height=bbox.y1-bbox.y0;
+                            const scale=Math.min(3,1536/Math.max(width,height));
+                            if(!bubbleCanvas){
+                                bubbleCanvas=createOcrCanvas();
+                                bubbleCtx=bubbleCanvas.getContext('2d', {willReadFrequently: true});
+                                if(!bubbleCtx)throw new Error('浏览器不支持图片处理');
+                            }
+                            bubbleCanvas.width=Math.round(width*scale);bubbleCanvas.height=Math.round(height*scale);
+                            bubbleCtx!.imageSmoothingEnabled=true;bubbleCtx!.imageSmoothingQuality='high';
+                            bubbleCtx!.drawImage(canvas,bbox.x0,bbox.y0,width,height,0,0,bubbleCanvas.width,bubbleCanvas.height);
+                            const result=await service.recognizeManga(bubbleCanvas,sdkOptions);
+                            const sx=bubbleCanvas.width/width,sy=bubbleCanvas.height/height;
                             const restore=(item:(typeof result.results)[number])=>({...item,box:{x:bbox.x0+item.box.x/sx,y:bbox.y0+item.box.y/sy,width:item.box.width/sx,height:item.box.height/sy}});
                             bubbles.push({bbox,results:result.results.map(restore),...(result.numericEvidence?.length?{numericEvidence:result.numericEvidence.map(restore)}:{})});
-                        }finally{crop.width=0;crop.height=0;}
-                    }
+                        }
+                    }finally{if(bubbleCanvas){bubbleCanvas.width=0;bubbleCanvas.height=0;}}
                     if(!isImage){
                         const knownItems=[...page.results,...bubbles.flatMap(bubble=>bubble.results)];
                         const rubyRescues=planMangaRubyRescueCrops(page,width,height,pixels.data,knownItems,remainingRubyRescues,knownItems);

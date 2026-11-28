@@ -1,0 +1,440 @@
+/* FluentRead 官方文档交互式 HTML 示意图统一样式体系 */
+.fr-dg {
+  container-type: inline-size;
+  margin: 24px 0 28px;
+  border: 1px solid var(--fr-line, #e7e7eb);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--fr-ink, #26232c);
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.65;
+  box-shadow: 0 2px 12px rgba(38, 35, 44, 0.035);
+}
+
+.fr-dg p {
+  margin: 0;
+}
+
+.fr-dg-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--fr-line, #e7e7eb);
+  background: #faf9fb;
+}
+
+.fr-dg-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 680;
+  color: var(--fr-ink, #26232c);
+}
+
+.fr-dg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vp-c-brand-1, #b92252);
+  flex: none;
+}
+
+.fr-dg-badge {
+  font-size: 11px;
+  font-weight: 550;
+  color: var(--fr-muted, #6b6872);
+  padding: 2px 8px;
+  border: 1px solid var(--fr-line, #e7e7eb);
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.fr-dg-body {
+  padding: 20px;
+}
+
+.fr-dg-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--fr-line, #e7e7eb);
+  background: #faf9fb;
+  font-size: 11.5px;
+  color: var(--fr-muted, #6b6872);
+}
+
+/* 切换标签条 */
+.fr-dg-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--fr-line, #e7e7eb);
+  border-radius: 9px;
+  background: #f6f5f8;
+  margin-bottom: 16px;
+}
+
+.fr-dg-tab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fr-muted, #6b6872);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.16s, color 0.16s, border-color 0.16s;
+}
+
+.fr-dg-tab:hover {
+  color: var(--fr-ink, #26232c);
+}
+
+.fr-dg-tab[aria-pressed='true'],
+.fr-dg-tab[aria-selected='true'] {
+  background: #ffffff;
+  color: var(--vp-c-brand-1, #b92252);
+  border-color: #ebc2cf;
+  box-shadow: 0 1px 4px rgba(185, 34, 82, 0.08);
+}
+
+.fr-dg-tab:focus-visible,
+.fr-dg a:focus-visible,
+.fr-dg button:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1, #b92252);
+  outline-offset: 2px;
+}
+
+/* 语义色标签与节点 */
+.fr-dg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.fr-dg-chip-rose {
+  background: #fdf2f5;
+  color: #a61c48;
+  border-color: #f3cdd9;
+}
+
+.fr-dg-chip-teal {
+  background: #eef8f6;
+  color: #1f665c;
+  border-color: #c7e6e0;
+}
+
+.fr-dg-chip-blue {
+  background: #f0f5fc;
+  color: #2c528c;
+  border-color: #cfe0f5;
+}
+
+.fr-dg-chip-amber {
+  background: #fdf7ec;
+  color: #8a5b12;
+  border-color: #f0dbb4;
+}
+
+.fr-dg-chip-slate {
+  background: #f4f3f6;
+  color: #504d58;
+  border-color: #e2e0e7;
+}
+
+/* 卡片与网格原语 */
+.fr-dg-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fr-dg-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fr-dg-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.fr-dg-card {
+  border: 1px solid var(--fr-line, #e7e7eb);
+  border-radius: 10px;
+  padding: 13px 14px;
+  background: #ffffff;
+}
+
+.fr-dg-card-soft {
+  background: #faf9fb;
+}
+
+.fr-dg-card-rose {
+  background: #fff9fb;
+  border-color: #efcbd7;
+}
+
+.fr-dg-card-teal {
+  background: #f6fbfa;
+  border-color: #cbe6e0;
+}
+
+.fr-dg-card-blue {
+  background: #f7fafe;
+  border-color: #d2e2f6;
+}
+
+.fr-dg-card-amber {
+  background: #fffbf4;
+  border-color: #f0dfb9;
+}
+
+.fr-dg-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 680;
+  margin-bottom: 5px;
+  color: var(--fr-ink, #26232c);
+}
+
+.fr-dg-card-desc {
+  font-size: 12px;
+  color: var(--fr-muted, #6b6872);
+  line-height: 1.6;
+}
+
+/* 流程管线步骤 */
+.fr-dg-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.fr-dg-step {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--fr-line, #e7e7eb);
+  border-radius: 10px;
+  padding: 12px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fr-dg-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fdf2f5;
+  color: var(--vp-c-brand-1, #b92252);
+  font-size: 11px;
+  font-weight: 700;
+  flex: none;
+}
+
+.fr-dg-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #b5aebc;
+  font-size: 16px;
+  font-weight: 700;
+  flex: none;
+  user-select: none;
+}
+
+/* 边界虚线框（本机 / 云端隔离示意） */
+.fr-dg-zone {
+  border: 1.5px dashed #d5d1dc;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fcfbfd;
+}
+
+.fr-dg-zone-local {
+  border-color: #96cec3;
+  background: #f5fbf9;
+}
+
+.fr-dg-zone-cloud {
+  border-color: #d9b8c5;
+  background: #fff9fb;
+}
+
+.fr-dg-zone-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+}
+
+/* 按键帽 */
+.fr-dg-kbd-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.fr-dg-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid #d7d4df;
+  border-bottom-width: 2.5px;
+  background: #ffffff;
+  color: var(--fr-ink, #26232c);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.fr-dg-plus {
+  font-size: 11px;
+  color: var(--fr-muted, #6b6872);
+}
+
+/* 表格矩阵 */
+.fr-dg-matrix-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--fr-line, #e7e7eb);
+  border-radius: 10px;
+}
+
+.vp-doc .fr-dg-matrix,
+.fr-dg-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  font-size: 12px;
+  display: table;
+}
+
+.vp-doc .fr-dg-matrix th,
+.vp-doc .fr-dg-matrix td,
+.fr-dg-matrix th,
+.fr-dg-matrix td {
+  padding: 9px 11px;
+  border: 0;
+  border-bottom: 1px solid var(--fr-line, #e7e7eb);
+  text-align: left;
+  vertical-align: middle;
+  background: transparent;
+}
+
+.vp-doc .fr-dg-matrix thead th,
+.fr-dg-matrix thead th {
+  background: #faf9fb;
+  font-weight: 650;
+  color: var(--fr-ink, #26232c);
+  white-space: nowrap;
+}
+
+.vp-doc .fr-dg-matrix tbody tr:last-child td,
+.fr-dg-matrix tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.fr-dg-status-yes {
+  color: #1f665c;
+  font-weight: 700;
+}
+
+.fr-dg-status-part {
+  color: #8a5b12;
+  font-weight: 650;
+}
+
+.fr-dg-status-no {
+  color: #9e9aa6;
+}
+
+/* 链接徽章 */
+.vp-doc .fr-dg-link-pill,
+.fr-dg-link-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--fr-line, #e7e7eb);
+  background: #ffffff;
+  color: var(--fr-ink, #26232c);
+  font-size: 12px;
+  font-weight: 550;
+  text-decoration: none;
+  transition: border-color 0.16s, color 0.16s, background 0.16s;
+}
+
+.vp-doc .fr-dg-link-pill:hover,
+.fr-dg-link-pill:hover {
+  border-color: #e4aec0;
+  color: var(--vp-c-brand-1, #b92252);
+  background: #fff9fb;
+  text-decoration: none;
+}
+
+/* 响应式容器查询 */
+@container (max-width: 680px) {
+  .fr-dg-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fr-dg-grid-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fr-dg-flow {
+    flex-direction: column;
+  }
+  .fr-dg-arrow {
+    transform: rotate(90deg);
+    height: 18px;
+  }
+}
+
+@container (max-width: 540px) {
+  .fr-dg-body {
+    padding: 14px;
+  }
+  .fr-dg-head,
+  .fr-dg-foot {
+    padding: 11px 14px;
+  }
+  .fr-dg-grid-2,
+  .fr-dg-grid-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

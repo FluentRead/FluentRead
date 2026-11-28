@@ -1,129 +1,114 @@
-# Video & meeting translation
+# Video & meeting captions
 
-Read original captions and translations in YouTube, X, Bilibili, Udemy, edX, Disney+, and Google Meet, Teams, or Zoom web meetings. Bilibili and X also offer local AI transcription.
+Watch videos, online courses, web meetings, and standard HTML media with bilingual captions—complete with mode shortcuts, timing sync, phonetic guides, sentence study, subtitle export, and local AI speech transcription when captions are missing.
 
 <GuideVisual kind="video" en />
 
-## A video with subtitles
+<DocDiagram kind="video-matrix" en />
 
-1. Enable **Video subtitle translation** in the extension menu or settings, and turn on the video's native captions.
-2. In YouTube or X, click the FluentRead icon near the fullscreen button.
-3. Choose **Bilingual / Translated / Original**. Other supported platforms provide display controls near their captions.
+## Videos with native captions {#videos-with-captions}
 
-The service follows webpage translation by default; choose a separate one in **Video translation settings**. Selecting **Off** in the player hides FluentRead subtitles while keeping its icon so you can re-enable them later.
+1. Confirm **Video subtitle translation** is enabled in the menu or settings, and turn on native captions in the video player.
+2. Click the **FluentRead icon** in the player control bar (usually beside the CC or fullscreen button).
+3. Select **Bilingual / Translation / Original**, or choose **Off** to hide captions while keeping the toolbar icon accessible (disable the global switch in Settings to hide the icon itself).
 
-To switch subtitle modes from the keyboard without clicking the player icon, enable **Subtitle mode shortcut** under **Video translation settings → General** (default `Alt+M` / `Option+M`, with presets and custom shortcut recording) and choose **Bilingual ↔ Original**, **Cycle (Bilingual → Translated → Original)**, or **Cycle all (including Off)**. The shortcut automatically yields while typing in input fields.
+### Shortcuts & listening practice
 
-Translation depends on the selected service's response. Opening a video or seeking to an untranslated section can cause a delay. Retry a failed translation without repeating transcription: recognized source captions and their timeline remain available.
+- **Mode shortcut:** Enable **Caption display shortcut** under **Video translation → General** (default `Alt+M` / `Option+M`, customizable) to toggle **Bilingual ↔ Original** or cycle modes—automatically yields inside comment/search inputs.
+- **Listening drill without duplicate API calls:** Cycling **Off → Original → Bilingual → Off** keeps completed translations cached; native captions stay cleanly hidden while FluentRead is active.
 
-## Meeting captions and human subtitles
+### Supported video & course platforms
 
-Meetings use web clients, including Zoom's `/wc/` client. The platform, host, or account must allow captions. Browser extensions do not control desktop meeting apps.
+| Platform | Caption behavior & notes |
+| --- | --- |
+| **YouTube** | **Prefer human captions** (on by default) uses existing target-language human tracks directly; Original mode shows clean full-cue lines instead of word-by-word scrolling |
+| **Bilibili (Standard / Multi-P)** | Prefers uploader human captions, then platform AI captions (login required); supports local AI transcription when empty; manual start by default (configurable per site); bangumi excluded |
+| **X (Twitter)** | Translates native captions; supports on-device Whisper or local Qwen3 ASR when captions are missing |
+| **Udemy / Udemy Business** | Prefers instructor original-language tracks; auto-starts by default and re-binds cleanly across lectures |
+| **edX / Coursera** | Supports HTML5 players with readable subtitle tracks, including sentence study and export (embedded YouTube players excluded) |
+| **Disney+** | Translates readable caption tracks subject to account, region, and player restrictions |
 
-Two options under **Video translation settings → General** are on by default:
+## Live web meeting captions {#meeting-and-human-captions}
 
-- **Automatically enable bilingual meeting captions** attempts to enable captions supplied by Google Meet, Teams, and Zoom. Enable native captions manually if it fails. Disabling translation or hiding FluentRead captions restores the native display.
-- **Prefer human subtitles** uses readable target-language human captions on YouTube, Udemy, and Disney+. Missing or inaccessible portions fall back to translating source captions.
+Supports web clients for **Google Meet**, **Microsoft Teams**, and **Zoom (`/wc/`)** (desktop meeting apps are outside browser-extension control):
 
-FluentRead does not start meeting recording or transcription, or generate captions for meetings that provide none. Udemy and Disney+ availability also depends on account, region, and player restrictions.
+- **Auto-enable bilingual captions on meeting platforms** is on by default under **Video translation → General** (requires host/account caption permission; toggle native captions manually if needed).
+- FluentRead **never** starts meeting recording or cloud transcription and cannot synthesize captions if the platform does not provide them.
 
-## Display and download
+## Missing captions & HTML audio/video (Local AI ASR) {#html-audio-and-video}
 
-Adjust size, background, position, width, and bilingual order in video appearance settings. Its example only previews styling; it reads no video and sends no requests.
+When **X videos**, **Bilibili standard/multi-P videos**, or standard webpage `<audio>` / `<video>` elements lack native captions, open the player’s FluentRead menu and click **Generate AI captions** (audio capture never starts automatically):
 
-If captions are early or late, open **Subtitle timing** in the player menu (under **Subtitle options** on X). Adjust by **0.5 seconds**, up to **±10 seconds**, or reset to zero. The saved offset applies to later videos and moves both lines together. It does not change playback or exported timestamps. Timing needs an available subtitle timeline.
+- **Direct local decode (up to 20 minutes):** Readable MP3, M4A, WAV, OGG, MP4, WebM, and Bilibili AAC DASH tracks decode locally window by window, displaying stable sentences as they finish.
+- **Playback capture (streams / >20 min):** HLS, MSE/blob, live streams, or longer media capture the active audio track on HTTPS/localhost in AudioWorklet-capable browsers. Play at **1× speed** (up to 20 minutes per run) and click **Stop** to finalize; seeking or changing speed ends the capture and exports are labeled `partial`.
+- **Protected media:** DRM-protected streams, CORS-blocked media, and closed Shadow DOM players cannot be transcribed; FluentRead does not bypass browser restrictions.
 
-Click **Download subtitles** in the menu header, then choose **Original / Translated / Bilingual** to save SRT. Each bilingual cue puts the original on the first line and the translation on the second. Identical lines appear once. The bilingual export uses a single timeline. An overlapping cue ends when the next one starts, and cues that start together share one entry.
+## Styling, timing sync & subtitle export {#appearance-and-saving-captions}
 
-Translated or bilingual exports first show how much text still needs translation and its time span:
-
-- **Translate missing text and export complete subtitles** requests missing translations only after confirmation. Usage follows your selected service.
-- **Export available results only** skips untranslated cues, adds `partial` to the filename, and reports how many were skipped.
-
-Close the menu or press Esc to cancel while translating missing text; completed translations remain reusable. Changing the video or translation settings requires a new preview. X AI subtitles become exportable only after complete recognition succeeds.
+- **Live appearance preview:** Adjust font size, outline, color, width, position, bilingual order, and background visibility in **Video subtitle appearance**.
+- **Timing offset (±10 s):** Adjust **Subtitle timing** in **±0.5 s** increments (up to `±10 s`, with one-click reset). Offsets save persistently and shift both lines without modifying exported timestamps.
+- **Export SRT / WebVTT / Markdown:** Click the download icon in the player menu and pick **Original / Translation / Bilingual**:
+  - Translation/bilingual exports preview missing cues first so you can choose **Translate missing & export full** or **Export available only** (`partial`).
+  - Bilingual SRT uses a clean single-track timeline with original above translation and duplicate lines collapsed.
 
 <details class="guide-details">
-<summary>An X video without subtitles</summary>
+<summary>Local Whisper models & local Qwen3 ASR setup</summary>
 
-## An X video without subtitles
+### In-browser Whisper models
 
-The desktop Chrome, Edge, and Firefox extensions use Whisper in the browser by default to transcribe X videos.
+1. Manage models under **Video translation → Local AI captions**: **Small** (~590 MB) is recommended; lighter **Tiny** (~100 MB) and **Base** (~150 MB) are also available (all multilingual with auto-detect).
+2. First download requires internet and resumes cleanly if interrupted; inference prefers GPU and falls back to CPU automatically.
+3. Browsers supporting the File System Access API can enable **Share models across browsers** (`FluentRead/whisper` folder).
+4. Switch models or choose **Re-transcribe this video** anytime from **Caption options** without clearing other cached videos.
 
-1. Open the X player's FluentRead menu and choose to generate AI subtitles.
-2. For Whisper in the browser, select and confirm a model download on first use. **Small** is recommended (about 590 MB). **Tiny** (about 100 MB) and **Base** (about 150 MB) use less storage.
-3. Wait while the extension reads and transcribes the audio. You can stop at any time. Stable sentences appear early, and the timeline is cached and becomes exportable after recognition succeeds.
+### Local Qwen3 ASR (vLLM)
 
-All Whisper models support multiple languages. Use **Auto** when the language is unknown or changes, or specify a known single language. Whisper in the browser uses available GPU acceleration and falls back to CPU. FluentRead sends recognized text to your translation service according to the display mode. Original-only mode displays the transcript locally.
-
-The limit is **20 minutes per video**. Speed depends on the video and device. Some media formats or restricted videos cannot be read; try opening the post or refreshing. Quiet speech, music, accents, and specialist terms can affect accuracy.
-
-Use **Subtitle options → Recognition model / Regenerate this video** to change models or recognize again. Existing captions remain until confirmation; cancel preserves them. Stop an active download or recognition before switching models. Regeneration does not require clearing other videos' caches.
-
-Manage Whisper models under **Video translation settings → Local AI subtitles**. The first download requires a connection. Retry failed downloads to reuse complete files and fill missing ones. Clearing browser caches can require downloading again. A recognition failure removes incomplete previews, while a translation failure preserves the recognized source.
-
-Browsers that support the File System Access API can also enable **Share models across browsers**. Select and authorize the same folder in each browser; models are stored in its `FluentRead/whisper` subfolder. Existing models can be moved there. Disconnecting does not delete shared files. Browser-local extension caches remain available.
-
-### Use Local Qwen3 ASR
-
-If you have vLLM with support for this model, run the command below to start a local service. It must serve the fixed model `Qwen/Qwen3-ASR-1.7B` at `POST /v1/audio/transcriptions` without credentials. [vLLM model recipe](https://github.com/vllm-project/recipes/blob/main/models/Qwen/Qwen3-ASR-1.7B.yaml)
+Run a local unauthenticated vLLM server exposing `POST /v1/audio/transcriptions` for `Qwen/Qwen3-ASR-1.7B` ([vLLM recipe](https://github.com/vllm-project/recipes/blob/main/models/Qwen/Qwen3-ASR-1.7B.yaml)):
 
 ```sh
 vllm serve Qwen/Qwen3-ASR-1.7B --host 127.0.0.1 --port 8000
 ```
 
-In **Video translation settings → Local AI subtitles → Recognition method**, choose **Local Qwen3 ASR**, enter `http://127.0.0.1:8000`, and save. The address must use `127.0.0.1` or `[::1]`. Once the service is running, select **Generate AI subtitles** on an X video with a readable audio track. This sends the audio to your local service.
-
-FluentRead estimates caption timing from audio windows. Stopping cancels the extension's request, and the server may continue processing audio it already received. If the service fails, retry or switch back to **Whisper in the browser** in settings.
+Select **Local Qwen3 ASR** under **Video translation → Local AI captions**, enter `http://127.0.0.1:8000` (loopback `127.0.0.1` or `[::1]` only), and save.
 
 </details>
 
 <details class="guide-details">
-<summary>Reading annotations and word highlighting</summary>
+<summary>Phonetic guides & word-by-word highlighting</summary>
 
-## Reading annotations
+### Phonetic guides
 
-In the browser extension, enable **Video appearance → Reading annotations** or its header icon in the YouTube/X menu. It is off by default and unavailable in the userscript. Supported readings include Japanese romaji, Korean romanization, Chinese pinyin, and Latin transliteration for Russian, Greek, Arabic, Hindi, and Thai.
+Enable under **Video subtitle appearance → Phonetic guides** or from the YouTube/X menu icon (off by default; browser extension only). Supports Japanese romaji, Korean romanization, Chinese pinyin, and Latin transliteration for Russian, Greek, Arabic, Hindi, and Thai.
 
-Readings follow the original text and stay hidden in translation-only or hidden-caption modes. Enabling them does not change display mode. Japanese first needs about **17.8 MB** of dictionary data, Hindi about **0.5 MB**. Verified data is cached locally for offline reuse; retry failed downloads in the menu. Captions are not sent to a reading service, and originals and translations can display while data is prepared.
-
-Readings are aids, and names, alternate pronunciations, and sound changes can be wrong. Check the audio. Annotations do not change source captions or exports.
+First use caches local dictionaries (~**17.8 MB** for Japanese, ~**0.5 MB** for Hindi) for offline reuse; subtitle text is never sent to a phonetic server.
 
 ### Word-by-word highlight
 
-Enable **Word-by-word highlight** in video appearance settings (off by default) to light up YouTube and X captions as they play. Timing is estimated from the whole cue's duration and text length, so it may differ from actual pronunciation.
+Enable **Word-by-word highlight** in appearance settings to light up words along playback on YouTube and X (estimated from cue timing and text length).
 
 </details>
 
 <details class="guide-details">
-<summary>Sentence learning</summary>
+<summary>Full-sentence study panel & shortcuts</summary>
 
-## Sentence learning
+### Full-sentence study
 
-Choose **Start sentence learning** in the subtitle menu on YouTube, X, Bilibili, Udemy, or edX. The browser extension can replay and save sentences once a complete subtitle track is available. Its downloads menu exports original, translated, or bilingual **SRT, WebVTT, and Markdown**. It asks before translating any missing captions. Long or unpunctuated captions may appear as fragments.
+Once full captions load on YouTube, X, Bilibili, Udemy, edX, Coursera, or HTML media, click **Start sentence study** in the menu:
 
-On Coursera lecture pages that expose a readable WebVTT track, enable **Bilingual** or **Original only** in the FluentRead player menu. The complete track is then available for replay, saving and download. Coursera manages access to the lecture.
-
-The learning panel splits existing captions into sentences using local rules. Each sentence keeps its source text and original caption timing. Sentences from the same caption can share a playback range, so moving between them keeps your current position.
-
-- **Previous / Next** select the adjacent sentence. Moving to a different source passage seeks to its start and preserves the current play or pause state.
-- **Replay source passage** plays from the start of the passage. **Loop source passage / Pause at passage end** follow the original caption timing. If the playhead is outside the range, use Replay to start. Manual seeking ends playback assistance and preserves your playback speed.
-- **Explain** is optional and calls your selection AI explanation service only when requested. It can use neighboring captions if context is allowed.
-- **Edit** changes the translation or explanation and pins the sentence. Drafts survive sentence changes during this panel session; return to the current sentence to follow playback again.
-- **Save sentence** keeps the source, confirmed translation, explanation, context, and time in the Learning Center. No explanation is required. Wait for a pending translation or enter your own before saving.
-
-With focus in the player, arrows change sentence, R toggles looping, and Q toggles pause at passage end. Text fields keep normal typing; an open subtitle menu takes keyboard priority. Drag the panel title to move it or use its style button to change layout and size. Closing learning or captions, or switching videos, stops playback assistance.
-
-Learning Center sources reopen the video near its original time; X positioning needs the extension enabled. Saved text remains if a video is deleted or restricted. Subtitle offsets and bilingual order do not change the original times used for saving and looping. Vocabulary exports that omit private context also omit video URLs and times.
+- **Shortcuts:** `← / →` switch sentences, `R` loops the source segment, `Q` toggles pause-at-end (yields in inputs and open menus).
+- **On-demand AI & editing:** Click **Explain** to call your selection AI provider; click **Edit** to refine translation or notes.
+- **Save with timestamp:** **Save sentence** stores the quote and video timestamp in [Learning Center](/en/guide/vocabulary-book) so you can jump back later.
 
 </details>
 
-## Missing or inaccurate subtitles
+## Troubleshooting
 
-Enable platform captions and wait for them to load. Ordinary translation cannot start without captions; on X, try local AI generation instead.
-
-An empty transcription means recognition found no readable speech. Check the audio and source language, or try Small instead of Tiny/Base. For a translation failure, retry or change translation services. Check important information against source captions and audio.
+- **No captions appear:** Enable native captions in the player first, or use local AI transcription where supported.
+- **“No readable captions recognized”:** Check for clear speech, confirm source language, or upgrade Whisper from Tiny/Base to **Small**.
+- **Translation failed:** Original captions and timing stay intact—simply retry or switch caption provider without re-transcribing audio.
 
 ## Related guides
 
-- [Data & privacy](/en/guide/privacy)
-- [Troubleshooting](/en/guide/faq)
+- [Learning center](/en/guide/vocabulary-book)
+- [Privacy policy](/en/guide/privacy)
+- [Troubleshooting & FAQ](/en/guide/faq)

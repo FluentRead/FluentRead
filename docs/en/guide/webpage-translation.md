@@ -1,31 +1,29 @@
-# Webpage translation
+# Page & section translation
 
-Translate an article or selected section, compare both languages, and return to the original at any time.
+Read translations directly below original paragraphs on any webpage, or target a single section or comment thread, and restore the original anytime.
 
 <GuideVisual kind="webpage" en />
 
+<DocDiagram kind="webpage-modes" en />
+
 ## Page translation
 
-1. Open an article and click FluentRead in the browser toolbar.
-2. Choose the target language and service, then click **Translate**.
-3. Read in bilingual mode. Use the display-mode button at the bottom right of the translation card to switch between **Bilingual / Translation only**. Choose **Restore** to return.
+1. Open an article and click FluentRead in the browser toolbar (or press `Alt+T` / `Option+T`).
+2. Confirm your **target language** and **translation provider**, then click **Translate**.
+3. Read in bilingual mode by default:
+   - Use the display-mode toggle at the bottom right of the translation card to switch between **Bilingual** and **Translation only** immediately without new API requests.
+   - Click **Restore** anytime to return to the original text and end the session.
+   - Press `Esc` in the popup service picker to step back to the overview, and again to return to the popup home screen.
 
-While choosing a translation service in the popup, press **Esc** to return to the service overview. Press it again to return to the popup home screen.
+### Helpful details
 
-Display mode is saved and updates existing translations without another request.
-
-For translation-only display on selected websites, enable **Translation only** under **Tools & learning → Website rules → Site preferences**. Other websites keep the global mode. See [Website reading area](/en/config/site-adaptation).
-
-If the font is hard to read, click **Aa** at the bottom right of the card to use the browser's default font; click again to restore the previous font. This preference is saved for all webpages, immediately updates existing and future translations, and survives refreshes.
-
-Translation follows your reading position by default, including newly expanded comments and later-loaded text. Change the translation range in settings to process the whole page at once. Restoring the original ends the current session; choose another language or service and start again if needed.
-
-Identical paragraphs on the same page share results when their translation requests match. Ordinary batches send each repeated text once and return its translation to every original position. With translation caching enabled, later batches and translation after restoring the original can also reuse completed results. Different languages, services, or result-affecting context are handled separately, as are AI multi-segment slots that depend on neighboring text.
-
-Passages already in the target or an excluded language usually keep their source text. Results matching the source are not duplicated. Simplified and Traditional Chinese can still convert when their characters differ. Language detection can be wrong; check source-language and site settings for missing translations.
+- **Per-site translation-only mode:** Enable **Translation only** for specific domains under **Tools & learning → Website rules → Site preferences** while keeping bilingual mode globally (see [Site rules & reading area](/en/config/site-adaptation)).
+- **Quick readable font toggle (Aa):** Click **Aa** at the bottom right of the card to switch translations to your browser’s default font; click again to revert. This preference saves globally and applies immediately.
+- **Scroll-based translation & deduplication:** Visible paragraphs translate as you scroll (including newly expanded comments and dynamically loaded content). Identical passages on the same page share results, and enabling translation cache reuses results across batches and re-translations when parameters match.
+- **Smart skipping & formatting:** Passages already in the target or excluded languages stay untranslated; Simplified/Traditional Chinese still converts when characters differ; `<del>` strikethrough formatting is preserved in bilingual translations.
 
 <details class="guide-details">
-<summary>See the actual webpage translation</summary>
+<summary>See a real webpage translation screenshot</summary>
 
 <figure class="doc-figure"><a href="/screenshots/en/translation.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/en/translation.webp" width="2560" height="1600" alt="Chinese paragraphs followed by English translations on the same webpage" loading="lazy" /></a><figcaption>Originals and translations appear paragraph by paragraph. Click to view the full-size screenshot.</figcaption></figure>
 
@@ -33,133 +31,105 @@ Passages already in the target or an excluded language usually keep their source
 
 ## Read research papers
 
-On an arXiv abstract page, choose **Bilingual translation (FluentRead)** in the paper access area. FluentRead opens the official HTML for that version in a new tab and translates from your reading position using your configured language and service. The original table of contents, formulas, and citation links remain usable.
+The browser extension adds direct reading entries on major academic sites:
 
-On a PubMed Central article, choose **Bilingual translation (FluentRead)** to translate the full text in place.
+| Platform | Action button | Behavior |
+| --- | --- | --- |
+| **arXiv (HTML available)** | **Bilingual translation (FluentRead)** | Opens the official HTML version in a new tab and translates from your reading position while keeping TOC, math, and citations intact |
+| **PubMed Central** | **Bilingual translation (FluentRead)** | Translates the full article directly in place |
+| **Hugging Face Papers / ACL Anthology / CVF / NeurIPS / PDF-only arXiv** | **Read PDF (FluentRead)** | Opens the original PDF in the [Document reader](/en/guide/document-translation) |
 
-On Hugging Face Papers, ACL Anthology, CVF Open Access, NeurIPS Proceedings, and arXiv pages that only offer a PDF, choose **Read PDF (FluentRead)** to open the original in the [document reader](/en/guide/document-translation). These shortcuts are available in the browser extension.
+## Section translation {#section-translation}
 
-## AI context and terminology
+When you only want to translate a main article, README, or comment thread:
 
-Open **Translation services → AI context** in the extension popup, enable the preference, and choose a configured AI service that supports it. New translations can reference the page topic, current section, nearby passages, and available earlier definitions and translations to help interpret ambiguous words and references. Enabling it does not rewrite existing translations; restore the original and translate again to apply it.
+1. Click **Section** beside **Translate** (or enable `Alt+R` / `Option+R` under **Settings → Translation → Section translation**).
+2. Move your pointer to preview highlighted regions and click to lock—or drag across multiple paragraphs and release.
+3. Adjust with **Expand / Shrink selection** or `↑ / ↓`, then click **Translate selected section** or press `Enter`.
 
-Context has a length limit and may not include the entire article. It does not guarantee correct interpretation. The feature is off by default; enabling it sends additional page text to your selected service and may increase requests and cost. Ordinary machine translation and some specialized translation models do not support it; the popup explains the current state.
-
-Short page references are used directly, without an extra AI summary request. Longer references are summarized; with translation caching enabled, matching page material, model, and request settings can reuse summaries and validated translations. AI multi-segment translation can share instructions and references across adjacent passages. Actual usage and speed depend on the content and service. Provider prompt caching is separate from FluentRead's local translation cache.
-
-For fixed terminology or words that should stay untranslated, use [Glossaries](/en/guide/glossary), which work with both machine and AI translation.
-
-## Section translation
-
-To translate only an article, README, or comment thread:
-
-1. Click **Section** beside **Translate**, then move the pointer to preview a highlighted section.
-2. Click to lock it. Use **Expand / Shrink selection** or **↑ / ↓** to adjust. You can also drag over several paragraphs and release to lock them.
-3. Click **Translate selected section** or press **Enter**. Locking a section alone does not translate it.
-
-The selection keeps sections crossed by fast or back-and-forth dragging. While dragging, you see the range; releasing the button checks its translatable content. Hover previews wait briefly for the pointer to settle before switching sections, reducing flicker. Moving to the toolbar keeps the selection unchanged.
-
-Choose **Reselect** to pick again. **Esc**, right-click, or the close button exits. Picking does not open links or activate page buttons. Scroll after locking to check the range.
-
-Select an already translated section again and confirm **Restore original** to stop its remaining work and restore that section. Confirm translation again to retry failed passages. Restoring the whole page also restores translated sections. Pausing the extension or leaving the page stops unfinished work.
-
-Section translation uses the webpage service, language, and display mode by default. Enable **Alt+R** (Option+R on Mac) under **Settings → Translation → Section translation** if used often. See [Shortcuts](/en/guide/custom-hotkey) for independent profiles.
-
-Full-page translation usually leaves headers, navigation, and sidebars unchanged. You can still select these areas explicitly. Their interface labels show only the translation to preserve the layout.
+- **Safe picking:** Links and page buttons do not trigger while picking; hover previews wait briefly to avoid flicker; press `Esc`, right-click, or click Close to exit.
+- **Restore or retry a section:** Pick an already-translated section and confirm **Restore original** to revert only that block, or confirm translation again to retry failed passages.
+- **Headers & sidebars:** Full-page mode usually skips headers and sidebars, while explicitly picking them translates their labels in translation-only style to preserve layout.
 
 ### Remember a section
 
-After locking, select **Remember this section**, choose the current directory or entire site, then choose a reminder or automatic translation for next time. Confirm **Translate and remember**. The default reminds you only in the current directory; without this option, translation applies only now. Several dragged sections can be saved together.
+After locking a section, check **Remember this section**:
 
-On later matching pages, only remembered sections are handled. Dismiss a reminder for the current visit; if no matching section is found, the page stays unchanged. If the website changes its structure, remove the old rule and pick again.
+1. Choose scope: **Current directory** or **Entire site**.
+2. Choose next-visit behavior: **Remind me** (default) or **Translate automatically**.
+3. Click **Translate and remember** to save (multiple dragged sections can be saved together).
 
-Manage, disable, or delete up to 100 rules under **Section translation → Remembered sections**. A rule can use an independent profile. If that profile is missing, choose another or select **Follow default** before continuing.
+Manage up to 100 saved rules (including independent provider profiles) under **Section translation → Remembered sections**.
+
+## AI context and terminology
+
+Open **Translation services → AI context** in the popup and select a supported AI provider so new translations can reference the page topic, current heading, nearby paragraphs, and prior definitions.
+
+- Off by default; enabling it sends extra page context (which may increase token usage) and applies to new translations after restoring and re-translating.
+- Short references are used directly without an extra summary call; longer pages generate a concise cached summary. Pair with [AI multi-segment translation](/en/config/translation-engines#ai-context-and-multi-segment-translation) to share context across adjacent blocks.
+- For strict terminology or keeping terms untranslated, use [Glossaries](/en/guide/glossary) (works with both machine and AI providers).
 
 ## Continue after a failure
 
-If a notice icon appears on the popup's translation button, select it to see the reason and available recovery actions.
-
-Retry individual failed passages directly. With the full-page progress panel enabled, **Locate failed passage** and **Retry failed items** handle failures in the current session while keeping successful text and your reading position. Passages you have not scrolled to are not failures.
-
-When the service specifies a cooldown, retrying early shows the remaining wait. You can keep reading or restore the original during the wait.
-
-A blocking dialog is translated first; closing it resumes the page. Restoring the original also cancels pending work, and old retry controls cannot restart it. A navigation that changes reading rules may restore the original first; start translation again on the new page.
-
-For missing article text or navigation-only results, see [Website reading area](/en/config/site-adaptation). Use [image translation](/en/guide/image-translation) or [area translation](/en/guide/area-translation) for text drawn in pictures or charts.
+- **Retry failed passages:** Click any failed paragraph directly, or enable the **Full-page progress panel** to **Locate failed passage** or **Retry failed items** without losing completed translations.
+- **Rate-limit cooldown:** If a provider returns a cooldown period, retrying early displays the remaining wait time.
+- **Dialogs & navigation:** Blocking modal dialogs translate first before resuming the main page; restoring cancels all pending requests cleanly.
+- Missing article body? Check [Site rules & reading area](/en/config/site-adaptation). Text inside images or charts? Use [Image translation](/en/guide/image-translation) or [Area translation](/en/guide/area-translation).
 
 <details class="guide-details">
-<summary>Personal corrections</summary>
+<summary>Personal corrections: edit webpage translations locally</summary>
 
-## Personal corrections
+### Personal corrections
 
-Enable **个人校订** (Personal corrections) under **Settings → Translation → Reading assistance**; it is off by default. Hover over a bilingual translation and choose **校订译文** (Edit translation), or press **Alt+Shift+E**. Edit, preview the affected sentences, check the scope, and confirm saving.
+Enable **Personal corrections** under **Settings → Translation → Reading assistance** (off by default). Hover a bilingual translation and click **Edit translation**, or press `Alt+Shift+E`, preview affected sentences, and confirm.
 
-The default is **Only this webpage**; different addresses, including query parameters and fragments, have separate records. For related pages, create a project and explicitly join each page. Automatic reuse needs identical source text, source/target languages, and heading context. Similar sentences only supply a draft suggestion, and conflicting corrections are not reused automatically.
-
-Manage, edit, delete, and undo records in the editor. Undo cannot overwrite later changes. Removing a correction, leaving a project, or disabling the feature restores provider output when available; otherwise it restores the source, which you can translate again. Disabling preserves records.
-
-Corrections stay on this device, with limits of 1,000 records and 100 projects. They are excluded from glossaries, configuration backups, and cloud sync. Only safely editable plain-text bilingual webpage passages are supported. Translation-only mode, protected code or formulas, PDFs, captions, and the userscript have no correction entry.
+- **Scope:** Defaults to **Only this webpage** (distinct URLs/queries/hashes stay separate). Create a project to reuse exact matches across related pages.
+- **Storage & limits:** Local only (up to 1,000 records and 100 projects), excluded from glossaries, backups, and cloud sync. Applies only to plain-text bilingual webpage passages.
 
 </details>
 
 <details class="guide-details">
-<summary>Floating ball and context menu</summary>
+<summary>Floating ball and context-menu entries</summary>
 
 ### Page floating ball
 
-**Settings → General → Page helpers → Full-page translation ball** is off by default. Once enabled, it rests halfway behind the desktop screen edge by default. Hover or focus it to slide it out. On touchscreens, the whole button remains visible and expands on tap. By default, clicking the main icon translates the page. Click it again to restore the original. Hold and drag it to either side to save its position.
+**Settings → General → Page helpers → Full-page translation ball** is off by default. When enabled, it docks semi-transparently along the screen edge; click to translate/restore, drag to reposition, or hover/focus to expand tools and open the quick panel via the gear button.
 
-The gear opens the quick panel for the current page. In translation services, **Esc** goes back one level at a time. From the main screen, press **Esc** or click outside to close the panel. Advanced settings control tool visibility, delay, click behavior, size, opacity, and edge margins.
-
-Expand the floating button and click **×** at the upper-right corner of the main icon to choose where to hide it.
-
-- **Hide until reload** applies to the open page. Reload the page to show the button according to your settings.
-- **Hide on this site** applies to the current site and its subdomains. Remove the site from the hidden sites list in **Floating button settings** to show it again.
-- **Hide on all sites** turns off the global floating button switch. Turn it back on under **Settings → General → Page helpers**.
-
-In the userscript, **×** hides the button until reload. Other translation controls remain available while the floating button is hidden.
+Click **×** on the expanded toolbar to **Hide until reload**, **Hide on this site** (including subdomains), or **Hide on all sites**. In the userscript, **×** hides until reload.
 
 ### Context-menu translation
 
-Right-click the page to translate it, selected text to **Translate selected text**, or an image to translate that image. Enable the corresponding context-menu entries in settings first.
-
-To use selection translation only through right-click, choose **Context menu only** under **Specialized translation → Selection translation → Activation** and keep its menu entry enabled. Select text again if the selection is no longer valid; retry failures in the result card.
+Right-click a webpage to translate the page, selected text to **Translate selected text**, or an image to translate it (enable desired entries in settings). Choose **Context menu only** under Selection translation activation to hide floating selection icons.
 
 </details>
 
 <details class="guide-details">
-<summary>Automatic translation, languages, and compatibility</summary>
+<summary>Automatic translation, page recognition, and paragraph tuning</summary>
 
-## Automatic translation and site rules
+### Automatic translation & languages
 
-Automatically translate frequently visited sites, or keep selected sites in their original language. See [Website reading area](/en/config/site-adaptation) for setup.
+Configure per-site automatic translation or disable rules in [Site rules & reading area](/en/config/site-adaptation). Source languages can auto-detect or be fixed manually; supported language pairs vary by provider.
 
-## More translation languages
+### Page recognition & compatibility
 
-Detect the source language automatically or select it explicitly. Services and models support different language pairs; a listed language is not supported by every service. Image and speech recognition also have separate language limits.
+- Buttons, tabs, and form labels display translation-only to keep UI intact. Inputs, raw XML/RSS/SVG, standalone timestamps/counters, and GitHub code lines stay untouched.
+- Standard embedded Hugging Face Space apps are supported in the browser extension.
+- If navigation or menus are skipped, enable **Recognize all nodes** under **Advanced settings → Page recognition**, restore, and re-translate.
 
-### Page recognition and compatibility
+### Tune paragraph processing
 
-Buttons, tabs, and form labels show only the translation even in bilingual mode to preserve their layout. Restoring returns their source labels. Input text and values submitted with forms remain unchanged. Standalone times, numbers, and constantly changing counters usually stay original; full sentences containing them can still translate.
-
-Raw XML, RSS, and SVG documents are left untouched; normal HTML and XHTML pages are supported. GitHub code lines remain original, while commit messages and comments can translate. The browser extension also supports embedded apps on standard Hugging Face Space addresses. Custom domains and special names with dots or underscores are not covered.
-
-For missing menus or navigation, enable recognition of all nodes under **Advanced settings → Page recognition**, restore the page, and translate again. The wider scope changes more interface text; turn it off when no longer needed.
-
-### Tune how paragraphs are handled
-
-In **Advanced settings**, adjust:
-
-- **Sidebar translation:** include navigation and sidebars while keeping headers and footers unchanged.
-- **Minimum characters per paragraph:** skip short fragments to reduce requests.
-- **Characters translated without scrolling:** default 0; increase it to process an initial amount of page text before scrolling. The rest follows reading progress.
-- **Line breaks in long paragraphs:** add line breaks after translated sentences.
-- **Bilingual order:** place original or translation first using existing results immediately. Other options apply on the next translation.
+Under **Advanced settings**:
+- **Sidebar translation:** Include sidebars and navigation while keeping headers/footers untouched.
+- **Minimum characters per paragraph:** Skip tiny fragments to reduce API calls.
+- **Characters translated without scrolling:** Default `0`; increase to pre-translate the top of a page before scrolling.
+- **Line breaks in long paragraphs:** Insert breaks after translated sentences.
+- **Bilingual order:** Place original or translation first (applies immediately to existing translations).
 
 </details>
 
 ## Related guides
 
-- [Appearance](/en/config/appearance)
-- [Shortcuts](/en/guide/custom-hotkey)
-- [Troubleshooting](/en/guide/faq)
+- [Appearance & reading aids](/en/config/appearance)
+- [Shortcuts & triggers](/en/guide/custom-hotkey)
+- [Site rules & reading area](/en/config/site-adaptation)
+- [Troubleshooting & FAQ](/en/guide/faq)

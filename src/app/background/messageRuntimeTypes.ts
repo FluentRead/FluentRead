@@ -14,10 +14,12 @@ import type {PopupContext} from './popupNavigation';
 import type {SelectionTtsContext} from './handlers/selectionTts';
 import type {TabTranslationStateStore} from './tabTranslationState';
 import type {BrowserCapabilities} from '@/src/platform/browser/capabilities';
+import type {VideoSubtitleFrameBackgroundContext} from './handlers/videoSubtitleFrame';
 
 export type BackgroundRuntimeContext = QQMailFrameBackgroundContext & NeteaseMailFrameBackgroundContext
     & EmbeddedFrameBackgroundContext & ConfigPersistenceContext & VocabularyBackgroundContext & SelectionTtsContext
-    & FullPageBackgroundContext & AreaTranslationBackgroundContext & PopupContext & MaterialBackgroundContext;
+    & FullPageBackgroundContext & AreaTranslationBackgroundContext & PopupContext & MaterialBackgroundContext
+    & VideoSubtitleFrameBackgroundContext;
 
 export interface BackgroundMessageRuntimeOptions {
     tabTranslationStates: TabTranslationStateStore;

@@ -163,7 +163,8 @@ const artifactBytes = Buffer.byteLength(source);
 // 相对基线 f5bd3ef53（2,204,493 字节）净增 4,723 字节（0.2142%），无新增依赖；利用原余量后按既有 1 KB 步长最小增加 5 KB 至 2,210,100，余 884 字节；保留全部协议、资源、排除项和 VM 断言。
 // 合入路线图任务 2/3/4/5/7（流媒体/本地音视频配置、PPTX/XLSX/LaTeX 文档偏好、写作助手全局快捷键、云同步 E2EE 与学习资产偏好、场景预设/命令面板/zh-TW 元数据，扩展专属运行时不进入脚本）后实测 2,215,621 字节，
 // 相对主线 d1c50afad（2,209,216 字节）净增 6,405 字节（0.2899%）；利用原余量后按既有 1 KB 步长最小增加 6 KB 至 2,216,100，余 479 字节；保留全部协议、资源、排除项和 VM 断言。
-const MAX_USERSCRIPT_BYTES = 2_216_100;
+// 合入最新 main 0bd213561（PR #1468 ShareCardStudio 导出按钮防抖布局修复）后实测 2,216,325 字节，相对 3063e6f1f（2,215,621 字节）增加 704 字节（本构建优化 PR 自身对油猴净增 0 字节），超出原预算 225 字节；按既有 1 KB 步长最小增加 1 KB 至 2,217,100，余 775 字节；保留全部协议、资源、排除项和 VM 断言。
+const MAX_USERSCRIPT_BYTES = 2_217_100;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

@@ -6,7 +6,14 @@ import {resolve} from 'node:path';
 import {deflateRawSync} from 'node:zlib';
 import {runInNewContext} from 'node:vm';
 import JSZip from 'jszip';
-import {compactExtensionZip, verifyExtensionZipPreservation} from '@/scripts/wasm/compact-extension-zip';
+import {
+    compactExtensionZip,
+    parseStandardZip,
+    readStandardZipEntry,
+    verifyExtensionZipPreservation,
+    verifyStandardZipCrc32,
+} from '@/scripts/wasm/compact-extension-zip';
+import {finalizeExtensionZip, isFastZipEnabled} from '@/scripts/testing/wxt-asset-helpers';
 
 interface WorkerDouble {
     emit(name: string, value: unknown): void;
@@ -334,5 +341,109 @@ describe('完整 ZIP 保留契约', () => {
         expect(different).not.toEqual(first); expect(crc32(different)).toBe(crc32(first));
         const original = await fixture({first}), output = await fixture({first: different});
         await expect(verifyExtensionZipPreservation(original, output)).rejects.toThrow('解压内容');
+    });
+    it('原生 CRC32 校验拒绝损坏的非目标条目且不启动 worker 或改写原包', async () => {
+        const original = await fixture();
+        const broken = Buffer.from(original);
+        const nonTarget = positions(broken).entries.find(entry => entry.name === 'a.txt')!;
+        broken[nonTarget.data] = broken[nonTarget.data]! ^ 0xff;
+        await fs.writeFile(zipPath, broken);
+        await expect(compact()).rejects.toThrow('CRC32');
+        expect(await fs.readFile(zipPath)).toEqual(broken);
+        expect(control.instances).toHaveLength(0);
+        await expect(verifyExtensionZipPreservation(broken, broken)).rejects.toThrow('CRC32');
+    });
+});
+
+describe('原生标准 ZIP 解析与快速打包辅助', () => {
+    it('parseStandardZip 与 verifyStandardZipCrc32 校验 STORE、DEFLATE 与空条目并拒绝损坏与未知方法', async () => {
+        const zip = new JSZip();
+        zip.file('stored.txt', 'hello-store', {compression: 'STORE', date, createFolders: false});
+        zip.file('deflated.txt', 'hello-deflate-'.repeat(50), {compression: 'DEFLATE', date, createFolders: false});
+        zip.file('empty.txt', '', {compression: 'STORE', date, createFolders: false});
+        const bytes = await zip.generateAsync({type: 'nodebuffer'});
+
+        const layout = verifyStandardZipCrc32(bytes);
+        expect(layout.entries.map(e => e.name)).toEqual(['stored.txt', 'deflated.txt', 'empty.txt']);
+        expect(readStandardZipEntry(bytes, layout.entries[0]!).toString('utf8')).toBe('hello-store');
+        expect(readStandardZipEntry(bytes, layout.entries[1]!).toString('utf8')).toBe('hello-deflate-'.repeat(50));
+        expect(readStandardZipEntry(bytes, layout.entries[2]!).length).toBe(0);
+
+        const badStore = Buffer.from(bytes);
+        badStore[layout.entries[0]!.dataOffset] = badStore[layout.entries[0]!.dataOffset]! ^ 1;
+        expect(() => verifyStandardZipCrc32(badStore)).toThrow('CRC32');
+
+        const badDeflate = Buffer.from(bytes);
+        badDeflate[layout.entries[1]!.dataOffset] = badDeflate[layout.entries[1]!.dataOffset]! ^ 0xff;
+        expect(() => verifyStandardZipCrc32(badDeflate)).toThrow('CRC32');
+
+        // 解压流合法但声明的原始长度偏大时拒绝
+        const wrongOrigSize = Buffer.from(bytes);
+        const deflatedPos = positions(wrongOrigSize).entries[1]!;
+        const inflatedLen = layout.entries[1]!.originalSize + 10;
+        wrongOrigSize.writeUInt32LE(inflatedLen, deflatedPos.central + 24);
+        wrongOrigSize.writeUInt32LE(inflatedLen, deflatedPos.local + 22);
+        expect(() => verifyStandardZipCrc32(wrongOrigSize)).toThrow('解压长度');
+
+        // 空 ZIP（0 个条目）可被 parseStandardZip 正常解析
+        const emptyZipBytes = await new JSZip().generateAsync({type: 'nodebuffer'});
+        const emptyLayout = verifyStandardZipCrc32(emptyZipBytes);
+        expect(emptyLayout.entries).toEqual([]);
+        expect(emptyLayout.localStart).toBe(emptyLayout.centralOffset);
+
+        const badMethod = Buffer.from(bytes);
+        const p = positions(badMethod).first;
+        badMethod.writeUInt16LE(12, p.central + 10);
+        badMethod.writeUInt16LE(12, p.local + 8);
+        const parsedBadMethod = parseStandardZip(badMethod);
+        expect(() => readStandardZipEntry(badMethod, parsedBadMethod.entries[0]!)).toThrow('不支持的压缩方法');
+    });
+
+    it('finalizeExtensionZip 原生校验 DEFLATE 损坏并在数据描述符 ZIP 时回退 JSZip', async () => {
+        const buildChromeZip = async (options: {streaming?: boolean; deflate?: boolean}) => {
+            const zip = new JSZip();
+            zip.file('manifest.json', JSON.stringify({name: 'FluentRead', key: 'MIIBIjANBgkqh'}), {
+                compression: options.deflate ? 'DEFLATE' : 'STORE',
+            });
+            zip.file('background.js', 'console.log("fluent-read");'.repeat(20), {
+                compression: options.deflate ? 'DEFLATE' : 'STORE',
+            });
+            return zip.generateAsync({type: 'nodebuffer', streamFiles: options.streaming});
+        };
+
+        const deflateBytes = await buildChromeZip({deflate: true});
+        const deflatePath = resolve(directory, 'chrome-deflate.zip');
+        await fs.writeFile(deflatePath, deflateBytes);
+        await expect(finalizeExtensionZip('chrome', deflatePath)).resolves.toBeUndefined();
+
+        const brokenDeflate = Buffer.from(deflateBytes);
+        const bg = positions(brokenDeflate).entries.find(entry => entry.name === 'background.js')!;
+        brokenDeflate[bg.data] = brokenDeflate[bg.data]! ^ 0xff;
+        await fs.writeFile(deflatePath, brokenDeflate);
+        await expect(finalizeExtensionZip('chrome', deflatePath)).rejects.toThrow('CRC32');
+
+        const streamingBytes = await buildChromeZip({streaming: true, deflate: true});
+        const streamingPath = resolve(directory, 'chrome-streaming.zip');
+        await fs.writeFile(streamingPath, streamingBytes);
+        await expect(finalizeExtensionZip('chrome', streamingPath)).resolves.toBeUndefined();
+
+        // 本地记录与目录 CRC32 不一致属于结构损坏，必须直接拒绝而不能借 JSZip 回退放行。
+        const brokenLocalCrc = Buffer.from(deflateBytes);
+        const bgEntry = positions(brokenLocalCrc).entries.find(entry => entry.name === 'background.js')!;
+        brokenLocalCrc[bgEntry.local + 14] = brokenLocalCrc[bgEntry.local + 14]! ^ 1;
+        await fs.writeFile(deflatePath, brokenLocalCrc);
+        await expect(finalizeExtensionZip('chrome', deflatePath)).rejects.toThrow('本地记录与目录不一致');
+    });
+
+    it('isFastZipEnabled 仅在非 CI 且 FLUENTREAD_ZIP_FAST=1 时开启快速打包', () => {
+        expect(isFastZipEnabled({})).toBe(false);
+        expect(isFastZipEnabled({FLUENTREAD_ZIP_FAST: ''})).toBe(false);
+        expect(isFastZipEnabled({FLUENTREAD_ZIP_FAST: '0'})).toBe(false);
+        expect(isFastZipEnabled({FLUENTREAD_ZIP_FAST: 'true'})).toBe(false);
+        expect(isFastZipEnabled({FLUENTREAD_ZIP_FAST: '1'})).toBe(true);
+        expect(isFastZipEnabled({FLUENTREAD_ZIP_FAST: '1', CI: 'true'})).toBe(false);
+        expect(isFastZipEnabled({FLUENTREAD_ZIP_FAST: '1', CI: '1'})).toBe(false);
+        expect(isFastZipEnabled({FLUENTREAD_ZIP_FAST: '1', CI: 'false'})).toBe(true);
+        expect(isFastZipEnabled({FLUENTREAD_ZIP_FAST: '1', CI: '0'})).toBe(true);
     });
 });

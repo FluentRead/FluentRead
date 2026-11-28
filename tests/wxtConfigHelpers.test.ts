@@ -35,6 +35,8 @@ describe('wxt.config extracted helpers', () => {
         expect(wxtConfig.configureSafariBackgroundPage).toBe(manifestHelpers.configureSafariBackgroundPage);
         expect(wxtConfig.configureStableContentUiResources).toBe(manifestHelpers.configureStableContentUiResources);
         expect(wxtConfig.finalizeExtensionZip).toBe(assetHelpers.finalizeExtensionZip);
+        expect(wxtConfig.isFastZipEnabled).toBe(assetHelpers.isFastZipEnabled);
+        expect(wxtConfig.aiSdkGatewayStubBuildPlugin).toBe(viteHelpers.aiSdkGatewayStubBuildPlugin);
         expect(wxtConfig.remoteConfigStorageBuildPlugin).toBe(viteHelpers.remoteConfigStorageBuildPlugin);
         expect(wxtConfig.extendRemoteConfigBuildConfig).toBe(viteHelpers.extendRemoteConfigBuildConfig);
         expect(wxtConfig.subframePageContextBuildPlugin).toBe(viteHelpers.subframePageContextBuildPlugin);
@@ -151,14 +153,33 @@ describe('wxt.config extracted helpers', () => {
         await expect(assetHelpers.finalizeExtensionZip('chrome', badZipPath)).rejects.toThrow(/key/u);
     });
 
-    it('Vite/Rolldown 辅助插件按入口组正确路由、裁剪与挂接过滤器', () => {
+    it('Vite/Rolldown 辅助插件按入口组正确路由、裁剪、挂接过滤器与拆分扩展 UI 块', () => {
         const remoteConfig: {plugins?: unknown[]} = {plugins: []};
         viteHelpers.extendRemoteConfigBuildConfig([{type: 'popup'}], remoteConfig);
         expect(remoteConfig.plugins).toHaveLength(1);
 
+        const namelessContentRemote: {plugins?: unknown[]} = {plugins: []};
+        viteHelpers.extendRemoteConfigBuildConfig([{type: 'content-script'}], namelessContentRemote);
+        expect(namelessContentRemote.plugins).toHaveLength(1);
+
+        const contentRemote: {plugins?: unknown[]} = {plugins: []};
+        viteHelpers.extendRemoteConfigBuildConfig([{type: 'content-script', name: 'content'}], contentRemote);
+        expect(contentRemote.plugins).toHaveLength(1);
+
         const mixedConfig: {plugins?: unknown[]} = {plugins: []};
         viteHelpers.extendRemoteConfigBuildConfig([{type: 'background'}], mixedConfig);
         expect(mixedConfig.plugins).toHaveLength(0);
+
+        for (const name of ['bilibiliCaptionBridge', 'shadowBridge', 'xVideoBridge', 'youtubeBridge', 'youtubeEmbedBridge', 'videoPcmWorklet']) {
+            const type = name === 'videoPcmWorklet' ? 'unlisted-script' : 'content-script';
+            const bridgeRemote: {plugins?: unknown[]} = {plugins: []};
+            viteHelpers.extendRemoteConfigBuildConfig([{type, name}], bridgeRemote);
+            expect(bridgeRemote.plugins).toEqual([]);
+
+            const bridgeCatalog: {plugins?: unknown[]} = {plugins: []};
+            viteHelpers.extendScopedChineseCatalogBuildConfig([{type, name}], bridgeCatalog);
+            expect(bridgeCatalog.plugins).toEqual([]);
+        }
 
         const pluginList = {
             plugins: [
@@ -171,12 +192,56 @@ describe('wxt.config extracted helpers', () => {
         viteHelpers.pruneEntrypointVitePlugins([{type: 'background', name: 'background'}], pluginList);
         expect(pluginList.plugins.map(p => (p as {name: string}).name)).toEqual(['fluentread-shared-onnx', 'keep-me']);
 
+        const bridgePlugins = {
+            plugins: [
+                {name: 'vite:vue'},
+                {name: 'fluentread-deferred-franc-models'},
+                {name: 'fluentread-extension-csp-vendor'},
+                {name: 'escape-extension-noncharacters'},
+            ],
+        };
+        viteHelpers.pruneEntrypointVitePlugins([{type: 'content-script', name: 'youtubeBridge'}], bridgePlugins);
+        expect(bridgePlugins.plugins.map(p => (p as {name: string}).name)).toEqual(['escape-extension-noncharacters']);
+
         const filterTarget = {
-            plugins: [{name: 'fluentread-defuddle-entity-decoder', transform: (code: string) => code}],
+            plugins: [
+                {name: 'fluentread-defuddle-entity-decoder', transform: (code: string) => code},
+                {name: 'fluentread-extension-csp-vendor', transform: (code: string) => code},
+            ],
         };
         viteHelpers.attachRolldownTransformFilters(filterTarget);
-        const transformed = filterTarget.plugins[0] as unknown as {transform: {filter: {id: RegExp}; handler: unknown}};
-        expect(transformed.transform.filter.id).toBeInstanceOf(RegExp);
-        expect(typeof transformed.transform.handler).toBe('function');
+        const transformedDefuddle = filterTarget.plugins[0] as unknown as {transform: {filter: {id: RegExp}; handler: unknown}};
+        expect(transformedDefuddle.transform.filter.id).toBeInstanceOf(RegExp);
+        expect(typeof transformedDefuddle.transform.handler).toBe('function');
+
+        const transformedCsp = filterTarget.plugins[1] as unknown as {transform: {filter: {id: RegExp}; handler: unknown}};
+        expect(transformedCsp.transform.filter.id.test('/app/node_modules/pdfjs-dist/legacy/build/pdf.mjs')).toBe(true);
+        expect(transformedCsp.transform.filter.id.test('/app/node_modules/zod/v4/core/schemas.js')).toBe(true);
+        expect(transformedCsp.transform.filter.id.test('/app/src/app/popup/main.ts')).toBe(false);
+
+        const uiChunkConfig: {build?: {rolldownOptions?: {output?: {codeSplitting?: {groups: {name: string; test: RegExp}[]}}}}} = {};
+        viteHelpers.configureExtensionUiChunks([{type: 'popup'}, {type: 'options'}], uiChunkConfig);
+        const groups = uiChunkConfig.build!.rolldownOptions!.output!.codeSplitting!.groups;
+        expect(groups.map(group => group.name)).toEqual(['vue-runtime', 'domain-parser', 'zh-cn-catalog']);
+        const choose = (id: string) => groups.find(group => group.test.test(id))?.name;
+        expect(choose('/app/src/core/i18n/messages/zh-CN.ts')).toBe('zh-cn-catalog');
+        expect(choose(String.raw`C:\app\src\core\i18n\messages\settings-copy\zh-CN.json`)).toBe('zh-cn-catalog');
+        expect(choose('/app/src/core/i18n/index.ts')).toBeUndefined();
+
+        const gatewayPlugin = viteHelpers.aiSdkGatewayStubBuildPlugin();
+        expect(gatewayPlugin.name).toBe('fluentread-ai-sdk-gateway-stub');
+        const resolvedGateway = gatewayPlugin.resolveId('@ai-sdk/gateway', '/app/node_modules/.pnpm/ai@7.0.165/node_modules/ai/dist/index.js');
+        expect(resolvedGateway).toBe('\0fluentread-ai-sdk-gateway-stub');
+        expect(gatewayPlugin.resolveId('@ai-sdk/gateway', '/app/node_modules/ai/dist/index.js')).toBe('\0fluentread-ai-sdk-gateway-stub');
+        expect(gatewayPlugin.resolveId('@ai-sdk/gateway', '/app/node_modules/some-pkg/src/ai/index.js')).toBeNull();
+        expect(gatewayPlugin.resolveId('@ai-sdk/gateway', '/app/src/app/background/runtime.ts')).toBeNull();
+        expect(gatewayPlugin.resolveId('ai', '/app/node_modules/ai/dist/index.js')).toBeNull();
+        const stubCode = gatewayPlugin.load(resolvedGateway!);
+        expect(stubCode).toContain('GatewayError');
+        expect(stubCode).toContain('GatewayAuthenticationError');
+        expect(stubCode).toContain('createGateway');
+        expect(stubCode).toContain('specificationVersion: "v4"');
+        expect(stubCode).toContain('gateway');
+        expect(gatewayPlugin.load('\0other')).toBeNull();
     });
 });

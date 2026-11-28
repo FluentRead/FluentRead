@@ -2,7 +2,7 @@
  * @file scripts/testing/wxt-vite-helpers.ts
  * 文件职责：封装 WXT 各入口组的 Vite/Rolldown 构建插件注入、按组插件裁剪、原生 transform 过滤与分块策略。
  * 主要内容：
- * - 提供非后台远程配置存储、受限子 frame 正文提取/站点规则替代及按入口裁剪中文目录插件；
+ * - 提供非后台远程配置存储、未使用 @ai-sdk/gateway 桩、受限子 frame 正文提取/站点规则替代及按入口裁剪中文目录插件；
  * - 提供按入口组裁剪无关 Vite 插件与挂接 Rolldown 原生 transform 过滤器的优化钩子；
  * - 提供模块 Worker 分组与扩展 UI 页面共享 chunk 拆分函数。
  * 模块边界：纯构建期 Vite/Rolldown 配置变换函数，不涉及浏览器清单、归档压缩或运行时状态。
@@ -16,7 +16,7 @@ import {scopedChineseCatalogBuildPlugin} from '../i18n/scopedChineseCatalogPlugi
 
 const PROJECT_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
-const SUBFRAME_CONTENT_SCRIPT_NAMES = new Set(['youtubeEmbed', 'supportedFrame', 'neteaseMailFrame']);
+const SUBFRAME_CONTENT_SCRIPT_NAMES = new Set(['youtubeEmbed', 'videoSubtitleFrame', 'supportedFrame', 'neteaseMailFrame']);
 const SUBFRAME_CATALOG_HOSTS: Readonly<Record<string, readonly string[]>> = {
     neteaseMailFrame: ['mail.163.com', 'mail.126.com', 'mail.yeah.net'],
     supportedFrame: ['hf.space', 'disqus.com', 'www.kaggleusercontent.com', 'mail.qq.com', 'courses.edx.org'],
@@ -29,8 +29,16 @@ const BRIDGE_OR_WORKLET_NAMES = new Set([
     'youtubeEmbedBridge',
     'videoPcmWorklet',
 ]);
+
+function isAllBridgesOrWorklet(entrypoints: readonly {name?: string}[]): boolean {
+    return entrypoints.length > 0 && entrypoints.every((entrypoint) =>
+        typeof entrypoint.name === 'string' && BRIDGE_OR_WORKLET_NAMES.has(entrypoint.name));
+}
+
 const NON_CONTENT_SCRIPT_PLUGIN_NAMES = new Set([
     'fluentread-shared-onnx',
+    'fluentread-kokoro-transformers',
+    'fluentread-ai-sdk-gateway-stub',
     'wllama-static-extension-worker',
     'fluent-read-tesseract-sdk-initialization',
     'fluentread-pinned-pdfjs-bidi',
@@ -51,6 +59,9 @@ const ROLLDOWN_TRANSFORM_FILTERS: Readonly<Record<string, RolldownTransformFilte
         },
         code: /\b(?:ContentScriptContext|InvalidMatchPattern|MatchPattern|browser|createIframeUi|createIntegratedUi|createShadowRootUi|defineAppConfig|defineBackground|defineContentScript|defineUnlistedScript|defineWxtPlugin|fakeBrowser|getAppConfig|injectScript|storage|useAppConfig)\b/,
     },
+    'fluentread-extension-csp-vendor': {
+        id: /(?:^|[\\/])(?:regenerator-runtime[\\/]runtime\.js|jszip[\\/]dist[\\/]jszip\.min\.js|pdfjs-dist[\\/]legacy[\\/]build[\\/]pdf\.mjs|@pdf-lib[\\/]fontkit[\\/]dist[\\/]fontkit\.es\.js|lodash-es[\\/]_root\.js|zod[\\/]v4[\\/]core[\\/]schemas\.js)$/,
+    },
     'fluentread-defuddle-entity-decoder': {id: /(?:^|[\\/])defuddle[\\/]dist[\\/]index\.js$/},
     'fluentread-deferred-franc-models': {id: /(?:^|[\\/])franc-min[\\/]index\.js$/},
     'wllama-static-extension-worker': {id: /@wllama[\\/]wllama[\\/]esm[\\/]index\.js$/},
@@ -58,7 +69,47 @@ const ROLLDOWN_TRANSFORM_FILTERS: Readonly<Record<string, RolldownTransformFilte
 };
 
 /**
- * 内容脚本和扩展 UI 永远通过 runtime 代理读取后台权威配置。通用配置存储运行时同时
+ * Vercel AI SDK（ai@7）无条件静态导入 @ai-sdk/gateway 以支持字符串模型 ID 路由，
+ * 而 FluentRead 始终传入显式 LanguageModel 实例，永不走 Vercel AI Gateway；
+ * 在后台等非内容脚本构建中以极简显式抛错桩替代之，避免将 76 KB+ 网关逻辑与 schema 打入 background.js。
+ */
+export function aiSdkGatewayStubBuildPlugin() {
+    const virtualId = '\0fluentread-ai-sdk-gateway-stub';
+    const aiSdkImporter = /[\\/]node_modules[\\/]ai[\\/]/u;
+    return {
+        name: 'fluentread-ai-sdk-gateway-stub',
+        enforce: 'pre' as const,
+        resolveId(source: string, importer?: string) {
+            if (source === '@ai-sdk/gateway' && importer && aiSdkImporter.test(importer)) {
+                return virtualId;
+            }
+            return null;
+        },
+        load(id: string) {
+            if (id !== virtualId) return null;
+            return [
+                'export class GatewayError extends Error { static isInstance() { return false; } }',
+                'export class GatewayAuthenticationError extends GatewayError { static isInstance() { return false; } }',
+                'const unsupported = () => { throw new Error("FluentRead does not use @ai-sdk/gateway; pass an explicit LanguageModel instance."); };',
+                'export const createGateway = unsupported;',
+                'export const gateway = Object.assign(unsupported, {',
+                '    specificationVersion: "v4",',
+                '    languageModel: unsupported,',
+                '    embeddingModel: unsupported,',
+                '    textEmbeddingModel: unsupported,',
+                '    imageModel: unsupported,',
+                '    transcriptionModel: unsupported,',
+                '    speechModel: unsupported,',
+                '    rerankingModel: unsupported,',
+                '    videoModel: unsupported,',
+                '    speechTranslationModel: unsupported,',
+                '});',
+            ].join('\n');
+        },
+    };
+}
+
+/** 内容脚本和扩展 UI 永远通过 runtime 代理读取后台权威配置。通用配置存储运行时同时
  * 装配后台加密 IndexedDB（Dexie、加密与旧存储迁移），这些非后台入口无需解析它们；
  * 只对明确不包含后台的构建组使用纯远程实现，MV2 background page 仍保留数据库端口。
  */
@@ -75,11 +126,13 @@ export function remoteConfigStorageBuildPlugin(projectRoot = PROJECT_ROOT) {
 }
 
 export function extendRemoteConfigBuildConfig(
-    entrypoints: readonly {type: string}[],
+    entrypoints: readonly {type: string; name?: string}[],
     viteConfig: {plugins?: unknown[]},
 ): void {
     const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page', 'sidepanel']);
-    if (entrypoints.length === 0 || !entrypoints.every((entrypoint) => remoteOnlyTypes.has(entrypoint.type))) return;
+    if (entrypoints.length === 0
+        || isAllBridgesOrWorklet(entrypoints)
+        || !entrypoints.every((entrypoint) => remoteOnlyTypes.has(entrypoint.type))) return;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), remoteConfigStorageBuildPlugin()];
 }
 
@@ -216,13 +269,15 @@ export function extendSubframeSiteCatalogBuildConfig(
     viteConfig.plugins = [...(viteConfig.plugins ?? []), plugin];
 }
 
-/** 内容脚本与后台仅注入其产物实际可达的中文界面条目；所有扩展 UI 页面继续共享完整中文目录块。 */
+/** 内容脚本与后台仅注入其产物实际可达的中文界面条目；极轻 MAIN 世界桥/AudioWorklet 跳过注入，所有扩展 UI 页面继续共享完整中文目录块。 */
 export function extendScopedChineseCatalogBuildConfig(
-    entrypoints: readonly {type: string}[],
+    entrypoints: readonly {type: string; name?: string}[],
     viteConfig: {plugins?: unknown[]},
 ): void {
     const scopedTypes = new Set(['content-script', 'background']);
-    if (entrypoints.length === 0 || !entrypoints.every((entrypoint) => scopedTypes.has(entrypoint.type))) return;
+    if (entrypoints.length === 0
+        || isAllBridgesOrWorklet(entrypoints)
+        || !entrypoints.every((entrypoint) => scopedTypes.has(entrypoint.type))) return;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), scopedChineseCatalogBuildPlugin()];
 }
 
@@ -233,8 +288,7 @@ export function pruneEntrypointVitePlugins(
 ): void {
     if (entrypoints.length === 0 || !Array.isArray(viteConfig.plugins) || viteConfig.plugins.length === 0) return;
     const removed = new Set<string>();
-    const allBridgesOrWorklet = entrypoints.every((entrypoint) =>
-        typeof entrypoint.name === 'string' && BRIDGE_OR_WORKLET_NAMES.has(entrypoint.name));
+    const allBridgesOrWorklet = isAllBridgesOrWorklet(entrypoints);
     const allNonUiScripts = entrypoints.every((entrypoint) =>
         entrypoint.type === 'background' || entrypoint.type === 'unlisted-script'
         || (typeof entrypoint.name === 'string' && BRIDGE_OR_WORKLET_NAMES.has(entrypoint.name)));
@@ -253,6 +307,7 @@ export function pruneEntrypointVitePlugins(
     }
     if (allBridgesOrWorklet) {
         removed.add('fluentread-deferred-franc-models');
+        removed.add('fluentread-extension-csp-vendor');
     }
     if (removed.size === 0) return;
     viteConfig.plugins = viteConfig.plugins.filter((plugin) => {
@@ -302,7 +357,7 @@ export function groupModuleWorkers(groups: EntrypointGroup[]): void {
     groups.splice(index, 0, workers);
 }
 
-/** 页面共用的框架与域名数据独立成块，避免与中文目录及配置合成一个超大公共块。 */
+/** 页面共用的框架、域名数据与简体中文目录独立成块，避免与共享配置/规则合并出超 500 kB 的 i18n 公共块。 */
 export function configureExtensionUiChunks(entrypoints: readonly {type: string}[], config: InlineConfig): void {
     const pages = new Set(['popup', 'options', 'unlisted-page', 'sidepanel']);
     if (entrypoints.length === 0 || !entrypoints.every(entrypoint => pages.has(entrypoint.type)) || config.build?.lib) return;
@@ -314,6 +369,7 @@ export function configureExtensionUiChunks(entrypoints: readonly {type: string}[
         target.codeSplitting = {groups: [
             {name: 'vue-runtime', test: /[\\/]node_modules[\\/](?:@vue[\\/](?:reactivity|runtime-core|runtime-dom|shared)|vue)[\\/]/u},
             {name: 'domain-parser', test: /[\\/]node_modules[\\/](?:tldts|tldts-core)[\\/]/u},
+            {name: 'zh-cn-catalog', test: /[\\/]src[\\/]core[\\/]i18n[\\/]messages[\\/]/u},
         ]};
     }
 }

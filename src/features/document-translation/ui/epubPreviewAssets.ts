@@ -5,7 +5,7 @@
  * 模块边界：本模块只做只读归档资源提取与展示安全净化，不修改原始 ePub 字节、不发起网络请求也不直接操作 iframe DOM；导出打包归 services/binary 与 services/archive，导航回填归 core/epubNavigation。
  */
 import type JSZip from 'jszip';
-import {decodeHTMLStrict} from 'entities';
+import {decodeHTMLStrict} from 'entities/lib/decode.js';
 import {SaxesParser, type SaxesTagNS} from 'saxes';
 import type {EpubDocumentChapter} from '../core/document';
 import {readEpubNavigation, resolveEpubNavigationTarget} from '../core/epubNavigation';

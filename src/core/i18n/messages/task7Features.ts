@@ -44,6 +44,7 @@ export const task7ChineseMessages = {
     'scenarioPresets.onboarding.subtitle': '支持多选，自动启用对应阅读辅助；随时可在设置中调整',
     'scenarioPresets.onboarding.applyAndStart': '应用并开始',
     'scenarioPresets.onboarding.skipAndStart': '跳过直接开始',
+    'scenarioPresets.onboarding.saveFailed': '场景预设保存失败，请重试或先跳过进入主菜单。',
 
     'scenarioPresets.settings.title': '场景预设',
     'scenarioPresets.settings.description': '按阅读或工作场景一键启用推荐能力，不会覆盖已配置的 API Key 或自定义规则',
@@ -55,6 +56,7 @@ export const task7ChineseMessages = {
     'scenarioPresets.settings.clearSelection': '清空选择',
     'scenarioPresets.settings.applied': '已应用所选场景预设',
     'scenarioPresets.settings.alreadySatisfied': '当前配置已满足所选场景的全部推荐项',
+    'scenarioPresets.settings.saveFailed': '保存场景预设失败，请稍后重试',
 
     'scenarioPresets.preview.title': '将启用以下阅读能力',
     'scenarioPresets.preview.safeNote': '采用非破坏性合并，不会清除或改写你的 API Key、服务地址和自定义规则。',
@@ -112,6 +114,7 @@ export const task7ChineseMessages = {
     'commandPalette.settings.hotkeyConflict': '此快捷键已用于{feature}，请更换组合键',
     'commandPalette.settings.hotkeySet': '命令面板快捷键已设为 {shortcut}',
     'commandPalette.settings.customHotkey': '全局命令面板自定义快捷键',
+    'commandPalette.notice.actionFailed': '命令暂时无法在当前页面执行，请稍后重试或检查相关设置。',
 } as const;
 
 export type Task7MessageKey = keyof typeof task7ChineseMessages;
@@ -154,6 +157,7 @@ const zhTWMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.onboarding.subtitle': '支援多選，自動啟用對應閱讀輔助；隨時可在設定中調整',
     'scenarioPresets.onboarding.applyAndStart': '套用並開始',
     'scenarioPresets.onboarding.skipAndStart': '略過直接開始',
+    'scenarioPresets.onboarding.saveFailed': '情境預設儲存失敗，請重試或先略過進入主選單。',
 
     'scenarioPresets.settings.title': '情境預設',
     'scenarioPresets.settings.description': '依閱讀或工作情境一鍵啟用推薦能力，不會覆蓋已設定的 API 金鑰或自訂規則',
@@ -165,6 +169,7 @@ const zhTWMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.settings.clearSelection': '清除選擇',
     'scenarioPresets.settings.applied': '已套用所選情境預設',
     'scenarioPresets.settings.alreadySatisfied': '目前設定已滿足所選情境的全部推薦項目',
+    'scenarioPresets.settings.saveFailed': '儲存情境預設失敗，請稍後重試',
 
     'scenarioPresets.preview.title': '將啟用以下閱讀能力',
     'scenarioPresets.preview.safeNote': '採用非破壞性合併，不會清除或改寫你的 API 金鑰、服務位址與自訂規則。',
@@ -222,6 +227,7 @@ const zhTWMessages: Readonly<Record<Task7MessageKey, string>> = {
     'commandPalette.settings.hotkeyConflict': '此快速鍵已用於{feature}，請更換組合鍵',
     'commandPalette.settings.hotkeySet': '命令面板快速鍵已設為 {shortcut}',
     'commandPalette.settings.customHotkey': '全域命令面板自訂快速鍵',
+    'commandPalette.notice.actionFailed': '命令暫時無法在目前頁面執行，請稍後重試或檢查相關設定。',
 };
 
 const enUSMessages: Readonly<Record<Task7MessageKey, string>> = {
@@ -262,6 +268,7 @@ const enUSMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.onboarding.subtitle': 'Select one or more presets to enable helpful tools right away; change anytime in Settings',
     'scenarioPresets.onboarding.applyAndStart': 'Apply and start',
     'scenarioPresets.onboarding.skipAndStart': 'Skip for now',
+    'scenarioPresets.onboarding.saveFailed': 'Failed to save scenario presets. Try again or skip for now.',
 
     'scenarioPresets.settings.title': 'Scenario presets',
     'scenarioPresets.settings.description': 'Apply recommended reading and workflow settings without overwriting your API keys or custom rules',
@@ -273,6 +280,7 @@ const enUSMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.settings.clearSelection': 'Clear selection',
     'scenarioPresets.settings.applied': 'Scenario presets applied',
     'scenarioPresets.settings.alreadySatisfied': 'All recommended options for the selected scenarios are already enabled',
+    'scenarioPresets.settings.saveFailed': 'Failed to save scenario presets. Please try again.',
 
     'scenarioPresets.preview.title': 'Capabilities to be enabled',
     'scenarioPresets.preview.safeNote': 'Non-destructive merge: your API keys, endpoints, and custom site rules are never overwritten.',
@@ -330,6 +338,7 @@ const enUSMessages: Readonly<Record<Task7MessageKey, string>> = {
     'commandPalette.settings.hotkeyConflict': 'This shortcut is already used for {feature}. Choose another combination.',
     'commandPalette.settings.hotkeySet': 'Command palette shortcut set to {shortcut}',
     'commandPalette.settings.customHotkey': 'Custom global command palette shortcut',
+    'commandPalette.notice.actionFailed': 'This command could not run on the current page. Try again or check your settings.',
 };
 
 const jaJPMessages: Readonly<Record<Task7MessageKey, string>> = {
@@ -370,6 +379,7 @@ const jaJPMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.onboarding.subtitle': '複数選択でき、適した補助機能をまとめて有効化します（後から設定で変更可能）',
     'scenarioPresets.onboarding.applyAndStart': '適用して開始',
     'scenarioPresets.onboarding.skipAndStart': 'スキップして開始',
+    'scenarioPresets.onboarding.saveFailed': 'プリセットの保存に失敗しました。再試行するかスキップしてください。',
 
     'scenarioPresets.settings.title': 'シーン別プリセット',
     'scenarioPresets.settings.description': '利用目的に合わせて推奨機能を一括有効化します。API キーや独自ルールは上書きされません',
@@ -381,6 +391,7 @@ const jaJPMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.settings.clearSelection': '選択をクリア',
     'scenarioPresets.settings.applied': '選択したシーン別プリセットを適用しました',
     'scenarioPresets.settings.alreadySatisfied': '選択したシーンの推奨設定はすでに有効です',
+    'scenarioPresets.settings.saveFailed': 'プリセットの保存に失敗しました。しばらくしてから再試行してください。',
 
     'scenarioPresets.preview.title': '有効になる機能',
     'scenarioPresets.preview.safeNote': '非破壊マージのため、既存の API キー・接続先・カスタムルールは保持されます。',
@@ -438,6 +449,7 @@ const jaJPMessages: Readonly<Record<Task7MessageKey, string>> = {
     'commandPalette.settings.hotkeyConflict': 'このショートカットは「{feature}」で使用中です。別の組み合わせを選んでください。',
     'commandPalette.settings.hotkeySet': 'コマンドパレットのショートカットを {shortcut} に設定しました',
     'commandPalette.settings.customHotkey': 'カスタムのグローバルコマンドパレットショートカット',
+    'commandPalette.notice.actionFailed': '現在のページではこのコマンドを実行できませんでした。設定を確認するか再試行してください。',
 };
 
 const koKRMessages: Readonly<Record<Task7MessageKey, string>> = {
@@ -478,6 +490,7 @@ const koKRMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.onboarding.subtitle': '여러 항목을 선택해 추천 도구를 바로 켤 수 있으며 설정에서 언제든 바꿀 수 있습니다',
     'scenarioPresets.onboarding.applyAndStart': '적용하고 시작',
     'scenarioPresets.onboarding.skipAndStart': '건너뛰고 시작',
+    'scenarioPresets.onboarding.saveFailed': '시나리오 프리셋을 저장하지 못했습니다. 다시 시도하거나 건너뛰세요.',
 
     'scenarioPresets.settings.title': '시나리오 프리셋',
     'scenarioPresets.settings.description': '읽기·업무 환경에 맞는 추천 기능을 한 번에 켭니다. API 키나 사용자 규칙은 덮어쓰지 않습니다',
@@ -489,6 +502,7 @@ const koKRMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.settings.clearSelection': '선택 지우기',
     'scenarioPresets.settings.applied': '선택한 시나리오 프리셋을 적용했습니다',
     'scenarioPresets.settings.alreadySatisfied': '선택한 시나리오의 모든 추천 항목이 이미 켜져 있습니다',
+    'scenarioPresets.settings.saveFailed': '시나리오 프리셋을 저장하지 못했습니다. 잠시 후 다시 시도하세요.',
 
     'scenarioPresets.preview.title': '활성화될 읽기 기능',
     'scenarioPresets.preview.safeNote': '비파괴 병합으로 기존 API 키, 서비스 주소, 사용자 지정 규칙을 유지합니다.',
@@ -546,6 +560,7 @@ const koKRMessages: Readonly<Record<Task7MessageKey, string>> = {
     'commandPalette.settings.hotkeyConflict': '이 단축키는 이미 {feature}에서 사용 중입니다. 다른 조합을 선택하세요.',
     'commandPalette.settings.hotkeySet': '명령 팔레트 단축키가 {shortcut}(으)로 설정되었습니다',
     'commandPalette.settings.customHotkey': '사용자 지정 전역 명령 팔레트 단축키',
+    'commandPalette.notice.actionFailed': '현재 페이지에서 이 명령을 실행할 수 없습니다. 다시 시도하거나 설정을 확인하세요.',
 };
 
 const frFRMessages: Readonly<Record<Task7MessageKey, string>> = {
@@ -586,6 +601,7 @@ const frFRMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.onboarding.subtitle': 'Sélection multiple prise en charge ; modifiable à tout moment dans les paramètres',
     'scenarioPresets.onboarding.applyAndStart': 'Appliquer et commencer',
     'scenarioPresets.onboarding.skipAndStart': 'Ignorer pour l’instant',
+    'scenarioPresets.onboarding.saveFailed': 'Impossible d’enregistrer les préréglages. Réessayez ou ignorez pour l’instant.',
 
     'scenarioPresets.settings.title': 'Préréglages de scénario',
     'scenarioPresets.settings.description': 'Activez les outils recommandés selon votre usage sans écraser vos clés API ni vos règles',
@@ -597,6 +613,7 @@ const frFRMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.settings.clearSelection': 'Effacer la sélection',
     'scenarioPresets.settings.applied': 'Préréglages de scénario appliqués',
     'scenarioPresets.settings.alreadySatisfied': 'Toutes les options recommandées sont déjà activées',
+    'scenarioPresets.settings.saveFailed': 'Échec de l’enregistrement des préréglages. Veuillez réessayer.',
 
     'scenarioPresets.preview.title': 'Fonctionnalités qui seront activées',
     'scenarioPresets.preview.safeNote': 'Fusion non destructive : vos clés API, adresses de service et règles personnalisées restent intactes.',
@@ -654,6 +671,7 @@ const frFRMessages: Readonly<Record<Task7MessageKey, string>> = {
     'commandPalette.settings.hotkeyConflict': 'Ce raccourci est déjà utilisé par {feature}. Choisissez une autre combinaison.',
     'commandPalette.settings.hotkeySet': 'Raccourci de la palette de commandes défini sur {shortcut}',
     'commandPalette.settings.customHotkey': 'Raccourci personnalisé de la palette de commandes',
+    'commandPalette.notice.actionFailed': 'Impossible d’exécuter cette commande sur la page actuelle. Réessayez ou vérifiez vos paramètres.',
 };
 
 const ruRUMessages: Readonly<Record<Task7MessageKey, string>> = {
@@ -694,6 +712,7 @@ const ruRUMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.onboarding.subtitle': 'Можно выбрать несколько вариантов; настройки всегда можно изменить позже',
     'scenarioPresets.onboarding.applyAndStart': 'Применить и начать',
     'scenarioPresets.onboarding.skipAndStart': 'Пропустить',
+    'scenarioPresets.onboarding.saveFailed': 'Не удалось сохранить пресеты. Повторите попытку или пропустите шаг.',
 
     'scenarioPresets.settings.title': 'Пресеты сценариев',
     'scenarioPresets.settings.description': 'Включайте рекомендуемые функции одним нажатием без перезаписи API-ключей и правил',
@@ -705,6 +724,7 @@ const ruRUMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.settings.clearSelection': 'Очистить выбор',
     'scenarioPresets.settings.applied': 'Выбранные пресеты применены',
     'scenarioPresets.settings.alreadySatisfied': 'Все рекомендуемые параметры для выбранных сценариев уже включены',
+    'scenarioPresets.settings.saveFailed': 'Не удалось сохранить пресеты. Повторите попытку позже.',
 
     'scenarioPresets.preview.title': 'Будут включены возможности',
     'scenarioPresets.preview.safeNote': 'Безопасное объединение: ваши API-ключи, адреса сервисов и пользовательские правила сохранятся.',
@@ -762,6 +782,7 @@ const ruRUMessages: Readonly<Record<Task7MessageKey, string>> = {
     'commandPalette.settings.hotkeyConflict': 'Это сочетание уже используется для «{feature}». Выберите другое.',
     'commandPalette.settings.hotkeySet': 'Для палитры команд назначено сочетание {shortcut}',
     'commandPalette.settings.customHotkey': 'Пользовательское сочетание палитры команд',
+    'commandPalette.notice.actionFailed': 'Не удалось выполнить команду на этой странице. Повторите попытку или проверьте настройки.',
 };
 
 const esESMessages: Readonly<Record<Task7MessageKey, string>> = {
@@ -802,6 +823,7 @@ const esESMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.onboarding.subtitle': 'Puedes elegir varios para activar funciones útiles; cámbialo cuando quieras en Ajustes',
     'scenarioPresets.onboarding.applyAndStart': 'Aplicar y empezar',
     'scenarioPresets.onboarding.skipAndStart': 'Omitir por ahora',
+    'scenarioPresets.onboarding.saveFailed': 'No se pudieron guardar los preajustes. Inténtalo de nuevo u omite por ahora.',
 
     'scenarioPresets.settings.title': 'Preajustes de escenario',
     'scenarioPresets.settings.description': 'Activa funciones recomendadas sin sobrescribir tus claves API ni tus reglas personalizadas',
@@ -813,6 +835,7 @@ const esESMessages: Readonly<Record<Task7MessageKey, string>> = {
     'scenarioPresets.settings.clearSelection': 'Limpiar selección',
     'scenarioPresets.settings.applied': 'Preajustes de escenario aplicados',
     'scenarioPresets.settings.alreadySatisfied': 'Todas las opciones recomendadas para estos escenarios ya están activas',
+    'scenarioPresets.settings.saveFailed': 'No se pudieron guardar los preajustes. Inténtalo de nuevo más tarde.',
 
     'scenarioPresets.preview.title': 'Capacidades que se activarán',
     'scenarioPresets.preview.safeNote': 'Combinación no destructiva: tus claves API, direcciones y reglas personalizadas permanecen intactas.',
@@ -870,6 +893,7 @@ const esESMessages: Readonly<Record<Task7MessageKey, string>> = {
     'commandPalette.settings.hotkeyConflict': 'Este atajo ya está asignado a {feature}. Elige otra combinación.',
     'commandPalette.settings.hotkeySet': 'Atajo de la paleta de comandos establecido en {shortcut}',
     'commandPalette.settings.customHotkey': 'Atajo personalizado de la paleta de comandos',
+    'commandPalette.notice.actionFailed': 'No se pudo ejecutar este comando en la página actual. Inténtalo de nuevo o revisa los ajustes.',
 };
 
 export const task7Messages: Readonly<Record<UiLanguage, Readonly<Record<Task7MessageKey, string>>>> = {

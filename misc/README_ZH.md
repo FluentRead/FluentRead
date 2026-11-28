@@ -124,7 +124,7 @@
 
 流畅阅读按 [GPL-3.0](../LICENSE) 开源发布，第三方组件的来源与许可见[第三方声明](../public/third-party-notices/)。
 
-设置和学习记录默认保存在本机，云端翻译由所选服务处理。Google Drive 配置同步（Chrome 测试功能）可将完整配置（含服务凭据）备份到自己的云盘，不包含单词本、聊天记录和用量统计。权限、加密及删除方式见[隐私政策](https://read.thinkstu.com/guide/privacy)。
+设置和学习记录默认保存在本机，云端翻译由所选服务处理。云同步备份支持 Google Drive（Chrome 测试功能）与 WebDAV，可将完整配置（含服务凭据）加密备份到你自己的云盘或服务器，不包含单词本、聊天记录和用量统计。权限、加密及删除方式见[隐私政策](https://read.thinkstu.com/guide/privacy)。
 
 ## Star 历史
 

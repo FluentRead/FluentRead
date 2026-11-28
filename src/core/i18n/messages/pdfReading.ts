@@ -227,7 +227,7 @@ export const pdfReadingTraditionalChineseMessages = {
     "document.pdfReading.annotationIncludeTranslation": "附加本段譯文",
     "document.pdfReading.annotationNote": "備注（可選）",
     "document.pdfReading.annotationHighlight": "高亮",
-    "document.pdfReading.annotationUnderline": "下划線",
+    "document.pdfReading.annotationUnderline": "底線",
     "document.pdfReading.annotationDelete": "刪除註解",
     "document.pdfReading.annotationDownload": "下載原 PDF 與註解",
     "document.pdfReading.annotationSaving": "正在儲存…",

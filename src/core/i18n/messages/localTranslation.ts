@@ -206,7 +206,7 @@ export const localTranslationTraditionalChineseMessages: Record<keyof typeof loc
     'settings.localTranslation.trialError': "翻譯未能完成，請縮短文本或選擇其他已下載模型",
     'settings.localTranslation.error.notDownloaded': '請先在“本機模型翻譯”設定中下載當前選擇的模型，再開始翻譯。',
     'settings.localTranslation.error.language': '當前模型不支援這個語言方向，請選擇對應的語言套件或混元模型。',
-    'settings.localTranslation.error.repetition': '模型生成了重復或不完整的譯文，請嘗試混元模型或縮短文本。',
+    'settings.localTranslation.error.repetition': '模型生成了重複或不完整的譯文，請嘗試混元模型或縮短文本。',
     'settings.localTranslation.error.timeout': '本機翻譯耗時過長，已停止。請縮短文本或選擇輕量模型。',
     'settings.localTranslation.error.removed': '當前模型已刪除，請下載或選擇其他模型後再翻譯。',
     'settings.localTranslation.error.browser': '當前瀏覽器無法運行混元，請升級瀏覽器或選擇輕量語言套件。',

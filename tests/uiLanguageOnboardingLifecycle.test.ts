@@ -333,4 +333,31 @@ describe('UiLanguageOnboarding 实际保存与生命周期', () => {
     invalidate('unmount');releasePatch();await applyPending;await settle()
     expect(confirmed).not.toHaveBeenCalled()
   })
+  it('场景预设保存失败时展示可重试错误，并支持 initialStep=scenario 直接恢复第二步', async () => {
+    const {Config} = await import('@/src/core/config/model')
+    const currentConfig = new Config();currentConfig.display = 0
+    const applyScenarioPatch = vi.fn(async () => {throw new Error('persist failed')})
+    await mount({initialLanguage: 'zh-TW', initialStep: 'scenario', enableScenarioStep: true, currentConfig, applyScenarioPatch})
+    expect(document.querySelector('[data-testid="onboarding-scenario-step"]')).not.toBeNull()
+    callback(button('[data-scenario="academic"]'))();await settle()
+    await callback(button('[data-testid="onboarding-scenario-apply"]'))();await settle()
+    expect(applyScenarioPatch).toHaveBeenCalledOnce()
+    expect(confirmed).not.toHaveBeenCalled()
+    expect(button('[data-testid="onboarding-scenario-error"]').textContent).toBe('scenarioPresets.onboarding.saveFailed')
+
+    // 异步失败期间卸载，不回写错误
+    let rejectLate!: (error: Error) => void
+    app?.unmount();app = undefined;await settle()
+    await mount({
+      initialLanguage: 'zh-TW',
+      initialStep: 'scenario',
+      enableScenarioStep: true,
+      currentConfig,
+      applyScenarioPatch: () => new Promise<void>((_resolve, reject) => {rejectLate = reject}),
+    })
+    callback(button('[data-scenario="academic"]'))();await settle()
+    const pendingFail = callback(button('[data-testid="onboarding-scenario-apply"]'))()
+    invalidate('unmount');rejectLate(new Error('late error'));await pendingFail;await settle()
+    expect(state.errorMessage).toBe('')
+  })
 })

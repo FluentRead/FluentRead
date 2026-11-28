@@ -1,7 +1,12 @@
 import {parseHTML} from 'linkedom';
 import * as Vue from 'vue';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {Config} from '@/src/core/config/model';
+import {Config, normalizeConfig} from '@/src/core/config/model';
+import {options} from '@/src/core/config/catalog';
+import {extractConfigCredentials, sanitizeConfigCredentials} from '@/src/core/config/credentials';
+import {createConfigApplication} from '@/src/services/config/application';
+import {createConfigPersistenceHandler} from '@/src/app/background/handlers/configPersistence';
+import type {ConfigStoragePort} from '@/src/platform/storage/configStorage';
 import {
     buildScenarioPresetPatch,
     DEVELOPER_PROTECTED_TAGS,
@@ -11,15 +16,17 @@ import {
     type ScenarioPresetCurrentConfig,
 } from '@/src/core/config/scenarioPresets';
 
-const {elMessageSuccess, elMessageInfo} = vi.hoisted(() => ({
+const {elMessageSuccess, elMessageInfo, elMessageError} = vi.hoisted(() => ({
     elMessageSuccess: vi.fn(),
     elMessageInfo: vi.fn(),
+    elMessageError: vi.fn(),
 }));
 
 vi.mock('element-plus', () => ({
     ElMessage: Object.assign(vi.fn(), {
         success: elMessageSuccess,
         info: elMessageInfo,
+        error: elMessageError,
         warning: vi.fn(),
     }),
 }));
@@ -142,10 +149,118 @@ describe('scenarioPresets 纯配置领域逻辑', () => {
         const crossBorder = buildScenarioPresetPatch(['cross-border'], makeDisabledConfig());
         expect(crossBorder.patch).toMatchObject({
             display: 1,
-            inputBoxTranslationTrigger: 'tripleSpace',
+            inputBoxTranslationTrigger: 'triple_space',
             writing: expect.objectContaining({enabled: true}),
             disableFloatingBall: false,
         });
+    });
+
+    it('每个场景预设补丁字段都符合 catalog 枚举并在 normalizeConfig 往返后完全保真', () => {
+        const validTriggers = new Set(options.inputBoxTranslationTrigger.map((item) => item.value));
+        const validHoverKeys = new Set(options.keys.map((item) => item.value));
+        const disabledBase = new Config();
+        disabledBase.display = 0;
+        disabledBase.hotkey = 'none';
+        disabledBase.excludedTags = [];
+        disabledBase.bilingualSentenceHighlightEnabled = false;
+        disabledBase.glossaryEnabled = false;
+        disabledBase.enableAIContext = false;
+        disabledBase.sectionTranslationHotkeyEnabled = false;
+        disabledBase.selectionTranslatorMode = 'disabled';
+        disabledBase.disableSelectionTranslator = true;
+        disabledBase.selectionTranslatorBidirectional = false;
+        disabledBase.vocabularyBookEnabled = false;
+        disabledBase.vocabularyReencounterEnabled = false;
+        disabledBase.informationHighlight = {...disabledBase.informationHighlight, enabled: false};
+        disabledBase.videoTranslationEnabled = false;
+        disabledBase.videoSubtitleVisible = false;
+        disabledBase.videoSubtitleDisplayMode = 'original-only';
+        disabledBase.disableImageTranslator = true;
+        disabledBase.imageTranslationHoverEnabled = false;
+        disabledBase.imageTranslationMangaEnabled = false;
+        disabledBase.disableFloatingBall = true;
+        disabledBase.inputBoxTranslationTrigger = 'disabled';
+        disabledBase.writing = {...disabledBase.writing, enabled: false};
+
+        for (const preset of SCENARIO_PRESETS) {
+            const {patch} = buildScenarioPresetPatch([preset.id], disabledBase);
+            if (patch.inputBoxTranslationTrigger !== undefined) {
+                expect(validTriggers.has(patch.inputBoxTranslationTrigger), preset.id).toBe(true);
+            }
+            if (patch.hotkey !== undefined) {
+                expect(validHoverKeys.has(patch.hotkey), preset.id).toBe(true);
+            }
+            const normalized = normalizeConfig({...disabledBase, ...patch});
+            for (const [key, value] of Object.entries(patch)) {
+                expect((normalized as unknown as Record<string, unknown>)[key], `${preset.id}.${key}`).toEqual(value);
+            }
+        }
+    });
+
+    it('真实 createConfigApplication 集成：不预改 config 直接 requestConfigPatch 持久化并触发订阅者', async () => {
+        const initial = normalizeConfig({
+            display: 0,
+            inputBoxTranslationTrigger: 'disabled',
+            disableFloatingBall: true,
+            writing: {...new Config().writing, enabled: false},
+        });
+        const records = new Map<string, unknown>([
+            ['local:config', {...sanitizeConfigCredentials(initial), __fluentConfigRevision: 1}],
+            ['local:credentials', extractConfigCredentials(initial)],
+        ]);
+        const listeners = new Map<string, Set<(value: unknown) => void>>();
+        const notify = (key: string) => {
+            for (const listener of listeners.get(key) ?? []) listener(structuredClone(records.get(key) ?? null));
+        };
+        const storage: ConfigStoragePort = {
+            writeOwner: true,
+            getItem: async <T>(key: string) => structuredClone(records.get(key) ?? null) as T | null,
+            setItem: async <T>(key: string, value: T) => { records.set(key, structuredClone(value)); notify(key); },
+            setItems: async (entries, removeKeys = []) => {
+                for (const [key, value] of entries) records.set(key, structuredClone(value));
+                for (const key of removeKeys) records.delete(key);
+                for (const key of [...entries.keys(), ...removeKeys]) notify(key);
+            },
+            removeItem: async (key) => { records.delete(key); notify(key); },
+            watch: (key, cb) => {
+                const set = listeners.get(key) ?? new Set();
+                set.add(cb as (value: unknown) => void);
+                listeners.set(key, set);
+                return () => { set.delete(cb as (value: unknown) => void); };
+            },
+        };
+        const authorityApp = createConfigApplication({storage, trustedContext: true});
+        const clientApp = createConfigApplication({storage: {...storage, writeOwner: false}, trustedContext: true});
+        await Promise.all([authorityApp.start(), clientApp.start()]);
+        const persistHandler = createConfigPersistenceHandler({
+            ready: authorityApp.configReady,
+            getCurrentConfig: () => authorityApp.config,
+            prepareConfigSaveRequest: authorityApp.prepareConfigSaveRequest,
+            prepareConfigPatchRequest: authorityApp.prepareConfigPatchRequest,
+            saveConfig: authorityApp.saveConfig,
+            getCurrentRevision: authorityApp.getConfigRevision,
+            isExtensionUrl: (url) => url.startsWith('chrome-extension://ext-test/'),
+        });
+        const sendMessage = async (message: unknown) => persistHandler.handle(
+            JSON.parse(JSON.stringify(message)),
+            {sender: {url: 'chrome-extension://ext-test/popup.html'}},
+        );
+
+        const notified = vi.fn();
+        const unsubscribe = clientApp.subscribeConfig(notified);
+        const {patch} = buildScenarioPresetPatch(['cross-border'], clientApp.config);
+        expect(patch.inputBoxTranslationTrigger).toBe('triple_space');
+
+        await clientApp.requestConfigPatch(patch, sendMessage);
+        expect(clientApp.config.display).toBe(1);
+        expect(clientApp.config.inputBoxTranslationTrigger).toBe('triple_space');
+        expect(clientApp.config.disableFloatingBall).toBe(false);
+        expect(clientApp.config.writing.enabled).toBe(true);
+        expect((records.get('local:config') as Record<string, unknown>).inputBoxTranslationTrigger).toBe('triple_space');
+        expect(notified).toHaveBeenCalled();
+
+        unsubscribe();
+        await Promise.all([authorityApp.flushConfigHistory(), clientApp.flushConfigHistory()]);
     });
 
     it('多选叠加保留用户已有快捷键、排除标签与启用项，全部满足时返回 alreadySatisfied', () => {
@@ -213,7 +328,7 @@ describe('ScenarioPresetsSettings 真实 Vue 组件行为', () => {
     });
 
     afterEach(async () => {
-        app?.unmount();
+        (app as Vue.App | undefined)?.unmount();
         app = undefined;
         await settle();
         vi.unstubAllGlobals();
@@ -365,5 +480,61 @@ describe('ScenarioPresetsSettings 真实 Vue 组件行为', () => {
         expect(config.disableFloatingBall).toBe(false);
         expect(config.imageTranslationMangaEnabled).toBe(true);
         expect(elMessageSuccess).toHaveBeenCalledTimes(1);
+    });
+
+    it('applyPatch 失败时提示错误；异步等待期间页面失活不弹出过时提示', async () => {
+        const config = new Config();
+        config.display = 0;
+        const failingPatch = vi.fn(async () => { throw new Error('persist failed'); });
+        await mountComponent({config, applyPatch: failingPatch});
+
+        events.get(document.querySelector('[data-testid="scenario-presets-toggle"]')!)?.onClick();
+        await settle();
+        events.get(document.querySelector('[data-scenario-id="academic"]')!)?.onClick();
+        await settle();
+        await events.get(document.querySelector('[data-testid="scenario-presets-apply"]')!)?.onClick();
+        await settle();
+        expect(elMessageError).toHaveBeenCalledWith('scenarioPresets.settings.saveFailed');
+
+        // 异步等待期间失活：成功和失败都不会触发过时提示
+        (app as Vue.App | undefined)?.unmount();
+        app = undefined;
+        await settle();
+        vi.clearAllMocks();
+
+        let resolvePending!: () => void;
+        let rejectPending!: (err: Error) => void;
+        const reactiveProps = await mountComponent({
+            config,
+            applyPatch: () => new Promise<void>((resolve) => { resolvePending = resolve; }),
+        });
+        events.get(document.querySelector('[data-testid="scenario-presets-toggle"]')!)?.onClick();
+        await settle();
+        events.get(document.querySelector('[data-scenario-id="academic"]')!)?.onClick();
+        await settle();
+        const inFlightSuccess = events.get(document.querySelector('[data-testid="scenario-presets-apply"]')!)?.onClick();
+        reactiveProps.active = false;
+        await settle();
+        resolvePending();
+        await inFlightSuccess;
+        expect(elMessageSuccess).not.toHaveBeenCalled();
+
+        (app as Vue.App | undefined)?.unmount();
+        app = undefined;
+        await settle();
+        const reactiveProps2 = await mountComponent({
+            config,
+            applyPatch: () => new Promise<void>((_resolve, reject) => { rejectPending = reject; }),
+        });
+        events.get(document.querySelector('[data-testid="scenario-presets-toggle"]')!)?.onClick();
+        await settle();
+        events.get(document.querySelector('[data-scenario-id="academic"]')!)?.onClick();
+        await settle();
+        const inFlightFail = events.get(document.querySelector('[data-testid="scenario-presets-apply"]')!)?.onClick();
+        reactiveProps2.active = false;
+        await settle();
+        rejectPending(new Error('late failure'));
+        await inFlightFail;
+        expect(elMessageError).not.toHaveBeenCalled();
     });
 });

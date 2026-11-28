@@ -86,6 +86,7 @@ import {
     type ScenarioPresetId,
 } from '@/src/core/config/scenarioPresets';
 import {useUiI18n} from '@/src/ui/i18n';
+import {useSettingsActionContext} from '../model/useSettingsActionContext';
 import SettingsGroup from './components/SettingsGroup.vue';
 import SettingsItem from './components/SettingsItem.vue';
 
@@ -96,6 +97,7 @@ const props = withDefaults(defineProps<{
 }>(), {active: true});
 
 const {t} = useUiI18n();
+const context = useSettingsActionContext(() => props.active, () => [props.config]);
 const expanded = ref(false);
 const selectedIds = ref<ScenarioPresetId[]>([]);
 const applying = ref(false);
@@ -112,7 +114,8 @@ function toggleScenario(id: ScenarioPresetId): void {
 }
 
 async function applySelectedPresets(): Promise<void> {
-    if (!props.active || applying.value || preview.value.scenarioIds.length === 0) return;
+    if (!context.active.value || applying.value || preview.value.scenarioIds.length === 0) return;
+    const current = context.capture();
     const result = buildScenarioPresetPatch(selectedIds.value, props.config);
     if (result.alreadySatisfied) {
         ElMessage.info(t('scenarioPresets.settings.alreadySatisfied'));
@@ -125,7 +128,10 @@ async function applySelectedPresets(): Promise<void> {
         } else {
             Object.assign(props.config, result.patch);
         }
+        if (!current()) return;
         ElMessage.success(t('scenarioPresets.settings.applied'));
+    } catch {
+        if (current()) ElMessage.error(t('scenarioPresets.settings.saveFailed'));
     } finally {
         applying.value = false;
     }

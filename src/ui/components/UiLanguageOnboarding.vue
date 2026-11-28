@@ -49,6 +49,7 @@
           {{ t('scenarioPresets.onboarding.skipAndStart') }}
         </button>
       </div>
+      <p v-if="errorMessage" class="onboarding-error" role="alert" data-testid="onboarding-scenario-error" :lang="selectedLanguage">{{ errorMessage }}</p>
     </div>
   </section>
 </template>
@@ -72,10 +73,11 @@ import {useSettingsActionContext} from '@/src/features/settings/model/useSetting
 
 const props = withDefaults(defineProps<{
   initialLanguage: UiLanguage;
+  initialStep?: 'language' | 'scenario';
   enableScenarioStep?: boolean;
   currentConfig?: ScenarioPresetCurrentConfig;
   applyScenarioPatch?: (patch: Partial<Config>) => Promise<void> | void;
-}>(), {enableScenarioStep: false});
+}>(), {initialStep: 'language', enableScenarioStep: false});
 
 const emit = defineEmits<{
   saved: [language: UiLanguage];
@@ -99,7 +101,7 @@ const saveFailureMessages: Readonly<Record<UiLanguage, string>> = {
   'es-ES': 'No se pudo confirmar que se guardara el idioma. Confirma de nuevo para reintentarlo.',
 };
 const selectedLanguage = ref<UiLanguage>(props.initialLanguage);
-const step = ref<'language' | 'scenario'>('language');
+const step = ref<'language' | 'scenario'>(props.enableScenarioStep && props.initialStep === 'scenario' ? 'scenario' : 'language');
 const selectedScenarios = ref<ScenarioPresetId[]>([]);
 const onboardingRoot = ref<HTMLElement | null>(null);
 const languageOptionButtons = ref<HTMLButtonElement[]>([]);
@@ -124,7 +126,7 @@ watch(() => [selectedLanguage.value, context.active.value] as const, ([value, ac
 }, {immediate: true});
 watch(context.revision, () => {
   errorMessage.value = '';
-  step.value = 'language';
+  step.value = props.enableScenarioStep && props.initialStep === 'scenario' ? 'scenario' : 'language';
   selectedScenarios.value = [];
   focusSequence += 1;
 }, {flush: 'sync'});
@@ -201,6 +203,7 @@ async function finishScenario(apply: boolean): Promise<void> {
   if (!scenarioInteractionActive.value) return;
   const current = context.capture(), chosenLanguage = selectedLanguage.value;
   confirming.value = true;
+  errorMessage.value = '';
   try {
     if (apply && props.currentConfig && props.applyScenarioPatch) {
       const {patch, changedKeys} = buildScenarioPresetPatch(selectedScenarios.value, props.currentConfig);
@@ -209,6 +212,8 @@ async function finishScenario(apply: boolean): Promise<void> {
     if (!current()) return;
     committed.value = true;
     emit('confirmed', chosenLanguage);
+  } catch {
+    if (current()) errorMessage.value = t('scenarioPresets.onboarding.saveFailed');
   } finally {
     confirming.value = false;
   }

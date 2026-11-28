@@ -21,6 +21,8 @@
       aria-labelledby="fr-command-palette-title"
       data-testid="command-palette-dialog"
       @keydown.stop="handleKeydown"
+      @keyup.stop
+      @keypress.stop
       @click.stop
     >
       <header class="fr-palette-header">
@@ -186,10 +188,11 @@ function close(): void {
 function executeItem(item: CommandPaletteItem): void {
     const handler = executeHandler;
     close();
-    void handler!(item.id);
+    void Promise.resolve(handler!(item.id)).catch(() => undefined);
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+    if (event.isComposing || event.keyCode === 229) return;
     const action = resolvePaletteKeyAction(event.key, activeIndex.value, projection.value.flatItems.length);
     if (action.type === 'noop') return;
     event.preventDefault();

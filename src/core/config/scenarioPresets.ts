@@ -212,7 +212,7 @@ export function buildScenarioPresetPatch(
         } else {
             enableBilingualDisplay();
             if (!currentConfig.inputBoxTranslationTrigger || currentConfig.inputBoxTranslationTrigger === 'disabled') {
-                patch.inputBoxTranslationTrigger = 'tripleSpace';
+                patch.inputBoxTranslationTrigger = 'triple_space';
             }
             if (currentConfig.writing?.enabled !== true) {
                 patch.writing = {

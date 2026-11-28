@@ -11,6 +11,7 @@
       v-if="!handoffRequested"
       :key="onboardingContext.revision.value"
       :initial-language="initialLanguage"
+      :initial-step="languageSaved ? 'scenario' : 'language'"
       :enable-scenario-step="true"
       :current-config="config"
       :apply-scenario-patch="applyScenarioPatch"
@@ -40,6 +41,7 @@ const initialLanguage = resolveUiLanguageFromLocale(readLocale());
 const mainApp = shallowRef<Component | null>(null);
 const loadFailed = ref(false);
 const handoffRequested = ref(false);
+const languageSaved = ref(false);
 const pageExited = ref(false);
 const onboardingContext = useSettingsActionContext(() => !mainApp.value && !pageExited.value, () => []);
 const darkMode = matchMedia('(prefers-color-scheme: dark)');
@@ -79,8 +81,7 @@ watch(onboardingContext.active, active => {
 
 async function applyScenarioPatch(patch: Partial<Config>): Promise<void> {
   if (!onboardingContext.active.value || Object.keys(patch).length === 0) return;
-  Object.assign(config, patch);
-  await requestConfigPatch(patch).catch(() => undefined);
+  await requestConfigPatch(patch, message => browser.runtime.sendMessage(message));
 }
 function loadMain(): Promise<Component> {
   return pendingMain ??= import('./PopupApp.vue').then(module => module.default).catch(error => {
@@ -90,6 +91,7 @@ function loadMain(): Promise<Component> {
 }
 function prepareMain(current: () => boolean): void {
   if (!current()) return;
+  languageSaved.value = true;
   void loadMain().catch(() => {});
 }
 async function openMain(current: () => boolean): Promise<void> {

@@ -12,6 +12,7 @@ import {
     matchesCommandPaletteHotkey,
 } from '@/src/core/config/commandPalette';
 import {normalizeUiLanguage, translate} from '@/src/core/i18n';
+import {showPageNotice} from '@/src/features/page-notice/public';
 import {config} from '@/src/services/config/store';
 import {
     buildDefaultCommandCatalog,
@@ -20,20 +21,22 @@ import {
 } from '../core';
 import CommandPalette, {type CommandPaletteOpenPayload} from '../ui/CommandPalette.vue';
 
+export type CommandPaletteActionResult = boolean | void | Promise<boolean | void>;
+
 export interface CommandPaletteActionPorts {
     readonly isFullPageActive: () => boolean;
-    readonly toggleFullPage: () => void;
-    readonly switchDisplayMode: () => void | Promise<void>;
-    readonly startSectionTranslation: () => void;
-    readonly startAreaTranslation: () => void | Promise<void>;
-    readonly openSidepanel: () => void | Promise<void>;
-    readonly openDocumentTranslation: () => void | Promise<void>;
-    readonly openLearningCenter: () => void | Promise<void>;
-    readonly openSettings: () => void | Promise<void>;
-    readonly toggleFloatingBall: () => void | Promise<void>;
-    readonly toggleSmartHighlight: () => void;
+    readonly toggleFullPage: () => CommandPaletteActionResult;
+    readonly switchDisplayMode: () => CommandPaletteActionResult;
+    readonly startSectionTranslation: () => CommandPaletteActionResult;
+    readonly startAreaTranslation: () => CommandPaletteActionResult;
+    readonly openSidepanel: () => CommandPaletteActionResult;
+    readonly openDocumentTranslation: () => CommandPaletteActionResult;
+    readonly openLearningCenter: () => CommandPaletteActionResult;
+    readonly openSettings: () => CommandPaletteActionResult;
+    readonly toggleFloatingBall: () => CommandPaletteActionResult;
+    readonly toggleSmartHighlight: () => CommandPaletteActionResult;
     readonly isSmartHighlightActive: () => boolean;
-    readonly toggleWritingAssistant: () => void | Promise<void>;
+    readonly toggleWritingAssistant: () => CommandPaletteActionResult;
     readonly canAreaTranslate: () => boolean;
     readonly canOpenSidepanel: () => boolean;
     readonly canOpenDocument: () => boolean;
@@ -56,10 +59,11 @@ const HOST_ID = 'fluent-read-command-palette-container';
 let context: ContentScriptContext | null = null;
 let controller: AbortController | null = null;
 let ui: ShadowRootContentScriptUi<VueShadowMount> | null = null;
-let pending: Promise<PaletteInstance | null> | null = null;
 let activePorts: CommandPaletteActionPorts | null = null;
 let recentCommands: CommandPaletteActionId[] = [];
 let generation = 0;
+let openPending = false;
+let desiredOpen = false;
 
 function paletteInstance(): PaletteInstance | null {
     return (ui?.mounted?.instance as PaletteInstance | null) ?? null;
@@ -71,8 +75,17 @@ export function isCommandPaletteMounted(): boolean {
 
 function isEditableInputTarget(event: KeyboardEvent): boolean {
     if (event.ctrlKey || event.metaKey) return false;
-    const target = event.composedPath()[0] as Element | undefined;
-    return Boolean(target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])'));
+    return event.composedPath().some((node) => (
+        node instanceof HTMLElement
+        && (node.isContentEditable || node.matches('input,textarea,select'))
+    ));
+}
+
+function notifyCommandFailed(): void {
+    const uiLanguage = normalizeUiLanguage(config.uiLanguage);
+    showPageNotice(translate('commandPalette.notice.actionFailed', uiLanguage), 'error', {
+        key: 'command-palette',
+    });
 }
 
 async function ensurePalette(): Promise<PaletteInstance | null> {
@@ -83,64 +96,55 @@ async function ensurePalette(): Promise<PaletteInstance | null> {
     }
     if (!controller || !context || context.isInvalid || config.on === false) return null;
     if (ui) return paletteInstance();
-    if (!pending) {
-        const current = generation;
-        const task = createVueShadowUi(context, {
-            name: 'fluent-read-command-palette-ui',
-            hostId: HOST_ID,
-            component: CommandPalette,
-            mode: 'closed',
-        }).then((created) => {
-            if (current !== generation || !controller || context?.isInvalid || config.on === false) {
-                created.remove();
-                return null;
-            }
-            ui = created;
-            return paletteInstance();
-        }).finally(() => {
-            if (pending === task) pending = null;
-        });
-        pending = task;
+    const current = generation;
+    const created = await createVueShadowUi(context, {
+        name: 'fluent-read-command-palette-ui',
+        hostId: HOST_ID,
+        component: CommandPalette,
+        mode: 'closed',
+    });
+    if (current !== generation || !controller || context?.isInvalid || (config.on as boolean) === false) {
+        created.remove();
+        return null;
     }
-    return pending;
+    ui = created;
+    return paletteInstance();
+}
+
+function executePortAction(id: CommandPaletteActionId, ports: CommandPaletteActionPorts): CommandPaletteActionResult {
+    switch (id) {
+        case 'toggle-full-page':
+            return ports.toggleFullPage();
+        case 'switch-display-mode':
+            return ports.switchDisplayMode();
+        case 'start-section-translation':
+            return ports.startSectionTranslation();
+        case 'start-area-translation':
+            return ports.startAreaTranslation();
+        case 'open-sidepanel':
+            return ports.openSidepanel();
+        case 'open-document-translation':
+            return ports.openDocumentTranslation();
+        case 'open-learning-center':
+            return ports.openLearningCenter();
+        case 'open-settings':
+            return ports.openSettings();
+        case 'toggle-floating-ball':
+            return ports.toggleFloatingBall();
+        case 'toggle-smart-highlight':
+            return ports.toggleSmartHighlight();
+        case 'toggle-writing-assistant':
+            return ports.toggleWritingAssistant();
+    }
 }
 
 async function runCommandAction(id: CommandPaletteActionId, ports: CommandPaletteActionPorts): Promise<void> {
     recentCommands = recordRecentCommand(recentCommands, id);
-    switch (id) {
-        case 'toggle-full-page':
-            ports.toggleFullPage();
-            return;
-        case 'switch-display-mode':
-            await ports.switchDisplayMode();
-            return;
-        case 'start-section-translation':
-            ports.startSectionTranslation();
-            return;
-        case 'start-area-translation':
-            await ports.startAreaTranslation();
-            return;
-        case 'open-sidepanel':
-            await ports.openSidepanel();
-            return;
-        case 'open-document-translation':
-            await ports.openDocumentTranslation();
-            return;
-        case 'open-learning-center':
-            await ports.openLearningCenter();
-            return;
-        case 'open-settings':
-            await ports.openSettings();
-            return;
-        case 'toggle-floating-ball':
-            await ports.toggleFloatingBall();
-            return;
-        case 'toggle-smart-highlight':
-            ports.toggleSmartHighlight();
-            return;
-        case 'toggle-writing-assistant':
-            await ports.toggleWritingAssistant();
-            return;
+    try {
+        const result = await executePortAction(id, ports);
+        if (result === false) notifyCommandFailed();
+    } catch {
+        notifyCommandFailed();
     }
 }
 
@@ -150,11 +154,23 @@ export async function openCommandPalette(): Promise<void> {
     const ports = activePorts;
     const existing = paletteInstance();
     if (existing?.isOpen()) {
+        desiredOpen = false;
         existing.close();
         return;
     }
-    const palette = await ensurePalette();
-    if (!palette || current !== generation || !controller || (config.on as boolean) === false || context?.isInvalid) return;
+    if (openPending) {
+        desiredOpen = !desiredOpen;
+        return;
+    }
+    openPending = true;
+    desiredOpen = true;
+    let palette: PaletteInstance | null;
+    try {
+        palette = await ensurePalette();
+    } finally {
+        openPending = false;
+    }
+    if (!desiredOpen || !palette || current !== generation || !controller || (config.on as boolean) === false || context?.isInvalid) return;
     const uiLanguage = normalizeUiLanguage(config.uiLanguage);
     const commands = buildDefaultCommandCatalog({
         translate: (key) => translate(key, uiLanguage),
@@ -178,6 +194,7 @@ export async function openCommandPalette(): Promise<void> {
 }
 
 export function closeCommandPalette(): void {
+    desiredOpen = false;
     paletteInstance()?.close();
 }
 
@@ -191,7 +208,7 @@ export function mountCommandPalette(
     const abortController = new AbortController();
     controller = abortController;
     document.addEventListener('keydown', (event) => {
-        if (!event.isTrusted || event.repeat) return;
+        if (!event.isTrusted || event.repeat || event.isComposing || event.keyCode === 229) return;
         if (config.on === false || config.commandPaletteEnabled === false) return;
         if (!matchesCommandPaletteHotkey(event, config.commandPaletteHotkey, config.customCommandPaletteHotkey)) return;
         if (isEditableInputTarget(event)) return;
@@ -203,11 +220,12 @@ export function mountCommandPalette(
 
 export function unmountCommandPalette(): void {
     generation += 1;
+    openPending = false;
+    desiredOpen = false;
     controller?.abort();
     controller = null;
     context = null;
     activePorts = null;
-    pending = null;
     const previous = ui;
     ui = null;
     previous?.remove();

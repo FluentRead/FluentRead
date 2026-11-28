@@ -1,6 +1,6 @@
 {
   "reencounter.setting": "再次遇見收藏表達",
-  "reencounter.settingHelp": "閱讀時輕量標記收藏表達，點擊對照新舊原句。預設關閉，不自動調用 AI 或改變復習計畫。",
+  "reencounter.settingHelp": "閱讀時輕量標記收藏表達，點擊對照新舊原句。預設關閉，不自動調用 AI 或改變複習計畫。",
   "reencounter.entry": "再次遇見 · {count}",
   "reencounter.title": "再次遇見",
   "reencounter.close": "關閉對照卡片",

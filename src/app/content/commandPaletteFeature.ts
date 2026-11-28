@@ -32,6 +32,17 @@ function formatConfiguredShortcut(hotkey: string | undefined, customHotkey: stri
     return parsed.isValid ? parsed.displayName : resolved;
 }
 
+type ConfigPatchSender = NonNullable<Parameters<typeof requestConfigPatch>[1]>;
+
+const sendConfigMessage: ConfigPatchSender = (message) => (
+    browser.runtime.sendMessage(message) as ReturnType<ConfigPatchSender>
+);
+
+async function sendNavigationMessage(message: Record<string, unknown>): Promise<boolean> {
+    const response = await browser.runtime.sendMessage(message) as {success?: boolean} | undefined;
+    return response?.success !== false;
+}
+
 export function createCommandPaletteContentFeature(
     ctx: ContentScriptContext,
     config: Config,
@@ -48,44 +59,28 @@ export function createCommandPaletteContentFeature(
                 else autoTranslateEnglishPage();
             },
             switchDisplayMode: async () => {
-                const nextDisplay = config.display === 1 ? 0 : 1;
-                config.display = nextDisplay;
-                await requestConfigPatch({display: nextDisplay}).catch(() => undefined);
+                await requestConfigPatch({display: config.display === 1 ? 0 : 1}, sendConfigMessage);
             },
-            startSectionTranslation: () => {
-                startSectionTranslationPicker();
-            },
-            startAreaTranslation: async () => {
-                await startAreaTranslationFromContextMenu();
-            },
-            openSidepanel: async () => {
-                await browser.runtime.sendMessage({type: 'openTranslationSidepanel'}).catch(() => undefined);
-            },
-            openDocumentTranslation: async () => {
-                await browser.runtime.sendMessage({type: 'openDocumentWorkspace'}).catch(() => undefined);
-            },
-            openLearningCenter: async () => {
-                await browser.runtime.sendMessage({type: 'openOptionsPage', section: 'settings-vocabulary'}).catch(() => undefined);
-            },
-            openSettings: async () => {
-                await browser.runtime.sendMessage({type: 'openOptionsPage'}).catch(() => undefined);
-            },
+            startSectionTranslation: () => startSectionTranslationPicker(),
+            startAreaTranslation: () => startAreaTranslationFromContextMenu(),
+            openSidepanel: () => sendNavigationMessage({type: 'openTranslationSidepanel'}),
+            openDocumentTranslation: () => sendNavigationMessage({type: 'openDocumentWorkspace'}),
+            openLearningCenter: () => sendNavigationMessage({type: 'openOptionsPage', section: 'settings-vocabulary'}),
+            openSettings: () => sendNavigationMessage({type: 'openOptionsPage'}),
             toggleFloatingBall: async () => {
-                const nextDisabled = config.disableFloatingBall !== true;
-                config.disableFloatingBall = nextDisabled;
-                await requestConfigPatch({disableFloatingBall: nextDisabled}).catch(() => undefined);
+                await requestConfigPatch({disableFloatingBall: config.disableFloatingBall !== true}, sendConfigMessage);
             },
             toggleSmartHighlight: () => {
-                if (!informationHighlight) return;
+                if (!informationHighlight) return false;
                 informationHighlight.setEnabled(!informationHighlight.getState().enabled);
+                return true;
             },
             isSmartHighlightActive: () => informationHighlight?.getState().enabled === true,
             toggleWritingAssistant: async () => {
                 const nextWriting = {...config.writing, enabled: config.writing?.enabled !== true};
-                config.writing = nextWriting;
-                await requestConfigPatch({writing: nextWriting}).catch(() => undefined);
+                await requestConfigPatch({writing: nextWriting}, sendConfigMessage);
             },
-            canAreaTranslate: () => capabilities.areaTranslation && config.selectionAreaEnabled !== false,
+            canAreaTranslate: () => capabilities.areaTranslation && config.selectionAreaEnabled === true,
             canOpenSidepanel: () => capabilities.browser !== 'userscript',
             canOpenDocument: () => capabilities.browser !== 'userscript',
             canSmartHighlight: () => Boolean(informationHighlight),

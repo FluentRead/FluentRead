@@ -259,6 +259,16 @@ describe('界面 i18n 契约', () => {
     expect(translate('settings.general.defaultTargetLanguage', 'en-US')).toBe('Translation language');
   });
 
+  it('繁體中文文案目录与旧文案映射不包含常见简繁误转词', () => {
+    const badTerms = /下划線|復習|重復|復用|失敗回覆公共接口/u;
+    const zhTWEntries = Object.entries(translatedCatalogs[0]);
+    expect(zhTWEntries.filter(([, value]) => badTerms.test(value))).toEqual([]);
+    expect(translate('settings.services.deeplx.endpointHelp', 'zh-TW')).toContain('失敗回退公共介面');
+    expect(translate('sentenceHighlight.lineColor', 'zh-TW')).toBe('底線顏色');
+    expect(translate('commandPalette.notice.actionFailed', 'zh-TW')).not.toBe('commandPalette.notice.actionFailed');
+    expect(translate('scenarioPresets.onboarding.saveFailed', 'zh-TW')).not.toBe('scenarioPresets.onboarding.saveFailed');
+  });
+
   it('为目标语言选择器提供中文、英文和原生名称的组合标签', () => {
     expect(options.to.slice(0, 8).map(item => getMultilingualTargetLanguageLabel(item.value, item.label))).toEqual([
       '简体中文 / Simplified Chinese',

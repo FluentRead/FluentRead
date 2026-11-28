@@ -38,7 +38,7 @@
   "video.learning.playFailed": "播放器未允許播放，請使用影片播放按鈕。",
   "video.learning.enableExplain": "請先在劃詞翻譯設定中啟用 AI 講解。",
   "video.learning.explainFailed": "解釋失敗，請重試。",
-  "video.learning.saved": "已儲存到學習中心；重復收藏會合併。",
+  "video.learning.saved": "已儲存到學習中心；重複收藏會合併。",
   "video.learning.saveFailed": "收藏失敗，請重試。",
   "video.learning.settingsChanged": "設定已更新；播放控制已解除。",
   "video.learning.tooLong": "當前字幕片段或解釋過長，暫不能收藏。解釋可縮短到 2000 字元；原句收藏最多 4096 字元。",

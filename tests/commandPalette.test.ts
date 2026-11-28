@@ -1,7 +1,11 @@
 import {parseHTML} from 'linkedom';
 import * as Vue from 'vue';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {Config} from '@/src/core/config/model';
+import {Config, normalizeConfig} from '@/src/core/config/model';
+import {extractConfigCredentials, sanitizeConfigCredentials} from '@/src/core/config/credentials';
+import {createConfigApplication} from '@/src/services/config/application';
+import {createConfigPersistenceHandler} from '@/src/app/background/handlers/configPersistence';
+import type {ConfigStoragePort} from '@/src/platform/storage/configStorage';
 import {
     COMMAND_PALETTE_HOTKEY_OPTIONS,
     commandPaletteHotkeyDisplayName,
@@ -38,6 +42,7 @@ const {
     isFullPageActiveMock,
     startSectionMock,
     startAreaMock,
+    showPageNoticeMock,
 } = vi.hoisted(() => ({
     elMessageMock: vi.fn(),
     elMessageWarning: vi.fn(),
@@ -47,8 +52,33 @@ const {
     autoTranslateMock: vi.fn(),
     restoreOriginalMock: vi.fn(),
     isFullPageActiveMock: vi.fn(() => false),
-    startSectionMock: vi.fn(),
-    startAreaMock: vi.fn(),
+    startSectionMock: vi.fn(() => true),
+    startAreaMock: vi.fn(async () => true),
+    showPageNoticeMock: vi.fn(),
+}));
+
+vi.mock('@/src/features/page-notice/public', () => ({
+    showPageNotice: showPageNoticeMock,
+}));
+
+vi.mock('@/src/features/image-translation/ui/public', () => ({
+    ImageOcrSettings: {render: () => null},
+}));
+
+vi.mock('@/src/features/settings/ui/services/useVisionProbeStatus', () => ({
+    useVisionProbeStatus: () => ({result: Vue.ref({capability: 'unknown'})}),
+}));
+
+vi.mock('@/src/features/settings/ui/services/PromptTemplateEditor.vue', () => ({
+    default: {render: () => null},
+}));
+
+vi.mock('@/src/ui/components/GlossaryLibrarySelect.vue', () => ({
+    default: {render: () => null},
+}));
+
+vi.mock('@/src/ui/components/ServiceIcon.vue', () => ({
+    default: {render: () => null},
 }));
 
 vi.mock('element-plus', () => ({
@@ -57,6 +87,8 @@ vi.mock('element-plus', () => ({
         success: vi.fn(),
         info: vi.fn(),
     }),
+    ElTooltip: {render: () => null},
+    ElPopover: {render: () => null},
 }));
 
 vi.mock('@/src/platform/shadow-ui', () => ({
@@ -460,9 +492,34 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
         exposed.open({commands, recentIds: ['open-settings'], shortcutHint: 'Alt+K', onExecute});
         await settle();
 
-        // 键盘导航：ArrowDown / ArrowUp / Home / End / noop / Enter
+        // 键盘导航：ArrowDown / ArrowUp / Home / End / noop / IME 组合输入保护 / Enter
         const keydown = events.get(dialog)!.onKeydown;
-        const makeKey = (key: string) => ({key, preventDefault: vi.fn(), stopPropagation: vi.fn()});
+        const makeKey = (key: string, extra: Record<string, unknown> = {}) => ({
+            key,
+            isComposing: false,
+            keyCode: 0,
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+            ...extra,
+        });
+        // IME 组合输入期间的 Enter / Escape 必须忽略
+        const imeEnter = makeKey('Enter', {isComposing: true});
+        keydown(imeEnter);
+        expect(imeEnter.preventDefault).not.toHaveBeenCalled();
+        expect(exposed.isOpen()).toBe(true);
+        const ime229Esc = makeKey('Escape', {keyCode: 229});
+        keydown(ime229Esc);
+        expect(ime229Esc.preventDefault).not.toHaveBeenCalled();
+        expect(exposed.isOpen()).toBe(true);
+
+        // keyup 与 keypress 同样阻止冒泡
+        const keyupEv = {stopPropagation: vi.fn()};
+        const keypressEv = {stopPropagation: vi.fn()};
+        events.get(dialog)!.onKeyup(keyupEv);
+        events.get(dialog)!.onKeypress(keypressEv);
+        expect(keyupEv.stopPropagation).toHaveBeenCalledOnce();
+        expect(keypressEv.stopPropagation).toHaveBeenCalledOnce();
+
         const downEv = makeKey('ArrowDown');
         keydown(downEv);
         expect(downEv.preventDefault).toHaveBeenCalledOnce();
@@ -522,12 +579,13 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
         await settle();
         expect(exposed.isOpen()).toBe(false);
 
-        // 点击命令项 & 点击关闭按钮 & 点击背景
-        exposed.open({commands, recentIds: [], shortcutHint: 'Alt+K', onExecute});
+        // 点击命令项（含异步拒绝安全兜底）& 点击关闭按钮 & 点击背景
+        const rejectingExecute = vi.fn(async () => { throw new Error('command failed'); });
+        exposed.open({commands, recentIds: [], shortcutHint: 'Alt+K', onExecute: rejectingExecute});
         await settle();
         events.get(document.querySelector('[data-command-id="open-settings"]')!)!.onClick();
         await settle();
-        expect(onExecute).toHaveBeenLastCalledWith('open-settings');
+        expect(rejectingExecute).toHaveBeenLastCalledWith('open-settings');
 
         exposed.open({commands, recentIds: [], shortcutHint: 'Alt+K', onExecute});
         await settle();
@@ -615,16 +673,17 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
         runtime.mountCommandPalette(validCtx, ports);
         expect(runtime.isCommandPaletteMounted()).toBe(true);
 
-        // 通过 document keydown 触发：先测忽略条件（非 trusted / repeat / disabled / 非匹配键 / 输入框无 Ctrl/Meta）
-        const dispatchKey = (props: Record<string, any>, targetEl: Element = document.body) => {
+        // 通过 document keydown 触发：先测忽略条件（非 trusted / repeat / IME / disabled / 非匹配键 / 输入框及 Shadow DOM 可编辑元素）
+        const dispatchKey = (props: Record<string, any>, path: EventTarget[] = [document.body]) => {
             const {isTrusted = true, ...rest} = props;
             const ev: any = new win.Event('keydown', {bubbles: true, cancelable: true});
             Object.defineProperty(ev, 'isTrusted', {value: isTrusted, configurable: true});
             Object.assign(ev, {
-                key: 'k', code: 'KeyK', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false, repeat: false,
+                key: 'k', code: 'KeyK', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false,
+                repeat: false, isComposing: false, keyCode: 0,
                 ...rest,
             });
-            ev.composedPath = () => [targetEl];
+            ev.composedPath = () => path;
             ev.preventDefault = vi.fn();
             ev.stopPropagation = vi.fn();
             document.dispatchEvent(ev);
@@ -633,19 +692,37 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
 
         dispatchKey({isTrusted: false});
         dispatchKey({repeat: true});
+        dispatchKey({isComposing: true});
+        dispatchKey({keyCode: 229});
         config.commandPaletteEnabled = false;
         dispatchKey({});
         config.commandPaletteEnabled = true;
         dispatchKey({key: 'x', code: 'KeyX'});
-        dispatchKey({}, document.getElementById('host-input')!);
+        dispatchKey({}, [document.getElementById('host-input')!]);
+        // Shadow DOM 内嵌 contenteditable 节点通过 composedPath() 识别并避让
+        const editableDiv = document.createElement('div');
+        Object.defineProperty(editableDiv, 'isContentEditable', {value: true, configurable: true});
+        const nonElementNode = document.createTextNode('typing');
+        dispatchKey({}, [nonElementNode, editableDiv, document.body]);
         expect(createVueShadowUiMock).not.toHaveBeenCalled();
 
         // 使用 Ctrl+Shift+K 在输入框内允许触发（覆盖 isEditableInputTarget 中 ctrlKey 返回 false）
         config.commandPaletteHotkey = 'Ctrl+Shift+K';
-        const ctrlEv = dispatchKey({altKey: false, ctrlKey: true, shiftKey: true}, document.getElementById('host-input')!);
+        const ctrlEv = dispatchKey({altKey: false, ctrlKey: true, shiftKey: true}, [document.getElementById('host-input')!]);
         expect(ctrlEv.preventDefault).toHaveBeenCalledOnce();
         await vi.waitFor(() => expect(isOpenState).toBe(true));
         expect(createVueShadowUiMock).toHaveBeenCalledTimes(1);
+
+        // 命令动作抛错或返回 false 时安全捕获并弹出 showPageNotice，不产生未处理拒绝
+        ports.startSectionTranslation.mockReturnValueOnce(false as any);
+        await lastPayload.onExecute('start-section-translation');
+        expect(showPageNoticeMock).toHaveBeenCalledTimes(1);
+        ports.openSettings.mockRejectedValueOnce(new Error('bg down'));
+        await lastPayload.onExecute('open-settings');
+        expect(showPageNoticeMock).toHaveBeenCalledTimes(2);
+        ports.startSectionTranslation.mockClear();
+        ports.openSettings.mockClear();
+        showPageNoticeMock.mockClear();
 
         // 执行全部 11 项命令动作
         const allIds: CommandPaletteActionId[] = [
@@ -698,18 +775,32 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
         runtime.closeCommandPalette();
         expect(isOpenState).toBe(false);
 
+        // 快速连按两次 Alt+K（在 createVueShadowUi 完成前）：第二次取消打开，不闪现面板
+        runtime.unmountCommandPalette();
+        let resolveDoublePress!: (value: any) => void;
+        createVueShadowUiMock.mockImplementationOnce(() => new Promise((r) => { resolveDoublePress = r; }));
+        runtime.mountCommandPalette(validCtx, ports);
+        const firstOpen = runtime.openCommandPalette();
+        const secondCancel = runtime.openCommandPalette();
+        const doublePressOpen = vi.fn();
+        resolveDoublePress({
+            shadowHost: {isConnected: true},
+            remove: vi.fn(),
+            mounted: {instance: {open: doublePressOpen, close: vi.fn(), isOpen: () => false}},
+        });
+        await Promise.all([firstOpen, secondCancel]);
+        expect(doublePressOpen).not.toHaveBeenCalled();
+
         // 卸载后在异步 createVueShadowUi 返回时自动清理滞后 UI
         runtime.unmountCommandPalette();
         let resolveLate!: (value: any) => void;
         createVueShadowUiMock.mockImplementationOnce(() => new Promise((r) => { resolveLate = r; }));
         runtime.mountCommandPalette(validCtx, ports);
         const lateOpen = runtime.openCommandPalette();
-        // 并发第二次打开复用同一个 pending
-        const lateOpen2 = runtime.openCommandPalette();
         runtime.unmountCommandPalette();
         const lateRemove = vi.fn();
         resolveLate({shadowHost: {isConnected: true}, remove: lateRemove, mounted: {instance: fakeUi.mounted.instance}});
-        await Promise.all([lateOpen, lateOpen2]);
+        await lateOpen;
         expect(lateRemove).toHaveBeenCalledOnce();
 
         // 再次挂载后，ctx.isInvalid=true 时 ensurePalette 返回 null
@@ -756,8 +847,13 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
                 },
             },
         });
-        requestConfigPatchMock.mockRejectedValue(new Error('storage offline'));
-        sendMessageMock.mockRejectedValue(new Error('bg offline'));
+        requestConfigPatchMock.mockImplementation(async (patch: Partial<Config>, sender?: (msg: unknown) => Promise<unknown>) => {
+            expect(typeof sender).toBe('function');
+            // 验证传入的 sender 指向 browser.runtime.sendMessage，且调用前未原地预改 config
+            await sender!({type: '__probe__'});
+            Object.assign(config, patch);
+        });
+        sendMessageMock.mockResolvedValue({success: true});
 
         feature.mount({} as any);
         expect(feature.isMounted!()).toBe(true);
@@ -774,13 +870,21 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
         await openedPayload.onExecute('toggle-full-page');
         expect(restoreOriginalMock).toHaveBeenCalledOnce();
 
-        // 双语 <-> 仅译文切换（含 patch 失败兜底）
+        // 双语 <-> 仅译文切换（不预改 config，经 requestConfigPatch + sendMessage 提交）
+        let displayBeforePatch: number | undefined;
+        requestConfigPatchMock.mockImplementationOnce(async (patch: Partial<Config>, sender?: (msg: unknown) => Promise<unknown>) => {
+            displayBeforePatch = config.display;
+            expect(typeof sender).toBe('function');
+            await sender!({type: '__probe__'});
+            Object.assign(config, patch);
+        });
         await openedPayload.onExecute('switch-display-mode');
+        expect(displayBeforePatch).toBe(1);
         expect(config.display).toBe(0);
         await openedPayload.onExecute('switch-display-mode');
         expect(config.display).toBe(1);
 
-        // 局部翻译 / 圈选 / 四个后台页面消息
+        // 局部翻译 / 圈选 / 四个后台页面消息（含返回 false 与失败通知）
         await openedPayload.onExecute('start-section-translation');
         expect(startSectionMock).toHaveBeenCalledOnce();
         await openedPayload.onExecute('start-area-translation');
@@ -795,9 +899,22 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
         expect(sendMessageMock).toHaveBeenCalledWith({type: 'openOptionsPage', section: 'settings-vocabulary'});
         expect(sendMessageMock).toHaveBeenCalledWith({type: 'openOptionsPage'});
 
-        // 悬浮球 / 智能高亮 / 写作助手切换
+        // 后台返回 {success: false} 时触发用户可见提示
+        sendMessageMock.mockResolvedValueOnce({success: false});
+        showPageNoticeMock.mockClear();
+        await openedPayload.onExecute('open-sidepanel');
+        expect(showPageNoticeMock).toHaveBeenCalledOnce();
+
+        // 悬浮球 / 智能高亮 / 写作助手切换（验证调用前未预改 config）
         config.disableFloatingBall = false;
+        let ballBeforePatch: boolean | undefined;
+        requestConfigPatchMock.mockImplementationOnce(async (patch: Partial<Config>, sender?: (msg: unknown) => Promise<unknown>) => {
+            ballBeforePatch = config.disableFloatingBall;
+            expect(typeof sender).toBe('function');
+            Object.assign(config, patch);
+        });
         await openedPayload.onExecute('toggle-floating-ball');
+        expect(ballBeforePatch).toBe(false);
         expect(config.disableFloatingBall).toBe(true);
         await openedPayload.onExecute('toggle-floating-ball');
         expect(config.disableFloatingBall).toBe(false);
@@ -811,6 +928,14 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
 
         feature.unmount!();
         expect(feature.isMounted!()).toBe(false);
+
+        // canAreaTranslate 必须严格要求 selectionAreaEnabled === true（undefined/false 均为不可用）
+        config.selectionAreaEnabled = undefined as unknown as boolean;
+        const undefinedAreaFeature = createCommandPaletteContentFeature({isInvalid: false} as any, config, capabilities);
+        undefinedAreaFeature.mount({} as any);
+        await runtime.openCommandPalette();
+        expect(openedPayload.commands.find((c: any) => c.id === 'start-area-translation')?.available).toBe(false);
+        undefinedAreaFeature.unmount!();
 
         // 无 informationHighlight + 关闭各类快捷键/无效快捷键 + userscript 禁用边界
         config.floatingBallHotkey = 'none';
@@ -835,6 +960,91 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
 
         const userscriptFeature = createCommandPaletteContentFeature({isInvalid: false} as any, config, {browser: 'userscript', areaTranslation: false} as any);
         expect(userscriptFeature.isEnabled()).toBe(false);
+    });
+
+    it('真实 createConfigApplication 集成：命令面板三项配置开关持久化并触发 subscribeConfig', async () => {
+        const {createCommandPaletteContentFeature} = await import('@/src/app/content/commandPaletteFeature');
+        const runtime = await import('@/src/features/command-palette/content/runtime');
+        const initial = normalizeConfig({
+            display: 1,
+            disableFloatingBall: false,
+            writing: {...new Config().writing, enabled: false},
+        });
+        const records = new Map<string, unknown>([
+            ['local:config', {...sanitizeConfigCredentials(initial), __fluentConfigRevision: 2}],
+            ['local:credentials', extractConfigCredentials(initial)],
+        ]);
+        const listeners = new Map<string, Set<(value: unknown) => void>>();
+        const notify = (key: string) => {
+            for (const listener of listeners.get(key) ?? []) listener(structuredClone(records.get(key) ?? null));
+        };
+        const storage: ConfigStoragePort = {
+            writeOwner: true,
+            getItem: async <T>(key: string) => structuredClone(records.get(key) ?? null) as T | null,
+            setItem: async <T>(key: string, value: T) => { records.set(key, structuredClone(value)); notify(key); },
+            setItems: async (entries, removeKeys = []) => {
+                for (const [key, value] of entries) records.set(key, structuredClone(value));
+                for (const key of removeKeys) records.delete(key);
+                for (const key of [...entries.keys(), ...removeKeys]) notify(key);
+            },
+            removeItem: async (key) => { records.delete(key); notify(key); },
+            watch: (key, cb) => {
+                const set = listeners.get(key) ?? new Set();
+                set.add(cb as (value: unknown) => void);
+                listeners.set(key, set);
+                return () => { set.delete(cb as (value: unknown) => void); };
+            },
+        };
+        const authorityApp = createConfigApplication({storage, trustedContext: true});
+        const contentApp = createConfigApplication({storage: {...storage, writeOwner: false}, trustedContext: false});
+        await Promise.all([authorityApp.start(), contentApp.start()]);
+        const persistHandler = createConfigPersistenceHandler({
+            ready: authorityApp.configReady,
+            getCurrentConfig: () => authorityApp.config,
+            prepareConfigSaveRequest: authorityApp.prepareConfigSaveRequest,
+            prepareConfigPatchRequest: authorityApp.prepareConfigPatchRequest,
+            saveConfig: authorityApp.saveConfig,
+            getCurrentRevision: authorityApp.getConfigRevision,
+            isExtensionUrl: (url) => url.startsWith('chrome-extension://ext-palette/'),
+        });
+        sendMessageMock.mockImplementation(async (message: unknown) => persistHandler.handle(
+            JSON.parse(JSON.stringify(message)),
+            {sender: {url: 'https://example.com/article'}},
+        ));
+        requestConfigPatchMock.mockImplementation((patch: Partial<Config>, sender?: (msg: unknown) => Promise<unknown>) => contentApp.requestConfigPatch(patch, sender as any));
+
+        let openedPayload: any = null;
+        createVueShadowUiMock.mockResolvedValue({
+            shadowHost: {isConnected: true},
+            remove: vi.fn(),
+            mounted: {
+                instance: {
+                    open: (payload: any) => { openedPayload = payload; },
+                    close: vi.fn(),
+                    isOpen: () => false,
+                },
+            },
+        });
+        const notified = vi.fn();
+        const unsubscribe = contentApp.subscribeConfig(notified);
+        const feature = createCommandPaletteContentFeature({isInvalid: false} as any, contentApp.config, {browser: 'chrome', areaTranslation: true} as any);
+        feature.mount({} as any);
+        await runtime.openCommandPalette();
+
+        await openedPayload.onExecute('switch-display-mode');
+        await openedPayload.onExecute('toggle-floating-ball');
+        await openedPayload.onExecute('toggle-writing-assistant');
+
+        expect(contentApp.config.display).toBe(0);
+        expect(contentApp.config.disableFloatingBall).toBe(true);
+        expect(contentApp.config.writing.enabled).toBe(true);
+        expect((records.get('local:config') as Record<string, unknown>).display).toBe(0);
+        expect((records.get('local:config') as Record<string, unknown>).disableFloatingBall).toBe(true);
+        expect(notified).toHaveBeenCalled();
+
+        feature.unmount!();
+        unsubscribe();
+        await Promise.all([authorityApp.flushConfigHistory(), contentApp.flushConfigHistory()]);
     });
 });
 
@@ -1001,5 +1211,103 @@ describe('CommandPaletteSettings 真实 Vue 组件行为与快捷键冲突校验
         events.get(switchEl)!.onChange(true);
         expect(config.commandPaletteEnabled).toBe(true);
         expect(capturedCustomHotkeyProps).toBeNull();
+    });
+
+    it('双向快捷键冲突校验：其他设置组件绑定 Alt+K 时可识别全局命令面板占用', async () => {
+        const config = Vue.reactive(new Config());
+        config.commandPaletteEnabled = true;
+        config.commandPaletteHotkey = 'Alt+K';
+        config.sectionTranslationHotkeyEnabled = true;
+        config.paragraphCopyEnabled = true;
+
+        const renderer = Vue.createRenderer({
+            patchProp(el: any, key: string, _prev: any, next: any) {
+                if (/^on[A-Z]/u.test(key)) return;
+                if (key === 'class') { el.className = next ?? ''; return; }
+                if (next === undefined || next === null || (next === false && !/^(?:aria-|data-)/u.test(key))) {
+                    el.removeAttribute(key);
+                } else {
+                    el.setAttribute(key, String(next));
+                }
+            },
+            insert: (child: any, parent: any, anchor: any = null) => parent.insertBefore(child, anchor),
+            remove: (child: any) => child.parentNode?.removeChild(child),
+            createElement: (tag: string) => Vue.markRaw(document.createElement(tag)),
+            createText: (val: string) => document.createTextNode(val),
+            createComment: (val: string) => document.createComment(val),
+            setText: (node: any, val: string) => { node.nodeValue = val; },
+            setElementText: (el: any, val: string) => { el.textContent = val; },
+            parentNode: (node: any) => node.parentNode,
+            nextSibling: (node: any) => node.nextSibling,
+            querySelector: (sel: string) => document.querySelector(sel),
+            setScopeId: () => {},
+            cloneNode: (node: any) => node.cloneNode(true),
+            insertStaticContent: (html: string, parent: any, anchor: any) => {
+                const tpl = document.createElement('template');
+                tpl.innerHTML = html;
+                const first = tpl.content.firstChild!;
+                const last = tpl.content.lastChild!;
+                parent.insertBefore(tpl.content, anchor);
+                return [first, last];
+            },
+        });
+
+        const checkComponent = async (loader: () => Promise<{default: Vue.Component}>, extraProps: Record<string, unknown>, check: (setupState: any) => string) => {
+            const Comp = {...(await loader()).default, render: () => null} as Vue.Component;
+            let state: any = null;
+            const localApp = renderer.createApp({
+                setup: () => () => Vue.h(Comp, {
+                    config,
+                    active: true,
+                    ...extraProps,
+                    ref: (vm: any) => { if (vm) state = vm.$.setupState; },
+                }),
+            });
+            for (const name of ['ElSwitch', 'ElSelect', 'ElOption', 'ElButton', 'ElIcon', 'ElDialog', 'ElInput', 'ElPopover', 'ElInputNumber']) {
+                localApp.component(name, Vue.defineComponent({
+                    inheritAttrs: false,
+                    setup(_, {slots}) { return () => Vue.h('div', slots.default?.()); },
+                }));
+            }
+            localApp.config.warnHandler = () => {};
+            const container = document.createElement('div');
+            document.body.appendChild(container);
+            localApp.mount(container);
+            await settle();
+            const message = check(state);
+            localApp.unmount();
+            container.remove();
+            return message;
+        };
+
+        expect(await checkComponent(
+            () => import('@/src/features/settings/ui/SectionTranslationSettings.vue'),
+            {},
+            (s) => s.findHotkeyConflict('Alt+K'),
+        )).toBeTruthy();
+
+        expect(await checkComponent(
+            () => import('@/src/features/settings/ui/AreaTranslationSettings.vue'),
+            {enabled: true, showOcr: false, serviceOptions: []},
+            (s) => s.findHotkeyConflict('Alt+K'),
+        )).toBeTruthy();
+
+        expect(await checkComponent(
+            () => import('@/src/features/settings/ui/ParagraphCopySettings.vue'),
+            {},
+            (s) => s.findHotkeyConflict('Alt+K'),
+        )).toBeTruthy();
+
+        expect(await checkComponent(
+            () => import('@/src/features/settings/ui/InputTranslationSettings.vue'),
+            {serviceOptions: []},
+            (s) => s.findHotkeyConflict('Alt+K'),
+        )).toBeTruthy();
+
+        expect(await checkComponent(
+            () => import('@/src/features/settings/ui/QuickTranslationProfiles.vue'),
+            {action: 'hover', profiles: []},
+            (s) => s.validateProfileHotkey('Alt+K', ''),
+        )).toBeTruthy();
     });
 });

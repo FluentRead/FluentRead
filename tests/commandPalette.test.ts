@@ -1309,5 +1309,37 @@ describe('CommandPaletteSettings 真实 Vue 组件行为与快捷键冲突校验
             {action: 'hover', profiles: []},
             (s) => s.validateProfileHotkey('Alt+K', ''),
         )).toBeTruthy();
+
+        config.writing = {...config.writing, enabled: true, writingHotkey: 'Alt+Shift+W'};
+        expect(await checkComponent(
+            () => import('@/src/features/settings/ui/CommandPaletteSettings.vue'),
+            {},
+            (s) => s.findHotkeyConflict('Alt+Shift+W'),
+        )).toBeTruthy();
+        expect(await checkComponent(
+            () => import('@/src/features/settings/ui/WritingSettings.vue'),
+            {},
+            (s) => s.findWritingHotkeyConflict('Alt+K'),
+        )).toBeTruthy();
+    });
+
+    it('normalizeConfig 与 buildConfigDiff 完整覆盖自定义空值回退、停用释放与格式化标签', async () => {
+        const {normalizeConfig} = await import('@/src/core/config/model');
+        const {buildConfigDiff} = await import('@/src/core/config/diff');
+
+        const fallback = normalizeConfig({
+            commandPaletteEnabled: false,
+            commandPaletteHotkey: 'custom',
+            customCommandPaletteHotkey: '',
+        });
+        expect(fallback.commandPaletteEnabled).toBe(false);
+        expect(fallback.commandPaletteHotkey).toBe('Alt+K');
+
+        const base = normalizeConfig({commandPaletteHotkey: 'Alt+K', customCommandPaletteHotkey: ''});
+        const custom = normalizeConfig({commandPaletteHotkey: 'custom', customCommandPaletteHotkey: 'Alt+Shift+K'});
+        const diff = buildConfigDiff(base, custom);
+        const hotkeyEntry = diff.groups.flatMap((g) => g.changes).find((entry) => entry.key === 'commandPaletteHotkey');
+        expect(hotkeyEntry?.before).toBe('Alt+K');
+        expect(hotkeyEntry?.after).toBe('自定义快捷键');
     });
 });

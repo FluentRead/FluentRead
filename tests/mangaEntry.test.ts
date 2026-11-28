@@ -7,13 +7,13 @@ const mocks = vi.hoisted(() => ({
     config: {on: true, disableImageTranslator: true, disableFloatingBall: true, floatingBallDisabledDomains: [] as string[], imageTranslationMangaEnabled: true,
         imageTranslationMangaPromptEnabled: true, imageTranslationMangaDownloadConfirmed: false,
         imageTranslationMangaSites: [] as unknown[], imageTranslationMangaPrefetchPages:3, animations:false, from: 'auto', to: 'zh-Hans', imageTranslationService: '',theme:'auto'},
-    create: vi.fn(), status: vi.fn(), toggle: vi.fn(), subscribe: vi.fn(), persist: vi.fn(), send: vi.fn(),
+    create: vi.fn(), status: vi.fn(), toggle: vi.fn(), retryFailed: vi.fn(), subscribe: vi.fn(), persist: vi.fn(), send: vi.fn(),
     stopStatus: vi.fn(), stopConfig: vi.fn(), listReading:vi.fn(), readReading:vi.fn(), observeReading:vi.fn(), registerHost:vi.fn(), releaseHost:vi.fn(), registerOpener:vi.fn(), stopOpener:vi.fn(),
 }));
 vi.mock('@/src/platform/shadow-ui', () => ({createVueShadowUi: mocks.create}));
 vi.mock('@/src/services/config/store', () => ({config: mocks.config, subscribeConfig: mocks.subscribe, requestConfigPatch: mocks.persist}));
 vi.mock('webextension-polyfill', () => ({default: {runtime: {sendMessage: mocks.send}}}));
-vi.mock('@/src/features/image-translation/content/runtime', () => ({subscribeMangaTranslation: mocks.status, toggleMangaTranslation: mocks.toggle,
+vi.mock('@/src/features/image-translation/content/runtime', () => ({subscribeMangaTranslation: mocks.status, toggleMangaTranslation: mocks.toggle, retryFailedMangaTranslation: mocks.retryFailed,
     getMangaReadingCandidates:mocks.listReading,readMangaReadingCandidate:mocks.readReading,observeMangaReadingCandidate:mocks.observeReading,registerMangaReadingOverlayHost:mocks.registerHost,registerMangaReadingOpener:mocks.registerOpener}));
 vi.mock('@/src/features/image-translation/ui/MangaEntry.vue', () => ({default: {name: 'MangaEntry'}}));
 import {isImageTranslatorNeeded, isMangaReaderPage, mountMangaEntry, openMangaEntry, openMangaReading, subscribeMangaReading, unmountMangaEntry} from '@/src/features/image-translation/content/mangaEntry';
@@ -313,6 +313,11 @@ describe('独立漫画入口所有权和配置端口', () => {
         mocks.create.mockResolvedValue({remove: vi.fn()});await mountMangaEntry({} as never);expect(openMangaEntry()).toBe(false);
         props().toggle();expect(mocks.toggle).toHaveBeenCalledOnce();mocks.config.imageTranslationMangaEnabled = false;props().toggle();
         mocks.config.on = false;props().toggle();expect(mocks.toggle).toHaveBeenCalledOnce();
+        mocks.retryFailed.mockReturnValue(2);
+        expect(props().retryFailed()).toBe(0);
+        mocks.config.on = true;expect(props().retryFailed()).toBe(0);
+        mocks.config.imageTranslationMangaEnabled = true;expect(props().retryFailed()).toBe(2);
+        expect(mocks.retryFailed).toHaveBeenCalledOnce();
     });
     it('模型状态和持久化走既有消息端口，状态失败不会误当资源已经可用', async () => {
         await mountMangaEntry({} as never);expect(await props().inspectResources()).toBe(true);

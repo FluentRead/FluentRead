@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaReader.ts
  * 文件职责：把漫画站点的正文图片、超长图分段、可读画布、公开背景图和页面生命周期接入同一连续翻译会话。
- * 主要内容：按站点规则发现正文，圈选页发布区域入口；单次刷新帧内复用元素与祖先矩形测量并将本帧已算身份透传给画布、背景和分段更新，长图分段查询包裹帧缓存以消除重复布局读取；已确认的 GANMA 路径内页码和 Mangahub 正整数查询页码不视为换章，其他查询参数仍参与章节身份，来源授权保留完整地址；已开启的同章哔哩哔哩会话在可见的原站加载提示期间保留等待，不识别空像素；通用站点支持宽扁条漫切片并保持懒加载图片受 IntersectionObserver 观察；滚动及可见性移动后短暂停留才启动新识别，隐藏事件同步关闭调度闸，正文混合载体线性合并为 DOM 页序，变动通知同步关闸并在布局刷新后排队；已完成结果仍按实际位置立即交接，普通图片滚动通过可见性通知减少全量测量；画布显式开启和重试先隐藏旧译层并要求完整来源验证，自动布局保留轻量指纹；当前页优先的有界队列支持可选并发上限并与附近页共享一千六百万像素预算，换章、隐藏和卸载清理监听器与停留计时器。
+ * 主要内容：按站点规则发现正文，圈选页发布区域入口；单次刷新帧内复用元素与祖先矩形测量并将本帧已算身份透传给画布、背景和分段更新，长图分段查询包裹帧缓存以消除重复布局读取；无可预合成轻量缓存时跳过刷新后的全量几何重测；已确认的 GANMA 路径内页码和 Mangahub 正整数查询页码不视为换章，其他查询参数仍参与章节身份，来源授权保留完整地址；已开启的同章哔哩哔哩会话在可见的原站加载提示期间保留等待，不识别空像素；通用站点支持宽扁条漫切片并保持懒加载图片受 IntersectionObserver 观察；滚动及可见性移动后短暂停留才启动新识别，隐藏事件同步关闭调度闸，正文混合载体线性合并为 DOM 页序，变动通知同步关闸并在布局刷新后排队；已完成结果仍按实际位置立即交接，普通图片滚动通过可见性通知减少全量测量；画布显式开启、单页重试与批量重试失败页先隐藏旧译层并要求完整来源验证，自动布局保留轻量指纹；当前页优先的有界队列支持可选并发上限并与附近页共享一千六百万像素预算，换章、隐藏和卸载清理监听器与停留计时器。
  * 模块边界：只检查已展示正文，不抓取章节、不读取站点私有数据或绕过访问限制；图片与画布的读取、翻译、缓存和原图恢复通过注入端口复用图片运行时。
  */
 import {createMangaSession, type MangaTranslationStatus} from './mangaSession';
@@ -66,6 +66,7 @@ export function createMangaReader(ports: {
     identity: (image: HTMLImageElement) => string;
     translate: (image: HTMLImageElement) => Promise<void | 'deferred'>;
     reuse?: (image: HTMLImageElement) => boolean;
+    hasWarmable?: () => boolean;
     warm?: (images: HTMLImageElement[]) => void;
     resetCache?: () => void;
     restore: (image: HTMLImageElement) => void;
@@ -363,8 +364,8 @@ export function createMangaReader(ports: {
                 visible: page.visible && !document.hidden, retain: nearby.has(page.image),
                 prefetch: upcoming.has(page.image) || (document.hidden && page.visible)})),
         });
-        // 仅重建已完成页面，前后一屏内按可见页优先；不因轻量容量扩大付费预译窗口。
-        if (ports.warm) {
+        // 仅重建已完成页面，前后一屏内按可见页优先；无待预合成缓存时跳过全章几何重测。
+        if (ports.warm && ports.hasWarmable?.() !== false) {
             const nearbyPages: Array<{image: HTMLImageElement; visible: boolean; distance: number}> = [];
             // refresh 端口可能归还宿主样式，故在其后测量；以下排序期间不再调用 DOM 或会话端口。
             for (const page of candidates) {
@@ -463,6 +464,17 @@ export function createMangaReader(ports: {
         scheduleLayout: () => scheduleLayout(),
         retry(image: MangaSurface) { cancelSettling();refresh();const retried = session.retry(image);if (retried && isCanvas(image)) ports.canvas?.invalidate?.(image);
             if(retried&&opened?.source.surface===image){const current=opened;opened=undefined;try{current.invalid();}catch{/* 不影响重试 */}}return retried; },
+        retryFailed() {
+            cancelSettling();
+            refresh();
+            return session.retryFailed(surface => {
+                if (isCanvas(surface)) ports.canvas?.invalidate?.(surface);
+                if (opened?.source.surface === surface) {
+                    const current = opened; opened = undefined;
+                    try { current.invalid(); } catch { /* 不影响重试 */ }
+                }
+            });
+        },
         toggle() { cancelSettling();discoveryDirty = true; refresh(); if (areaFallback) return false; if (!session.status().active) selectedCanvases.forEach(canvas => ports.canvas?.invalidate?.(canvas));const toggled = session.toggle(); checkOpened();refresh(); return toggled; },
         dispose() {
             disposed = true;

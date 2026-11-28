@@ -587,4 +587,54 @@ describe('standalone manga reading panel prototype',()=>{
       vi.useRealTimers();
     }
   });
+
+  it('refreshPending reloads only an opened selected pending candidate without stealing focus', async () => {
+    const h = await mount();
+    // Closed panel -> no-op
+    h.instance.refreshPending();
+    expect(h.props.read).not.toHaveBeenCalled();
+
+    // Opened with no selection -> no-op
+    await h.instance.open(trusted); await h.tick();
+    h.instance.refreshPending();
+    expect(h.props.read).not.toHaveBeenCalled();
+
+    // Selected pending candidate -> reloads cleanly without moving active focus
+    h.props.read
+      .mockResolvedValueOnce({status: 'pending'})
+      .mockResolvedValueOnce({status: 'ready', lines: [line('刷新后译文', 'Refreshed')]});
+    h.button('图片 1')!.props.onClick(trusted); await h.tick();
+    expect(h.panel.status).toBe('pending');
+    const dialog = h.get(n => n.props.role === 'dialog')!;
+    active = dialog;
+    h.instance.refreshPending(); await h.tick();
+    expect(h.props.read).toHaveBeenCalledTimes(2);
+    expect(h.panel.status).toBe('ready');
+    expect(active).toBe(dialog);
+
+    // Already ready -> refreshPending is a no-op
+    h.instance.refreshPending(); await h.tick();
+    expect(h.props.read).toHaveBeenCalledTimes(2);
+
+    // Opened while list was temporarily unavailable -> refreshPending defers once through layout frame and auto-selects single candidate
+    vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    try {
+      h.instance.close(); await h.tick();
+      const only: MangaReadingCandidate = {kind: 'image', ordinal: 1, token: {}};
+      h.props.list
+        .mockReturnValueOnce({status: 'unavailable'} as never)
+        .mockReturnValueOnce({status: 'unavailable'} as never)
+        .mockReturnValueOnce({status: 'ready', items: [only]});
+      h.props.read.mockResolvedValueOnce({status: 'ready', lines: [line('自动加载译文', 'Auto loaded')]});
+      await h.instance.open(trusted); await h.tick();
+      expect(h.panel.status).toBe('unavailable');
+      h.instance.refreshPending();
+      vi.advanceTimersByTime(50);
+      await h.tick(); await h.tick();
+      expect(h.panel.status).toBe('ready');
+      expect(h.get(n => n.tag === 'pre' && n.text === '自动加载译文')).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

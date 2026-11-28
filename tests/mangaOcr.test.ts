@@ -415,6 +415,7 @@ describe('原图长框中的旋转标签',()=>{
             if(mode==='context'&&mocks.canvases.length===2)vi.mocked(canvas.getContext).mockReturnValue(null);
             return canvas;
         });
+        let localBubbleCalls=0;
         mocks.recognize.mockImplementation(async function(this:any,canvas:HTMLCanvasElement){
             await this.detector.run(canvas);
             if(canvas.width===width){
@@ -422,7 +423,7 @@ describe('原图长框中的旋转标签',()=>{
                 if(mode==='local')return {results:[coarse,{text:'27',confidence:.993,box:{x:157,y:220,width:14,height:10}}]};
                 return {results:[coarse]};
             }
-            if(mode==='local'&&canvas.width!==360)return {results:[{text:canvas===mocks.canvases[1]?'42':'SIDE',confidence:.994,box:{x:15,y:21,width:36,height:18}}]};
+            if(mode==='local'&&canvas.width!==360)return {results:[{text:++localBubbleCalls===1?'42':'SIDE',confidence:.994,box:{x:15,y:21,width:36,height:18}}]};
             if(mocks.contexts.at(-1).rotate.mock.calls[0][0]>0){
                 if(mode==='cancel')abort!.abort();
                 return {results:[{text:'9 L',confidence:.79,box:{x:161,y:46,width:68,height:20}}]};

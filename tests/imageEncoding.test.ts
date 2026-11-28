@@ -94,4 +94,12 @@ describe('图片与 OCR 共用异步无损编码',()=>{
         await failed;expect(vi.getTimerCount()).toBe(0);
         vi.stubGlobal('FileReader',Reader);const retry=canvas(),retried=encodeImageCanvas(retry.canvas);retry.encoded();readers.at(-1)!.complete('ok');expect(await retried).toBe('ok');
     });
+    it('按需使用 JPEG 编码并应用默认或指定质量参数',async()=>{
+        const first=canvas(),r1=encodeImageCanvas(first.canvas,undefined,{timeoutMs:5000,message:'t',mimeType:'image/jpeg'});
+        expect(first.toBlob).toHaveBeenCalledWith(expect.any(Function),'image/jpeg',0.92);
+        first.encoded();readers.at(-1)!.complete('data:image/jpeg;base64,a');expect(await r1).toBe('data:image/jpeg;base64,a');
+        const second=canvas(),r2=encodeImageCanvas(second.canvas,undefined,{timeoutMs:5000,message:'t',mimeType:'image/jpeg',quality:0.85});
+        expect(second.toBlob).toHaveBeenCalledWith(expect.any(Function),'image/jpeg',0.85);
+        second.encoded();readers.at(-1)!.complete('data:image/jpeg;base64,b');expect(await r2).toBe('data:image/jpeg;base64,b');
+    });
 });

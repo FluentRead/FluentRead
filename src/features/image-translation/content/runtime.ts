@@ -8,7 +8,7 @@
  * 分段旁置：仅分段载体提供已冻结的核心像素视窗，并随原漫画请求透传供完整补绘准入；普通图片与无视窗宿主不增加请求字段或读取布局。
  * 大图查看器：可信点击后预解码已有译图，待查看器开场动画结束再接管；透明手势层不打断接管，同图高清切换及查看器节点替换复用该结果。
  * 滚动呈现：普通译图复用宿主定位容器；旋转、缩放和透视图片先确认共用裁切链，再以相邻的等尺寸原生盒子继承祖先变换，复制自身变换及参考盒，不把外接矩形当作原图；失败布局按几何身份去重，样式变化后可重试，固定层管理操作条和常规回退。
- * 滚动开销：纯滚动帧对离屏图跳过样式和裁切扫描，保留可安全随容器回到视口的译图；样式只在值变化时写入。
+ * 滚动开销：纯滚动帧对离屏图跳过样式和裁切扫描，保留可安全随容器回到视口的译图；样式只在值变化时写入；无需缩放的同源光栅 data:/blob: 图片直接读取原始字节，已撤销 blob 或需走画布读取的不透明漫画页经 32×32 alpha 探测后优先以高质量 JPEG 编码以压缩传输体积与编码耗时；无可预合成轻量缓存时跳过全章几何重测，并暴露 retryFailedMangaTranslation 供入口一键重试失败页。
  */
 import {imageTranslationFailureCode, imageLocalFailureMessage, type ImageLocalFailure} from '../failure';
 import {sendRuntimeMessage} from '@/src/platform/browser/runtimeMessages';
@@ -34,7 +34,7 @@ import {
 } from '@/src/features/image-translation/services/client';
 import type { OcrLine } from '@/src/features/image-translation/core';
 import type {ImageViewport} from '@/src/shared/image/types';
-import {fetchPageImageForOcr} from '@/src/features/image-translation/services/remoteImage';
+import {fetchPageImageForOcr, MAX_REMOTE_IMAGE_BYTES} from '@/src/features/image-translation/services/remoteImage';
 import {encodeImageCanvas} from '@/src/features/image-translation/services/imageEncoding';
 import {withImageSourceAuthorization} from './sourceAuthorization';
 import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSource, isImagePresentationOccluded, resolveMangaPresentationBounds, canShareImageOverflowClipping, type ImagePresentation} from './presentation';
@@ -328,6 +328,11 @@ export function toggleMangaTranslation(): boolean {
         if (state.queuedTranslation) restoreImageTranslation(state);
     });
     return toggled;
+}
+
+/** 一键重试当前漫画会话中的全部失败页面，回到同一受控并发队列。 */
+export function retryFailedMangaTranslation(): number {
+    return mangaReader?.retryFailed() ?? 0;
 }
 
 function publishMangaStatus(status: MangaTranslationStatus): void {
@@ -1308,9 +1313,98 @@ async function readAuthorizedImage(image: HTMLImageElement, options: {readonly s
     }
 }
 
+const FAST_RASTER_DATA_URL = /^data:image\/(?:png|jpeg|jpg|webp|avif);base64,[A-Za-z0-9+/=\s]+$/i;
+const FAST_RASTER_MIME = /^image\/(?:png|jpeg|jpg|webp|avif)$/i;
+const MAX_DIRECT_DATA_URL_LENGTH = Math.ceil(MAX_REMOTE_IMAGE_BYTES * 4 / 3) + 64;
+
+function readBlobAsDataUrl(blob: Blob, deadline: number, signal?: AbortSignal): Promise<string> {
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) return Promise.reject(new Error('图片读取超时'));
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        let reader: FileReader | undefined;
+        const timeout = setTimeout(() => finish(new Error('图片读取超时')), remaining);
+        const abort = () => finish(createImageAbortError());
+        function finish(error?: Error, result?: string) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            signal?.removeEventListener('abort', abort);
+            if (reader) {
+                reader.onload = null;
+                reader.onerror = null;
+                if (reader.readyState === 1) reader.abort();
+            }
+            if (error) reject(error);
+            else resolve(result!);
+        }
+        signal?.addEventListener('abort', abort, {once: true});
+        if (signal?.aborted) { abort(); return; }
+        try {
+            reader = new FileReader();
+            reader.onload = () => {
+                if (typeof reader!.result !== 'string') finish(new Error('图片数据读取失败'));
+                else finish(undefined, reader!.result);
+            };
+            reader.onerror = () => finish(new Error('图片数据读取失败'));
+            reader.readAsDataURL(blob);
+        } catch (error) { finish(error as Error); }
+    });
+}
+
+/** 在尺寸无需缩小时直接读取同源光栅 blob: 原始字节，跳过主线程 Canvas 绘制与高膨胀 PNG 复编码。 */
+async function tryReadBlobImageData(source: string, deadline: number, signal?: AbortSignal): Promise<string | null> {
+    if (typeof fetch !== 'function' || typeof FileReader !== 'function') return null;
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) throw new Error('图片读取超时');
+    const controller = new AbortController();
+    let timedOut = false;
+    const onAbort = () => controller.abort();
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, remaining);
+    signal?.addEventListener('abort', onAbort, {once: true});
+    try {
+        const response = await fetch(source, {signal: controller.signal});
+        if (signal?.aborted) throw createImageAbortError();
+        if (timedOut) throw new Error('图片读取超时');
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        if (signal?.aborted) throw createImageAbortError();
+        if (timedOut) throw new Error('图片读取超时');
+        const mime = blob.type.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+        if (!FAST_RASTER_MIME.test(mime) || blob.size <= 0 || blob.size > MAX_REMOTE_IMAGE_BYTES) return null;
+        return await readBlobAsDataUrl(blob, deadline, signal);
+    } catch (error) {
+        if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw createImageAbortError();
+        if (timedOut || (error instanceof Error && error.message === '图片读取超时')) throw new Error('图片读取超时');
+        return null;
+    } finally {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+    }
+}
+
+function isCanvasOpaque(canvas: HTMLCanvasElement): boolean {
+    const probe = document.createElement('canvas');
+    probe.width = 32;
+    probe.height = 32;
+    try {
+        const ctx = probe.getContext('2d', {willReadFrequently: true});
+        if (!ctx) return false;
+        ctx.drawImage(canvas, 0, 0, 32, 32);
+        const {data} = ctx.getImageData(0, 0, 32, 32);
+        for (let i = 3; i < data.length; i += 4) {
+            if (data[i] < 255) return false;
+        }
+        return true;
+    } finally {
+        probe.width = 0;
+        probe.height = 0;
+    }
+}
+
 export async function getImageData(
     image: HTMLImageElement,
-    options: {readonly signal?: AbortSignal; readonly timeoutMs?: number} = {},
+    options: {readonly signal?: AbortSignal; readonly timeoutMs?: number; readonly preferOpaqueJpeg?: boolean} = {},
 ): Promise<string> {
     if (options.signal?.aborted) throw createImageAbortError();
     const budget = typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs)
@@ -1321,6 +1415,16 @@ export async function getImageData(
     if (!originalWidth || !originalHeight) throw new Error('图片尚未加载完成');
     const scale = Math.min(1, MAX_IMAGE_READ_EDGE / Math.max(originalWidth, originalHeight),
         Math.sqrt(MAX_IMAGE_READ_PIXELS / (originalWidth * originalHeight)));
+    if (scale === 1) {
+        const source = image.currentSrc || image.src;
+        if (source.startsWith('data:') && source.length <= MAX_DIRECT_DATA_URL_LENGTH && FAST_RASTER_DATA_URL.test(source)) {
+            return source;
+        }
+        if (source.startsWith('blob:')) {
+            const direct = await tryReadBlobImageData(source, deadline, options.signal);
+            if (direct) return direct;
+        }
+    }
     const width = Math.max(1, Math.floor(originalWidth * scale));
     const height = Math.max(1, Math.floor(originalHeight * scale));
     const canvas = document.createElement('canvas');
@@ -1334,10 +1438,12 @@ export async function getImageData(
     }
     try {
         context.drawImage(image, 0, 0, width, height);
+        const encodeFormat = options.preferOpaqueJpeg && isCanvasOpaque(canvas)
+            ? {mimeType: 'image/jpeg' as const, quality: 0.92} : undefined;
         const remaining = deadline - performance.now();
         if (remaining <= 0) throw new Error('图片读取超时');
-        // PNG 编码本身检查画布污染，省去额外像素回读；等待期间仍保留独占画布。
-        return await encodeImageCanvas(canvas, options.signal, {timeoutMs: remaining, message: '图片读取超时'});
+        // 编码本身检查画布污染；漫画不透明页采用高画质 JPEG 显著减小 IPC 载荷并加速主线程编码。
+        return await encodeImageCanvas(canvas, options.signal, {timeoutMs: remaining, message: '图片读取超时', ...encodeFormat});
     } catch (error) {
         if (!(error instanceof Error) || error.name !== 'SecurityError') throw error;
         canvas.width = 0;
@@ -1711,7 +1817,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         state.waitingForImage = false;
         if (!requestIsCurrent(state, controller)) return;
         const imageData = await withTimeout(
-            getImageData(state.image, {signal: controller.signal, timeoutMs: IMAGE_READ_TIMEOUT_MS}),
+            getImageData(state.image, {signal: controller.signal, timeoutMs: IMAGE_READ_TIMEOUT_MS, preferOpaqueJpeg: state.manga === true}),
             IMAGE_READ_TIMEOUT_MS, '图片读取超时', controller.signal,
         );
         if (!requestIsCurrent(state, controller)) return;
@@ -2306,6 +2412,7 @@ export function mountImageTranslator(): void {
         identity: image => `${sourceIdentity(image)}:${configurationIdentity(true)}`,
         translate: translateMangaImage,
         reuse: reuseMangaImage,
+        hasWarmable: () => (lightCache.stats().pages > 0 && config.useCache) || warming.size > 0,
         warm: prepareMangaCachedImages,
         resetCache: clearMangaCache,
         restore: restoreMangaImage,

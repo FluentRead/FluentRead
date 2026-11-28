@@ -34,7 +34,7 @@ async function mountEntry(toolsDisplay?: 'hover' | 'always', dockPosition?: {sid
     page:{site:'fixture', route:'/chapter/1'},
     settings:{sourceLanguage:undefined as string | undefined, promptEnabled:true, floatingBallVisible:false, downloadConfirmed:false, animations:true, ...(toolsDisplay === undefined ? {} : {toolsDisplay})},
     dockPosition,
-    toggle:vi.fn(), inspectResources:vi.fn(async () => false), persist:vi.fn(async (_patch: Record<string, unknown>) => undefined), openSettings:vi.fn(),
+    toggle:vi.fn(), retryFailed:undefined as (() => number) | undefined, inspectResources:vi.fn(async () => false), persist:vi.fn(async (_patch: Record<string, unknown>) => undefined), openSettings:vi.fn(),
     startAreaTranslation:vi.fn(async () => true), onPeekOriginal:undefined as ((peeking:boolean)=>void) | undefined, readManga:undefined as ((event:MouseEvent)=>void) | undefined, readingOpen:false,readingState:undefined as {open:boolean} | undefined,readingChanged:vi.fn(),
     reading:undefined as {list:()=>MangaReadingList;read:(token:object,signal:AbortSignal)=>Promise<MangaReadingResult>;observe:(token:object,invalid:()=>void)=>(()=>void)|undefined;copy:(text:string)=>Promise<void>;theme:'light'|'dark'|'auto'}|undefined,
   });
@@ -626,5 +626,111 @@ describe('manga entry telemetry, hold-to-peek original, and theme propagation', 
     launcherNode().props.onPointerdown({pointerType: 'mouse', button: 0, isPrimary: true, pointerId: 15, clientX: 970, clientY: 400});
     launcherNode().props.onLostpointercapture();
     expect(listeners.get('pointermove')?.size ?? 0).toBe(0);
+  });
+
+  it('shows one-click retry failed button, stage preparing percent, dock progress bar, and auto-refreshes pending reading panel', async () => {
+    const {panel, props, exposed, tick, find} = await mountEntry('hover');
+    const retry = vi.fn(() => 2);
+    props.retryFailed = retry;
+    props.status.active = true;
+    props.status.pending = true;
+    props.status.stage = 'preparing';
+    props.status.progress = 37.6;
+    props.status.pageCount = 8;
+    props.status.completed = 0;
+    await tick();
+
+    // Preparing stage appends percentage next to completed/pageCount and drives the slim progress bar
+    expect(find(value => value.props.class === 'fr-manga-progress-pill')?.text).toBe('0/8 · 38%');
+    expect(find(value => value.props.class === 'fr-manga-dock-progress-fill')?.props.style).toEqual({width: '38%'});
+    // Retry button is hidden while pending
+    expect(find(value => value.props.class?.includes('fr-manga-retry-launcher'))).toBeUndefined();
+
+    // Non-finite progress during preparing falls back to chapter ratio
+    props.status.progress = Number.NaN;
+    props.status.completed = 2;
+    await tick();
+    expect(find(value => value.props.class === 'fr-manga-progress-pill')?.text).toBe('2/8');
+    expect(find(value => value.props.class === 'fr-manga-dock-progress-fill')?.props.style).toEqual({width: '25%'});
+
+    // Pending without pageCount uses numeric progress for bar
+    props.status.pageCount = 0;
+    props.status.stage = 'recognizing';
+    props.status.progress = 64;
+    await tick();
+    expect(find(value => value.props.class === 'fr-manga-progress-pill')?.text).toBe('64%');
+    expect(find(value => value.props.class === 'fr-manga-dock-progress-fill')?.props.style).toEqual({width: '64%'});
+
+    // Idle active with 0 pages or with 0 completed pages hides progress bar
+    props.status.pending = false;
+    await tick();
+    expect(find(value => value.props.class === 'fr-manga-dock-progress')).toBeUndefined();
+    props.status.pageCount = 8;
+    props.status.completed = 0;
+    await tick();
+    expect(find(value => value.props.class === 'fr-manga-dock-progress')).toBeUndefined();
+
+    // Errors while active and idle reveal the retry button with singular/plural labels
+    props.status.errors = 1;
+    await tick();
+    const retryBtn = find(value => value.props.class?.includes('fr-manga-retry-launcher'))!;
+    expect(retryBtn.props['aria-label']).toBe('重试');
+    props.status.errors = 3;
+    await tick();
+    expect(retryBtn.props['aria-label']).toBe('重试 (3)');
+
+    // Focus/hover bridge, Escape collapse, touch detection, keyboard vs mouse click
+    const blurSpy = vi.spyOn(panel.retryLauncher, 'blur');
+    panel.retryLauncher.matches = () => true;
+    panel.reveal();
+    panel.retract({relatedTarget: panel.retryLauncher});
+    expect(panel.expanded).toBe(true);
+    panel.retryLauncher.matches = () => false;
+    retryBtn.props.onPointerdown({pointerType: 'touch'});
+    await tick();
+    expect(retryBtn.props.class).toContain('is-touch');
+
+    const stopProp = vi.fn();
+    retryBtn.props.onClick({detail: 0, stopPropagation: stopProp});
+    expect(stopProp).toHaveBeenCalledOnce();
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(blurSpy).not.toHaveBeenCalled();
+
+    retryBtn.props.onClick({detail: 1, stopPropagation: stopProp});
+    expect(retry).toHaveBeenCalledTimes(2);
+    expect(blurSpy).toHaveBeenCalledOnce();
+
+    retryBtn.props.onKeydown({key: 'Escape', stopPropagation: vi.fn()});
+    expect(panel.expanded).toBe(false);
+
+    // Auto-refresh mounted MangaReadingPanel when a pending page finishes
+    const token = {};
+    const read = vi.fn()
+      .mockResolvedValueOnce({status: 'pending' as const})
+      .mockResolvedValueOnce({status: 'ready' as const, lines: [{text: '自动刷新译文', bbox: {x0: 0, y0: 0, x1: 20, y1: 10}}]});
+    props.reading = {
+      list: () => ({status: 'ready' as const, items: [{token, kind: 'image' as const, ordinal: 1}]}),
+      read,
+      observe: () => vi.fn(),
+      copy: vi.fn(async () => {}),
+      theme: 'auto',
+    };
+    props.status.errors = 0;
+    props.status.pending = true;
+    await tick();
+    await exposed.openReading({isTrusted: true} as Event);
+    await tick();
+    await tick();
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(find(value => value.text === '当前页面正在处理')).toBeDefined();
+
+    // Completing the page triggers auto-refresh in MangaReadingPanel without manual click
+    props.status.completed = 3;
+    props.status.pending = false;
+    await tick();
+    await tick();
+    await tick();
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(find(value => value.tag === 'pre' && value.text === '自动刷新译文')).toBeDefined();
   });
 });

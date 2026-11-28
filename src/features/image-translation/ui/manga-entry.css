@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/ui/manga-entry.css
  * 文件职责：为漫画入口操作坞、确认弹窗与漫画文字面板提供隔离 ShadowRoot 内的统一界面样式。
- * 主要内容：在 ShadowRoot 内定义与 FluentRead 澄明轻盈设计规范一致的局部变量，避免宿主页变量干扰；修复深色主题弹窗文字色继承缺陷并按显式 data-theme 与系统偏好同步切换，提供左右侧可拖动紧贴停靠坞与悬停桥接、实时进度计数、按住对照原图按钮、遮罩层以及文字面板搜索/上下页切换/单条悬停复制样式，并完整适配窄屏与减少动态效果偏好。
+ * 主要内容：在 ShadowRoot 内定义与 FluentRead 澄明轻盈设计规范一致的局部变量，避免宿主页变量干扰；修复深色主题弹窗文字色继承缺陷并按显式 data-theme 与系统偏好同步切换，提供左右侧可拖动紧贴停靠坞与悬停桥接、实时进度计数与底部细进度条、一键重试失败页与按住对照原图按钮、遮罩层以及文字面板搜索/上下页切换/单条悬停复制样式，并完整适配窄屏与减少动态效果偏好。
  * 模块边界：由漫画入口显式传给 ShadowRoot 注入；全部选择器限定在 FluentRead 漫画类名，不读取或修改宿主页面样式。
  */
 
@@ -94,6 +94,7 @@
 .fr-manga-reading-body:focus-visible,
 .fr-manga-entry button:focus-visible,
 .fr-manga-launcher:focus-visible,
+.fr-manga-retry-launcher:focus-visible,
 .fr-manga-peek-launcher:focus-visible,
 .fr-manga-reading-launcher:focus-visible {
   outline: 2px solid var(--fr-manga-brand);
@@ -701,6 +702,7 @@
   transition: none;
 }
 
+.fr-manga-dock.is-dragging .fr-manga-retry-launcher,
 .fr-manga-dock.is-dragging .fr-manga-peek-launcher,
 .fr-manga-dock.is-dragging .fr-manga-reading-launcher {
   opacity: 0;
@@ -708,6 +710,7 @@
 }
 
 .fr-manga-launcher,
+.fr-manga-retry-launcher,
 .fr-manga-peek-launcher,
 .fr-manga-reading-launcher {
   position: relative;
@@ -764,6 +767,7 @@
   touch-action: none;
 }
 
+.fr-manga-retry-launcher,
 .fr-manga-peek-launcher,
 .fr-manga-reading-launcher {
   width: 34px;
@@ -775,11 +779,20 @@
   pointer-events: none;
 }
 
+.fr-manga-retry-launcher {
+  border-color: color-mix(in srgb, var(--fr-manga-warning) 38%, var(--fr-manga-line));
+  color: var(--fr-manga-warning);
+}
+
+.fr-manga-dock[data-position="left"] .fr-manga-retry-launcher,
 .fr-manga-dock[data-position="left"] .fr-manga-peek-launcher,
 .fr-manga-dock[data-position="left"] .fr-manga-reading-launcher {
   transform: translateX(-10px);
 }
 
+.fr-manga-retry-launcher.is-touch,
+.fr-manga-retry-launcher.is-expanded,
+.fr-manga-retry-launcher:focus-visible,
 .fr-manga-peek-launcher.is-touch,
 .fr-manga-peek-launcher.is-expanded,
 .fr-manga-peek-launcher:focus-visible,
@@ -791,6 +804,9 @@
   pointer-events: auto;
 }
 
+.fr-manga-dock[data-position="left"] .fr-manga-retry-launcher.is-touch,
+.fr-manga-dock[data-position="left"] .fr-manga-retry-launcher.is-expanded,
+.fr-manga-dock[data-position="left"] .fr-manga-retry-launcher:focus-visible,
 .fr-manga-dock[data-position="left"] .fr-manga-peek-launcher.is-touch,
 .fr-manga-dock[data-position="left"] .fr-manga-peek-launcher.is-expanded,
 .fr-manga-dock[data-position="left"] .fr-manga-peek-launcher:focus-visible,
@@ -807,14 +823,40 @@
 }
 
 .fr-manga-launcher:hover,
+.fr-manga-retry-launcher:hover,
 .fr-manga-peek-launcher:hover,
 .fr-manga-reading-launcher:hover {
   box-shadow: 0 6px 18px rgba(23, 32, 51, .2);
 }
 
+.fr-manga-retry-launcher:hover {
+  background: var(--fr-manga-warning-soft);
+}
+
 .fr-manga-launcher svg { display: block; width: 18px; height: 18px; flex: none; }
+.fr-manga-retry-launcher svg,
 .fr-manga-peek-launcher svg,
 .fr-manga-reading-launcher svg { display: block; width: 16px; height: 16px; flex: none; }
+
+.fr-manga-dock-progress {
+  position: absolute;
+  right: 11px;
+  bottom: 2px;
+  left: 11px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--fr-manga-brand-soft);
+  pointer-events: none;
+}
+
+.fr-manga-dock-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fr-manga-brand);
+  transition: width .22s cubic-bezier(.23,1,.32,1);
+}
 
 .fr-manga-progress-pill {
   color: var(--fr-manga-ink);
@@ -971,6 +1013,8 @@
   .fr-manga-spinner { animation: none; }
   .fr-manga-dock,
   .fr-manga-launcher,
+  .fr-manga-retry-launcher,
+  .fr-manga-dock-progress-fill,
   .fr-manga-peek-launcher,
   .fr-manga-reading-launcher,
   .fr-manga-reading article,

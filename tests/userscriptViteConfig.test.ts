@@ -945,7 +945,7 @@ describe('userscript browser shim injection', () => {
         expect(localTranslationKeys).toContain('settings.localTranslation.hunyuan3');
         const sidepanelKeys = ['title', 'openCenter', 'keyboardHint', 'openError', 'settingsError', 'startupError',
             'scope.label', 'scope.tab', 'scope.window', 'scope.description'].map(name => `sidepanel.${name}`);
-        const toolbarKeys = ['click.label', 'click.description', 'click.popup', 'click.translate', 'openPopup'].map(name => `toolbar.${name}`);
+        const toolbarKeys = ['click.label', 'click.description', 'click.popup', 'click.translate', 'openPopup', 'title.default', 'title.translate'].map(name => `toolbar.${name}`);
         expect(Object.keys(extension).filter(key => key.startsWith('toolbar.')).sort()).toEqual([...toolbarKeys].sort());
         const popupLayoutEditingKeys = Object.keys(extension).filter(key => key.startsWith('settings.interface.popupLayout.')
             && key !== 'settings.interface.popupLayout.label' && !key.startsWith('settings.interface.popupLayout.modules.'));

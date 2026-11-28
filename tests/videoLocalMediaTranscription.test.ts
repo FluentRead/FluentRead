@@ -52,8 +52,13 @@ describe('本地音视频格式校验与格式化', () => {
     it('校验支持的音视频扩展名、MIME、空文件与体积上限', () => {
         expect(classifyLocalMediaKind({name: 'talk.MP4', type: 'video/mp4'})).toBe('video');
         expect(classifyLocalMediaKind({name: 'clip.webm', type: 'audio/webm'})).toBe('audio');
+        expect(classifyLocalMediaKind({name: 'song.mp3', type: 'audio/mpeg'})).toBe('audio');
         expect(classifyLocalMediaKind({name: 'podcast.m4a', type: ''})).toBe('audio');
+        expect(classifyLocalMediaKind({name: 'movie.mp4', type: 'application/octet-stream'})).toBe('video');
         expect(classifyLocalMediaKind({name: 'noext', type: 'audio/flac; codecs=flac'})).toBe('audio');
+        expect(classifyLocalMediaKind({name: 'notes.mp4', type: 'text/plain'})).toBeNull();
+        expect(classifyLocalMediaKind({name: 'weird.txt', type: 'audio/mpeg'})).toBeNull();
+        expect(classifyLocalMediaKind({name: 'noext', type: 'application/octet-stream'})).toBeNull();
         expect(classifyLocalMediaKind({name: 'noext', type: 'text/plain'})).toBeNull();
         expect(classifyLocalMediaKind({name: 'doc.pdf', type: 'application/pdf'})).toBeNull();
 
@@ -107,8 +112,20 @@ describe('本地音视频格式校验与格式化', () => {
 });
 
 describe('本地音视频 Web Audio 解码与窗口切片', () => {
-    it('支持默认 Web Audio、webkitAudioContext、降采样与取消清理', async () => {
+    it('优先使用 OfflineAudioContext，并支持 AudioContext/webkitAudioContext 回退与降采样', async () => {
         const speech = makeSpeechPcm(2, 16_000);
+        const offlineDecode = vi.fn(async () => makeAudioBuffer(speech, 16_000, 1));
+        vi.stubGlobal('OfflineAudioContext', class {
+            decodeAudioData = offlineDecode;
+        });
+
+        const file = {arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer};
+        const offlineResult = await decodeLocalMediaToPcm16k(file, new AbortController().signal);
+        expect(offlineResult.durationMs).toBe(2000);
+        expect(offlineDecode).toHaveBeenCalledOnce();
+
+        // 无 OfflineAudioContext 时回退 AudioContext 并在 finally 中关闭
+        vi.stubGlobal('OfflineAudioContext', undefined);
         const close = vi.fn(async () => { throw new Error('close ignored'); });
         const decodeAudioData = vi.fn(async () => makeAudioBuffer(speech, 16_000, 1));
         vi.stubGlobal('AudioContext', class {
@@ -117,7 +134,6 @@ describe('本地音视频 Web Audio 解码与窗口切片', () => {
             close = close;
         });
 
-        const file = {arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer};
         const result = await decodeLocalMediaToPcm16k(file, new AbortController().signal);
         expect(result.durationMs).toBe(2000);
         expect(result.pcm.length).toBe(speech.length);
@@ -140,15 +156,21 @@ describe('本地音视频 Web Audio 解码与窗口切片', () => {
         await expect(decodeLocalMediaToPcm16k(file, new AbortController().signal)).rejects.toThrow('Web Audio');
     });
 
-    it('拒绝空字节、异常时长、超 20 分钟、无声道、静音及各阶段取消', async () => {
+    it('拒绝空字节、异常时长、超 20 分钟、无声道、静音及文件读取/解码各阶段取消', async () => {
         const preAborted = new AbortController();
         preAborted.abort(new Error('already aborted'));
         await expect(decodeLocalMediaToPcm16k({arrayBuffer: async () => new ArrayBuffer(4)}, preAborted.signal)).rejects.toThrow('already aborted');
 
+        // arrayBuffer 挂起期间立即取消
+        const hangRead = new AbortController();
+        const pendingRead = decodeLocalMediaToPcm16k({arrayBuffer: () => new Promise<ArrayBuffer>(() => undefined)}, hangRead.signal);
+        hangRead.abort('cancelled during read');
+        await expect(pendingRead).rejects.toMatchObject({name: 'AbortError'});
+
         const midRead = new AbortController();
         await expect(decodeLocalMediaToPcm16k({
             arrayBuffer: async () => {
-                midRead.abort('plain-reason');
+                Object.defineProperty(midRead.signal, 'aborted', {value: true, configurable: true});
                 return new ArrayBuffer(4);
             },
         }, midRead.signal)).rejects.toMatchObject({name: 'AbortError'});
@@ -308,6 +330,10 @@ describe('本地音视频离线转写与导出会话', () => {
 
         const dedupBilingual = buildLocalMediaExport('Dedup', [{startMs: 0, durationMs: 1000, text: '中文', translation: '中文'}], 'bilingual', 'srt');
         expect(dedupBilingual.text).not.toContain('中文\n中文');
+
+        // 控制字符和纯点/斜杠文件名安全回退为 local-media，不泄漏 youtube-subtitles
+        expect(buildLocalMediaExport('...\u0000///', final.cues, 'original', 'srt').filename).toBe('local-media-original.srt');
+        expect(buildLocalMediaExport('clip\u0007name', final.cues, 'original', 'srt').filename).toBe('clipname-original.srt');
     });
 
     it('支持本机 Qwen3 ASR、多窗重置与仅原文模式，并可后续补译与失败重试', async () => {

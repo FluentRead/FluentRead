@@ -80,10 +80,16 @@ function extractBaseName(name: string): string {
 export function classifyLocalMediaKind(file: Pick<LocalMediaFileLike, 'name' | 'type'>): LocalMediaKind | null {
     const extension = extractExtension(file.name);
     const mime = file.type.trim().toLowerCase().split(';')[0];
+    if (mime && mime !== 'application/octet-stream') {
+        const mimeKind = SUPPORTED_MIME_TO_KIND[mime];
+        if (!mimeKind) return null;
+        if (AUDIO_EXTENSIONS.has(extension)) return 'audio';
+        if (VIDEO_EXTENSIONS.has(extension)) return mimeKind;
+        return extension ? null : mimeKind;
+    }
     if (AUDIO_EXTENSIONS.has(extension)) return 'audio';
-    if (VIDEO_EXTENSIONS.has(extension)) return mime.startsWith('audio/') ? 'audio' : 'video';
-    if (extension) return null;
-    return SUPPORTED_MIME_TO_KIND[mime] ?? null;
+    if (VIDEO_EXTENSIONS.has(extension)) return 'video';
+    return null;
 }
 
 export function validateLocalMediaFile(file: LocalMediaFileLike): LocalMediaValidationResult {

@@ -83,6 +83,7 @@
           type="button"
           class="fr-local-media-btn"
           data-local-media-action="translate-pending"
+          :disabled="!canOperate"
           @click="retryPendingTranslations"
         >
           {{ t('video.localMedia.retryTranslations') }}
@@ -114,6 +115,8 @@
           playsinline
           :src="objectUrl"
           @timeupdate="onTimeUpdate"
+          @ended="onMediaEnded"
+          @play="onMediaPlay"
         />
         <audio
           v-else
@@ -123,6 +126,8 @@
           controls
           :src="objectUrl"
           @timeupdate="onTimeUpdate"
+          @ended="onMediaEnded"
+          @play="onMediaPlay"
         />
         <div
           v-if="displayMode !== 'off' && activeCue"
@@ -219,7 +224,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onBeforeUnmount, ref} from 'vue';
+import {computed, onBeforeUnmount, onDeactivated, ref, watch} from 'vue';
 import type {Config, VideoSubtitleDisplayMode} from '@/src/core/config/model';
 import {useUiI18n} from '@/src/ui/i18n';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
@@ -269,6 +274,7 @@ const validationError = ref('');
 const currentTimeMs = ref(0);
 const activeSentenceIndex = ref(0);
 const playbackAssist = ref<'off' | 'loop' | 'pause'>('off');
+const pausedAtEnd = ref(false);
 const displayMode = ref<VideoSubtitleDisplayMode | 'off'>('bilingual');
 const exportMode = ref<LocalMediaExportMode>('bilingual');
 const exportFormat = ref<SubtitleExportFormat>('srt');
@@ -315,7 +321,7 @@ const statusText = computed(() => {
     }
     if (state.phase === 'translating') {
         return t('video.localMedia.phaseTranslating', {
-            current: state.translatedCount,
+            current: state.translatedCount + state.failedTranslationCount,
             total: Math.max(1, state.totalCues),
         });
     }
@@ -383,6 +389,7 @@ function loadFile(file: File): void {
     currentTimeMs.value = 0;
     activeSentenceIndex.value = 0;
     playbackAssist.value = 'off';
+    pausedAtEnd.value = false;
 }
 
 function onFileInputChange(event: Event): void {
@@ -407,6 +414,7 @@ function clearFile(): void {
     currentTimeMs.value = 0;
     activeSentenceIndex.value = 0;
     playbackAssist.value = 'off';
+    pausedAtEnd.value = false;
 }
 
 function onDisplayModeChange(event: Event): void {
@@ -421,9 +429,17 @@ function onExportFormatChange(event: Event): void {
     exportFormat.value = (event.target as HTMLSelectElement).value as SubtitleExportFormat;
 }
 
+function suspendActiveWork(): void {
+    mediaElement.value?.pause?.();
+    if (busy.value) session.cancel();
+}
+
 function startTranscription(): void {
     if (!canOperate.value) return;
     validationError.value = '';
+    activeSentenceIndex.value = 0;
+    playbackAssist.value = 'off';
+    pausedAtEnd.value = false;
     void session.transcribe(selectedFile.value!, displayMode.value !== 'original-only');
 }
 
@@ -432,18 +448,21 @@ function cancelWork(): void {
 }
 
 function retryPendingTranslations(): void {
+    if (!canOperate.value) return;
     void session.translatePending();
 }
 
 function seekToSentence(index: number): void {
     const target = sentences.value[index];
     const media = mediaElement.value!;
+    pausedAtEnd.value = false;
     media.currentTime = target.startMs / 1000;
     currentTimeMs.value = target.startMs;
     void media.play?.().catch(() => undefined);
 }
 
 function selectSentence(index: number): void {
+    if (index < 0 || index >= sentences.value.length) return;
     activeSentenceIndex.value = index;
     seekToSentence(index);
 }
@@ -453,26 +472,49 @@ function stepSentence(delta: number): void {
 }
 
 function replayActiveSentence(): void {
-    seekToSentence(activeSentenceIndex.value);
+    selectSentence(activeSentenceIndex.value);
 }
 
 function togglePlaybackAssist(mode: 'loop' | 'pause'): void {
     playbackAssist.value = playbackAssist.value === mode ? 'off' : mode;
+    pausedAtEnd.value = false;
 }
 
-function onTimeUpdate(): void {
-    const media = mediaElement.value!;
+function onMediaPlay(): void {
+    if (pausedAtEnd.value) {
+        pausedAtEnd.value = false;
+        playbackAssist.value = 'off';
+    }
+}
+
+function onMediaEnded(event: Event): void {
+    const media = event.currentTarget as HTMLMediaElement;
+    const current = sentences.value[activeSentenceIndex.value];
+    if (!current) return;
+    if (playbackAssist.value === 'loop') {
+        pausedAtEnd.value = false;
+        media.currentTime = current.startMs / 1000;
+        currentTimeMs.value = current.startMs;
+        void media.play?.().catch(() => undefined);
+    } else if (playbackAssist.value === 'pause') {
+        pausedAtEnd.value = true;
+    }
+}
+
+function onTimeUpdate(event: Event): void {
+    const media = event.currentTarget as HTMLMediaElement;
     const ms = Math.max(0, media.currentTime * 1000);
     currentTimeMs.value = ms;
 
     const current = sentences.value[activeSentenceIndex.value];
-    if (current && playbackAssist.value !== 'off' && ms >= current.endMs) {
+    if (current && playbackAssist.value !== 'off' && !pausedAtEnd.value && ms >= current.endMs) {
         if (playbackAssist.value === 'loop') {
             media.currentTime = current.startMs / 1000;
             currentTimeMs.value = current.startMs;
             void media.play?.().catch(() => undefined);
             return;
         }
+        pausedAtEnd.value = true;
         media.pause?.();
         return;
     }
@@ -488,6 +530,18 @@ function exportSubtitles(): void {
     const output = buildLocalMediaExport(baseName.value, snapshot.value.cues, exportMode.value, exportFormat.value);
     (props.downloadFile ?? downloadTextFile)(output.filename, output.text, output.mime);
 }
+
+watch(sentences, next => {
+    if (activeSentenceIndex.value >= next.length) activeSentenceIndex.value = 0;
+});
+
+watch(canOperate, allowed => {
+    if (!allowed) suspendActiveWork();
+});
+
+onDeactivated(() => {
+    suspendActiveWork();
+});
 
 onBeforeUnmount(() => {
     session.destroy();

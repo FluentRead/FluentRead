@@ -275,9 +275,11 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         Object.defineProperty(video, 'pause', {value: pauseSpy, configurable: true});
         Object.defineProperty(video, 'currentTime', {value: 0.5, writable: true, configurable: true});
 
-        // 禁用状态下点击开始按钮被忽略
+        // 禁用状态下自动暂停播放且点击开始按钮被忽略
         config.videoTranslationEnabled = false;
         await flush();
+        expect(pauseSpy).toHaveBeenCalledOnce();
+        pauseSpy.mockClear();
         document.querySelector<HTMLButtonElement>('[data-local-media-action="transcribe"]')!.click();
         await flush();
         expect(sendMessage).not.toHaveBeenCalled();
@@ -327,7 +329,9 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         displaySelect.dispatchEvent(new window.Event('change'));
         await flush();
 
-        // 逐句跳转、重播、单句循环与句末暂停
+        // 逐句跳转（含越界保护）、重播、单句循环与句末暂停
+        document.querySelector<HTMLButtonElement>('[data-local-media-action="prev-sentence"]')!.click();
+        await flush();
         document.querySelector<HTMLButtonElement>('[data-local-media-action="next-sentence"]')!.click();
         await flush();
         expect(playSpy).toHaveBeenCalled();
@@ -339,7 +343,7 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         document.querySelector<HTMLButtonElement>('[data-sentence-index="1"]')!.click();
         await flush();
 
-        // 开启单句循环并越过句尾，验证回跳至该句起点
+        // 开启单句循环并越过句尾 + 触发媒体 ended，验证回跳至该句起点
         const loopBtn = document.querySelector<HTMLButtonElement>('[data-local-media-action="toggle-loop"]')!;
         loopBtn.click();
         await flush();
@@ -348,8 +352,12 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         video.dispatchEvent(new window.Event('timeupdate'));
         await flush();
         expect(video.currentTime).toBeLessThan(3.5);
+        video.currentTime = 5.0;
+        video.dispatchEvent(new window.Event('ended'));
+        await flush();
+        expect(video.currentTime).toBeLessThan(3.5);
 
-        // 切换为句末暂停并越过句尾，验证 pause 被调用；且未到句尾时不暂停
+        // 切换为句末暂停并越过句尾，验证 pause 被调用；点击播放后释放句末暂停不再卡死
         const pauseBtn = document.querySelector<HTMLButtonElement>('[data-local-media-action="toggle-pause"]')!;
         pauseBtn.click();
         await flush();
@@ -361,13 +369,28 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         video.dispatchEvent(new window.Event('timeupdate'));
         await flush();
         expect(pauseSpy).toHaveBeenCalledOnce();
+        // 再次触发 timeupdate 不重复暂停，ended 保持 pausedAtEnd
+        video.dispatchEvent(new window.Event('timeupdate'));
+        video.dispatchEvent(new window.Event('ended'));
+        await flush();
+        expect(pauseSpy).toHaveBeenCalledOnce();
+        // 用户按下播放后自动解除句末暂停，不再卡在句尾
+        video.dispatchEvent(new window.Event('play'));
+        await flush();
+        expect(pauseBtn.getAttribute('aria-pressed')).toBe('false');
+        // 非 pausedAtEnd 状态下 play 不产生副作用
+        video.dispatchEvent(new window.Event('play'));
+        await flush();
 
-        // 再次点击关闭句末暂停并触发无命中区间的 timeupdate
+        // 切换再关闭句末暂停并触发无命中区间的 timeupdate 与普通 ended
+        pauseBtn.click();
+        await flush();
         pauseBtn.click();
         await flush();
         expect(pauseBtn.getAttribute('aria-pressed')).toBe('false');
         video.currentTime = 2.0;
         video.dispatchEvent(new window.Event('timeupdate'));
+        video.dispatchEvent(new window.Event('ended'));
         await flush();
 
         // 导出字幕：SRT / VTT / Markdown
@@ -392,6 +415,25 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         await flush();
         exportBtn.click();
         expect(downloadFile).toHaveBeenLastCalledWith('demo-original.md', expect.stringContaining('### '), 'text/markdown;charset=utf-8');
+
+        // 重新转写为更短的 1 句字幕时自动重置 activeSentenceIndex，不越界崩溃
+        sendMessage.mockImplementation(async (msg: unknown) => {
+            const payload = msg as {type: string};
+            if (payload.type === 'fluentReadGetLocalVideoModelState') {
+                return {success: true, models: ['small'], available: {tiny: false, base: false, small: true}};
+            }
+            if (payload.type === 'fluentReadTranscribeLocalVideoAudio') {
+                return {success: true, text: 'Only one sentence now.', segments: [{startMs: 0, endMs: 1800, text: 'Only one sentence now.'}]};
+            }
+            return {success: true};
+        });
+        document.querySelector<HTMLButtonElement>('[data-sentence-index="1"]')!.click();
+        await flush();
+        document.querySelector<HTMLButtonElement>('[data-local-media-action="transcribe"]')!.click();
+        await vi.waitFor(() => expect(document.querySelectorAll('[data-sentence-index]').length).toBe(1));
+        await flush();
+        document.querySelector<HTMLButtonElement>('[data-local-media-action="replay-sentence"]')!.click();
+        await flush();
 
         // 卸载组件自动清理会话并释放 Object URL
         unmount();
@@ -542,9 +584,98 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         expect(exportBtn.hasAttribute('disabled')).toBe(true);
         exportBtn.click();
 
+        // 禁用态下补译按钮被禁用且直接点击被守卫
+        config.videoTranslationEnabled = false;
+        await flush();
+        const retryPendingBtn = document.querySelector<HTMLButtonElement>('[data-local-media-action="translate-pending"]')!;
+        expect(retryPendingBtn.hasAttribute('disabled')).toBe(true);
+        retryPendingBtn.click();
+        await flush();
+        config.videoTranslationEnabled = true;
+        await flush();
+
         // 补译走默认 translateVideoText 端口
         document.querySelector<HTMLButtonElement>('[data-local-media-action="translate-pending"]')!.click();
         await vi.waitFor(() => expect(document.querySelector('[data-local-media-action="translate-pending"]')).toBeNull());
         await flush();
+
+        // KeepAlive 失活与 active=false 均暂停播放并取消在途转写
+        const keepAliveActive = vue.ref(true);
+        let resolveModelWait!: (v: unknown) => void;
+        const kaSend = vi.fn<(msg: unknown) => Promise<unknown>>(msg => {
+            const payload = msg as {type: string};
+            if (payload.type === 'fluentReadGetLocalVideoModelState') {
+                return new Promise(resolve => { resolveModelWait = resolve; });
+            }
+            return Promise.resolve({success: true});
+        });
+        const kaDoc = parseHTML('<html><body><div id="ka-root"></div></body></html>');
+        vi.stubGlobal('document', kaDoc.document);
+        vi.stubGlobal('window', kaDoc.window);
+        const kaRenderer = vue.createRenderer<Node, Element>({
+            insert: (node, parent, anchor) => parent.insertBefore(node, anchor || null),
+            remove: node => node.parentNode?.removeChild(node),
+            createElement: tag => vue.markRaw(kaDoc.document.createElement(tag)),
+            createText: value => kaDoc.document.createTextNode(value),
+            createComment: value => kaDoc.document.createComment(value),
+            setText: (node, value) => { node.nodeValue = value; },
+            setElementText: (node, value) => { node.textContent = value; },
+            parentNode: node => node.parentElement,
+            nextSibling: node => node.nextSibling,
+            patchProp: (node, key, previous, next) => {
+                if (/^on[A-Z]/.test(key)) {
+                    const event = key.slice(2).toLowerCase();
+                    if (previous) node.removeEventListener(event, previous);
+                    if (next) node.addEventListener(event, next);
+                } else if (next == null || (next === false && !/^(aria-|data-)/.test(key))) {
+                    node.removeAttribute(key);
+                } else {
+                    node.setAttribute(key, next === true && !/^(aria-|data-)/.test(key) ? '' : String(next));
+                }
+            },
+        });
+        const activeProp = vue.ref(true);
+        const kaApp = kaRenderer.createApp({
+            setup: () => () => vue.h(vue.KeepAlive, null, {
+                default: () => keepAliveActive.value
+                    ? vue.h(LocalMediaTranscriptionPanel, {config, active: activeProp.value, sendMessage: kaSend})
+                    : null,
+            }),
+        });
+        kaApp.mount(kaDoc.document.getElementById('ka-root')!);
+        await flush();
+
+        const kaInput = kaDoc.document.querySelector<HTMLInputElement>('[data-local-media-input]')!;
+        Object.defineProperty(kaInput, 'files', {value: [makeFakeFile('ka.mp3', 'audio/mpeg', 2048)], configurable: true});
+        kaInput.dispatchEvent(new kaDoc.window.Event('change', {bubbles: true}));
+        await flush();
+
+        const kaAudio = kaDoc.document.querySelector<HTMLAudioElement>('audio[data-local-media-player]')!;
+        const kaPause = vi.fn();
+        Object.defineProperty(kaAudio, 'pause', {value: kaPause, configurable: true});
+        // 无句时触发 ended 安全返回
+        kaAudio.dispatchEvent(new kaDoc.window.Event('ended'));
+        await flush();
+
+        // 1) KeepAlive 切离触发 onDeactivated -> 暂停播放并取消转写
+        kaDoc.document.querySelector<HTMLButtonElement>('[data-local-media-action="transcribe"]')!.click();
+        await flush();
+        keepAliveActive.value = false;
+        await flush();
+        expect(kaPause).toHaveBeenCalledTimes(1);
+        resolveModelWait({success: true, models: ['small'], available: {tiny: false, base: false, small: true}});
+        await flush();
+
+        // 2) 重新激活后通过 active=false 触发 watch(canOperate) -> 暂停播放并取消转写
+        keepAliveActive.value = true;
+        await flush();
+        kaDoc.document.querySelector<HTMLButtonElement>('[data-local-media-action="transcribe"]')!.click();
+        await flush();
+        activeProp.value = false;
+        await flush();
+        expect(kaPause).toHaveBeenCalledTimes(2);
+        activeProp.value = true;
+        await flush();
+        kaApp.unmount();
     });
 });

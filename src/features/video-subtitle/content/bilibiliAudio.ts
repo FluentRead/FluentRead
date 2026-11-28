@@ -60,7 +60,7 @@ export async function readBilibiliAudio(part: string, video: HTMLMediaElement, s
             {signal: controller.signal, credentials: 'include', maxBytes: 2_000_000})));
         if (response.code !== 0) throw new Error('无法读取当前视频音轨，请确认视频可播放后重试');
         const payload = bangumi && response.result ? captionRecord(response.result) : captionRecord(response.data);
-        if (payload.is_drm === true || Boolean(payload.drm_tech_type)) {
+        if (Boolean(payload.is_drm) || Boolean(payload.drm_tech_type)) {
             throw new Error('当前番剧受 DRM 保护，无法读取独立音轨');
         }
         const declaredDuration = typeof payload.timelength === 'number' ? payload.timelength / 1000 : captionRecord(payload.dash).duration;

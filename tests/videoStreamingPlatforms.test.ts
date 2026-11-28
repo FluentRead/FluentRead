@@ -216,9 +216,33 @@ describe('主流流媒体平台运行时生命周期', () => {
 
         expect(f.captionShadow()?.querySelector('.source')?.textContent).toBe('Welcome to Netflix.');
         expect(f.captionShadow()?.querySelector('.translation')?.textContent).toBe('流媒体测试译文');
+        expect(f.captionShadow()?.querySelector<HTMLElement>('.tools')?.hidden).toBe(true);
         expect(nativeCaption.style.getPropertyValue('visibility')).toBe('hidden');
         expect(f.document.getElementById('fluent-read-platform-controls')).not.toBeNull();
         expect(f.document.getElementById('fluent-read-platform-controls')?.nextSibling).toBe(anchor);
+
+        // 全屏事件触发重新布局且不丢失控制栏
+        f.document.dispatchEvent(new f.window.Event('fullscreenchange'));
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.document.getElementById('fluent-read-platform-controls')).not.toBeNull();
+
+        // 快捷键 Alt+M 切换显示模式（双语 <-> 仅原文）
+        f.config.videoSubtitleModeHotkeyEnabled = true;
+        f.config.videoSubtitleModeHotkeyAction = 'bilingual-original';
+        const shortcutEvent = Object.assign(new f.window.Event('keydown', {bubbles: true, cancelable: true}), {
+            key: 'm',
+            code: 'KeyM',
+            altKey: true,
+            ctrlKey: false,
+            shiftKey: false,
+            metaKey: false,
+            repeat: false,
+            isComposing: false,
+        });
+        Object.defineProperty(shortcutEvent, 'isTrusted', {value: true});
+        f.document.dispatchEvent(shortcutEvent);
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.config.videoSubtitleDisplayMode).toBe('original-only');
 
         // 通过控制栏菜单切换关闭模式：恢复原生字幕，但保留控制栏按钮以便重新开启
         const toggleBtn = f.controlsShadow()!.querySelector<HTMLButtonElement>('#fluent-read-video-subtitle-button')!;
@@ -323,9 +347,58 @@ describe('主流流媒体平台运行时生命周期', () => {
         expect(track.mode).toBe('hidden');
         expect(f.document.getElementById('fluent-read-platform-controls')).not.toBeNull();
 
+        // 静默空档不反复切回 track.mode='showing' 造成原生字幕闪烁
+        f.video!.currentTime = 20;
+        await vi.advanceTimersByTimeAsync(300);
+        expect(f.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
+        expect(track.mode).toBe('hidden');
+
         f.config.videoTranslationEnabled = false;
         f.change();
         expect(track.mode).toBe('showing');
         expect(f.document.getElementById('fluent-read-platform-controls')).toBeNull();
+    });
+
+    it('不擅自启用用户已关闭的 disabled <track>，并在流媒体控制栏同步翻译失败与重试', async () => {
+        const translate = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue('流媒体重试成功');
+        const f = createStreamingFixture(
+            'https://www.netflix.com/watch/9001',
+            `<div class="watch-video--player-view">
+                <video></video>
+                <div class="player-timedtext-text-container">Retryable Netflix line.</div>
+                <div class="watch-video--bottom-controls-container">
+                    <button id="nf-cc" data-uia="control-audio-subtitle"></button>
+                </div>
+            </div>`,
+            translate,
+        );
+        const anchor = f.document.getElementById('nf-cc')!;
+        anchor.getBoundingClientRect = () => ({left: 800, top: 660, right: 832, bottom: 692, width: 32, height: 32, x: 800, y: 660, toJSON: () => ({})});
+
+        const disabledTrack = {
+            kind: 'subtitles',
+            language: 'en',
+            label: 'English',
+            mode: 'disabled' as TextTrackMode,
+            cues: [{startTime: 0, endTime: 10, text: 'Disabled track cue.'}],
+        };
+        Object.defineProperty(f.video!, 'textTracks', {value: [disabledTrack], configurable: true});
+
+        const dispose = f.start();
+        await vi.advanceTimersByTimeAsync(100);
+
+        // disabled 轨道保持 disabled，读取的是可见 DOM 字幕
+        expect(disabledTrack.mode).toBe('disabled');
+        expect(f.captionShadow()?.querySelector('.source')?.textContent).toBe('Retryable Netflix line.');
+        expect(f.captionShadow()?.querySelector('.translation')?.textContent).toBe('');
+        expect(f.controlsShadow()?.querySelector('[data-source-status]')?.textContent).toBe('这句翻译失败');
+        const retryBtn = f.controlsShadow()!.querySelector<HTMLButtonElement>('[data-action="retry-subtitle-translation"]')!;
+        expect(retryBtn.hidden).toBe(false);
+
+        retryBtn.click();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(f.captionShadow()?.querySelector('.translation')?.textContent).toBe('流媒体重试成功');
+        expect(retryBtn.hidden).toBe(true);
+        dispose();
     });
 });

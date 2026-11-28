@@ -16,7 +16,7 @@ export async function startHtmlMediaFrameApp(ctx: ContentScriptContext): Promise
     const platform = getCaptionPlatform(window.location);
     if (window.top === window || ctx.isInvalid || !/^https?:$/.test(window.location.protocol)
         || /(^|\.)(youtube\.com|x\.com|twitter\.com)$/i.test(window.location.hostname)
-        || (platform && platform !== 'coursera')) return;
+        || (platform && platform !== 'coursera' && platform !== 'vimeo')) return;
     const lifetime = new AbortController();
     let disposed = false;
     let stop: (() => void) | undefined;

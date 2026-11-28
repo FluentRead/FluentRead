@@ -99,7 +99,8 @@ export function buildLocalMediaExport(
         }
     }
     const serialized = serializeSubtitleFile(prepared, format);
-    const safeName = sanitizeSubtitleFilename(baseName);
+    const stripped = baseName.replace(/[\u0000-\u001f\u007f\\/:*?"<>|]+/gu, '').replace(/^\.+|\.+$/gu, '').trim();
+    const safeName = stripped ? sanitizeSubtitleFilename(stripped) : 'local-media';
     return {
         filename: `${safeName}-${mode}.${serialized.extension}`,
         text: serialized.text,

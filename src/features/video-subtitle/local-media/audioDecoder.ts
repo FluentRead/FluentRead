@@ -44,7 +44,19 @@ function createAbortError(signal: AbortSignal): Error {
     return error;
 }
 
+function raceWithAbort<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        const onAbort = () => reject(createAbortError(signal));
+        signal.addEventListener('abort', onAbort, {once: true});
+        void work.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+    });
+}
+
 async function decodeWithWebAudio(buffer: ArrayBuffer): Promise<AudioBuffer> {
+    if (typeof globalThis.OfflineAudioContext === 'function') {
+        const offline = new globalThis.OfflineAudioContext(1, 1, VIDEO_AI_SAMPLE_RATE);
+        return offline.decodeAudioData(buffer);
+    }
     const AudioContextClass = globalThis.AudioContext
         || (globalThis as typeof globalThis & {webkitAudioContext?: typeof AudioContext}).webkitAudioContext;
     if (typeof AudioContextClass !== 'function') {
@@ -66,17 +78,12 @@ export async function decodeLocalMediaToPcm16k(
     ports: LocalMediaDecodePorts = {},
 ): Promise<DecodedLocalMediaPcm> {
     if (signal.aborted) throw createAbortError(signal);
-    const buffer = await source.arrayBuffer();
+    const buffer = await raceWithAbort(source.arrayBuffer(), signal);
     if (signal.aborted) throw createAbortError(signal);
     if (buffer.byteLength === 0) throw new Error('所选媒体文件为空');
 
     const decoder = ports.decodeAudioData ?? decodeWithWebAudio;
-    const work = decoder(buffer);
-    const decoded = await new Promise<AudioBuffer>((resolve, reject) => {
-        const onAbort = () => reject(createAbortError(signal));
-        signal.addEventListener('abort', onAbort, {once: true});
-        void work.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
-    });
+    const decoded = await raceWithAbort(decoder(buffer), signal);
 
     if (signal.aborted) throw createAbortError(signal);
     if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) {

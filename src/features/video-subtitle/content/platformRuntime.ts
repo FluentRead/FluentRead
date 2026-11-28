@@ -91,6 +91,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
     let sourceLine: HTMLElement | null = null;
     let readingLine: HTMLElement | null = null;
     let translatedLine: HTMLElement | null = null;
+    let toolsBar: HTMLElement | null = null;
     let retry: HTMLButtonElement | null = null;
     let mode: HTMLSelectElement | null = null;
     let generation = 0;
@@ -419,7 +420,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         }).catch(() => { /* 注音失败保留原文与译文；切句或重新开启时可再次尝试。 */ });
     };
 
-    const restoreCaptions = () => {
+    const restoreCaptionVisibility = () => {
         captionVisibility.forEach((previous, node) => {
             if (node.style.getPropertyValue('visibility') === 'hidden' && node.style.getPropertyPriority('visibility') === 'important') {
                 if (previous.value) node.style.setProperty('visibility', previous.value, previous.priority);
@@ -427,8 +428,14 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             }
         });
         captionVisibility.clear();
+    };
+    const restoreTrackModes = () => {
         trackModes.forEach((state, track) => { if (track.mode === state.applied) track.mode = state.previous; });
         trackModes.clear();
+    };
+    const restoreCaptions = () => {
+        restoreCaptionVisibility();
+        restoreTrackModes();
     };
     const restoreAutoButton = () => {
         if (autoButton?.isConnected
@@ -488,6 +495,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         readingLine = document.createElement('div'); readingLine.className = 'reading'; readingLine.hidden = true;
         translatedLine = document.createElement('div'); translatedLine.className = 'translation';
         const tools = document.createElement('div'); tools.className = 'tools';
+        toolsBar = tools;
         // 原生选择框与重试按钮保留自身键盘动作，不由长字幕的滚动快捷键接管。
         for (const event of ['keydown', 'keyup']) tools.addEventListener(event, key => key.stopPropagation());
         mode = document.createElement('select'); mode.setAttribute('aria-label', ports.label('字幕显示模式'));
@@ -498,7 +506,8 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             : {videoSubtitleDisplayMode: mode!.value as Config['videoSubtitleDisplayMode']}));
         retry = document.createElement('button'); retry.type = 'button'; retry.textContent = ports.label('重试'); retry.hidden = true;
         retry.addEventListener('click', () => { cache.retryFailures(); signature = ''; schedule(); });
-        if (course) { mode.hidden = true; tools.hidden = true; }
+        const hideInlineTools = Boolean(course || controlsHost);
+        mode.hidden = hideInlineTools; tools.hidden = hideInlineTools;
         tools.append(mode, retry); panel.append(sourceLine, readingLine, translatedLine, tools); shadow.append(style, panel); parent.appendChild(host);
     };
 
@@ -539,15 +548,19 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
     const syncTracks = () => {
         if (!video) return;
         const tracks = Array.from(video.textTracks || []).filter(track => track.kind === 'subtitles' || track.kind === 'captions');
+        const activeTracks = tracks.filter(track => track.mode === 'showing' || track.mode === 'hidden');
+        const showing = activeTracks.find(track => track.mode === 'showing');
+        const original = showing
+            || (sourceTrack && activeTracks.includes(sourceTrack) ? sourceTrack : null)
+            || activeTracks.find(track => !captionLanguageMatch(track.language, config.to))
+            || activeTracks[0]
+            || null;
         const entries = tracks.map(track => ({track, languageCode: track.language, name: track.label}));
-        const human = config.videoPreferHumanSubtitles ? chooseTargetHumanCaptionTrack(entries, config.to)?.track || null : null;
-        const showing = tracks.find(track => track.mode === 'showing');
-        const original = showing || (sourceTrack && tracks.includes(sourceTrack) ? sourceTrack : null)
-            || tracks.find(track => !captionLanguageMatch(track.language, config.to)) || tracks[0] || null;
+        const human = original && config.videoPreferHumanSubtitles ? chooseTargetHumanCaptionTrack(entries, config.to)?.track || null : null;
         if (original !== sourceTrack || human !== targetTrack) {
             restoreCaptions(); clear(); sourceTrack = original; targetTrack = human;
         }
-        // hidden 会让浏览器加载字幕但不重复绘制；退出或关闭时恢复此前模式。
+        // hidden 会让浏览器加载字幕但不重复绘制；退出或关闭时恢复此前模式，绝不擅自启用已关闭的轨道。
         if (sourceTrack) setTrackMode(sourceTrack, 'hidden');
         if (targetTrack) setTrackMode(targetTrack, 'hidden');
     };
@@ -619,9 +632,12 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             : nodes.map(node => node.textContent || '').slice(-3).join(' ') || readPlatformTranscriptCue(platform, document, time)).slice(0, 3000);
         const human = course && timeline.status === 'ready' ? '' : trackTextAt(targetTrack, time);
         if (course && video?.paused) cache.retainPrefetches([]);
-        if (!source) { clear(); restoreCaptions(); return; }
+        if (!source) { clear(); restoreCaptionVisibility(); return; }
         ensureUi();
         if (!host || !sourceLine || !translatedLine || !mode) return;
+        const hideInlineTools = Boolean(course || controlsHost);
+        if (mode.hidden !== hideInlineTools) mode.hidden = hideInlineTools;
+        if (toolsBar && toolsBar.hidden !== hideInlineTools) toolsBar.hidden = hideInlineTools;
         const appearance = getVideoSubtitleAppearanceCssVars(config.videoSubtitleAppearance);
         for (const [key, value] of Object.entries(appearance)) setStyleIfChanged(host.style, key, value);
         const bounds = selection?.bounds;
@@ -670,13 +686,14 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             const translation = text === source && config.videoSubtitleDisplayMode === 'bilingual' ? '' : text;
             if (translatedLine.textContent !== translation) translatedLine.textContent = translation;
             fit();
+            if (hasControlBar) syncCourseControls();
         };
         if (human) { show(human); return; }
         fit();
         const showFailure = () => {
             if (disposed || current !== generation || !translatedLine || !retry) return;
-            translatedLine.textContent = course ? '' : ports.label('这句翻译失败'); retry.hidden = false; fit();
-            if (course) syncCourseControls();
+            translatedLine.textContent = course || controlsHost ? '' : ports.label('这句翻译失败'); retry.hidden = false; fit();
+            if (hasControlBar) syncCourseControls();
         };
         void cache.request(source).then(text => {
             if (!text && cache.hasFailure(source)) showFailure();

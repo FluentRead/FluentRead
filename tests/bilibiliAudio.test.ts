@@ -46,6 +46,8 @@ describe('B 站独立音轨读取', () => {
         expect(request.searchParams.get(id.startsWith('ep') ? 'ep_id' : 'season_id')).toBe(id.slice(2));
         f.fetch.mockResolvedValueOnce(new Response(JSON.stringify({code: 0, result: {...data(), is_drm: true}})));
         await expect(f.run(id)).rejects.toThrow('DRM');
+        f.fetch.mockResolvedValueOnce(new Response(JSON.stringify({code: 0, result: {...data(), is_drm: 1}})));
+        await expect(f.run(id)).rejects.toThrow('DRM');
         f.fetch.mockResolvedValueOnce(new Response(JSON.stringify({code: 0, data: {...data(), drm_tech_type: 2}})));
         await expect(f.run(id)).rejects.toThrow('DRM');
     });

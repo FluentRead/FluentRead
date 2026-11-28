@@ -224,12 +224,13 @@ describe('final boundary A: help focus and tooltip-content events', () => {
         event(button, 'focus', {relatedTarget: link});
         expect(tooltip.onOpen).toHaveBeenCalledTimes(3);
         expect(button.getAttribute('aria-label')).toBe('About this field');
-        expect(tooltip.props).toMatchObject({trigger: 'hover', showAfter: 200, hideAfter: 600, enterable: true});
+        expect(tooltip.props).toMatchObject({trigger: 'hover', showAfter: 200, hideAfter: 600, enterable: true, placement: 'top'});
     });
 
     it('keeps content available across hovered blur, resumes closing after leave, and Escape stops propagation and resets hover via hide', async () => {
-        const mounted = await mount(FieldHelp, {content: 'Copyable help'});
+        const mounted = await mount(FieldHelp, {content: 'Copyable help', placement: 'bottom-end'});
         const button = mounted.root.querySelector('button')!, tooltip = ports.tooltips[0];
+        expect(tooltip.props.placement).toBe('bottom-end');
         const content = dom.document.querySelector('.fluentread-field-help-popper > div')!;
         const bubbled = vi.fn(); mounted.root.addEventListener('keydown', bubbled);
         event(content, 'mouseenter'); event(button, 'blur'); expect(tooltip.onClose).not.toHaveBeenCalled();

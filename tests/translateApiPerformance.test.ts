@@ -189,6 +189,40 @@ describe('translation API request lifecycle performance', () => {
     expect(mocks.sendMessage.mock.calls[0][0]).toMatchObject({requestTimeoutMs: expected - 1_000});
   });
 
+  it.each([false, true])('本地模型批量标记 %s 使用 120 秒默认预算，显式覆盖优先', async batch => {
+    expect(getTranslationTimeout('localTranslation', undefined, batch)).toBe(120_000);
+    expect(getTranslationTimeout('localTranslation', 2_000, batch)).toBe(2_000);
+    mocks.config.service = 'localTranslation';
+    mocks.sendMessage.mockResolvedValue(batch ? ['本地译文'] : '本地译文');
+    if (batch) await translateTextBatch(['Local model budget source'], 'Page', {maxRetries: 0});
+    else await translateText('Local model budget source', 'Page', {maxRetries: 0});
+    expect(mocks.sendMessage.mock.calls[0][0]).toMatchObject({requestTimeoutMs: 119_000});
+  });
+
+  it.each([false, true])('本地模型批量标记 %s 无 signal 超时时也会向后台发送取消消息', async batch => {
+    mocks.config.service = 'localTranslation';
+    const pendingTransport = deferred<string | string[]>();
+    mocks.sendMessage.mockImplementation((message: {type?: string}) => {
+      if (message.type === 'fluentReadTranslationCancel') return Promise.resolve({success: true});
+      return pendingTransport.promise;
+    });
+    const request = (batch
+      ? translateTextBatch(['Local timeout source'], 'Page', {maxRetries: 0, timeout: 5_000})
+      : translateText('Local timeout source', 'Page', {maxRetries: 0, timeout: 5_000})
+    ).catch(error => error);
+    await flushMicrotasks();
+    const sent = mocks.sendMessage.mock.calls[0]?.[0] as {clientRequestId?: string};
+    expect(sent?.clientRequestId).toEqual(expect.any(String));
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(request).resolves.toMatchObject({message: '翻译请求超时'});
+    expect(mocks.sendMessage).toHaveBeenCalledWith({
+      type: 'fluentReadTranslationCancel',
+      clientRequestId: sent.clientRequestId,
+    });
+    pendingTransport.resolve(batch ? ['迟到译文'] : '迟到译文');
+  });
+
   it.each([10_000, 600_000].flatMap(timeout => [false, true].map(batch => ({timeout, batch}))))
   ('AI $timeout 毫秒配置在批量标记 $batch 的公开预算及真实请求中保留', async ({timeout, batch}) => {
     mocks.config.service = 'mock-ai';
@@ -452,11 +486,11 @@ describe('translation API request lifecycle performance', () => {
       serviceOverride: service,
       sourceLanguage: 'auto',
       sourceLanguageDetectionText: 'Bonjour',
-      requestTimeoutMs: service === 'chromeTranslator' ? 299_000 : 44_000,
+      requestTimeoutMs: service === 'chromeTranslator' ? 299_000 : 119_000,
     });
     expect(chromeExplicit).not.toHaveProperty('sourceLanguageDetectionText');
     expect(cloudAuto).not.toHaveProperty('sourceLanguageDetectionText');
-    expect(chromeExplicit).toMatchObject({requestTimeoutMs: service === 'chromeTranslator' ? 299_000 : 44_000});
+    expect(chromeExplicit).toMatchObject({requestTimeoutMs: service === 'chromeTranslator' ? 299_000 : 119_000});
     expect(cloudAuto).toMatchObject({requestTimeoutMs: 44_000});
   });
 

@@ -2,7 +2,7 @@
  * @file src/core/language/localTranslation.ts
  *
  * 文件职责：把指定或自动识别的翻译语言解析为本地模型 tokenizer 接受的语言码。
- * 主要内容：复用统一文本识别链，保持 OPUS、混元、M2M100 与 NLLB 的语言别名、简繁映射和不支持语言错误；自动识别只在调用方没有指定语言时运行。
+ * 主要内容：复用统一文本识别链，按目录声明的 OPUS 语言对与混元 Hy-MT2（38 种）/Hy-MT3（102 种含西里尔脚本变体）语言集合解析别名、简繁映射与不支持语言错误；自动识别只在调用方没有指定语言时运行。
  * 模块边界：本文件属于 core 纯语言规则，不读配置存储、不访问页面或模型运行时；依赖静态模型目录，配置目录不得反向依赖本模块或文本检测。
  */
 
@@ -13,12 +13,19 @@ import {
     getLocalTranslationModel,
     normalizeLocalTranslationModel,
     LOCAL_TRANSLATION_MODEL_IDS,
+    HUNYUAN2_SUPPORTED_LANGUAGES,
     HUNYUAN_LANGUAGE_NAMES,
     type LocalTranslationModelId,
 } from '@/src/core/config/localTranslation';
 
 // 本地模型词表沿用 ISO 639-1 旧写法：挪威语为 no，他加禄语/菲律宾语为 tl。
 const LOCAL_MODEL_BASE_ALIASES: Readonly<Record<string, string>> = {nb: 'no', fil: 'tl'};
+
+// Hy-MT3 单独区分西里尔字母书写体的哈萨克语与蒙古语。
+const HUNYUAN3_SCRIPTED_LANGUAGES: Readonly<Record<string, string>> = {
+    'kk-cyrl': 'kk-Cyrl',
+    'mn-cyrl': 'mn-Cyrl',
+};
 
 const M2M100_LANGUAGE_CODES: Readonly<Record<string, string>> = {
     af: 'af', ar: 'ar', bg: 'bg', bn: 'bn', cs: 'cs', da: 'da', de: 'de', el: 'el',
@@ -43,6 +50,11 @@ const NLLB_LANGUAGE_CODES: Readonly<Record<string, string>> = {
     uk: 'ukr_Cyrl', ur: 'urd_Arab', vi: 'vie_Latn',
     'zh-Hans': 'zho_Hans', 'zh-Hant': 'zho_Hant', zh: 'zho_Hans',
 };
+
+function resolveHunyuan3ScriptedLanguage(normalized: string): string | undefined {
+    const parts = normalized.replace(/_/gu, '-').toLowerCase().split('-');
+    return HUNYUAN3_SCRIPTED_LANGUAGES[`${parts[0]}-${parts[1]}`];
+}
 
 function languageBase(value: string): string {
     const canonical = normalizeDetectedLanguageCode(value) || value.trim().toLowerCase();
@@ -71,15 +83,20 @@ export function resolveLocalTranslationLanguageCode(
     }
 
     const base = languageBase(normalized);
-    const engine = getLocalTranslationModel(model).engine;
-    if (engine === 'opus') {
-        const allowed = model === LOCAL_TRANSLATION_MODEL_IDS.opusZhEn ? ['zh', 'en'] : ['ja', 'en'];
-        if (allowed.includes(base)) return base;
+    const modelMeta = getLocalTranslationModel(model);
+    if (modelMeta.opusLanguages) {
+        if (modelMeta.opusLanguages.includes(base)) return base;
         throw new Error('LOCAL_TRANSLATION_LANGUAGE_UNSUPPORTED');
     }
-    if (engine === 'hunyuan') {
+    if (modelMeta.engine === 'hunyuan') {
         if (normalized === 'zh-Hant') return 'zh-Hant';
-        if (HUNYUAN_LANGUAGE_NAMES[base]) return base;
+        if (model === LOCAL_TRANSLATION_MODEL_IDS.hunyuan3) {
+            const scripted = resolveHunyuan3ScriptedLanguage(normalized);
+            if (scripted) return scripted;
+            if (HUNYUAN_LANGUAGE_NAMES[base]) return base;
+        } else if (HUNYUAN2_SUPPORTED_LANGUAGES.has(base)) {
+            return base;
+        }
         throw new Error('LOCAL_TRANSLATION_LANGUAGE_UNSUPPORTED');
     }
     if (modelFamily(model) === 'nllb') {

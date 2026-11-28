@@ -1,7 +1,7 @@
 /**
  * @file src/app/offscreen/translation.ts
  * 文件职责：在离屏文档中调用 Chrome 和 Edge 的浏览器内置翻译，处理模型状态、语言检测、规范化与错误。
- * 主要内容：定义最小环境与请求契约，验证语言码并映射中文别名；现代 API 按环境复用一个检测器和最多两个语言对，以独立取消、串行租约、空闲 TTL 与 LRU 控制常驻，旧 API 保持独占清理；保留 availability、下载进度、低置信度和保守脚本兜底。
+ * 主要内容：定义最小环境与请求契约，验证语言码并映射中文别名；现代 API 按环境复用一个检测器和最多两个语言对，以独立取消、串行租约、空闲 TTL 与 LRU 控制常驻，并在无状态回调时按环境对不超过 2000 字符的可靠检测样本做 256 条 LRU 记忆化（随容器卸载或 environment.LanguageDetector 引用变更清空），旧 API 保持独占清理；4000 字符及以内正文优先直调 translate 减少流式分配，长文本或仅提供流式接口时使用 translateStreaming；保留 availability、下载进度、低置信度和保守脚本兜底。
  * 模块边界：这里不读取扩展配置、不选择第三方 provider，也不监听 runtime 消息；调用协议由 offscreen/messageRouter 管理，宿主能力是否开放由 browser capability 层决定。
  */
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
@@ -301,10 +301,15 @@ interface ChromeCachedResource {
 interface ChromeResourceCache {
     readonly entries: Map<string, ChromeCachedResource>;
     readonly waiters: Set<() => void>;
+    readonly detectedLanguages: Map<string, string>;
+    detectorRef?: ChromeTranslationEnvironment['LanguageDetector'];
     disposed: boolean;
 }
 const chromeResourceCaches = new WeakMap<ChromeTranslationEnvironment, ChromeResourceCache>();
 const CHROME_CANCEL_DRAIN_TIMEOUT_MS = 1_500;
+const CHROME_LANGUAGE_DETECTION_CACHE_LIMIT = 256;
+const CHROME_LANGUAGE_DETECTION_CACHE_MAX_LENGTH = 2_000;
+const CHROME_TRANSLATE_STREAMING_THRESHOLD = 4_000;
 
 function wakeChromeResourceWaiters(cache: ChromeResourceCache): void {
     for (const wake of cache.waiters) wake();
@@ -326,11 +331,12 @@ function removeChromeResource(cache: ChromeResourceCache, entry: ChromeCachedRes
 export function disposeChromeTranslationModels(environment: ChromeTranslationEnvironment): void {
     let cache = chromeResourceCaches.get(environment);
     if (!cache) {
-        cache = {entries: new Map(), waiters: new Set(), disposed: true};
+        cache = {entries: new Map(), waiters: new Set(), detectedLanguages: new Map(), disposed: true};
         chromeResourceCaches.set(environment, cache);
         return;
     }
     cache.disposed = true;
+    cache.detectedLanguages.clear();
     for (const entry of cache.entries.values()) removeChromeResource(cache, entry);
     wakeChromeResourceWaiters(cache);
 }
@@ -366,6 +372,15 @@ async function waitForChromeResourceCapacity(cache: ChromeResourceCache, signal?
     }
 }
 
+function getOrCreateChromeResourceCache(environment: ChromeTranslationEnvironment): ChromeResourceCache {
+    let cache = chromeResourceCaches.get(environment);
+    if (!cache) {
+        cache = {entries: new Map(), waiters: new Set(), detectedLanguages: new Map(), disposed: false};
+        chromeResourceCaches.set(environment, cache);
+    }
+    return cache;
+}
+
 /**
  * 同语言对首次并发共享创建；同实例任务串行，但取消只结束当前请求。
  * 容量满时只淘汰无租约的最旧实例，所有实例忙碌时等待，避免额外第三个语言对。
@@ -380,11 +395,7 @@ async function runCachedChromeOperation<T extends ChromeResource, R>(
     reporter?: ChromeModelStatusReporter,
 ): Promise<R> {
     throwIfAborted(signal);
-    let cache = chromeResourceCaches.get(environment);
-    if (!cache) {
-        cache = {entries: new Map(), waiters: new Set(), disposed: false};
-        chromeResourceCaches.set(environment, cache);
-    }
+    const cache = getOrCreateChromeResourceCache(environment);
     let entry: ChromeCachedResource;
     while (true) {
         throwIfAborted(signal);
@@ -585,6 +596,22 @@ export async function detectChromeLanguage(
         throwIfChromeEnvironmentDisposed(environment);
         const modernDetector = environment.LanguageDetector;
         if (typeof modernDetector?.create === 'function') {
+            const cache = getOrCreateChromeResourceCache(environment);
+            if (cache.detectorRef !== modernDetector) {
+                cache.detectedLanguages.clear();
+                cache.detectorRef = modernDetector;
+                const staleDetector = cache.entries.get('language-detector');
+                if (staleDetector) removeChromeResource(cache, staleDetector);
+            }
+            const canUseCache = !reporter && text.length <= CHROME_LANGUAGE_DETECTION_CACHE_MAX_LENGTH;
+            if (canUseCache) {
+                const cached = cache.detectedLanguages.get(text);
+                if (cached !== undefined) {
+                    cache.detectedLanguages.delete(text);
+                    cache.detectedLanguages.set(text, cached);
+                    return cached;
+                }
+            }
             const result = await runCachedChromeOperation(
                 environment, 'language-detector', 'language-detector',
                 async (creationSignal, sharedReporter) => {
@@ -612,7 +639,18 @@ export async function detectChromeLanguage(
                 signal, reporter,
             );
             const detected = detectedLanguageFrom(result);
-            if (detected) return refineDetectedChineseLanguage(detected, text);
+            if (detected) {
+                const refined = refineDetectedChineseLanguage(detected, text);
+                if (canUseCache) {
+                    throwIfChromeEnvironmentDisposed(environment);
+                    cache.detectedLanguages.delete(text);
+                    cache.detectedLanguages.set(text, refined);
+                    if (cache.detectedLanguages.size > CHROME_LANGUAGE_DETECTION_CACHE_LIMIT) {
+                        cache.detectedLanguages.delete(cache.detectedLanguages.keys().next().value as string);
+                    }
+                }
+                return refined;
+            }
         } else if (typeof environment.translation?.createDetector === 'function') {
             detector = await acquireAbortableResource(environment.translation.createDetector(), signal);
             throwIfAborted(signal);
@@ -692,6 +730,15 @@ async function translateWithChromeTranslator(
     lifecycleSignal?: AbortSignal,
 ): Promise<string> {
     throwIfAborted(signal);
+    if (typeof translator.translate === 'function'
+        && (text.length <= CHROME_TRANSLATE_STREAMING_THRESHOLD
+            || typeof translator.translateStreaming !== 'function')) {
+        const result = modern && signal ? translator.translate(text, {signal}) : translator.translate(text);
+        const translated = modern ? await result : await awaitWithAbort(result, signal);
+        throwIfAborted(signal);
+        if (typeof translated !== 'string') throw new Error('翻译器返回了无效结果');
+        return translated;
+    }
     if (typeof translator.translateStreaming === 'function') {
         let translated = '';
         const stream = modern && signal
@@ -708,31 +755,24 @@ async function translateWithChromeTranslator(
         signal?.addEventListener('abort', close, {once: true});
         lifecycleSignal?.addEventListener('abort', close, {once: true});
         try {
-            while (true) {
+            while (!completed) {
                 // 现代 signal 会中止原生流；保留队列租约直到原生 next() 确认结束。
                 const next = modern ? await iterator.next()
                     : await awaitWithAbort(Promise.resolve(iterator.next()), signal);
                 throwIfAborted(signal);
                 if (next.done) {
                     completed = true;
-                    break;
+                } else {
+                    const chunk = next.value;
+                    if (typeof chunk !== 'string') throw new Error('翻译器返回了无效的流式结果');
+                    translated += chunk;
                 }
-                const chunk = next.value;
-                if (typeof chunk !== 'string') throw new Error('翻译器返回了无效的流式结果');
-                translated += chunk;
             }
         } finally {
             signal?.removeEventListener('abort', close);
             lifecycleSignal?.removeEventListener('abort', close);
             if (!completed) close();
         }
-        return translated;
-    }
-    if (typeof translator.translate === 'function') {
-        const result = modern && signal ? translator.translate(text, {signal}) : translator.translate(text);
-        const translated = modern ? await result : await awaitWithAbort(result, signal);
-        throwIfAborted(signal);
-        if (typeof translated !== 'string') throw new Error('翻译器返回了无效结果');
         return translated;
     }
     throw new Error('翻译器不支持翻译方法');

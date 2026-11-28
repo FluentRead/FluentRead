@@ -2,7 +2,7 @@
  * @file src/core/config/localTranslation.ts
  *
  * 文件职责：定义浏览器本地翻译静态模型目录、下载状态键与无需文本识别的模型配置规则。
- * 主要内容：提供中英/日英轻量语言包、混元翻译和旧模型兼容目录，定义持久下载任务、模型语言名称与 OPUS 仓库映射。
+ * 主要内容：提供中/日/法/德/西/俄与英语双向轻量语言包、混元 Hy-MT3 1.8B（102 种语言）、已替代的 Hy-MT2 1.8B（38 种语言）及旧模型兼容目录，定义持久下载任务、模型语言名称、OPUS 仓库映射与错误文案键。
  * 模块边界：只处理静态配置、下载状态与模型元数据，不导入文本检测或读取浏览器存储；指定和自动语言解析由 core/language/localTranslation.ts 消费本目录。
  */
 
@@ -16,6 +16,11 @@ export const LOCAL_TRANSLATION_MODEL_REVISION = 'main' as const;
 export const LOCAL_TRANSLATION_MODEL_IDS = {
     opusZhEn: 'fluentread/opus-zh-en',
     opusJaEn: 'fluentread/opus-ja-en',
+    opusFrEn: 'fluentread/opus-fr-en',
+    opusDeEn: 'fluentread/opus-de-en',
+    opusEsEn: 'fluentread/opus-es-en',
+    opusRuEn: 'fluentread/opus-ru-en',
+    hunyuan3: 'tencent/Hy-MT3-1.8B-GGUF',
     hunyuan: 'tencent/Hy-MT2-1.8B-GGUF',
     m2m100: 'Xenova/m2m100_418M',
     nllb: 'Xenova/nllb-200-distilled-600M',
@@ -33,6 +38,8 @@ export interface LocalTranslationModel {
     memoryMb: readonly [number, number];
     engine: 'opus' | 'hunyuan' | 'legacy';
     repositories: readonly string[];
+    opusLanguages?: readonly [string, string];
+    supersededBy?: LocalTranslationModelId;
     legacy?: boolean;
 }
 
@@ -62,17 +69,18 @@ export const LOCAL_TRANSLATION_MODELS: readonly LocalTranslationModel[] = [
         memoryMb: [500, 2000],
         engine: 'opus',
         repositories: ['Xenova/opus-mt-en-zh', 'Xenova/opus-mt-zh-en'],
+        opusLanguages: ['zh', 'en'],
     },
     {
-        value: LOCAL_TRANSLATION_MODEL_IDS.hunyuan,
-        label: 'Hy-MT2 1.8B',
-        nameKey: 'settings.localTranslation.hunyuan',
-        descriptionKey: 'settings.localTranslation.hunyuanDescription',
-        languagesKey: 'settings.localTranslation.languagesHunyuan',
-        downloadSizeMb: 1133,
-        memoryMb: [1500, 2500],
+        value: LOCAL_TRANSLATION_MODEL_IDS.hunyuan3,
+        label: 'Hy-MT3 1.8B',
+        nameKey: 'settings.localTranslation.hunyuan3',
+        descriptionKey: 'settings.localTranslation.hunyuan3Description',
+        languagesKey: 'settings.localTranslation.languagesHunyuan3',
+        downloadSizeMb: 1348,
+        memoryMb: [1800, 2800],
         engine: 'hunyuan',
-        repositories: ['tencent/Hy-MT2-1.8B-GGUF'],
+        repositories: ['tencent/Hy-MT3-1.8B-GGUF'],
     },
     {
         value: LOCAL_TRANSLATION_MODEL_IDS.opusJaEn,
@@ -84,6 +92,67 @@ export const LOCAL_TRANSLATION_MODELS: readonly LocalTranslationModel[] = [
         memoryMb: [500, 2000],
         engine: 'opus',
         repositories: ['Xenova/opus-mt-ja-en', 'Xenova/opus-mt-en-jap'],
+        opusLanguages: ['ja', 'en'],
+    },
+    {
+        value: LOCAL_TRANSLATION_MODEL_IDS.opusFrEn,
+        label: 'OPUS-MT French / English',
+        nameKey: 'settings.localTranslation.opusFrEn',
+        descriptionKey: 'settings.localTranslation.opusFrEnDescription',
+        languagesKey: 'settings.localTranslation.languagesFrEn',
+        downloadSizeMb: 226,
+        memoryMb: [500, 2000],
+        engine: 'opus',
+        repositories: ['Xenova/opus-mt-en-fr', 'Xenova/opus-mt-fr-en'],
+        opusLanguages: ['fr', 'en'],
+    },
+    {
+        value: LOCAL_TRANSLATION_MODEL_IDS.opusDeEn,
+        label: 'OPUS-MT German / English',
+        nameKey: 'settings.localTranslation.opusDeEn',
+        descriptionKey: 'settings.localTranslation.opusDeEnDescription',
+        languagesKey: 'settings.localTranslation.languagesDeEn',
+        downloadSizeMb: 223,
+        memoryMb: [500, 2000],
+        engine: 'opus',
+        repositories: ['Xenova/opus-mt-en-de', 'Xenova/opus-mt-de-en'],
+        opusLanguages: ['de', 'en'],
+    },
+    {
+        value: LOCAL_TRANSLATION_MODEL_IDS.opusEsEn,
+        label: 'OPUS-MT Spanish / English',
+        nameKey: 'settings.localTranslation.opusEsEn',
+        descriptionKey: 'settings.localTranslation.opusEsEnDescription',
+        languagesKey: 'settings.localTranslation.languagesEsEn',
+        downloadSizeMb: 239,
+        memoryMb: [500, 2000],
+        engine: 'opus',
+        repositories: ['Xenova/opus-mt-en-es', 'Xenova/opus-mt-es-en'],
+        opusLanguages: ['es', 'en'],
+    },
+    {
+        value: LOCAL_TRANSLATION_MODEL_IDS.opusRuEn,
+        label: 'OPUS-MT Russian / English',
+        nameKey: 'settings.localTranslation.opusRuEn',
+        descriptionKey: 'settings.localTranslation.opusRuEnDescription',
+        languagesKey: 'settings.localTranslation.languagesRuEn',
+        downloadSizeMb: 236,
+        memoryMb: [500, 2000],
+        engine: 'opus',
+        repositories: ['Xenova/opus-mt-en-ru', 'Xenova/opus-mt-ru-en'],
+        opusLanguages: ['ru', 'en'],
+    },
+    {
+        value: LOCAL_TRANSLATION_MODEL_IDS.hunyuan,
+        label: 'Hy-MT2 1.8B',
+        nameKey: 'settings.localTranslation.hunyuan',
+        descriptionKey: 'settings.localTranslation.hunyuanDescription',
+        languagesKey: 'settings.localTranslation.languagesHunyuan',
+        downloadSizeMb: 1133,
+        memoryMb: [1500, 2500],
+        engine: 'hunyuan',
+        repositories: ['tencent/Hy-MT2-1.8B-GGUF'],
+        supersededBy: LOCAL_TRANSLATION_MODEL_IDS.hunyuan3,
     },
     {
         value: LOCAL_TRANSLATION_MODEL_IDS.m2m100,
@@ -140,6 +209,14 @@ export function normalizeLocalTranslationDownloadSnapshot(value: unknown): Local
     return {version: 2, tasks};
 }
 
+/** 混元 Hy-MT2 1.8B 原生支持的 38 种语言码集合。 */
+export const HUNYUAN2_SUPPORTED_LANGUAGES: ReadonlySet<string> = new Set([
+    'zh', 'en', 'ja', 'fr', 'pt', 'es', 'tr', 'ru', 'ar', 'ko', 'th', 'it', 'de', 'vi', 'ms',
+    'id', 'tl', 'hi', 'zh-Hant', 'pl', 'cs', 'nl', 'km', 'my', 'fa', 'gu', 'ur', 'te', 'mr',
+    'he', 'bn', 'ta', 'uk', 'bo', 'kk', 'mn', 'ug', 'yue',
+]);
+
+/** 混元翻译模型支持的完整 102 种语言英文名表（含 Hy-MT2 的 38 种与 Hy-MT3 新增的 64 种，以及 no 别名）。 */
 export const HUNYUAN_LANGUAGE_NAMES: Readonly<Record<string, string>> = {
     zh: 'Chinese', en: 'English', ja: 'Japanese', fr: 'French', pt: 'Portuguese',
     es: 'Spanish', tr: 'Turkish', ru: 'Russian', ar: 'Arabic', ko: 'Korean', th: 'Thai',
@@ -148,6 +225,20 @@ export const HUNYUAN_LANGUAGE_NAMES: Readonly<Record<string, string>> = {
     km: 'Khmer', my: 'Burmese', fa: 'Persian', gu: 'Gujarati', ur: 'Urdu', te: 'Telugu',
     mr: 'Marathi', he: 'Hebrew', bn: 'Bengali', ta: 'Tamil', uk: 'Ukrainian',
     bo: 'Tibetan', kk: 'Kazakh', mn: 'Mongolian', ug: 'Uyghur', yue: 'Cantonese',
+    el: 'Greek', ro: 'Romanian', hu: 'Hungarian', bg: 'Bulgarian', sr: 'Serbian',
+    hr: 'Croatian', sk: 'Slovak', sl: 'Slovenian', sq: 'Albanian', mk: 'Macedonian',
+    be: 'Belarusian', lt: 'Lithuanian', lv: 'Latvian', et: 'Estonian', fi: 'Finnish',
+    sv: 'Swedish', da: 'Danish', no: 'Norwegian', nb: 'Norwegian', nn: 'Norwegian Nynorsk',
+    is: 'Icelandic', ga: 'Irish', gd: 'Scottish Gaelic', cy: 'Welsh', ca: 'Catalan',
+    gl: 'Galician', eu: 'Basque', af: 'Afrikaans', lb: 'Luxembourgish', mt: 'Maltese',
+    eo: 'Esperanto', yi: 'Yiddish', hy: 'Armenian', ka: 'Georgian', az: 'Azerbaijani',
+    uz: 'Uzbek', ky: 'Kyrgyz', tk: 'Turkmen', tg: 'Tajik', tt: 'Tatar',
+    ba: 'Bashkir', ku: 'Kurdish', ckb: 'Central Kurdish', ps: 'Pashto', ne: 'Nepali',
+    si: 'Sinhala', pa: 'Punjabi', sd: 'Sindhi', as: 'Assamese', or: 'Odia',
+    kn: 'Kannada', ml: 'Malayalam', sa: 'Sanskrit', lo: 'Lao', jv: 'Javanese',
+    su: 'Sundanese', ceb: 'Cebuano', war: 'Waray', sw: 'Swahili', am: 'Amharic',
+    so: 'Somali', mg: 'Malagasy', ht: 'Haitian Creole',
+    'kk-Cyrl': 'Cyrillic Kazakh', 'mn-Cyrl': 'Cyrillic Mongolian',
 };
 
 export function resolveOpusTranslationRepository(model: unknown, source: string, target: string): string {

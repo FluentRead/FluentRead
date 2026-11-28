@@ -517,8 +517,9 @@ describe('shared UI actual client SFC lifecycle', () => {
   });
   it('keeps help Teleports inside a closed shadow root and preserves body teleport on extension pages', async () => {
     const help = await mount(FieldHelp, {content: 'Help'}, {shadow: 'closed'});
-    expect(ports.tooltips[0].props.teleported).toBe(false);expect(help.root.querySelector('[data-tooltip-content-port]')).not.toBeNull();expect(dom.document.body.querySelector('[data-tooltip-content-port]')).toBeNull();help.unmount();
-    const pageHelp = await mount(FieldHelp, {content: 'Page help'});expect(ports.tooltips[1].props.teleported).toBe(true);expect(pageHelp.root.querySelector('[data-tooltip-content-port]')).toBeNull();expect(dom.document.body.querySelector('[data-tooltip-content-port]')).not.toBeNull();
+    expect(ports.tooltips[0].props.teleported).toBe(false);expect(ports.tooltips[0].props.placement).toBe('top');expect(help.root.querySelector('[data-tooltip-content-port]')).not.toBeNull();expect(dom.document.body.querySelector('[data-tooltip-content-port]')).toBeNull();help.unmount();
+    const pageHelp = await mount(FieldHelp, {content: 'Page help', placement: 'bottom-end'});expect(ports.tooltips[1].props.teleported).toBe(true);expect(ports.tooltips[1].props.placement).toBe('bottom-end');expect(pageHelp.root.querySelector('[data-tooltip-content-port]')).toBeNull();expect(dom.document.body.querySelector('[data-tooltip-content-port]')).not.toBeNull();
+    pageHelp.props.placement = 'left';await settle();expect(ports.tooltips[1].props.placement).toBe('left');
     pageHelp.unmount();expect(dom.document.body.querySelector('[data-tooltip-content-port]')).toBeNull();
   });
   it('keeps color menu Teleports inside a closed shadow root and preserves body teleport on extension pages', async () => {

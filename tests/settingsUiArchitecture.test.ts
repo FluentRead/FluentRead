@@ -1034,7 +1034,7 @@ describe('options UI composition architecture', () => {
       expect(group.match(/data-configuration-group=/gu)).toHaveLength(1)
       expect(connectionGroup).not.toContain(group)
     }
-    expect(serviceConfiguration).toContain('<Teleport v-if="connectionActionTarget && !publicPlanBlocked && !browserTranslationUnavailable" :to="connectionActionTarget">')
+    expect(serviceConfiguration).toContain('<Teleport v-if="connectionActionTarget && !publicPlanBlocked && !browserTranslationUnavailable && service !== services.localTranslation" :to="connectionActionTarget">')
     expect(catalog).toContain('class="hero-connection-action"')
     expect(apiKeyList).not.toContain('data-connection-test-button')
     expect(serviceConfiguration).toContain(':disabled="connectionTestDisabled"')
@@ -1207,6 +1207,14 @@ describe('options UI composition architecture', () => {
     expect(item).toContain(':data-service-value="item.value"')
     expect(item).not.toContain('library-favorite')
     expect(item).toContain('<ServiceIcon')
+    expect(item).toContain('.library-item:has(> .library-select:focus-visible)')
+    expect(item).toContain('.library-select:focus-visible { outline: none; }')
+    expect(source('src/ui/styles/interface-skins/palette.css')).toContain('button:not(.library-select):not(.library-remove):focus-visible')
+    expect(source('src/ui/styles/interface-skins/palette.css')).toContain('.library-item:has(> .library-select:focus-visible),\n:root[data-interface-skin-kind="palette"][data-interface-skin] .library-remove:focus-visible')
+    expect(source('src/ui/styles/interface-skins/palette.css')).toContain('outline-offset: -2px;')
+    expect(source('src/ui/styles/interface-skins/contrast.css')).toContain('button:not(.library-select):not(.library-remove):focus-visible')
+    expect(source('src/ui/styles/interface-skins/contrast.css')).toContain('.library-item:has(> .library-select:focus-visible),\n:root[data-interface-skin="contrast"] .library-remove:focus-visible')
+    expect(source('src/ui/styles/interface-skins/contrast.css')).toContain('outline-offset: -4px;')
   })
 
   it('keeps webpage translation and interactions organized in clear layers', () => {

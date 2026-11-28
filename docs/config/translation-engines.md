@@ -55,9 +55,10 @@
 
 下载支持暂停/续传与备用源自动切换；模型保存在本机浏览器缓存（不进入配置备份），空闲后自动释放运行内存，详见[本地模型常见问题](/guide/faq#本地模型会每次重新加载吗-会一直占用内存吗)。
 
-### Ollama 与浏览器内置翻译
+### Ollama、Rapid-MLX 与浏览器内置翻译
 
 - **Ollama（本地）**：启动本机 Ollama 并拉取模型后，在**聚合平台与接口 → Ollama（本地）**填入模型名即可连接 `http://127.0.0.1:11434`（无需 Key）。若电脑较慢，建议将该服务的**请求限制 → 整个服务 → 自定义**并发设为 `1`。
+- **Rapid-MLX（Apple Silicon）**：`pip install rapid-mlx` 安装后，允许扩展来源启动：`rapid-mlx serve qwen3.5-4b-4bit --cors-origins chrome-extension://djnlaiohfaaifbibleebjggkghlmcpcj`（解压加载版换成 `chrome://extensions` 显示的 ID；Firefox 用 `moz-extension://<uuid>`）。选择 **Rapid-MLX → 自定义模型**，填写 `curl http://127.0.0.1:8000/v1/models` 返回的准确模型 ID，默认无需 Key；改端口时在代理地址填写完整的 `/v1/chat/completions` URL。
 - **浏览器内置翻译**：桌面 Chrome 138+ / Edge 148+ 可直接使用系统 Translator API，详见[浏览器内置翻译](/guide/chrome-translator)。
 
 ## 传统翻译与云厂商 API {#使用云服务厂商}

@@ -136,6 +136,7 @@ export const models = new Map<string, Array<string>>([
     [services.cheaperinference, [defaultModelIds[services.cheaperinference], "deepseek-v4-flash", "glm-5.3", "claude-sonnet-5", customModelString]],
     [services.cheapaimodel, [defaultModelIds[services.cheapaimodel], "glm-5.3-flash", "glm-5.3", customModelString]],
     [services.ollama, [defaultModelIds[services.ollama], "qwen3:8b", "gemma3:12b", "qwen3.8:27b", "qwen3.8-flash-next:125b-a6b-q4_K_M", "qwen3.8-flash-next:125b-mlx", customModelString]],
+    [services.rapidmlx, [customModelString]],
 ]);
 
 // 每个需要模型选择的 AI 服务都把列表第一项作为开箱即用的默认模型。

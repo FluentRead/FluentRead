@@ -103,8 +103,8 @@ export const servicesType = {
         services.openrouter,
         services.grok,
         services.newapi,
-        // 本地 Ollama 默认无鉴权，不纳入密钥要求。
-        ...referenceAiPlatformServices.filter((service) => service !== services.ollama),
+        // 本地 Ollama 与 Rapid-MLX 默认无鉴权，不纳入密钥要求。
+        ...referenceAiPlatformServices.filter((service) => service !== services.ollama && service !== services.rapidmlx),
         // 云服务厂商统一把主密钥存放在 token[service]。
         ...cloudVendorServices.filter((service) => service !== services.tencent),
     ]),

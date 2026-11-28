@@ -53,6 +53,7 @@ export const services = {
     grok: "grok", // X.AI 的 Grok
     newapi: "newapi", // New API 接口
     ollama: "ollama", // 本地 Ollama 运行时
+    rapidmlx: "rapidmlx", // Apple Silicon 本地 Rapid-MLX 运行时
     mistral: "mistral", // Mistral AI
     cohere: "cohere", // Cohere
     togetherai: "togetherai", // Together AI
@@ -98,9 +99,10 @@ export const cloudVendorServices = Object.freeze([
     services.volcTranslation,
 ]);
 
-/** 支持的 OpenAI 兼容平台；除本地 Ollama 外都需要平台密钥。 */
+/** 支持的 OpenAI 兼容平台；除本地 Ollama 与 Rapid-MLX 外都需要平台密钥。 */
 export const referenceAiPlatformServices = Object.freeze([
     services.ollama,
+    services.rapidmlx,
     services.mistral,
     services.cohere,
     services.togetherai,

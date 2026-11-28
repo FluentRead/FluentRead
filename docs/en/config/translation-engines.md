@@ -55,9 +55,10 @@ Download and verify models under **Translation providers → Local model transla
 
 Downloads support pause/resume and mirror fallback, stay in local browser storage (excluded from backups), and release RAM automatically when idle. See [local model FAQ](/en/guide/faq#do-local-models-reload-on-every-request-or-stay-in-memory-forever).
 
-### Ollama & Built-in browser translation
+### Ollama, Rapid-MLX & Built-in browser translation
 
 - **Ollama (Local):** Start Ollama and pull a model, then select **Aggregators & endpoints → Ollama (Local)** (`http://127.0.0.1:11434`, no key required). On slower hardware, set service concurrency to `1` under **Request limits**.
+- **Rapid-MLX (Apple Silicon):** Install with `pip install rapid-mlx`, then allow the extension origin: `rapid-mlx serve qwen3.5-4b-4bit --cors-origins chrome-extension://djnlaiohfaaifbibleebjggkghlmcpcj` (unpacked builds: use the ID from `chrome://extensions`; Firefox: `moz-extension://<uuid>`). Select **Rapid-MLX → Custom model** and enter an exact model ID from `curl http://127.0.0.1:8000/v1/models`; no key required. For another port, enter the full `/v1/chat/completions` URL in the proxy field.
 - **Built-in browser translation:** Desktop Chrome 138+ and Edge 148+ support the native Translator API—see [Built-in browser translation](/en/guide/chrome-translator).
 
 ## Classic & cloud vendor APIs {#using-cloud-providers}

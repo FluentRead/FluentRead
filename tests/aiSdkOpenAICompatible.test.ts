@@ -317,6 +317,30 @@ describe.each([['locked SDK', translateWithSdk], ['standalone HTTP', translateWi
     expect(JSON.parse(String(init.body))).toMatchObject({model, stream: false});
   });
 
+  it.each(['', '   ', 'local-test-key'])('Rapid-MLX uses its local endpoint and optional key "%s"', async token => {
+    const service = services.rapidmlx;
+    mockConfig.service = service;
+    mockConfig.model = {[service]: 'mlx-community/Qwen3.5-4B-MLX-4bit'};
+    mockConfig.token = {[service]: token};
+    mockConfig.proxy = {};
+    expect(servicesType.isUseToken(service)).toBe(false);
+    expect(getMissingCredentialMessage(service, mockConfig)).toBeNull();
+    const fetchMock = vi.fn().mockImplementation(async () => successResponse('本地翻译'));
+    setRuntimeFetch(fetchMock);
+
+    await expect(translateWithOpenAICompatibleAiSdk(withProviderSnapshot({origin: 'Hello'}, mockConfig)))
+      .resolves.toBe('本地翻译');
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('http://127.0.0.1:8000/v1/chat/completions');
+    expect(new Headers(init.headers).get('Authorization')).toBe(token.trim() ? `Bearer ${token}` : null);
+    expect(JSON.parse(String(init.body))).toMatchObject({model: 'mlx-community/Qwen3.5-4B-MLX-4bit', stream: false});
+
+    mockConfig.proxy = {[service]: 'http://127.0.0.1:8012/v1/chat/completions'};
+    await expect(translateWithOpenAICompatibleAiSdk(withProviderSnapshot({origin: 'Hello again'}, mockConfig)))
+      .resolves.toBe('本地翻译');
+    expect(fetchMock.mock.calls[1][0]).toBe('http://127.0.0.1:8012/v1/chat/completions');
+  });
+
   it('preserves custom top-level fields while keeping the SDK-owned stream mode', async () => {
     mockConfig.custom = 'http://127.0.0.1:11434/non-standard-generate';
     mockConfig.customBody[services.custom] = JSON.stringify({

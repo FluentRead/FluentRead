@@ -170,7 +170,7 @@ describe('OpenAI 兼容平台目录', () => {
             expect(AI_SDK_COMMON_SERVICE_IDS).toContain(service);
             expect(getAiSdkEndpointRoute(service)).toBe('common');
             expect(getServiceWebsite(service)?.kind).toBe('website');
-            expect(servicesType.isUseToken(service)).toBe(service !== services.ollama);
+            expect(servicesType.isUseToken(service)).toBe(service !== services.ollama && service !== services.rapidmlx);
         }
         expect(resolveOpenAICompatibleEndpoint(services.ollama, {proxy: {}}).baseURL).toBe('http://127.0.0.1:11434/v1');
         expect(resolveOpenAICompatibleEndpoint(services.ollama, {proxy: {[services.ollama]: 'http://192.168.1.8:11434/v1/chat/completions'}}).baseURL)

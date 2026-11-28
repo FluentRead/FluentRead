@@ -142,6 +142,7 @@ export const options = {
         {value: services.cloudgpu, label: "CloudGPU", catalogKind: "platform"},
         {value: services.cheaperinference, label: "Cheaper Inference", catalogKind: "platform"},
         {value: services.cheapaimodel, label: "cheapaimodel", catalogKind: "platform"},
+        {value: services.rapidmlx, label: "Rapid-MLX", description: "连接本机 Rapid-MLX（Apple Silicon），无需密钥，模型与数据都留在本地。", catalogKind: "platform", searchTerms: ["rapid mlx rapid-mlx local localhost 本地 Mac"]},
         {value: services.ollama, label: "Ollama", description: "连接本机 Ollama，无需密钥，模型与数据都留在本地。", catalogKind: "platform", searchTerms: ["local localhost 本地"]},
         {value: services.custom, label: "自定义接口", catalogKind: "platform"},
     ],

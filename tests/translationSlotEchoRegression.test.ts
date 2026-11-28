@@ -584,7 +584,7 @@ describe('真实 broker 的全文单条槽协议', () => {
         expect(h.provider.mock.calls[1]![0]).toMatchObject({
             origin: heading, sourceLanguageDetectionText: detectionSample, validateTranslationSlots: false,
         });
-        expect(detect.mock.calls.map(([text]) => text)).toEqual([heading, detectionSample, detectionSample]);
+        expect(detect.mock.calls.map(([text]) => text)).toEqual([heading, detectionSample]);
         // 现代 API 在同一 offscreen 环境复用模型；每次操作完成只归还租约。
         expect(detectorDestroy).not.toHaveBeenCalled();
         expect(translatorDestroy).not.toHaveBeenCalled();
@@ -597,7 +597,7 @@ describe('真实 broker 的全文单条槽协议', () => {
         expect([...h.store.values()]).toEqual([complete]);
         await expect(h.broker.translateWithCache(request)).resolves.toBe(complete);
         expect(h.provider).toHaveBeenCalledTimes(2);
-        expect(detect).toHaveBeenCalledTimes(3);
+        expect(detect).toHaveBeenCalledTimes(2);
         disposeChromeTranslationModels(environment);
         expect(detectorDestroy).toHaveBeenCalledOnce();
         expect(translatorDestroy).toHaveBeenCalledOnce();

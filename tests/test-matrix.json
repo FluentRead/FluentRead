@@ -391,6 +391,7 @@
       "tests/writingEntryPlacement.test.ts",
       "tests/writingReference.test.ts",
       "tests/writingEditors.test.ts",
+      "tests/writingSiteExpansion.test.ts",
       "tests/writingMarkdown.test.ts",
       "tests/translationToolbarStatus.test.ts",
       "tests/apiKeyRotation.test.ts",

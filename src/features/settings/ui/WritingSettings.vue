@@ -7,7 +7,7 @@
 <template>
   <div class="writing-settings">
     <div ref="modelOptionsHost" data-i18n-ignore />
-    <FeatureEnableCard v-model="config.writing.enabled" title="启用写作助手" :description="t('writing.experience.enableDescription')" />
+    <FeatureEnableCard :model-value="config.writing.enabled" title="启用写作助手" :description="t('writing.experience.enableDescription')" @update:model-value="handleWritingEnabledChange" />
     <p v-if="!config.writing.enabled" class="writing-description" role="status">{{ t('writing.experience.disabled') }}</p>
     <p v-else-if="!config.on" class="writing-description" role="status">{{ t('writing.experience.paused') }}</p>
     <SettingsGroup v-if="config.writing.disabledDomains.length" :title="t('writing.entry.disabledSites')">
@@ -44,7 +44,26 @@
           <el-option v-for="item in WRITING_LANGUAGES.filter(item => item.value !== 'target')" :key="item.value" data-i18n-ignore :value="item.value" :label="getMultilingualTargetLanguageLabel(item.value, item.label, uiLanguage)" />
         </el-select>
       </SettingsItem>
+      <SettingsItem :label="t('writing.hotkey.label')" :description="t('writing.hotkey.description')">
+        <div class="writing-hotkey-controls">
+          <el-button size="small" data-testid="writing-hotkey-button" :aria-label="t('writing.hotkey.edit')" :title="t('writing.hotkey.edit')" @click="openHotkeyDialog">
+            <kbd v-if="hotkeyDisplay" data-i18n-ignore>{{ hotkeyDisplay }}</kbd>
+            <span v-else>{{ t('writing.hotkey.disabled') }}</span>
+          </el-button>
+          <el-button v-if="config.writing.writingHotkey !== DEFAULT_WRITING_HOTKEY" size="small" text data-testid="writing-hotkey-reset" @click="resetWritingHotkey">
+            {{ t('writing.hotkey.reset') }}
+          </el-button>
+        </div>
+      </SettingsItem>
     </SettingsGroup>
+    <CustomHotkeyInput
+      v-if="showHotkeyDialog"
+      v-model="showHotkeyDialog"
+      :current-value="config.writing.writingHotkey"
+      :validate="findWritingHotkeyConflict"
+      @confirm="handleWritingHotkeyConfirm"
+      @cancel="closeHotkeyDialog"
+    />
     <SettingsGroup title="回答风格" data-settings-anchor="style" data-settings-anchor-label="回答风格">
       <div class="writing-default-style">
         <WritingStylePreview
@@ -67,7 +86,8 @@
   </div>
 </template>
 <script setup lang="ts">
-import {computed, ref, toRef, watch} from 'vue';
+import {computed, defineAsyncComponent, ref, toRef, watch} from 'vue';
+import {ElMessage} from 'element-plus';
 import {useUiI18n} from '@/src/ui/i18n';
 import type {Config} from '@/src/core/config/model';
 import {getMultilingualTargetLanguageLabel, models, options, resolveConfiguredModel, services} from '@/src/core/config/catalog';
@@ -76,12 +96,24 @@ import {resolveWritingReadiness} from '@/src/core/config/writingReadiness';
 import {filterAvailableTranslationServices, getTranslationServiceUnavailableMessage} from '@/src/services/translation/capabilities';
 import {markDisabledTranslationServices} from '@/src/core/config/serviceAvailability';
 import {getCustomOpenAIProviderModels, isCustomOpenAIProviderId} from '@/src/core/config/customOpenAI';
-import {WRITING_LANGUAGES, WRITING_LENGTHS, WRITING_STYLES, WRITING_TONES, WRITING_ROLES, WRITING_TONE_MAX_LENGTH, WRITING_ROLE_MAX_LENGTH, resolveWritingLanguage, resolveWritingReferenceLanguage} from '@/src/core/config/writing';
+import {
+  DEFAULT_WRITING_HOTKEY, WRITING_LANGUAGES, WRITING_LENGTHS, WRITING_STYLES, WRITING_TONES, WRITING_ROLES,
+  WRITING_TONE_MAX_LENGTH, WRITING_ROLE_MAX_LENGTH, normalizeWritingHotkey, resolveWritingLanguage,
+  resolveWritingReferenceLanguage, writingHotkeyDisplayName,
+} from '@/src/core/config/writing';
+import {canonicalizeHotkey, parseHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
+import {resolveAreaTranslationHotkey} from '@/src/core/config/areaTranslation';
+import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
+import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy';
+import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation';
+import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
+import {findEnabledQuickTranslationHotkeyConflict, inputBoxTranslationTriggerHotkey, quickTranslationActionKey} from '@/src/core/config/quickTranslation';
 import {WritingChoices} from '@/src/features/writing-assistant/ui/public';
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import SettingsGroup from './components/SettingsGroup.vue';
 import SettingsItem from './components/SettingsItem.vue';
 import WritingStylePreview from './components/WritingStylePreview.vue';
+const CustomHotkeyInput = defineAsyncComponent(() => import('@/src/ui/components/CustomHotkeyInput.vue'));
 const {t, translateLegacy, language: uiLanguage} = useUiI18n();
 // allow-create 的候选由控件内部生成；专属容器保护整个传送菜单中的模型原值。
 const modelOptionsHost = ref<HTMLElement>();
@@ -130,8 +162,67 @@ const referencePreviewLabel = computed(() => {
   if (!language || language === resolveWritingLanguage(config.value.writing.language, config.value.to)) return '';
   return (WRITING_LANGUAGES.find(item => item.value === language)?.label || language).split(' / ')[0];
 });
+const showHotkeyDialog = ref(false);
+const hotkeyDisplay = computed(() => writingHotkeyDisplayName(config.value.writing.writingHotkey));
+function openHotkeyDialog() { showHotkeyDialog.value = true; }
+function closeHotkeyDialog() { showHotkeyDialog.value = false; }
+function reservedWritingHotkeyOwners(): {hotkey: string; feature: string}[] {
+  const current = config.value;
+  return [
+    {hotkey: resolveReservedClickSelectionHotkey(current), feature: translateLegacy('两点选取')},
+    {hotkey: resolveConfiguredHotkey(current.hotkey, current.customHotkey), feature: t('popup.hoverTranslation')},
+    {hotkey: resolveConfiguredHotkey(current.floatingBallHotkey, current.customFloatingBallHotkey), feature: t('quickTranslation.commonFullPageShortcut')},
+    {
+      hotkey: current.selectionTranslatorMode === 'disabled' || current.disableSelectionTranslator === true
+        ? ''
+        : resolveConfiguredHotkey(current.selectionTranslatorTrigger, current.customSelectionTranslatorHotkey),
+      feature: t('popup.selectionTranslation'),
+    },
+    {hotkey: current.selectionAreaEnabled ? resolveAreaTranslationHotkey(current.selectionAreaHotkey, current.customSelectionAreaHotkey) : '', feature: t('popup.areaTranslation')},
+    {hotkey: current.paragraphCopyEnabled ? resolveParagraphCopyHotkey(current.paragraphCopyHotkey, current.customParagraphCopyHotkey) : '', feature: t('paragraphCopy.settings.title')},
+    {hotkey: current.sectionTranslationHotkeyEnabled ? resolveSectionTranslationHotkey(current.sectionTranslationHotkey, current.customSectionTranslationHotkey) : '', feature: t('sectionTranslation.settings.title')},
+    {hotkey: current.videoSubtitleModeHotkeyEnabled ? resolveVideoSubtitleModeHotkey(current.videoSubtitleModeHotkey, current.customVideoSubtitleModeHotkey) : '', feature: t('video.modeShortcut.title')},
+    {hotkey: current.informationHighlight?.hotkeyEnabled === true ? current.informationHighlight.hotkey ?? '' : '', feature: t('informationHighlight.title')},
+    {hotkey: inputBoxTranslationTriggerHotkey(current.inputBoxTranslationTrigger, current.customInputBoxTranslationHotkey), feature: translateLegacy('输入框翻译')},
+  ];
+}
+function findWritingHotkeyConflict(hotkey: string): string {
+  if (!hotkey || hotkey === 'none') return '';
+  const parsed = parseHotkey(hotkey);
+  if (!parsed.isValid || parsed.modifiers.length === 0 || parsed.modifiers.includes('meta')) return t('writing.hotkey.requireModifier');
+  const resolved = canonicalizeHotkey(hotkey);
+  const identity = resolved.toLocaleLowerCase();
+  const owner = reservedWritingHotkeyOwners().find(item => canonicalizeHotkey(item.hotkey).toLocaleLowerCase() === identity);
+  if (owner) return t('writing.hotkey.conflict', {feature: owner.feature});
+  const profile = findEnabledQuickTranslationHotkeyConflict(config.value.quickTranslationProfiles ?? [], resolved);
+  if (!profile) return '';
+  return t('quickTranslation.conflictProfile', {group: t(`quickTranslation.heading.${quickTranslationActionKey(profile.action)}`)});
+}
+function handleWritingEnabledChange(enabled: boolean) {
+  if (enabled && config.value.writing.writingHotkey) {
+    const conflict = findWritingHotkeyConflict(config.value.writing.writingHotkey);
+    if (conflict) {
+      ElMessage.warning(conflict);
+      config.value.writing.writingHotkey = '';
+    }
+  }
+  config.value.writing.enabled = enabled;
+}
+function handleWritingHotkeyConfirm(hotkey: string) {
+  const conflict = findWritingHotkeyConflict(hotkey);
+  if (conflict) { ElMessage.warning(conflict); return; }
+  config.value.writing.writingHotkey = normalizeWritingHotkey(hotkey === 'none' ? '' : hotkey);
+  closeHotkeyDialog();
+}
+function resetWritingHotkey() {
+  const conflict = findWritingHotkeyConflict(DEFAULT_WRITING_HOTKEY);
+  if (conflict) { ElMessage.warning(conflict); return; }
+  config.value.writing.writingHotkey = DEFAULT_WRITING_HOTKEY;
+}
 </script>
 <style scoped>
+.writing-hotkey-controls{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.writing-hotkey-controls kbd{font-family:inherit;font-size:12px}
 .writing-settings{max-width:1080px;margin:0 auto}
 .writing-settings>.feature-enable-card{margin:0 0 24px}
 .writing-description{margin:-12px 0 24px;color:var(--muted);font-size:12px;line-height:1.7}

@@ -4,11 +4,11 @@
  * 主要内容：声明动作、用户要求、草稿、可预览上下文、目标语言、语气、可选篇幅风格身份及近期问答；响应包含实际服务模型。
  * 模块边界：仅定义类型，页面不能通过请求覆盖后台密钥或服务地址。
  */
-import type {WritingIntent, WritingLength, WritingStyle} from '@/src/core/config/writing';
+import type {WritingIntent, WritingLength, WritingSiteId, WritingStyle} from '@/src/core/config/writing';
 export interface WritingRequest {
     type: 'fluentReadWriting'; action: 'run'; requestId: string; intent: WritingIntent;
     instruction: string; draft: string; context: string; language: string; tone: string; length?: WritingLength | 'auto';
-    style?: WritingStyle; role?: string;
+    style?: WritingStyle; role?: string; site?: WritingSiteId;
     history: Array<{question: string; answer: string}>;
 }
 export type WritingResponse = {success: true; text: string; service: string; model: string}

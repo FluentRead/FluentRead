@@ -587,10 +587,11 @@
       "scenario": "实际复习请求、换词与迟到结果"
     },
     "src/features/writing-assistant/ui/WritingEntrySettings.vue": {
-      "kind": "frozen-debt",
-      "sourceSha256": "0730858eae134718a9f020cef1de6de64d19514bfa60e55bafb1992329d3722a",
-      "reason": "提供写作入口的三种关闭范围和完整设置入口。 当前尚未登记可确认的自动组件行为消费者；不把父组件mock或源码契约算作该组件行为证明。",
-      "exitCriteria": "修改此文件前，以真实SFC执行对应事件/异步/取消场景并登记消费者，或纳入正式逐文件严格覆盖；不得刷新冻结hash延续豁免。"
+      "kind": "behavior",
+      "tests": [
+        "tests/writingSiteExpansion.test.ts"
+      ],
+      "scenario": "真实SFC渲染关闭范围选项、快捷键提示、键盘焦点循环、保存中状态、失败提示与取消/保存/打开设置事件"
     },
     "src/features/writing-assistant/ui/WritingPanel.vue": {
       "kind": "behavior",

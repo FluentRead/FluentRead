@@ -1,7 +1,7 @@
 {
-  "baselineBytes": 3827157,
+  "baselineBytes": 3891952,
   "softWarnDeltaBytes": 20000,
   "hardMaxDeltaBytes": 64000,
-  "updatedFromCommit": "652647653",
+  "updatedFromCommit": "71e2844dd",
   "notes": "Full Options standalone direct-install build (hosted outside Greasy Fork's 2 MB cap). Normal UI/copy PRs within +20 kB pass cleanly; +20 kB..+64 kB emits a soft [userscript-size] WARN without breaking CI; >+64 kB (3,820,047 bytes) hard-fails to block unexpected dependency, asset, or model bloat. Refresh baseline explicitly with: node scripts/verify-userscript-standalone-build.mjs --update-baseline"
 }

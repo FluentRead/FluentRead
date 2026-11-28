@@ -14,17 +14,25 @@ import {
     videoSubtitleModeLabelKey,
     type VideoSubtitleModeShortcutPorts,
 } from '@/src/features/video-subtitle/content/modeShortcut';
+import {
+    getActiveVideoSubtitleModeController,
+    registerActiveVideoSubtitleModeController,
+    type ActiveVideoSubtitleModeController,
+} from '@/src/features/video-subtitle/content/activeModeController';
 
 function createKeyEvent(overrides: Record<string, unknown> = {}): KeyboardEvent & {
     preventDefault: ReturnType<typeof vi.fn>;
     stopPropagation: ReturnType<typeof vi.fn>;
+    stopImmediatePropagation: ReturnType<typeof vi.fn>;
 } {
     const preventDefault = vi.fn();
     const stopPropagation = vi.fn();
+    const stopImmediatePropagation = vi.fn();
     return {
         isTrusted: true,
         repeat: false,
         isComposing: false,
+        defaultPrevented: false,
         key: 'm',
         code: 'KeyM',
         altKey: true,
@@ -33,11 +41,13 @@ function createKeyEvent(overrides: Record<string, unknown> = {}): KeyboardEvent 
         shiftKey: false,
         preventDefault,
         stopPropagation,
+        stopImmediatePropagation,
         composedPath: () => [],
         ...overrides,
     } as unknown as KeyboardEvent & {
         preventDefault: ReturnType<typeof vi.fn>;
         stopPropagation: ReturnType<typeof vi.fn>;
+        stopImmediatePropagation: ReturnType<typeof vi.fn>;
     };
 }
 
@@ -52,7 +62,19 @@ describe('视频字幕显示模式快捷键运行时处理', () => {
         expect(pageNoticeMock.showPageNotice).toHaveBeenCalledWith(
             'video.modeShortcut.switched:video.modeBilingual',
             'success',
-            {key: 'video-subtitle-mode', durationMs: 1800},
+            {key: 'video-subtitle-mode', durationMs: 1600},
+        );
+        notifyVideoSubtitleModeSwitch('original-only', (key, params) => params ? `${key}:${params.mode}:${params.shortcut ?? ''}` : key, '  ');
+        expect(pageNoticeMock.showPageNotice).toHaveBeenLastCalledWith(
+            'video.modeShortcut.switched:video.modeOriginal:',
+            'success',
+            {key: 'video-subtitle-mode', durationMs: 1600},
+        );
+        notifyVideoSubtitleModeSwitch('original-only', (key, params) => params ? `${key}:${params.mode}:${params.shortcut ?? ''}` : key, 'Alt+M');
+        expect(pageNoticeMock.showPageNotice).toHaveBeenLastCalledWith(
+            'video.modeShortcut.switchedWithKey:video.modeOriginal:Alt+M',
+            'success',
+            {key: 'video-subtitle-mode', durationMs: 1600},
         );
         clearVideoSubtitleModeNotice();
         expect(pageNoticeMock.dismissPageNotice).toHaveBeenCalledWith('video-subtitle-mode');
@@ -80,7 +102,7 @@ describe('视频字幕显示模式快捷键运行时处理', () => {
         const event = createKeyEvent();
         expect(handleVideoSubtitleModeShortcutKeydown(event, ports)).toBe(true);
         expect(event.preventDefault).toHaveBeenCalledTimes(1);
-        expect(event.stopPropagation).toHaveBeenCalledTimes(1);
+        expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(1);
         expect(applyMode).toHaveBeenCalledWith('bilingual');
         expect(notify).toHaveBeenCalledWith('bilingual');
     });
@@ -142,14 +164,19 @@ describe('视频字幕显示模式快捷键运行时处理', () => {
             applyMode,
         };
 
-        expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent({isTrusted: false}), basePorts)).toBe(false);
-        expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent({repeat: true}), basePorts)).toBe(false);
-        expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent({isComposing: true}), basePorts)).toBe(false);
-        expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent({key: 'x', code: 'KeyX'}), basePorts)).toBe(false);
+        const isActive = vi.fn(() => true);
+        const hotkeyPorts: VideoSubtitleModeShortcutPorts = {...basePorts, isActive};
+        expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent({isTrusted: false}), hotkeyPorts)).toBe(false);
+        expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent({repeat: true}), hotkeyPorts)).toBe(false);
+        expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent({isComposing: true}), hotkeyPorts)).toBe(false);
+        expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent({defaultPrevented: true}), hotkeyPorts)).toBe(false);
+        expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent({key: 'x', code: 'KeyX'}), hotkeyPorts)).toBe(false);
+        expect(isActive).not.toHaveBeenCalled();
         expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent(), {
-            ...basePorts,
+            ...hotkeyPorts,
             config: {...basePorts.config, videoSubtitleModeHotkeyEnabled: false},
         })).toBe(false);
+        expect(isActive).not.toHaveBeenCalled();
         expect(handleVideoSubtitleModeShortcutKeydown(createKeyEvent(), {
             ...basePorts,
             isActive: () => false,
@@ -159,5 +186,47 @@ describe('视频字幕显示模式快捷键运行时处理', () => {
         expect(handleVideoSubtitleModeShortcutKeydown(typingEvent, basePorts)).toBe(false);
         expect(typingEvent.preventDefault).not.toHaveBeenCalled();
         expect(applyMode).not.toHaveBeenCalled();
+    });
+});
+
+describe('活跃视频字幕模式控制器注册表', () => {
+    it('按后注册优先返回首个活跃控制器且注销幂等', () => {
+        expect(getActiveVideoSubtitleModeController()).toBeNull();
+
+        let firstActive = false;
+        let secondActive = true;
+        const first: ActiveVideoSubtitleModeController = {
+            isActive: () => firstActive,
+            getCurrentMode: () => 'bilingual',
+            switchMode: () => 'original-only',
+        };
+        const second: ActiveVideoSubtitleModeController = {
+            isActive: () => secondActive,
+            getCurrentMode: () => 'original-only',
+            switchMode: () => 'bilingual',
+        };
+
+        const unregisterFirst = registerActiveVideoSubtitleModeController(first);
+        expect(getActiveVideoSubtitleModeController()).toBeNull();
+
+        firstActive = true;
+        expect(getActiveVideoSubtitleModeController()).toBe(first);
+
+        const unregisterSecond = registerActiveVideoSubtitleModeController(second);
+        expect(getActiveVideoSubtitleModeController()).toBe(second);
+
+        secondActive = false;
+        expect(getActiveVideoSubtitleModeController()).toBe(first);
+
+        unregisterFirst();
+        unregisterFirst();
+        expect(getActiveVideoSubtitleModeController()).toBeNull();
+
+        secondActive = true;
+        expect(getActiveVideoSubtitleModeController()).toBe(second);
+
+        unregisterSecond();
+        unregisterSecond();
+        expect(getActiveVideoSubtitleModeController()).toBeNull();
     });
 });

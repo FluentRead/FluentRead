@@ -522,4 +522,138 @@ describe('page error notice', () => {
 
         expect(document.getElementById('fluent-read-page-notice-host')).toBeNull();
     });
+
+    it('全屏与 Popover 顶层适配：支持 Popover 时挂载顶层、已打开时不重复置顶、响应全屏变更、捕获异常并在清空后释放监听', async () => {
+        let popoverOpen = false;
+        const showPopover = vi.fn(() => {popoverOpen = true;});
+        const hidePopover = vi.fn(() => {popoverOpen = false;});
+        const origMatches = window.HTMLElement.prototype.matches;
+        let matchesBehavior: 'state' | 'throw' | 'missing' = 'state';
+        const stubMatches = function (this: HTMLElement, selector: string): boolean {
+            if (selector === ':popover-open') {
+                if (matchesBehavior === 'throw') throw new SyntaxError('unsupported selector');
+                return popoverOpen;
+            }
+            return origMatches.call(this, selector);
+        };
+        Object.defineProperty(window.HTMLElement.prototype, 'showPopover', {value: showPopover, configurable: true, writable: true});
+        Object.defineProperty(window.HTMLElement.prototype, 'hidePopover', {value: hidePopover, configurable: true, writable: true});
+        Object.defineProperty(window.HTMLElement.prototype, 'matches', {value: stubMatches, configurable: true, writable: true});
+        try {
+            const first = showPageNotice('切换为双语', 'success', {key: 'mode'});
+            await Promise.resolve();
+            const host = document.getElementById('fluent-read-page-notice-host')!;
+            expect(host.getAttribute('popover')).toBe('manual');
+            expect(host.style.getPropertyValue('right')).toBe('auto');
+            expect(host.style.getPropertyValue('bottom')).toBe('auto');
+            expect(host.style.getPropertyValue('background')).toBe('transparent');
+            expect(showPopover).toHaveBeenCalledTimes(1);
+            expect(hidePopover).toHaveBeenCalledTimes(1);
+
+            // 非全屏复用宿主且已 :popover-open 时不重复 hidePopover + showPopover
+            showPageNotice('切换为原文', 'success', {key: 'mode'});
+            expect(showPopover).toHaveBeenCalledTimes(1);
+            expect(hidePopover).toHaveBeenCalledTimes(1);
+
+            // 宿主被移动回 body 时自动迁回 documentElement；全屏复用但仍为 :popover-open 时不打断焦点/不重复置顶
+            document.body.appendChild(host);
+            const player = document.createElement('div');
+            document.body.appendChild(player);
+            Object.defineProperty(document, 'fullscreenElement', {value: player, configurable: true});
+            showPageNotice('全屏切换', 'success', {key: 'mode'});
+            expect(host.parentElement).toBe(document.documentElement);
+            expect(showPopover).toHaveBeenCalledTimes(1);
+            expect(hidePopover).toHaveBeenCalledTimes(1);
+
+            // 若尚未 :popover-open（或 matches 抛错/缺失），复用时自动重新置顶
+            popoverOpen = false;
+            showPageNotice('重新置顶 1', 'success', {key: 'mode'});
+            expect(showPopover).toHaveBeenCalledTimes(2);
+
+            matchesBehavior = 'throw';
+            showPageNotice('重新置顶 2', 'success', {key: 'mode'});
+            expect(showPopover).toHaveBeenCalledTimes(3);
+
+            Object.defineProperty(window.HTMLElement.prototype, 'matches', {value: undefined, configurable: true, writable: true});
+            showPageNotice('重新置顶 3', 'success', {key: 'mode'});
+            expect(showPopover).toHaveBeenCalledTimes(4);
+            Object.defineProperty(window.HTMLElement.prototype, 'matches', {value: stubMatches, configurable: true, writable: true});
+            matchesBehavior = 'state';
+
+            // fullscreenchange / webkitfullscreenchange 即使已 :popover-open 也强制重新置顶
+            document.dispatchEvent(new window.Event('fullscreenchange'));
+            document.dispatchEvent(new window.Event('webkitfullscreenchange'));
+            expect(showPopover).toHaveBeenCalledTimes(6);
+
+            // 全屏状态下按 Escape 关闭通知但不阻断浏览器退出全屏
+            const escapeEvent = noticeEvent(first, 'keydown', {key: 'Escape'});
+            expect(escapeEvent.defaultPrevented).toBe(false);
+            expect(first.classList.contains('is-leaving')).toBe(true);
+
+            // hidePopover/showPopover 异常时静默兜底
+            hidePopover.mockImplementationOnce(() => {throw new Error('not open');});
+            showPopover.mockImplementationOnce(() => {throw new Error('blocked');});
+            document.dispatchEvent(new window.Event('fullscreenchange'));
+
+            // 清空最后一条通知时调用 hidePopover（并捕获异常）且移除全屏监听
+            hidePopover.mockImplementationOnce(() => {throw new Error('already closed');});
+            await vi.advanceTimersByTimeAsync(180);
+            expect(document.getElementById('fluent-read-page-notice-host')).toBeNull();
+            const callsAfterClose = showPopover.mock.calls.length;
+            document.dispatchEvent(new window.Event('fullscreenchange'));
+            expect(showPopover).toHaveBeenCalledTimes(callsAfterClose);
+
+            // 仅存在 showPopover 而无 hidePopover 时也能安全置顶并释放
+            Object.defineProperty(window.HTMLElement.prototype, 'hidePopover', {value: undefined, configurable: true, writable: true});
+            Object.defineProperty(document, 'fullscreenElement', {value: null, configurable: true});
+            const second = showPageNotice('仅有 showPopover', 'success');
+            second.querySelector<HTMLButtonElement>('.notice-close')!.click();
+            await vi.advanceTimersByTimeAsync(180);
+            expect(document.getElementById('fluent-read-page-notice-host')).toBeNull();
+        } finally {
+            delete (window.HTMLElement.prototype as {showPopover?: unknown}).showPopover;
+            delete (window.HTMLElement.prototype as {hidePopover?: unknown}).hidePopover;
+            Object.defineProperty(window.HTMLElement.prototype, 'matches', {value: origMatches, configurable: true, writable: true});
+        }
+    });
+
+    it('无 Popover API 时回退至非替换全屏容器迁移，替换元素全屏保留 documentElement，成功通知跳过凭据检测', async () => {
+        const notice = showPageNotice('DeepSeek 需要 API Key，当前尚未配置', 'success');
+        await Promise.resolve();
+        expect(notice.getAttribute('role')).toBe('status');
+        expect(notice.querySelector('.notice-action')).toBeNull();
+
+        const host = document.getElementById('fluent-read-page-notice-host')!;
+        expect(host.hasAttribute('popover')).toBe(false);
+        expect(host.parentElement).toBe(document.documentElement);
+
+        const fsContainer = document.createElement('div');
+        const fsVideo = document.createElement('video');
+        const fsAudio = document.createElement('audio');
+        const fsIframe = document.createElement('iframe');
+        const fsCanvas = document.createElement('canvas');
+        const fsImg = document.createElement('img');
+        document.body.append(fsContainer, fsVideo, fsAudio, fsIframe, fsCanvas, fsImg);
+
+        Object.defineProperty(document, 'fullscreenElement', {value: fsContainer, configurable: true});
+        document.dispatchEvent(new window.Event('fullscreenchange'));
+        expect(host.parentElement).toBe(fsContainer);
+
+        // 同一全屏容器再次触发不重复迁移
+        document.dispatchEvent(new window.Event('fullscreenchange'));
+        expect(host.parentElement).toBe(fsContainer);
+
+        // 替换元素（video/audio/iframe/canvas/img 等，含 Safari webkitFullscreenElement）迁回 documentElement
+        Object.defineProperty(document, 'fullscreenElement', {value: null, configurable: true});
+        for (const replaced of [fsVideo, fsAudio, fsIframe, fsCanvas, fsImg]) {
+            Object.defineProperty(document, 'fullscreenElement', {value: fsContainer, configurable: true});
+            document.dispatchEvent(new window.Event('fullscreenchange'));
+            expect(host.parentElement).toBe(fsContainer);
+
+            Object.defineProperty(document, 'fullscreenElement', {value: null, configurable: true});
+            Object.defineProperty(document, 'webkitFullscreenElement', {value: replaced, configurable: true});
+            document.dispatchEvent(new window.Event('webkitfullscreenchange'));
+            expect(host.parentElement).toBe(document.documentElement);
+        }
+    });
 });

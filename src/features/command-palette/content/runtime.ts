@@ -27,6 +27,7 @@ export interface CommandPaletteActionPorts {
     readonly isFullPageActive: () => boolean;
     readonly toggleFullPage: () => CommandPaletteActionResult;
     readonly switchDisplayMode: () => CommandPaletteActionResult;
+    readonly switchVideoSubtitleMode?: () => CommandPaletteActionResult;
     readonly startSectionTranslation: () => CommandPaletteActionResult;
     readonly startAreaTranslation: () => CommandPaletteActionResult;
     readonly openSidepanel: () => CommandPaletteActionResult;
@@ -41,11 +42,14 @@ export interface CommandPaletteActionPorts {
     readonly canOpenSidepanel: () => boolean;
     readonly canOpenDocument: () => boolean;
     readonly canSmartHighlight: () => boolean;
+    readonly canSwitchVideoSubtitleMode?: () => boolean;
+    readonly getVideoSubtitleModeLabel?: () => string | undefined;
     readonly shortcuts?: () => Partial<{
         readonly fullPage: string;
         readonly section: string;
         readonly area: string;
         readonly smartHighlight: string;
+        readonly videoSubtitleMode: string;
     }>;
 }
 
@@ -117,6 +121,8 @@ function executePortAction(id: CommandPaletteActionId, ports: CommandPaletteActi
             return ports.toggleFullPage();
         case 'switch-display-mode':
             return ports.switchDisplayMode();
+        case 'switch-video-subtitle-mode':
+            return ports.switchVideoSubtitleMode?.();
         case 'start-section-translation':
             return ports.startSectionTranslation();
         case 'start-area-translation':
@@ -183,6 +189,8 @@ export async function openCommandPalette(): Promise<void> {
         canOpenSidepanel: ports.canOpenSidepanel(),
         canOpenDocument: ports.canOpenDocument(),
         canSmartHighlight: ports.canSmartHighlight(),
+        canSwitchVideoSubtitleMode: ports.canSwitchVideoSubtitleMode?.() === true,
+        videoSubtitleModeLabel: ports.getVideoSubtitleModeLabel?.(),
         shortcuts: ports.shortcuts?.(),
     });
     palette.open({

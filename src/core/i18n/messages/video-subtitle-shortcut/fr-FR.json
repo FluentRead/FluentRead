@@ -1,0 +1,18 @@
+{
+  "video.modeShortcut.action.listening-cycle": "Écoute active (Désactivé → Original → Bilingue)",
+  "video.modeShortcut.action.listening-cycleDescription": "Commence sans sous-titres, puis passe à Original uniquement, Bilingue et revient à Désactivé pour écouter d’abord puis vérifier le texte et la traduction.",
+  "video.modeShortcut.action.toggle-visibility": "Afficher ↔ Désactivé (conserver le mode actuel)",
+  "video.modeShortcut.action.toggle-visibilityDescription": "Masque ou réaffiche les sous-titres vidéo en une touche tout en conservant votre choix actuel (Bilingue, Traduction ou Original).",
+  "video.modeShortcut.hotkeyNeedModifier": "Le raccourci des sous-titres vidéo doit inclure une touche modificatrice ou une touche de fonction (F1-F12) afin de ne pas bloquer les touches simples du lecteur",
+  "video.modeShortcut.enabledDescriptionCustomEmpty": "Une fois activé, utilisez le raccourci sur les pages vidéo pour changer le mode des sous-titres ; {shortcut} est utilisé tant qu’aucune combinaison personnalisée n’est enregistrée.",
+  "video.modeShortcut.conflictInline": "Cette combinaison entre en conflit avec « {feature} ». Modifiez le raccourci ci-dessous avant de l’activer.",
+  "video.modeShortcut.disabledByConflict": "Le raccourci de mode des sous-titres vidéo est en conflit avec « {feature} » et a été désactivé automatiquement. Modifiez la combinaison dans Traduction et affichage.",
+  "video.modeShortcut.switchedWithKey": "Sous-titres vidéo passés en mode : {mode} ({shortcut})",
+  "video.modeShortcut.menuBadge": "Raccourci {shortcut}",
+  "video.modeShortcut.appearanceEnabledHint": "Raccourci activé : {shortcut} ({action})",
+  "video.modeShortcut.appearanceDisabledHint": "Activez le changement au clavier dans Traduction et affichage → Raccourci de mode des sous-titres",
+  "video.localMedia.translateNow": "Traduire les sous-titres",
+  "video.localMedia.hiddenListeningHint": "Sous-titres masqués (mode écoute). Cliquez sur une phrase pour y accéder.",
+  "commandPalette.action.switchVideoSubtitleMode.title": "Changer le mode des sous-titres vidéo",
+  "commandPalette.action.switchVideoSubtitleMode.description": "Bascule entre Bilingue, Original uniquement, Traduction uniquement ou Désactivé selon la règle actuelle du raccourci"
+}

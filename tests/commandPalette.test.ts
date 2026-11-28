@@ -195,7 +195,8 @@ describe('commandPalette 纯领域搜索、分组、最近记录与键盘导航'
     });
 
     it('构建默认目录并准确反映全文状态、双语模式、开关状态和能力可用性', () => {
-        expect(sampleCatalog).toHaveLength(11);
+        expect(sampleCatalog).toHaveLength(12);
+        expect(sampleCatalog.find((c) => c.id === 'switch-video-subtitle-mode')?.available).toBe(false);
         expect(sampleCatalog.find((c) => c.id === 'toggle-full-page')?.title).toBe('翻译当前网页');
         expect(sampleCatalog.find((c) => c.id === 'toggle-full-page')?.badge).toBeUndefined();
         expect(sampleCatalog.find((c) => c.id === 'switch-display-mode')?.title).toBe('切换为仅译文模式');
@@ -214,6 +215,14 @@ describe('commandPalette 纯领域搜索、分组、最近记录与键盘导航'
             canOpenSidepanel: false,
             canOpenDocument: false,
             canSmartHighlight: false,
+            canSwitchVideoSubtitleMode: true,
+            videoSubtitleModeLabel: 'Original',
+            shortcuts: {videoSubtitleMode: 'Alt+M'},
+        });
+        expect(flipped.find((c) => c.id === 'switch-video-subtitle-mode')).toMatchObject({
+            available: true,
+            badge: 'Original',
+            shortcut: 'Alt+M',
         });
         expect(flipped.find((c) => c.id === 'toggle-full-page')?.title).toBe('Restore original page');
         expect(flipped.find((c) => c.id === 'toggle-full-page')?.badge).toBe('Translated');
@@ -641,6 +650,7 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
             isFullPageActive: vi.fn(() => false),
             toggleFullPage: vi.fn(),
             switchDisplayMode: vi.fn(),
+            switchVideoSubtitleMode: vi.fn(),
             startSectionTranslation: vi.fn(),
             startAreaTranslation: vi.fn(),
             openSidepanel: vi.fn(),
@@ -655,7 +665,9 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
             canOpenSidepanel: vi.fn(() => true),
             canOpenDocument: vi.fn(() => true),
             canSmartHighlight: vi.fn(() => true),
-            shortcuts: vi.fn(() => ({fullPage: 'Alt+T'})),
+            canSwitchVideoSubtitleMode: vi.fn(() => true),
+            getVideoSubtitleModeLabel: vi.fn(() => '双语'),
+            shortcuts: vi.fn(() => ({fullPage: 'Alt+T', videoSubtitleMode: 'Alt+M'})),
         };
 
         // 未挂载时 openCommandPalette / closeCommandPalette 安全空操作
@@ -724,10 +736,11 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
         ports.openSettings.mockClear();
         showPageNoticeMock.mockClear();
 
-        // 执行全部 11 项命令动作
+        // 执行全部 12 项命令动作
         const allIds: CommandPaletteActionId[] = [
             'toggle-full-page',
             'switch-display-mode',
+            'switch-video-subtitle-mode',
             'start-section-translation',
             'start-area-translation',
             'open-sidepanel',
@@ -743,6 +756,7 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
         }
         expect(ports.toggleFullPage).toHaveBeenCalledOnce();
         expect(ports.switchDisplayMode).toHaveBeenCalledOnce();
+        expect(ports.switchVideoSubtitleMode).toHaveBeenCalledOnce();
         expect(ports.startSectionTranslation).toHaveBeenCalledOnce();
         expect(ports.startAreaTranslation).toHaveBeenCalledOnce();
         expect(ports.openSidepanel).toHaveBeenCalledOnce();
@@ -862,6 +876,64 @@ describe('CommandPalette.vue 真实组件、runtime 与 commandPaletteFeature �
         expect(openedPayload.commands.find((c: any) => c.id === 'start-section-translation')?.shortcut).toBeTruthy();
         expect(openedPayload.commands.find((c: any) => c.id === 'start-area-translation')?.shortcut).toBeTruthy();
         expect(openedPayload.commands.find((c: any) => c.id === 'toggle-smart-highlight')?.shortcut).toMatch(/H/u);
+        // 无活跃视频字幕控制器时，即使页面存在隐藏 <video>，视频字幕切换命令也不可用且执行为空操作
+        const hiddenVideo = document.createElement('video');
+        document.body.appendChild(hiddenVideo);
+        config.videoTranslationEnabled = true;
+        config.videoSubtitleModeHotkeyEnabled = false;
+        await runtime.openCommandPalette();
+        const inactiveVideoCmd = openedPayload.commands.find((c: any) => c.id === 'switch-video-subtitle-mode');
+        expect(inactiveVideoCmd?.available).toBe(false);
+        expect(inactiveVideoCmd?.badge).toBeUndefined();
+        expect(inactiveVideoCmd?.shortcut).toBeUndefined();
+        await openedPayload.onExecute('switch-video-subtitle-mode');
+        hiddenVideo.remove();
+
+        // 注册活跃视频字幕模式控制器后命令可用，实时展示控制器当前模式徽标与快捷键，执行时委托给控制器（兼容课程页 manualEnabled，不直接写全局配置）
+        const {registerActiveVideoSubtitleModeController} = await import('@/src/features/video-subtitle/public');
+        let controllerActive = true;
+        let controllerMode: 'bilingual' | 'translation-only' | 'original-only' | 'off' = 'bilingual';
+        const switchModeSpy = vi.fn(() => {
+            controllerMode = controllerMode === 'bilingual' ? 'off' : 'original-only';
+            return controllerMode;
+        });
+        const unregisterVideoController = registerActiveVideoSubtitleModeController({
+            isActive: () => controllerActive,
+            getCurrentMode: () => controllerMode,
+            switchMode: switchModeSpy,
+        });
+        config.videoTranslationEnabled = true;
+        config.videoSubtitleModeHotkeyEnabled = true;
+        config.videoSubtitleModeHotkey = 'Alt+M';
+        await runtime.openCommandPalette();
+        const videoCmd = openedPayload.commands.find((c: any) => c.id === 'switch-video-subtitle-mode');
+        expect(videoCmd?.available).toBe(true);
+        expect(videoCmd?.shortcut).toMatch(/M/u);
+        expect(videoCmd?.badge).toBeTruthy();
+
+        requestConfigPatchMock.mockClear();
+        showPageNoticeMock.mockClear();
+        await openedPayload.onExecute('switch-video-subtitle-mode');
+        expect(switchModeSpy).toHaveBeenCalledTimes(1);
+        expect(requestConfigPatchMock).not.toHaveBeenCalled();
+        expect(showPageNoticeMock).not.toHaveBeenCalled();
+        // 关闭状态下再读取 badge，再执行一次切至仅原文
+        await runtime.openCommandPalette();
+        expect(openedPayload.commands.find((c: any) => c.id === 'switch-video-subtitle-mode')?.badge).toBeTruthy();
+        await openedPayload.onExecute('switch-video-subtitle-mode');
+        expect(switchModeSpy).toHaveBeenCalledTimes(2);
+        expect(controllerMode).toBe('original-only');
+        // 切到仅译文并关闭视频总开关时，badge 仍反映控制器模式且 shortcut 为 undefined
+        controllerMode = 'translation-only';
+        config.videoTranslationEnabled = false;
+        await runtime.openCommandPalette();
+        expect(openedPayload.commands.find((c: any) => c.id === 'switch-video-subtitle-mode')?.badge).toBeTruthy();
+        expect(openedPayload.commands.find((c: any) => c.id === 'switch-video-subtitle-mode')?.shortcut).toBeUndefined();
+        // 控制器失活或注销后命令不可用
+        controllerActive = false;
+        await runtime.openCommandPalette();
+        expect(openedPayload.commands.find((c: any) => c.id === 'switch-video-subtitle-mode')?.available).toBe(false);
+        unregisterVideoController();
 
         // 全文翻译 & 恢复
         isFullPageActiveMock.mockReturnValueOnce(false).mockReturnValueOnce(true);
@@ -1303,6 +1375,24 @@ describe('CommandPaletteSettings 真实 Vue 组件行为与快捷键冲突校验
             {serviceOptions: []},
             (s) => s.findHotkeyConflict('Alt+K'),
         )).toBeTruthy();
+
+        // InputTranslationSettings 也能检测已启用的视频字幕模式快捷键占用，并在关闭视频总开关后释放
+        config.videoTranslationEnabled = true;
+        config.videoSubtitleModeHotkeyEnabled = true;
+        config.videoSubtitleModeHotkey = 'Alt+M';
+        expect(await checkComponent(
+            () => import('@/src/features/settings/ui/InputTranslationSettings.vue'),
+            {serviceOptions: []},
+            (s) => s.findHotkeyConflict('Alt+M'),
+        )).toBeTruthy();
+        config.videoTranslationEnabled = false;
+        expect(await checkComponent(
+            () => import('@/src/features/settings/ui/InputTranslationSettings.vue'),
+            {serviceOptions: []},
+            (s) => s.findHotkeyConflict('Alt+M'),
+        )).toBe('');
+        config.videoTranslationEnabled = true;
+        config.videoSubtitleModeHotkeyEnabled = false;
 
         expect(await checkComponent(
             () => import('@/src/features/settings/ui/QuickTranslationProfiles.vue'),

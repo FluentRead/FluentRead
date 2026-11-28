@@ -922,7 +922,7 @@ describe('userscript browser shim injection', () => {
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
         const subtitleModeShortcutKeys = Object.keys(extension).filter(key => key.startsWith('video.modeShortcut.') && key !== 'video.modeShortcut.title');
-        expect(subtitleModeShortcutKeys).toHaveLength(18);
+        expect(subtitleModeShortcutKeys).toHaveLength(30);
         for (const key of subtitleModeShortcutKeys) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);

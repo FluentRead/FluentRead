@@ -71,6 +71,7 @@ describe('hotkey parsing', () => {
         });
         expect(parseHotkey('F4')).toMatchObject({isValid: true, key: 'f4'});
         expect(parseHotkey('/')).toMatchObject({isValid: true, key: '/'});
+        expect(parseHotkey('Ctrl++')).toMatchObject({isValid: true, modifiers: ['ctrl'], key: '+'});
     });
 
     it('以稳定格式保留多个 Ctrl 方案，并统一别名与修饰键顺序', () => {
@@ -166,10 +167,15 @@ describe('hotkey matching', () => {
         expect(normalizeHotkeyEventKey(keyboardEvent({key: '§', code: ''}))).toBe('§');
         expect(normalizeHotkeyEventKey(keyboardEvent({key: 'Unidentified', code: 'KeyY'}))).toBe('y');
         expect(normalizeHotkeyEventKey(keyboardEvent({key: 'Dead', code: 'Digit2'}))).toBe('2');
+        expect(normalizeHotkeyEventKey(keyboardEvent({key: 'Process', code: 'KeyM'}))).toBe('m');
+        expect(normalizeHotkeyEventKey(keyboardEvent({key: 'Process', code: ''}))).toBe('process');
         expect(normalizeHotkeyEventKey(keyboardEvent({key: 'Unidentified', code: 'F9'}))).toBe('f9');
         expect(normalizeHotkeyEventKey(keyboardEvent({key: 'Unidentified', code: 'ArrowDown'}))).toBe('arrowdown');
         expect(normalizeHotkeyEventKey(keyboardEvent({key: 'Unidentified', code: ''}))).toBe('unidentified');
         expect(normalizeHotkeyEventKey(keyboardEvent({key: ' ', code: 'Space'}))).toBe('space');
+        expect(normalizeHotkeyEventKey(keyboardEvent({key: 'Control', code: 'ControlLeft'}))).toBe('ctrl');
+        expect(normalizeHotkeyEventKey(keyboardEvent({key: 'Alt', code: 'AltLeft'}))).toBe('alt');
+        expect(normalizeHotkeyEventKey(keyboardEvent({key: 'Meta', code: 'MetaLeft'}))).toBe('meta');
         expect(matchesConfiguredHotkey(
             keyboardEvent({key: 'y', code: 'KeyT', ctrlKey: true}), 'Ctrl+Y',
         )).toBe(true);
@@ -184,11 +190,35 @@ describe('hotkey matching', () => {
         )).toBe(true);
     });
 
-    it('无效解析结果和修饰键不完全匹配时不命中', () => {
+    it('无效解析结果和修饰键不完全匹配时不命中，且拦截欧洲键盘 AltGr 误触发与放行 IME Process 回退', () => {
         const parsed = parseHotkey('Ctrl+T');
         expect(matchesHotkey(keyboardEvent({ctrlKey: true}), {...parsed, isValid: false})).toBe(false);
+        expect(matchesHotkey(keyboardEvent({ctrlKey: true}), {...parsed, modifiers: ['hyper']})).toBe(false);
+        expect(matchesHotkey(keyboardEvent({ctrlKey: true}), {...parsed, modifiers: ['toString']})).toBe(false);
         expect(matchesHotkey(keyboardEvent({ctrlKey: true, shiftKey: true}), parsed)).toBe(false);
         expect(matchesHotkey(keyboardEvent({altKey: true}), parsed)).toBe(false);
+
+        const ctrlAltM = parseHotkey('Ctrl+Alt+M');
+        expect(matchesHotkey(keyboardEvent({key: 'm', code: 'KeyM', ctrlKey: true, altKey: true}), ctrlAltM)).toBe(true);
+        expect(matchesHotkey(keyboardEvent({
+            key: 'm',
+            code: 'KeyM',
+            ctrlKey: true,
+            altKey: true,
+            getModifierState: () => false,
+        }), ctrlAltM)).toBe(true);
+        expect(matchesHotkey(keyboardEvent({
+            key: 'µ',
+            code: 'KeyM',
+            ctrlKey: true,
+            altKey: true,
+            getModifierState: (state: string) => state === 'AltGraph',
+        }), ctrlAltM)).toBe(false);
+        expect(matchesHotkey(keyboardEvent({
+            key: 'Process',
+            code: 'KeyM',
+            altKey: true,
+        }), parseHotkey('Alt+M'))).toBe(true);
     });
 
     it('匹配特殊键、字母数字、功能键和符号键', () => {

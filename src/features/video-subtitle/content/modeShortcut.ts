@@ -54,12 +54,14 @@ export function videoSubtitleModeLabelKey(mode: VideoSubtitleShortcutMenuMode): 
 export function notifyVideoSubtitleModeSwitch(
     mode: VideoSubtitleShortcutMenuMode,
     translateText: (key: string, params?: Record<string, string | number>) => string,
+    shortcut?: string,
 ): void {
-    showPageNotice(
-        translateText('video.modeShortcut.switched', {mode: translateText(videoSubtitleModeLabelKey(mode))}),
-        'success',
-        {key: VIDEO_SUBTITLE_MODE_NOTICE_KEY, durationMs: 1800},
-    );
+    const modeLabel = translateText(videoSubtitleModeLabelKey(mode));
+    const trimmedShortcut = shortcut?.trim();
+    const message = trimmedShortcut
+        ? translateText('video.modeShortcut.switchedWithKey', {mode: modeLabel, shortcut: trimmedShortcut})
+        : translateText('video.modeShortcut.switched', {mode: modeLabel});
+    showPageNotice(message, 'success', {key: VIDEO_SUBTITLE_MODE_NOTICE_KEY, durationMs: 1600});
 }
 
 /** 卸载或离开视频页面时撤销残留的字幕模式切换提示。 */
@@ -68,15 +70,15 @@ export function clearVideoSubtitleModeNotice(): void {
 }
 
 /**
- * 处理视频页面上的键盘按下事件；命中已启用的模式切换快捷键时阻止默认与冒泡，
- * 按切换方式应用下一模式并返回 true。
+ * 处理视频页面上的键盘按下事件；先按极轻量热路径过滤无关按键，
+ * 命中已启用的模式切换快捷键时阻止默认与同层/冒泡传播，按切换方式应用下一模式并返回 true。
  */
 export function handleVideoSubtitleModeShortcutKeydown(
     event: KeyboardEvent,
     ports: VideoSubtitleModeShortcutPorts,
 ): boolean {
-    if (!event.isTrusted || event.repeat || event.isComposing) return false;
-    if (ports.config.videoSubtitleModeHotkeyEnabled !== true || !ports.isActive()) return false;
+    if (!event.isTrusted || event.repeat || event.isComposing || event.defaultPrevented) return false;
+    if (ports.config.videoSubtitleModeHotkeyEnabled !== true) return false;
     if (!matchesVideoSubtitleModeHotkey(
         event,
         ports.config.videoSubtitleModeHotkey,
@@ -84,10 +86,11 @@ export function handleVideoSubtitleModeShortcutKeydown(
     )) {
         return false;
     }
+    if (!ports.isActive()) return false;
     if (isEditingInPage(event, ports.document)) return false;
 
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
 
     const nextMode = resolveNextVideoSubtitleMenuMode(
         normalizeDisplayMode(ports.config.videoSubtitleDisplayMode),

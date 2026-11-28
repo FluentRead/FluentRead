@@ -51,9 +51,13 @@ function makeFakeFile(name: string, type: string, size: number): File {
     } as unknown as File;
 }
 
-function mountPanel(propsObj: InstanceType<typeof LocalMediaTranscriptionPanel>['$props']) {
-    const {document, window} = parseHTML('<html><body><div id="root"></div></body></html>');
+function mountPanel(propsObj: InstanceType<typeof LocalMediaTranscriptionPanel>['$props'], wrapInClosedDetails = false) {
+    const bodyHtml = wrapInClosedDetails
+        ? '<details id="wrapper-details"><summary>Toggle</summary><div id="root"></div></details>'
+        : '<div id="root"></div>';
+    const {document, window} = parseHTML(`<html><body>${bodyHtml}</body></html>`);
     const selectedValues = new WeakMap<object, string>();
+    let focusedElement: Element | null = null;
     Object.defineProperty(window.HTMLSelectElement.prototype, 'value', {
         configurable: true,
         get() { return selectedValues.get(this) || ''; },
@@ -79,7 +83,11 @@ function mountPanel(propsObj: InstanceType<typeof LocalMediaTranscriptionPanel>[
     const renderer = vue.createRenderer<Node, Element>({
         insert: (node, parent, anchor) => parent.insertBefore(node, anchor || null),
         remove: node => node.parentNode?.removeChild(node),
-        createElement: tag => vue.markRaw(document.createElement(tag)),
+        createElement: tag => {
+            const el = vue.markRaw(document.createElement(tag)) as HTMLElement;
+            el.focus = () => { focusedElement = el; };
+            return el;
+        },
         createText: value => document.createTextNode(value),
         createComment: value => document.createComment(value),
         setText: (node, value) => { node.nodeValue = value; },
@@ -109,7 +117,7 @@ function mountPanel(propsObj: InstanceType<typeof LocalMediaTranscriptionPanel>[
     app.mount(host);
     const unmount = () => { app.unmount(); };
     unmountActive = unmount;
-    return {document, window, host, unmount};
+    return {document, window, host, unmount, getFocusedElement: () => focusedElement};
 }
 
 async function flush(): Promise<void> {
@@ -243,7 +251,7 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
             .mockResolvedValue('这是第二句完整的话。');
         const downloadFile = vi.fn();
 
-        const {document, window, unmount} = mountPanel({
+        const {document, window, unmount, getFocusedElement} = mountPanel({
             config,
             active: true,
             sendMessage,
@@ -294,6 +302,14 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         expect(document.querySelectorAll('[data-sentence-index]').length).toBe(2);
         expect(document.querySelector('[data-local-media-action="translate-pending"]')).not.toBeNull();
 
+        // 已尝试但失败的条目在切换 仅原文 -> 双语 时不自动无限重译，仍保留手动补译按钮
+        const translateCallsAfterFailure = translateText.mock.calls.length;
+        document.querySelector<HTMLButtonElement>('[data-local-media-mode="original-only"]')!.click();
+        await flush();
+        document.querySelector<HTMLButtonElement>('[data-local-media-mode="bilingual"]')!.click();
+        await flush();
+        expect(translateText.mock.calls.length).toBe(translateCallsAfterFailure);
+
         // 点击补译按钮完成第二句翻译
         document.querySelector<HTMLButtonElement>('[data-local-media-action="translate-pending"]')!.click();
         await vi.waitFor(() => expect(document.querySelector('[data-local-media-action="translate-pending"]')).toBeNull());
@@ -306,28 +322,94 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         expect(document.querySelector('[data-local-media-cue-source]')?.textContent).toBe('This is the first complete sentence.');
         expect(document.querySelector('[data-local-media-cue-translation]')?.textContent).toBe('这是第一句完整的话。');
 
-        // 切换显示模式（仅译文 / 仅原文 / 关闭 / 双语）
-        const displaySelect = document.querySelector<HTMLSelectElement>('[data-local-media-display-mode]')!;
-        displaySelect.value = 'translation-only';
-        displaySelect.dispatchEvent(new window.Event('change'));
-        await flush();
+        // 切换显示模式（仅译文 / 仅原文 / 关闭 / 双语）并校验分段按钮与逐句列表响应
+        const selectMode = async (mode: 'bilingual' | 'translation-only' | 'original-only' | 'off') => {
+            const btn = document.querySelector<HTMLButtonElement>(`[data-local-media-mode="${mode}"]`)!;
+            btn.click();
+            await flush();
+            expect(btn.getAttribute('aria-checked')).toBe('true');
+        };
+
+        await selectMode('translation-only');
         expect(document.querySelector('[data-local-media-cue-source]')).toBeNull();
         expect(document.querySelector('[data-local-media-cue-translation]')?.textContent).toBe('这是第一句完整的话。');
 
-        displaySelect.value = 'original-only';
-        displaySelect.dispatchEvent(new window.Event('change'));
-        await flush();
+        await selectMode('original-only');
         expect(document.querySelector('[data-local-media-cue-source]')?.textContent).toBe('This is the first complete sentence.');
         expect(document.querySelector('[data-local-media-cue-translation]')).toBeNull();
+        expect(document.querySelector('.fr-local-media-sentence-translation')).toBeNull();
 
-        displaySelect.value = 'off';
-        displaySelect.dispatchEvent(new window.Event('change'));
-        await flush();
+        await selectMode('off');
         expect(document.querySelector('[data-local-media-overlay]')).toBeNull();
+        expect(document.querySelectorAll('[data-local-media-sentence-hidden]').length).toBe(2);
 
-        displaySelect.value = 'bilingual';
-        displaySelect.dispatchEvent(new window.Event('change'));
+        await selectMode('bilingual');
+        expect(document.querySelector('.fr-local-media-sentence-translation')?.textContent).toBe('这是第一句完整的话。');
+
+        // 遵循 bilingualOrder = translation-first 时译文在原文上方
+        config.videoSubtitleAppearance.bilingualOrder = 'translation-first';
         await flush();
+        expect([...document.querySelector('[data-local-media-overlay]')!.children].map(el => el.getAttribute('data-local-media-cue-translation') !== null ? 'translation' : 'source')).toEqual(['translation', 'source']);
+        config.videoSubtitleAppearance.bilingualOrder = 'original-first';
+        await flush();
+
+        // WAI-ARIA radiogroup roving tabindex 与方向键/Home/End 导航
+        const dispatchModeKey = async (mode: string, key: string) => {
+            const btn = document.querySelector<HTMLButtonElement>(`[data-local-media-mode="${mode}"]`)!;
+            const ev: any = new window.Event('keydown', {bubbles: true, cancelable: true});
+            ev.key = key;
+            ev.preventDefault = vi.fn();
+            btn.dispatchEvent(ev);
+            await flush();
+            return ev;
+        };
+        expect(document.querySelector('[data-local-media-mode="bilingual"]')?.getAttribute('tabindex')).toBe('0');
+        expect(document.querySelector('[data-local-media-mode="translation-only"]')?.getAttribute('tabindex')).toBe('-1');
+        const rightEv = await dispatchModeKey('bilingual', 'ArrowRight');
+        expect(rightEv.preventDefault).toHaveBeenCalledOnce();
+        expect(document.querySelector('[data-local-media-mode="translation-only"]')?.getAttribute('aria-checked')).toBe('true');
+        expect(getFocusedElement()).toBe(document.querySelector('[data-local-media-mode="translation-only"]'));
+        await dispatchModeKey('translation-only', 'ArrowDown');
+        expect(document.querySelector('[data-local-media-mode="original-only"]')?.getAttribute('aria-checked')).toBe('true');
+        await dispatchModeKey('original-only', 'ArrowLeft');
+        expect(document.querySelector('[data-local-media-mode="translation-only"]')?.getAttribute('aria-checked')).toBe('true');
+        await dispatchModeKey('translation-only', 'ArrowUp');
+        expect(document.querySelector('[data-local-media-mode="bilingual"]')?.getAttribute('aria-checked')).toBe('true');
+        await dispatchModeKey('bilingual', 'End');
+        expect(document.querySelector('[data-local-media-mode="off"]')?.getAttribute('aria-checked')).toBe('true');
+        expect(getFocusedElement()).toBe(document.querySelector('[data-local-media-mode="off"]'));
+        await dispatchModeKey('off', 'Home');
+        expect(document.querySelector('[data-local-media-mode="bilingual"]')?.getAttribute('aria-checked')).toBe('true');
+        const noopModeEv = await dispatchModeKey('bilingual', 'Tab');
+        expect(noopModeEv.preventDefault).not.toHaveBeenCalled();
+
+        // 键盘快捷键切换工作台字幕模式（Alt+M），且弹窗打开时自动让行
+        config.videoSubtitleModeHotkeyEnabled = true;
+        config.videoSubtitleModeHotkey = 'Alt+M';
+        config.videoSubtitleModeHotkeyAction = 'bilingual-original';
+        await flush();
+        const makeShortcutEvent = () => {
+            const ev: any = new window.Event('keydown', {bubbles: true, cancelable: true});
+            Object.defineProperty(ev, 'isTrusted', {value: true, configurable: true});
+            Object.assign(ev, {
+                key: 'm', code: 'KeyM', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false,
+                repeat: false, isComposing: false,
+            });
+            ev.composedPath = () => [document.body];
+            return ev;
+        };
+        const modal = document.createElement('div');
+        modal.setAttribute('aria-modal', 'true');
+        document.body.appendChild(modal);
+        window.dispatchEvent(makeShortcutEvent());
+        await flush();
+        expect(document.querySelector('[data-local-media-mode="bilingual"]')?.getAttribute('aria-checked')).toBe('true');
+        modal.remove();
+
+        window.dispatchEvent(makeShortcutEvent());
+        await flush();
+        expect(document.querySelector('[data-local-media-mode="original-only"]')?.getAttribute('aria-checked')).toBe('true');
+        await selectMode('bilingual');
 
         // 逐句跳转（含越界保护）、重播、单句循环与句末暂停
         document.querySelector<HTMLButtonElement>('[data-local-media-action="prev-sentence"]')!.click();
@@ -567,14 +649,16 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         await flush();
 
         // 仅原文模式不触发翻译 -> translatedCount === 0 -> 切换导出模式为 translated 时按钮禁用且点击被守卫
-        const displaySelect = document.querySelector<HTMLSelectElement>('[data-local-media-display-mode]')!;
-        displaySelect.value = 'original-only';
-        displaySelect.dispatchEvent(new window.Event('change'));
+        document.querySelector<HTMLButtonElement>('[data-local-media-mode="original-only"]')!.click();
         await flush();
 
         document.querySelector<HTMLButtonElement>('[data-local-media-action="transcribe"]')!.click();
         await vi.waitFor(() => expect(document.querySelector('[data-local-media-status]')?.textContent).toContain('已生成'));
         await flush();
+
+        // 零译文且零失败时按钮展示「立即翻译」而非「重试」
+        const pendingBtnBefore = document.querySelector<HTMLButtonElement>('[data-local-media-action="translate-pending"]')!;
+        expect(pendingBtnBefore.textContent?.trim()).toBe(translate('video.localMedia.translateNow', 'zh-CN'));
 
         const exportModeSelect = document.querySelector<HTMLSelectElement>('[data-local-media-export-mode]')!;
         exportModeSelect.value = 'translated';
@@ -591,13 +675,37 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         expect(retryPendingBtn.hasAttribute('disabled')).toBe(true);
         retryPendingBtn.click();
         await flush();
+
+        // 禁用态切换到仅译文时不自动触发补译，且无译文时字幕叠层不显示空黑框
+        const audio = document.querySelector<HTMLAudioElement>('audio[data-local-media-player]')!;
+        Object.defineProperty(audio, 'currentTime', {value: 0.5, writable: true, configurable: true});
+        audio.dispatchEvent(new window.Event('timeupdate'));
+        await flush();
+        document.querySelector<HTMLButtonElement>('[data-local-media-mode="translation-only"]')!.click();
+        await flush();
+        expect(document.querySelector('[data-local-media-overlay]')).toBeNull();
+        document.querySelector<HTMLButtonElement>('[data-local-media-mode="original-only"]')!.click();
+        await flush();
         config.videoTranslationEnabled = true;
         await flush();
 
-        // 补译走默认 translateVideoText 端口
-        document.querySelector<HTMLButtonElement>('[data-local-media-action="translate-pending"]')!.click();
+        // 从仅原文切换到双语时自动触发补译（走默认 translateVideoText 端口）
+        document.querySelector<HTMLButtonElement>('[data-local-media-mode="bilingual"]')!.click();
         await vi.waitFor(() => expect(document.querySelector('[data-local-media-action="translate-pending"]')).toBeNull());
         await flush();
+
+        // 从配置初始化显示模式（videoSubtitleVisible = false 时初始化为 off）
+        const offConfig = vue.reactive(new Config());
+        offConfig.videoTranslationEnabled = true;
+        offConfig.videoSubtitleVisible = false;
+        const offMounted = mountPanel({config: offConfig, active: true});
+        await flush();
+        const offInput = offMounted.document.querySelector<HTMLInputElement>('[data-local-media-input]')!;
+        Object.defineProperty(offInput, 'files', {value: [makeFakeFile('off.mp3', 'audio/mpeg', 1024)], configurable: true});
+        offInput.dispatchEvent(new offMounted.window.Event('change', {bubbles: true}));
+        await flush();
+        expect(offMounted.document.querySelector('[data-local-media-mode="off"]')?.getAttribute('aria-checked')).toBe('true');
+        offMounted.unmount();
 
         // KeepAlive 失活与 active=false 均暂停播放并取消在途转写
         const keepAliveActive = vue.ref(true);
@@ -677,5 +785,51 @@ describe('LocalMediaTranscriptionPanel 真实组件生命周期', () => {
         activeProp.value = true;
         await flush();
         kaApp.unmount();
+    });
+
+    it('面板位于折叠的 details 内或节点脱离文档时，快捷键自动失效', async () => {
+        const config = vue.reactive(new Config());
+        config.uiLanguage = 'zh-CN';
+        config.videoTranslationEnabled = true;
+        config.videoSubtitleModeHotkeyEnabled = true;
+        config.videoSubtitleModeHotkey = 'Alt+M';
+        config.videoSubtitleModeHotkeyAction = 'bilingual-original';
+
+        const {document, window, unmount} = mountPanel({config, active: true}, true);
+        await flush();
+
+        const input = document.querySelector<HTMLInputElement>('[data-local-media-input]')!;
+        Object.defineProperty(input, 'files', {value: [makeFakeFile('folded.mp3', 'audio/mpeg', 1024)], configurable: true});
+        input.dispatchEvent(new window.Event('change', {bubbles: true}));
+        await flush();
+
+        const dispatchAltM = async () => {
+            const ev: any = new window.Event('keydown', {bubbles: true, cancelable: true});
+            Object.defineProperty(ev, 'isTrusted', {value: true, configurable: true});
+            Object.assign(ev, {
+                key: 'm', code: 'KeyM', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false,
+                repeat: false, isComposing: false,
+            });
+            ev.composedPath = () => [document.body];
+            window.dispatchEvent(ev);
+            await flush();
+        };
+
+        // 1) details 折叠状态下按快捷键无效
+        await dispatchAltM();
+        expect(document.querySelector('[data-local-media-mode="bilingual"]')?.getAttribute('aria-checked')).toBe('true');
+
+        // 2) 展开 details 后快捷键生效
+        const details = document.getElementById('wrapper-details')!;
+        details.setAttribute('open', '');
+        await dispatchAltM();
+        expect(document.querySelector('[data-local-media-mode="original-only"]')?.getAttribute('aria-checked')).toBe('true');
+
+        // 3) 面板节点脱离文档后快捷键无效
+        document.querySelector('[data-local-media-studio]')!.remove();
+        await dispatchAltM();
+        expect(document.querySelector('[data-local-media-studio]')).toBeNull();
+
+        unmount();
     });
 });

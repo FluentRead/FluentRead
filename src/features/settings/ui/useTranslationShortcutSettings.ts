@@ -8,7 +8,7 @@ import {onScopeDispose, ref, watch, type Ref} from 'vue';
 import {ElMessage} from 'element-plus';
 import type {Config} from '@/src/core/config/model';
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
-import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
+import {resolveReservedVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
 import {resolveWritingHotkey} from '@/src/core/config/writing';
 import {resolveCommandPaletteHotkey} from '@/src/core/config/commandPalette';
 import {findEnabledQuickTranslationHotkeyConflict, quickTranslationActionKey, inputBoxTranslationTriggerHotkey} from '@/src/core/config/quickTranslation';
@@ -58,9 +58,7 @@ export function useTranslationShortcutSettings(config: Ref<Config>, isActive: (k
         if (reservedInput && canonical === canonicalizeHotkey(reservedInput).toLowerCase()) {
             return t('quickTranslation.legacyConflictEdit', {feature: translateLegacy('输入框翻译')});
         }
-        const reservedVideoSubtitle = config.value.videoSubtitleModeHotkeyEnabled
-            ? resolveVideoSubtitleModeHotkey(config.value.videoSubtitleModeHotkey, config.value.customVideoSubtitleModeHotkey)
-            : '';
+        const reservedVideoSubtitle = resolveReservedVideoSubtitleModeHotkey(config.value);
         if (reservedVideoSubtitle && canonical === canonicalizeHotkey(reservedVideoSubtitle).toLowerCase()) {
             return t('quickTranslation.legacyConflictEdit', {feature: t('video.modeShortcut.title')});
         }

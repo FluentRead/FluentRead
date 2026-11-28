@@ -12,6 +12,7 @@ import selfHelpText from './self-help/zh-CN.json';
 import {compositeTranslationChineseMessages} from './compositeTranslation';
 import {aiRequestTimeoutChineseMessages} from './aiRequestTimeout';
 import {dictionaryWorkspaceChineseMessages} from './dictionaryWorkspace';
+import {videoSubtitleShortcutChineseMessages} from './videoSubtitleShortcut';
 import {selectionDictionaryChineseMessages} from './selectionDictionary';
 import {sectionTranslationRulesChineseMessages} from './sectionTranslationRules';
 import {pdfReadingChineseMessages} from './pdfReading';
@@ -597,6 +598,7 @@ export const zhCNMessages = {
     ...privacyProtectionChineseMessages,
     ...selectionDictionaryChineseMessages,
     ...dictionaryWorkspaceChineseMessages,
+    ...videoSubtitleShortcutChineseMessages,
     ...sectionTranslationRulesChineseMessages,
     "settings.requestLimits.retryIntervals": "重试间隔",
     "settings.requestLimits.apiKeyRecovery": "失败 Key 冷却时间",

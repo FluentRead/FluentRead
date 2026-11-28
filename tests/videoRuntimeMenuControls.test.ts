@@ -25,6 +25,7 @@ import {
 import {
     setVideoMenuToolsOpen,
     handleVideoMenuDisclosure,
+    renderVideoMenuModeShortcut,
 } from '@/src/features/video-subtitle/content/playerMenu';
 import {VIDEO_TRANSLATION_MENU_ID} from '@/src/features/video-subtitle/content/ui';
 
@@ -188,9 +189,24 @@ describe('createVideoRuntimeMenuControls 完整分支与边界', () => {
         player.appendChild(button);
         menu.hidden = false;
 
-        // 1. 正常开启状态 + 失败探测回调执行（有文本 & 无文本）
+        // 1. 正常开启状态 + 失败探测回调执行（有文本 & 无文本），以及按钮快捷键状态与菜单徽标
         controls.renderPlayerUiState();
         expect(hasFailure).toHaveBeenCalledWith('Hello caption');
+        expect(button.getAttribute('aria-label')).toContain('双语');
+        expect(button.getAttribute('aria-label')).toContain('Alt+V');
+        const badge = menu.querySelector<HTMLElement>('[data-mode-shortcut-badge]')!;
+        expect(badge.hidden).toBe(false);
+        expect(badge.textContent).toContain('Alt+V');
+        // 相同文案再次渲染命中无变更分支；关闭快捷键后隐藏并清空胶囊
+        controls.renderPlayerUiState();
+        ports.config.videoSubtitleModeHotkeyEnabled = false;
+        controls.renderPlayerUiState();
+        expect(badge.hidden).toBe(true);
+        expect(badge.textContent).toBe('');
+        // 无胶囊的空节点与空白快捷键安全跳过
+        renderVideoMenuModeShortcut(document.createElement('div'), 'Alt+V', 'zh-CN');
+        renderVideoMenuModeShortcut(menu, '   ', 'zh-CN');
+        ports.config.videoSubtitleModeHotkeyEnabled = true;
         activeText = '';
         controls.renderPlayerUiState();
 
@@ -281,9 +297,14 @@ describe('createVideoRuntimeMenuControls 完整分支与边界', () => {
         player.appendChild(button);
         menu.hidden = false;
 
-        // selectMenuMode('off') 在 AI 活跃时停止采集；再从 videoTranslationEnabled=false 切到 bilingual
+        // selectMenuMode('off') 在 AI 未就绪时停止采集；已就绪（ready）切 off 保留 AI 字幕不停止
         controls.selectMenuMode('off');
-        expect(ports.stopFullAiSubtitleGeneration).toHaveBeenCalled();
+        expect(ports.stopFullAiSubtitleGeneration).toHaveBeenCalledTimes(1);
+        ports.config.videoSubtitleVisible = true;
+        aiPhase = 'ready';
+        controls.selectMenuMode('off');
+        expect(ports.stopFullAiSubtitleGeneration).toHaveBeenCalledTimes(1);
+        aiPhase = 'capturing';
         ports.config.videoTranslationEnabled = false;
         controls.selectMenuMode('bilingual');
         expect(ports.ensureNativeCaptions).toHaveBeenCalled();
@@ -401,10 +422,17 @@ describe('createVideoRuntimeMenuControls 完整分支与边界', () => {
         hasVideo = false;
         hasTarget = false;
         controls.handleDocumentKeydown(shortcutEvent());
-        hasTarget = true;
-        controls.handleDocumentKeydown(shortcutEvent());
+        // 脱离文档树的 video 不视为活跃
+        video.remove();
         hasVideo = true;
         controls.handleDocumentKeydown(shortcutEvent());
+        player.appendChild(video);
+        hasTarget = true;
+        controls.handleDocumentKeydown(shortcutEvent());
+        // 关闭快捷键开关时直接跳过快捷键分发
+        ports.config.videoSubtitleModeHotkeyEnabled = false;
+        controls.handleDocumentKeydown(shortcutEvent());
+        ports.config.videoSubtitleModeHotkeyEnabled = true;
 
         // 非 Escape 或隐藏菜单直接返回
         menu.hidden = true;
@@ -445,5 +473,45 @@ describe('createVideoRuntimeMenuControls 完整分支与边界', () => {
         menu.dataset.panel = 'main';
         controls.handleDocumentKeydown(makeKeyEvent(window, {key: 'Escape'}));
         expect(menu.hidden).toBe(true);
+    });
+
+    it('暴露活跃视频模式控制器并覆盖活跃判定、当前模式查询、切换与通知分支', () => {
+        const {document, player} = installDom();
+        const video = document.createElement('video');
+        player.appendChild(video);
+        let hasTarget = true;
+        const ports = createPorts({
+            getObservedVideo: () => video,
+            getPlayerTarget: () => (hasTarget ? {player, video} : null),
+        });
+        ports.config.videoSubtitleModeHotkeyAction = 'bilingual-original';
+        ports.config.videoSubtitleDisplayMode = 'bilingual';
+        ports.config.videoSubtitleVisible = true;
+
+        const controls = createVideoRuntimeMenuControls(ports);
+        const controller = controls.createActiveModeController();
+
+        expect(controller.isActive()).toBe(true);
+        expect(controller.getCurrentMode()).toBe('bilingual');
+        expect(controller.switchMode()).toBe('original-only');
+        expect(ports.config.videoSubtitleDisplayMode).toBe('original-only');
+        expect(controller.getCurrentMode()).toBe('original-only');
+
+        // 快捷键关闭时仍可通过控制器切换模式，且不展示禁用快捷键提示
+        ports.config.videoSubtitleModeHotkeyEnabled = false;
+        expect(controller.switchMode()).toBe('bilingual');
+        expect(ports.config.videoSubtitleDisplayMode).toBe('bilingual');
+
+        // 隐藏字幕时 getCurrentMode 返回 off
+        ports.config.videoSubtitleVisible = false;
+        expect(controller.getCurrentMode()).toBe('off');
+        expect(controller.switchMode()).toBe('bilingual');
+        expect(ports.config.videoSubtitleVisible).toBe(true);
+
+        // 不活跃时 switchMode 返回 null
+        hasTarget = false;
+        video.remove();
+        expect(controller.isActive()).toBe(false);
+        expect(controller.switchMode()).toBeNull();
     });
 });

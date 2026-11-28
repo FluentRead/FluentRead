@@ -11,6 +11,7 @@ import selfHelpText from './self-help/fr-FR.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
 import {dictionaryWorkspaceMessages} from './dictionaryWorkspace';
+import {videoSubtitleShortcutMessages} from './videoSubtitleShortcut';
 import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesFrenchMessages} from './sectionTranslationRulesRomance';
 import {mimoRetirementLegacyText} from './mimoRetirement';
@@ -601,6 +602,7 @@ export const frFRMessages = {
     ...privacyProtectionMessages["fr-FR"],
     ...selectionDictionaryMessages["fr-FR"],
     ...dictionaryWorkspaceMessages["fr-FR"],
+    ...videoSubtitleShortcutMessages["fr-FR"],
     ...sectionTranslationRulesFrenchMessages,
     "settings.requestLimits.retryIntervals": "Délais de nouvelle tentative",
     "settings.requestLimits.apiKeyRecovery": "Refroidissement de la clé en échec",

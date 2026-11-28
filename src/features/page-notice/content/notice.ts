@@ -1,8 +1,8 @@
 /**
  * @file src/features/page-notice/content/notice.ts
  * 文件职责：在任意宿主页面的隔离 Shadow Root 中显示 FluentRead 成功或错误通知，并把缺少 API 凭据的错误转换为可直接前往设置的提醒。
- * 主要内容：包含凭据文案识别、通知标题与详情生成、扩展上下文失效时的本地品牌占位、宿主抗样式污染与设置主题、堆栈复用、有界停留时长、悬停和键盘焦点暂停、局部 Escape 关闭与焦点返回，导出 showPageNotice、按功能 key 撤销的 dismissPageNotice 与一秒节流的 sendErrorMessage。
- * 模块边界：本文件只拥有通知 DOM 和打开设置消息，不记录凭据、不处理翻译重试；外观来自 notice.css，后台 openOptions handler 处理导航，调用方传入的文本一律通过 textContent 展示。
+ * 主要内容：包含凭据文案识别、通知标题与详情生成、扩展上下文失效时的本地品牌占位、宿主抗样式污染与设置主题、全屏顶层 Popover/降级迁移同步、堆栈复用、有界停留时长、悬停和键盘焦点暂停、局部 Escape 关闭（全屏不阻断退出）与焦点返回，导出 showPageNotice、按功能 key 撤销的 dismissPageNotice 与一秒节流的 sendErrorMessage。
+ * 模块边界：本文件只拥有通知 DOM 和打开设置消息，不记录凭据、不处理翻译重试、不跨 feature 导入其他业务模块；外观来自 notice.css，后台 openOptions handler 处理导航，调用方传入的文本一律通过 textContent 展示。
  */
 import {throttle} from '@/src/shared/function/throttle';
 import {config} from '@/src/services/config/store';
@@ -60,6 +60,62 @@ interface NoticeEntry {
 const entries = new Map<HTMLElement, NoticeEntry>();
 let noticeHost: HTMLElement | null = null;
 let noticeStack: HTMLElement | null = null;
+let detachFullscreenListener: (() => void) | null = null;
+
+type PrefixedFullscreenDocument = Document & {webkitFullscreenElement?: Element | null};
+
+const NON_CONTAINER_FULLSCREEN_TAGS = new Set(['VIDEO', 'AUDIO', 'IFRAME', 'OBJECT', 'EMBED', 'CANVAS', 'IMG']);
+
+function getFullscreenTarget(): Element | null {
+    return document.fullscreenElement || (document as PrefixedFullscreenDocument).webkitFullscreenElement || null;
+}
+
+function isPopoverOpen(host: HTMLElement): boolean {
+    try {
+        return Boolean(host.matches?.(':popover-open'));
+    } catch {
+        return false;
+    }
+}
+
+function syncNoticeHostLayer(host: HTMLElement, forcePromote: boolean): void {
+    if (typeof host.showPopover === 'function') {
+        if (host.parentNode !== document.documentElement) document.documentElement.appendChild(host);
+        if (forcePromote || !isPopoverOpen(host)) {
+            try {
+                if (typeof host.hidePopover === 'function') host.hidePopover();
+            } catch {
+                // 节点尚未进入顶层或已脱离顶层时静默忽略。
+            }
+            try {
+                host.showPopover();
+            } catch {
+                // 宿主限制顶层或环境不支持时回退固定定位。
+            }
+        }
+        return;
+    }
+    const fs = getFullscreenTarget();
+    const targetParent = fs && !NON_CONTAINER_FULLSCREEN_TAGS.has(fs.tagName) ? fs : document.documentElement;
+    if (host.parentNode !== targetParent) targetParent.appendChild(host);
+}
+
+function releaseNoticeHost(): void {
+    detachFullscreenListener?.();
+    detachFullscreenListener = null;
+    const host = noticeHost;
+    noticeHost = null;
+    noticeStack = null;
+    if (!host) return;
+    if (typeof host.hidePopover === 'function') {
+        try {
+            host.hidePopover();
+        } catch {
+            // 节点已脱离顶层或被宿主移除时忽略。
+        }
+    }
+    host.remove();
+}
 
 function getMissingCredentialNotice(message: string): MissingCredentialNotice | null {
     const match = message.match(/^(.+?)\s+需要\s+(.+?)，当前尚未(?:完整)?配置(?:[；。]|$)/u);
@@ -132,11 +188,14 @@ function applyHostStyles(host: HTMLElement): void {
         position: 'fixed',
         top: '0',
         left: '0',
+        right: 'auto',
+        bottom: 'auto',
         width: '0',
         height: '0',
         margin: '0',
         padding: '0',
         border: '0',
+        background: 'transparent',
         overflow: 'visible',
         opacity: '1',
         visibility: 'visible',
@@ -154,18 +213,21 @@ function getNoticeStack(): HTMLElement {
         for (const entry of entries.values()) {
             if (entry.node.parentElement !== noticeStack) disposeNotice(entry);
         }
-        if (noticeStack) return noticeStack;
+        if (noticeStack) {
+            syncNoticeHostLayer(noticeHost!, false);
+            return noticeStack;
+        }
     }
 
-    // 宿主移除 host、内部堆栈或更换文档后，先释放旧实例持有的任务和 signal。
+    // 宿主移除 host、内部堆栈或更换文档后，先释放旧实例持有的任务、监听和 signal。
     for (const entry of entries.values()) disposeNotice(entry);
-    noticeHost = null;
-    noticeStack = null;
+    releaseNoticeHost();
     const host = document.createElement('fluent-read-page-notice');
     host.id = PAGE_NOTICE_HOST_ID;
     host.setAttribute('data-fr-page-notice-host', 'true');
     host.setAttribute('data-fluent-read-ui', '');
     host.setAttribute('translate', 'no');
+    if (typeof host.showPopover === 'function') host.setAttribute('popover', 'manual');
     applyHostStyles(host);
 
     const shadow = host.attachShadow({mode: 'open'});
@@ -175,9 +237,17 @@ function getNoticeStack(): HTMLElement {
     stack.className = 'notice-stack';
     shadow.append(style, stack);
 
-    document.documentElement.appendChild(host);
     noticeHost = host;
     noticeStack = stack;
+    syncNoticeHostLayer(host, true);
+    const ownerDoc = document;
+    const onFullscreen = () => syncNoticeHostLayer(host, true);
+    ownerDoc.addEventListener('fullscreenchange', onFullscreen);
+    ownerDoc.addEventListener('webkitfullscreenchange', onFullscreen);
+    detachFullscreenListener = () => {
+        ownerDoc.removeEventListener('fullscreenchange', onFullscreen);
+        ownerDoc.removeEventListener('webkitfullscreenchange', onFullscreen);
+    };
     return stack;
 }
 
@@ -211,9 +281,7 @@ function disposeNotice(entry: NoticeEntry): void {
     restoreNoticeFocus(entry);
     entry.node.remove();
     if (entries.size === 0 && entry.stack === noticeStack) {
-        noticeHost?.remove();
-        noticeHost = null;
-        noticeStack = null;
+        releaseNoticeHost();
     }
 }
 
@@ -271,7 +339,7 @@ function bindNoticeInteractions(entry: NoticeEntry): void {
         }],
         ['keydown', event => {
             if ((event as KeyboardEvent).key !== 'Escape') return;
-            event.preventDefault();
+            if (!getFullscreenTarget()) event.preventDefault();
             event.stopPropagation();
             removeNotice(entry);
         }],
@@ -292,7 +360,7 @@ function bindNoticeSignal(entry: NoticeEntry, signal?: AbortSignal): void {
 
 function paintNotice(entry: NoticeEntry, message: string, type: NoticeType, durationMs?: number): void {
     const language = normalizeUiLanguage(config.uiLanguage);
-    const missingCredential = getMissingCredentialNotice(message);
+    const missingCredential = type === 'success' ? null : getMissingCredentialNotice(message);
     const credential = missingCredential !== null;
     const tone = credential ? 'warning' : type;
     const node = entry.node;

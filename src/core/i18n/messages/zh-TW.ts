@@ -11,6 +11,7 @@ import selfHelpText from './self-help/zh-TW.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
 import {dictionaryWorkspaceMessages} from './dictionaryWorkspace';
+import {videoSubtitleShortcutMessages} from './videoSubtitleShortcut';
 import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesTraditionalChineseMessages} from './sectionTranslationRules';
 import {mimoRetirementLegacyText} from './mimoRetirement';
@@ -611,6 +612,7 @@ export const zhTWMessages = {
     ...privacyProtectionTraditionalChineseMessages,
     ...selectionDictionaryMessages['zh-TW'],
     ...dictionaryWorkspaceMessages['zh-TW'],
+    ...videoSubtitleShortcutMessages['zh-TW'],
     ...sectionTranslationRulesTraditionalChineseMessages,
     "settings.requestLimits.retryIntervals": "重試間隔",
     "settings.requestLimits.apiKeyRecovery": "失敗 Key 冷卻時間",

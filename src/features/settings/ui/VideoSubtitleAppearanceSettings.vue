@@ -31,6 +31,9 @@
           <el-switch v-model="config.videoSubtitleVisible" :aria-label="translateControlLabel('显示 FluentRead 视频字幕').replace('FluentRead', t('common.brand'))" :disabled="!config.videoTranslationEnabled" />
         </SettingsItem>
         <SettingsItem class="subtitle-mode-item" label="字幕显示模式" :disabled="!config.videoTranslationEnabled || !config.videoSubtitleVisible">
+          <template #description>
+            <small data-video-subtitle-mode-shortcut-hint>{{ modeShortcutHint }}</small>
+          </template>
           <SegmentedControl v-model="config.videoSubtitleDisplayMode" :options="displayModeOptions" data-video-subtitle-display-mode label="视频字幕显示模式" :disabled="!config.videoTranslationEnabled || !config.videoSubtitleVisible" />
         </SettingsItem>
         <SettingsItem class="subtitle-order-item" :label="t('video.bilingualOrder')" :description="config.videoSubtitleDisplayMode !== 'bilingual' ? t('video.bilingualOrderHint') : ''" :disabled="!orderAvailable">
@@ -220,6 +223,10 @@ import {
   getVideoSubtitleAppearanceCssVars,
   VIDEO_SUBTITLE_SKINS,
 } from '@/src/core/config/videoSubtitleAppearance';
+import {
+  normalizeVideoSubtitleModeHotkeyAction,
+  videoSubtitleModeHotkeyDisplayName,
+} from '@/src/core/config/videoSubtitleShortcut';
 import SettingsGroup from './components/SettingsGroup.vue';
 import SettingsItem from './components/SettingsItem.vue';
 import SegmentedControl from './components/SegmentedControl.vue';
@@ -236,6 +243,15 @@ const offsetAriaLabel = computed(() => config.value.videoSubtitleAppearance.posi
   ? topOffsetAriaLabels[currentLanguage.value]
   : translateControlLabel('字幕底部偏移'));
 const displayModeOptions = [{value: 'bilingual', label: '双语'}, {value: 'translation-only', label: '仅译文'}, {value: 'original-only', label: '仅原文'}];
+const modeShortcutHint = computed(() => {
+  if (!config.value.videoSubtitleModeHotkeyEnabled) return t('video.modeShortcut.appearanceDisabledHint');
+  const shortcut = videoSubtitleModeHotkeyDisplayName(
+    config.value.videoSubtitleModeHotkey,
+    config.value.customVideoSubtitleModeHotkey,
+  );
+  const action = t(`video.modeShortcut.action.${normalizeVideoSubtitleModeHotkeyAction(config.value.videoSubtitleModeHotkeyAction)}`);
+  return t('video.modeShortcut.appearanceEnabledHint', {shortcut, action});
+});
 const bilingualOrderOptions = computed(() => [{value: 'original-first', label: t('video.originalFirst')}, {value: 'translation-first', label: t('video.translationFirst')}]);
 const customOutlineAvailable = computed(() => config.value.videoSubtitleAppearance.outlineStyle === 'stroke' || config.value.videoSubtitleAppearance.outlineStyle === 'shadow');
 const subtitlesAvailable = computed(() => config.value.videoTranslationEnabled && config.value.videoSubtitleVisible);

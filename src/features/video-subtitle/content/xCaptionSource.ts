@@ -4,6 +4,7 @@
  * 主要内容：清理原生 cue 的时间标记后按播放时间选择正文，排除 FluentRead 自建原生全屏/画中画轨道避免自读循环，并对 Firefox/Safari 下 activeCues 为空但 track.cues 有内容的情况按 currentTime 回退读取；缓存原生 CC 开关按钮与合成容器/字幕段节点引用以消除 60 FPS querySelectorAll；为已排序的 sidecarCues 建立二分索引实现 O(log n) 查句；保持宿主 showing 轨道模式以同步原生 CC 按钮，通过视频级 CSS 隐藏原生绘制，并在禁用或换媒体时恢复轨道模式、样式与缓存。
  * 模块边界：不读取配置存储、不识别或翻译音频，也不发起网络请求；运行时注入当前媒体及字幕状态，负责挂载和卸载时序。
  */
+import {getFullscreenElement, isElementInPictureInPicture} from '@/src/platform/dom/fullscreen';
 import {VIDEO_AI_CAPTION_CONTAINER_ID, VIDEO_CAPTION_SEGMENT_SELECTOR, VIDEO_NATIVE_CUE_HIDDEN_CLASS, VIDEO_PLAYER_SELECTOR, findVideoPlayer, isXVideoPage, isHtmlMediaPage} from './ui';
 import {normalizeVideoCaptionText} from './subtitleLogic';
 import {getVisibleVideoAiCue} from './video-ai/cueTimeline';
@@ -75,13 +76,26 @@ export class XCaptionSource {
 
   constructor(private readonly read: () => {video: HTMLMediaElement | null; player?: HTMLElement; enabled: boolean; aiActive: boolean; aiCues: VideoSubtitleCue[]; sidecarCues: VideoSubtitleCue[]; language: string}) {}
 
+  private isShowingOwnedNativeTrack(video: HTMLMediaElement): boolean {
+    const doc = video.ownerDocument || document;
+    if (!isElementInPictureInPicture(doc, video) && getFullscreenElement(doc) !== video) return false;
+    const ownedNodes = video.querySelectorAll<HTMLTrackElement>('track[data-fluent-read-native-subtitles="true"]');
+    for (const node of ownedNodes) {
+      try {
+        if (node.track?.mode === 'showing') return true;
+      } catch { /* 页面可能已销毁轨道节点。 */ }
+    }
+    return false;
+  }
+
   private setNativeCueHidden(video: HTMLMediaElement | null): void {
-    if (this.hiddenCueVideo === video) {
-      video?.classList?.add(VIDEO_NATIVE_CUE_HIDDEN_CLASS);
+    const target = video && this.isShowingOwnedNativeTrack(video) ? null : video;
+    if (this.hiddenCueVideo === target) {
+      target?.classList?.add(VIDEO_NATIVE_CUE_HIDDEN_CLASS);
       return;
     }
     this.hiddenCueVideo?.classList?.remove(VIDEO_NATIVE_CUE_HIDDEN_CLASS);
-    this.hiddenCueVideo = video;
+    this.hiddenCueVideo = target;
     this.hiddenCueVideo?.classList?.add(VIDEO_NATIVE_CUE_HIDDEN_CLASS);
   }
 

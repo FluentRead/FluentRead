@@ -10,12 +10,18 @@ import type {Config} from '@/src/core/config/model';
 import {parseHotkey, resolveConfiguredHotkey} from '@/src/core/hotkey';
 import {areaTranslationHotkeyDisplayName} from '@/src/core/config/areaTranslation';
 import {sectionTranslationHotkeyDisplayName} from '@/src/core/config/sectionTranslation';
+import {
+    resolveReservedVideoSubtitleModeHotkey,
+    videoSubtitleModeHotkeyDisplayName,
+} from '@/src/core/config/videoSubtitleShortcut';
+import {normalizeUiLanguage, translate} from '@/src/core/i18n';
 import type {BrowserCapabilities} from '@/src/platform/browser/capabilities';
 import {requestConfigPatch} from '@/src/services/config/store';
 import type {ContentFeatureDefinition} from './featureRegistry';
 import type {InformationHighlightContentRuntime} from './informationHighlight';
 import {
     autoTranslateEnglishPage,
+    getActiveVideoSubtitleModeController,
     isCommandPaletteMounted,
     isFullPageTranslationActive,
     mountCommandPalette,
@@ -23,6 +29,7 @@ import {
     startAreaTranslationFromContextMenu,
     startSectionTranslationPicker,
     unmountCommandPalette,
+    videoSubtitleModeLabelKey,
 } from './features';
 
 function formatConfiguredShortcut(hotkey: string | undefined, customHotkey: string | undefined): string | undefined {
@@ -61,6 +68,10 @@ export function createCommandPaletteContentFeature(
             switchDisplayMode: async () => {
                 await requestConfigPatch({display: config.display === 1 ? 0 : 1}, sendConfigMessage);
             },
+            switchVideoSubtitleMode: () => {
+                const controller = getActiveVideoSubtitleModeController();
+                controller?.switchMode();
+            },
             startSectionTranslation: () => startSectionTranslationPicker(),
             startAreaTranslation: () => startAreaTranslationFromContextMenu(),
             openSidepanel: () => sendNavigationMessage({type: 'openTranslationSidepanel'}),
@@ -84,6 +95,13 @@ export function createCommandPaletteContentFeature(
             canOpenSidepanel: () => capabilities.browser !== 'userscript',
             canOpenDocument: () => capabilities.browser !== 'userscript',
             canSmartHighlight: () => Boolean(informationHighlight),
+            canSwitchVideoSubtitleMode: () => Boolean(getActiveVideoSubtitleModeController()),
+            getVideoSubtitleModeLabel: () => {
+                const controller = getActiveVideoSubtitleModeController();
+                return controller
+                    ? translate(videoSubtitleModeLabelKey(controller.getCurrentMode()), normalizeUiLanguage(config.uiLanguage))
+                    : undefined;
+            },
             shortcuts: () => ({
                 fullPage: formatConfiguredShortcut(config.floatingBallHotkey, config.customFloatingBallHotkey),
                 section: config.sectionTranslationHotkeyEnabled
@@ -94,6 +112,9 @@ export function createCommandPaletteContentFeature(
                     : undefined,
                 smartHighlight: config.informationHighlight?.hotkeyEnabled
                     ? formatConfiguredShortcut('custom', config.informationHighlight.hotkey)
+                    : undefined,
+                videoSubtitleMode: resolveReservedVideoSubtitleModeHotkey(config)
+                    ? videoSubtitleModeHotkeyDisplayName(config.videoSubtitleModeHotkey, config.customVideoSubtitleModeHotkey)
                     : undefined,
             }),
         }),

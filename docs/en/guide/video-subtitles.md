@@ -14,7 +14,13 @@ Watch videos (YouTube, X, Bilibili standard/multi-P/Bangumi, Netflix, Amazon Pri
 
 ### Shortcuts & listening practice
 
-- **Mode shortcut:** Enable **Caption display shortcut** under **Video translation → General** (default `Alt+M` / `Option+M`, customizable) to toggle **Bilingual ↔ Original** or cycle modes—automatically yields inside comment/search inputs.
+- **Mode shortcut:** Enable under **Video Translation Settings → Translation & display → Subtitle Display Mode Shortcut** (default `Alt+M` / `Option+M`; supports custom modifier combinations or `F1–F12`, prevents bare player keys, and yields inside comment/search inputs). Five switch behaviors are available:
+  - **Bilingual ↔ Original:** One-key toggle between bilingual and original-only captions.
+  - **Listening practice (Off → Original → Bilingual):** A three-step loop tailored for blind listening, caption check, and bilingual review.
+  - **Show ↔ Hide:** Instantly toggle caption visibility while preserving your previous display mode.
+  - **Cycle (Bilingual → Translated → Original)** / **Cycle all (including Off):** Rotate through display modes in sequence.
+- **Fullscreen toast feedback:** Switching modes while watching fullscreen renders the status notice inside the active fullscreen element so it remains clearly visible.
+- **Command Palette action:** On pages with a video, open the Command Palette (default `Alt+K` / `Option+K`) and search for “video subtitle” or “bilingual” to see the current mode badge and switch immediately.
 - **Listening drill without duplicate API calls:** Cycling **Off → Original → Bilingual → Off** keeps completed translations cached; native captions stay cleanly hidden while FluentRead is active.
 
 ### Supported video & course platforms
@@ -37,8 +43,8 @@ Under **Video translation → Local AI captions**, the **Local audio & video tra
 
 1. Files are validated and decoded locally via the Web Audio API into 16 kHz mono PCM—audio never leaves your device.
 2. Offline recognition reuses FluentRead's configured **Whisper in the browser** model or **Local Qwen3 ASR** protocol with full cancellation support.
-3. Recognized cues are translated via your configured translation provider (skipping cues already in the target language, with retry for failed items) and played back with synchronized **Bilingual / Translated only / Original only / Off** captions.
-4. Built-in **Sentence learning & loop** lets you jump by sentence, step previous/next, replay, **loop a single sentence**, or **pause at sentence end**.
+3. Recognized cues are translated according to the active display mode (skipping cues already in the target language, holding translation while in **Original only** or **Off**, and automatically translating pending cues when you switch to **Bilingual** or **Translated only**). Switch between **Bilingual / Translated only / Original only / Off** using the segmented bar or your configured **video subtitle mode shortcut**, respecting your bilingual line order preference.
+4. Built-in **Sentence learning & loop** lets you jump by sentence, step previous/next, replay, **loop a single sentence**, or **pause at sentence end**. **Original only** hides translation lines, and **Off** masks transcript text so you can practice blind listening without spoilers while still clicking any row to seek.
 5. Export **SRT, WebVTT, or Markdown** in bilingual, original, or translated mode. Clearing or switching files aborts active work and revokes temporary object URLs.
 
 ## Live web meeting captions {#meeting-and-human-captions}

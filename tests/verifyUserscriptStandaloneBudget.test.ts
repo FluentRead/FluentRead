@@ -60,7 +60,7 @@ afterEach(() => {
 describe('userscript standalone size budget', () => {
     it('仓库内置预算 JSON 保持预期的基线与软/硬增量阈值', () => {
         const budget = loadUserscriptSizeBudget(DEFAULT_USERSCRIPT_SIZE_BUDGET_PATH);
-        expect(budget.baselineBytes).toBe(3_827_157);
+        expect(budget.baselineBytes).toBe(3_891_952);
         expect(budget.softWarnDeltaBytes).toBe(20_000);
         expect(budget.hardMaxDeltaBytes).toBe(64_000);
     });

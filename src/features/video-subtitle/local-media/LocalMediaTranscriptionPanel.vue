@@ -5,7 +5,7 @@
  * 模块边界：不修改全局配置或网页播放器，所有临时对象 URL、取消信号与后台推理流在更换文件、重置或卸载时立即释放。
  -->
 <template>
-  <section class="fr-local-media-studio" data-local-media-studio aria-labelledby="fr-local-media-title">
+  <section ref="panelRoot" class="fr-local-media-studio" data-local-media-studio aria-labelledby="fr-local-media-title">
     <header class="fr-local-media-header">
       <div>
         <h3 id="fr-local-media-title">{{ t('video.localMedia.title') }}</h3>
@@ -86,18 +86,36 @@
           :disabled="!canOperate"
           @click="retryPendingTranslations"
         >
-          {{ t('video.localMedia.retryTranslations') }}
+          {{ translatePendingLabel }}
         </button>
 
-        <label class="fr-local-media-inline-field">
+        <div class="fr-local-media-inline-field">
           <span>{{ t('video.localMedia.displayMode') }}</span>
-          <select :value="displayMode" data-local-media-display-mode :aria-label="t('video.localMedia.displayMode')" @change="onDisplayModeChange">
-            <option value="bilingual">{{ t('video.localMedia.modeBilingual') }}</option>
-            <option value="translation-only">{{ t('video.localMedia.modeTranslated') }}</option>
-            <option value="original-only">{{ t('video.localMedia.modeOriginal') }}</option>
-            <option value="off">{{ t('video.localMedia.modeOff') }}</option>
-          </select>
-        </label>
+          <div
+            ref="displayModeGroup"
+            class="fr-local-media-segmented"
+            role="radiogroup"
+            data-local-media-display-mode
+            data-testid="local-media-display-mode"
+            :aria-label="t('video.localMedia.displayMode')"
+          >
+            <button
+              v-for="(option, index) in displayModeOptions"
+              :key="option.value"
+              type="button"
+              role="radio"
+              class="fr-local-media-segment-btn"
+              :class="{'is-active': displayMode === option.value}"
+              :data-local-media-mode="option.value"
+              :aria-checked="displayMode === option.value"
+              :tabindex="displayMode === option.value ? 0 : -1"
+              @click="setDisplayMode(option.value)"
+              @keydown="onDisplayModeKeydown($event, index)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-if="busy || snapshot.phase === 'ready'" class="fr-local-media-status-bar" role="status" data-local-media-status>
@@ -130,17 +148,19 @@
           @play="onMediaPlay"
         />
         <div
-          v-if="displayMode !== 'off' && activeCue"
+          v-if="displayMode !== 'off' && activeCue && (displayMode !== 'translation-only' || Boolean(activeCueTranslation))"
           class="fr-local-media-overlay"
           data-local-media-overlay
           aria-live="polite"
         >
-          <p v-if="displayMode !== 'translation-only'" class="fr-local-media-overlay-source" data-local-media-cue-source>
-            {{ activeCue.text }}
-          </p>
-          <p v-if="displayMode !== 'original-only' && activeCueTranslation" class="fr-local-media-overlay-translation" data-local-media-cue-translation>
-            {{ activeCueTranslation }}
-          </p>
+          <template v-for="line in overlayOrder" :key="line">
+            <p v-if="line === 'original' && displayMode !== 'translation-only'" class="fr-local-media-overlay-source" data-local-media-cue-source>
+              {{ activeCue.text }}
+            </p>
+            <p v-if="line === 'translation' && displayMode !== 'original-only' && activeCueTranslation" class="fr-local-media-overlay-translation" data-local-media-cue-translation>
+              {{ activeCueTranslation }}
+            </p>
+          </template>
         </div>
       </div>
 
@@ -181,9 +201,12 @@
               @click="selectSentence(idx)"
             >
               <time class="fr-local-media-time">{{ formatMediaTimestamp(item.sentence.startMs) }}</time>
-              <span class="fr-local-media-sentence-texts">
+              <span v-if="displayMode === 'off'" class="fr-local-media-sentence-hidden" data-local-media-sentence-hidden>
+                {{ t('video.localMedia.hiddenListeningHint') }}
+              </span>
+              <span v-else class="fr-local-media-sentence-texts">
                 <span class="fr-local-media-sentence-source">{{ item.sentence.text }}</span>
-                <span v-if="item.translation" class="fr-local-media-sentence-translation">{{ item.translation }}</span>
+                <span v-if="displayMode !== 'original-only' && item.translation" class="fr-local-media-sentence-translation">{{ item.translation }}</span>
               </span>
             </button>
           </li>
@@ -224,15 +247,18 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onBeforeUnmount, onDeactivated, ref, watch} from 'vue';
+import {computed, onActivated, onBeforeUnmount, onDeactivated, ref, watch} from 'vue';
 import type {Config, VideoSubtitleDisplayMode} from '@/src/core/config/model';
+import type {VideoSubtitleShortcutMenuMode} from '@/src/core/config/videoSubtitleShortcut';
 import {useUiI18n} from '@/src/ui/i18n';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {sendRuntimeMessage} from '@/src/platform/browser/runtimeMessages';
 import {translateVideoText} from '@/src/services/translation/client';
 import {downloadTextFile} from '@/src/shared/dom/downloadTextFile';
+import {handleVideoSubtitleModeShortcutKeydown} from '../content/modeShortcut';
 import {buildVideoSentenceTimeline, createVideoSentenceTimeIndex} from '../content/sentenceTimeline';
 import type {SubtitleExportFormat} from '../content/subtitleExport';
+import {normalizeVideoSubtitleDisplayMode} from '../content/ui';
 import {
     LOCAL_MEDIA_ACCEPT_ATTRIBUTE,
     formatMediaBytes,
@@ -263,6 +289,8 @@ const {t} = useUiI18n();
 const extensionDomSupported = computed(() => browserCapabilities.extensionDom);
 const canOperate = computed(() => props.active && props.config.videoTranslationEnabled && extensionDomSupported.value);
 
+const panelRoot = ref<HTMLElement | null>(null);
+const displayModeGroup = ref<HTMLElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const mediaElement = ref<HTMLMediaElement | null>(null);
 const dragging = ref(false);
@@ -275,9 +303,28 @@ const currentTimeMs = ref(0);
 const activeSentenceIndex = ref(0);
 const playbackAssist = ref<'off' | 'loop' | 'pause'>('off');
 const pausedAtEnd = ref(false);
-const displayMode = ref<VideoSubtitleDisplayMode | 'off'>('bilingual');
+const lastVisibleDisplayMode = ref<VideoSubtitleDisplayMode>(
+    normalizeVideoSubtitleDisplayMode(props.config.videoSubtitleDisplayMode),
+);
+const displayMode = ref<VideoSubtitleShortcutMenuMode>(
+    props.config.videoSubtitleVisible === false ? 'off' : lastVisibleDisplayMode.value,
+);
+const keepAliveActive = ref(true);
 const exportMode = ref<LocalMediaExportMode>('bilingual');
 const exportFormat = ref<SubtitleExportFormat>('srt');
+
+const displayModeOptions = computed<readonly {value: VideoSubtitleShortcutMenuMode; label: string}[]>(() => [
+    {value: 'bilingual', label: t('video.localMedia.modeBilingual')},
+    {value: 'translation-only', label: t('video.localMedia.modeTranslated')},
+    {value: 'original-only', label: t('video.localMedia.modeOriginal')},
+    {value: 'off', label: t('video.localMedia.modeOff')},
+]);
+
+const overlayOrder = computed(() => (
+    props.config.videoSubtitleAppearance?.bilingualOrder === 'translation-first'
+        ? ['translation', 'original'] as const
+        : ['original', 'translation'] as const
+));
 
 const snapshot = ref<LocalMediaSessionSnapshot>({
     phase: 'idle',
@@ -308,6 +355,17 @@ const session = new LocalMediaTranscriptionSession({
 
 const busy = computed(() => ['checking', 'decoding', 'transcribing', 'translating'].includes(snapshot.value.phase));
 const errorMessage = computed(() => validationError.value || snapshot.value.error);
+const translatePendingLabel = computed(() => (
+    snapshot.value.translatedCount === 0 && snapshot.value.failedTranslationCount === 0
+        ? t('video.localMedia.translateNow')
+        : t('video.localMedia.retryTranslations')
+));
+const shortcutListening = computed(() => (
+    keepAliveActive.value
+    && canOperate.value
+    && Boolean(selectedFile.value)
+    && props.config.videoSubtitleModeHotkeyEnabled === true
+));
 
 const statusText = computed(() => {
     const state = snapshot.value;
@@ -417,8 +475,70 @@ function clearFile(): void {
     pausedAtEnd.value = false;
 }
 
-function onDisplayModeChange(event: Event): void {
-    displayMode.value = (event.target as HTMLSelectElement).value as VideoSubtitleDisplayMode | 'off';
+function setDisplayMode(nextMode: VideoSubtitleShortcutMenuMode): void {
+    const previousMode = displayMode.value;
+    displayMode.value = nextMode;
+    if (nextMode !== 'off') lastVisibleDisplayMode.value = nextMode;
+    if (
+        (previousMode === 'original-only' || previousMode === 'off')
+        && (nextMode === 'bilingual' || nextMode === 'translation-only')
+        && canOperate.value
+        && !busy.value
+        && snapshot.value.cues.length > 0
+        && snapshot.value.translatedCount + snapshot.value.failedTranslationCount < snapshot.value.totalCues
+    ) {
+        void session.translatePending();
+    }
+}
+
+function onDisplayModeKeydown(event: KeyboardEvent, index: number): void {
+    const options = displayModeOptions.value;
+    let nextIndex: number;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+        nextIndex = (index + 1) % options.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        nextIndex = (index - 1 + options.length) % options.length;
+    } else if (event.key === 'Home') {
+        nextIndex = 0;
+    } else if (event.key === 'End') {
+        nextIndex = options.length - 1;
+    } else {
+        return;
+    }
+    event.preventDefault();
+    const nextOption = options[nextIndex];
+    setDisplayMode(nextOption.value);
+    displayModeGroup.value!.querySelector<HTMLButtonElement>(`[data-local-media-mode="${nextOption.value}"]`)!.focus();
+}
+
+function isShortcutContextActive(): boolean {
+    const root = panelRoot.value!;
+    if (!root.isConnected || root.closest('details:not([open])')) return false;
+    return !document.querySelector('[aria-modal="true"]');
+}
+
+function onShortcutKeydown(event: KeyboardEvent): void {
+    handleVideoSubtitleModeShortcutKeydown(event, {
+        document,
+        config: {
+            videoSubtitleModeHotkeyEnabled: props.config.videoSubtitleModeHotkeyEnabled,
+            videoSubtitleModeHotkey: props.config.videoSubtitleModeHotkey,
+            customVideoSubtitleModeHotkey: props.config.customVideoSubtitleModeHotkey,
+            videoSubtitleModeHotkeyAction: props.config.videoSubtitleModeHotkeyAction,
+            videoSubtitleDisplayMode: lastVisibleDisplayMode.value,
+        },
+        isActive: () => isShortcutContextActive(),
+        isVisible: () => displayMode.value !== 'off',
+        applyMode: mode => setDisplayMode(mode),
+    });
+}
+
+let shortcutListenerAttached = false;
+function syncShortcutListener(listening: boolean): void {
+    if (listening === shortcutListenerAttached) return;
+    shortcutListenerAttached = listening;
+    if (listening) window.addEventListener('keydown', onShortcutKeydown, true);
+    else window.removeEventListener('keydown', onShortcutKeydown, true);
 }
 
 function onExportModeChange(event: Event): void {
@@ -440,7 +560,7 @@ function startTranscription(): void {
     activeSentenceIndex.value = 0;
     playbackAssist.value = 'off';
     pausedAtEnd.value = false;
-    void session.transcribe(selectedFile.value!, displayMode.value !== 'original-only');
+    void session.transcribe(selectedFile.value!, () => displayMode.value !== 'original-only' && displayMode.value !== 'off');
 }
 
 function cancelWork(): void {
@@ -539,11 +659,21 @@ watch(canOperate, allowed => {
     if (!allowed) suspendActiveWork();
 });
 
+watch(shortcutListening, listening => {
+    syncShortcutListener(listening);
+}, {immediate: true, flush: 'sync'});
+
+onActivated(() => {
+    keepAliveActive.value = true;
+});
+
 onDeactivated(() => {
+    keepAliveActive.value = false;
     suspendActiveWork();
 });
 
 onBeforeUnmount(() => {
+    syncShortcutListener(false);
     session.destroy();
     revokeCurrentUrl();
 });
@@ -639,6 +769,29 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   font-size: 12px;
+}
+.fr-local-media-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--fr-border, rgba(128, 128, 128, 0.35));
+  background: var(--fr-surface-subtle, rgba(127, 127, 127, 0.06));
+}
+.fr-local-media-segment-btn {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.fr-local-media-segment-btn.is-active {
+  background: var(--fr-accent, #2563eb);
+  color: #fff;
+  font-weight: 600;
 }
 .fr-local-media-btn {
   padding: 6px 12px;
@@ -751,6 +904,11 @@ onBeforeUnmount(() => {
 .fr-local-media-sentence-translation {
   opacity: 0.8;
   font-size: 12px;
+}
+.fr-local-media-sentence-hidden {
+  font-size: 12px;
+  opacity: 0.65;
+  font-style: italic;
 }
 .fr-local-media-warning,
 .fr-local-media-error {

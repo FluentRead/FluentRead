@@ -4,14 +4,20 @@ import {
     DEFAULT_VIDEO_SUBTITLE_MODE_HOTKEY_ACTION,
     VIDEO_SUBTITLE_MODE_HOTKEY_ACTIONS,
     VIDEO_SUBTITLE_MODE_HOTKEY_OPTIONS,
+    isSupportedCustomVideoSubtitleModeHotkey,
     matchesVideoSubtitleModeHotkey,
     normalizeCustomVideoSubtitleModeHotkey,
     normalizeVideoSubtitleModeHotkey,
     normalizeVideoSubtitleModeHotkeyAction,
     resolveNextVideoSubtitleMenuMode,
+    resolveReservedVideoSubtitleModeHotkey,
     resolveVideoSubtitleModeHotkey,
     videoSubtitleModeHotkeyDisplayName,
 } from '@/src/core/config/videoSubtitleShortcut';
+import {
+    videoSubtitleShortcutChineseMessages,
+    videoSubtitleShortcutMessages,
+} from '@/src/core/i18n/messages/videoSubtitleShortcut';
 import {DEFAULT_AREA_TRANSLATION_HOTKEY} from '@/src/core/config/areaTranslation';
 import {DEFAULT_CLICK_SELECTION_HOTKEY, findClickSelectionHotkeyConflict} from '@/src/core/config/clickSelection';
 import {DEFAULT_PARAGRAPH_COPY_HOTKEY} from '@/src/core/config/paragraphCopy';
@@ -64,11 +70,40 @@ describe('视频字幕显示模式切换快捷键配置', () => {
         }
     });
 
-    it('自定义组合键保存为规范写法，无法解析时留空', () => {
+    it('自定义组合键仅允许带修饰键或功能键，单键与非法值拦截并留空', () => {
+        expect(isSupportedCustomVideoSubtitleModeHotkey('alt+k')).toBe(true);
+        expect(isSupportedCustomVideoSubtitleModeHotkey('F8')).toBe(true);
+        expect(isSupportedCustomVideoSubtitleModeHotkey('ctrl+shift+f12')).toBe(true);
+        for (const unsupported of [undefined, null, 7, '', 'm', '0', '/', 'Space', 'Enter', 'Cmd+M', 'Ctrl+Launch']) {
+            expect(isSupportedCustomVideoSubtitleModeHotkey(unsupported)).toBe(false);
+            expect(normalizeCustomVideoSubtitleModeHotkey(unsupported)).toBe('');
+        }
         expect(normalizeCustomVideoSubtitleModeHotkey('alt+k')).toBe('Alt+K');
-        expect(normalizeCustomVideoSubtitleModeHotkey('')).toBe('');
-        expect(normalizeCustomVideoSubtitleModeHotkey(undefined)).toBe('');
-        expect(normalizeCustomVideoSubtitleModeHotkey(7)).toBe('');
+        expect(normalizeCustomVideoSubtitleModeHotkey('f8')).toBe('F8');
+    });
+
+    it('仅在视频翻译未关闭且模式快捷键开启时保留组合键', () => {
+        expect(resolveReservedVideoSubtitleModeHotkey({
+            videoTranslationEnabled: true,
+            videoSubtitleModeHotkeyEnabled: true,
+            videoSubtitleModeHotkey: 'Alt+M',
+        })).toBe('Alt+M');
+        expect(resolveReservedVideoSubtitleModeHotkey({
+            videoSubtitleModeHotkeyEnabled: true,
+            videoSubtitleModeHotkey: 'custom',
+            customVideoSubtitleModeHotkey: 'Alt+K',
+        })).toBe('Alt+K');
+        expect(resolveReservedVideoSubtitleModeHotkey({
+            videoTranslationEnabled: false,
+            videoSubtitleModeHotkeyEnabled: true,
+            videoSubtitleModeHotkey: 'Alt+M',
+        })).toBe('');
+        expect(resolveReservedVideoSubtitleModeHotkey({
+            videoTranslationEnabled: true,
+            videoSubtitleModeHotkeyEnabled: false,
+            videoSubtitleModeHotkey: 'Alt+M',
+        })).toBe('');
+        expect(resolveReservedVideoSubtitleModeHotkey({})).toBe('');
     });
 
     it('选择自定义却没有录制成功时回到默认值，展示名称跟随平台写法', () => {
@@ -79,12 +114,18 @@ describe('视频字幕显示模式切换快捷键配置', () => {
         expect(videoSubtitleModeHotkeyDisplayName('Alt+M', '')).toMatch(/^(?:Alt|Option)\+M$/u);
     });
 
-    it('按键匹配要求修饰键完全一致，Mac 上 Option 改写的字符按物理键匹配', () => {
+    it('按键匹配要求修饰键完全一致，命中单槽编译缓存、支持 IME Process 回退并在配置变化时失效缓存', () => {
         expect(matchesVideoSubtitleModeHotkey(keyboardEvent({altKey: true}), 'Alt+M', '')).toBe(true);
+        // 连续相同参数命中单槽编译缓存
         expect(matchesVideoSubtitleModeHotkey(keyboardEvent({altKey: true, key: 'µ'}), 'Alt+M', '')).toBe(true);
+        expect(matchesVideoSubtitleModeHotkey(keyboardEvent({altKey: true, key: 'Process', code: 'KeyM'}), 'Alt+M', '')).toBe(true);
         expect(matchesVideoSubtitleModeHotkey(keyboardEvent({altKey: true, shiftKey: true}), 'Alt+M', '')).toBe(false);
         expect(matchesVideoSubtitleModeHotkey(keyboardEvent({ctrlKey: true}), 'Alt+M', '')).toBe(false);
+        // rawHotkey 变化失效缓存
         expect(matchesVideoSubtitleModeHotkey(keyboardEvent({altKey: true, key: 'k', code: 'KeyK'}), 'custom', 'Alt+K')).toBe(true);
+        // rawCustomHotkey 变化失效缓存
+        expect(matchesVideoSubtitleModeHotkey(keyboardEvent({altKey: true, key: 'j', code: 'KeyJ'}), 'custom', 'Alt+J')).toBe(true);
+        expect(matchesVideoSubtitleModeHotkey(keyboardEvent({altKey: true, key: 'k', code: 'KeyK'}), 'custom', 'Alt+J')).toBe(false);
     });
 
     it('切换方式只接受既定取值，异常输入回落到双语与原文往返', () => {
@@ -102,6 +143,21 @@ describe('视频字幕显示模式切换快捷键配置', () => {
         expect(resolveNextVideoSubtitleMenuMode('bilingual', true, 'bilingual-original')).toBe('original-only');
         expect(resolveNextVideoSubtitleMenuMode('translation-only', true, 'bilingual-original')).toBe('bilingual');
         expect(resolveNextVideoSubtitleMenuMode('bilingual', false, 'bilingual-original')).toBe('bilingual');
+
+        // 听力练习（关 → 原文 → 双语 → 关）；仅译文时切回仅原文
+        expect(resolveNextVideoSubtitleMenuMode('bilingual', false, 'listening-cycle')).toBe('original-only');
+        expect(resolveNextVideoSubtitleMenuMode('original-only', false, 'listening-cycle')).toBe('original-only');
+        expect(resolveNextVideoSubtitleMenuMode('original-only', true, 'listening-cycle')).toBe('bilingual');
+        expect(resolveNextVideoSubtitleMenuMode('bilingual', true, 'listening-cycle')).toBe('off');
+        expect(resolveNextVideoSubtitleMenuMode('translation-only', true, 'listening-cycle')).toBe('original-only');
+
+        // 显示 ↔ 关闭（保留当前模式）
+        expect(resolveNextVideoSubtitleMenuMode('bilingual', true, 'toggle-visibility')).toBe('off');
+        expect(resolveNextVideoSubtitleMenuMode('original-only', true, 'toggle-visibility')).toBe('off');
+        expect(resolveNextVideoSubtitleMenuMode('translation-only', true, 'toggle-visibility')).toBe('off');
+        expect(resolveNextVideoSubtitleMenuMode('bilingual', false, 'toggle-visibility')).toBe('bilingual');
+        expect(resolveNextVideoSubtitleMenuMode('original-only', false, 'toggle-visibility')).toBe('original-only');
+        expect(resolveNextVideoSubtitleMenuMode('translation-only', false, 'toggle-visibility')).toBe('translation-only');
 
         // 循环切换（不含关闭）：关闭时先恢复当前显示模式；可见时按 双语 → 译文 → 原文 循环
         expect(resolveNextVideoSubtitleMenuMode('original-only', false, 'cycle-display')).toBe('original-only');
@@ -159,6 +215,31 @@ describe('视频字幕显示模式切换快捷键配置', () => {
             videoSubtitleModeHotkey: 'Alt+M',
             customVideoSubtitleModeHotkey: '',
         }, 'Alt+M')).toBe('');
+        expect(findClickSelectionHotkeyConflict({
+            videoTranslationEnabled: false,
+            videoSubtitleModeHotkeyEnabled: true,
+            videoSubtitleModeHotkey: 'Alt+M',
+            customVideoSubtitleModeHotkey: '',
+        }, 'Alt+M')).toBe('');
+
+        const videoDisabledNormalized = normalizeConfig({
+            videoTranslationEnabled: false,
+            videoSubtitleModeHotkeyEnabled: true,
+            videoSubtitleModeHotkey: 'Alt+M',
+            quickTranslationProfiles: [{
+                id: 'p1',
+                name: 'Quick',
+                action: 'full-page',
+                enabled: true,
+                hotkey: 'Alt+M',
+                service: 'google',
+                targetLanguage: 'zh-Hans',
+                displayMode: 'default',
+                fullPageMode: 'default',
+                glossaryIds: [],
+            }],
+        });
+        expect(videoDisabledNormalized.quickTranslationProfiles[0]?.enabled).toBe(true);
 
         const before = new Config();
         const after = normalizeConfig({
@@ -173,5 +254,25 @@ describe('视频字幕显示模式切换快捷键配置', () => {
         expect(diffs.find((item) => item.key === 'videoSubtitleModeHotkey')?.after).toBe('自定义快捷键');
         expect(diffs.find((item) => item.key === 'customVideoSubtitleModeHotkey')?.after).toBe('Alt+K');
         expect(diffs.find((item) => item.key === 'videoSubtitleModeHotkeyAction')?.after).toBe('双语 → 译文 → 原文');
+
+        const listeningDiffs = buildConfigDiff(before, normalizeConfig({...before, videoSubtitleModeHotkeyAction: 'listening-cycle'})).groups.flatMap((group) => group.changes);
+        expect(listeningDiffs.find((item) => item.key === 'videoSubtitleModeHotkeyAction')?.after).toBe('听力练习（关 → 原文 → 双语）');
+        const toggleDiffs = buildConfigDiff(before, normalizeConfig({...before, videoSubtitleModeHotkeyAction: 'toggle-visibility'})).groups.flatMap((group) => group.changes);
+        expect(toggleDiffs.find((item) => item.key === 'videoSubtitleModeHotkeyAction')?.after).toBe('显示 ↔ 关闭');
+    });
+
+    it('模块化视频字幕快捷键八语文案键集与占位符完全一致且非空', () => {
+        const expectedKeys = Object.keys(videoSubtitleShortcutChineseMessages).sort();
+        expect(expectedKeys).toHaveLength(16);
+        const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/gu)].map((match) => match[1]).sort();
+        for (const [language, catalog] of Object.entries(videoSubtitleShortcutMessages)) {
+            expect(Object.keys(catalog).sort(), language).toEqual(expectedKeys);
+            for (const key of expectedKeys) {
+                expect(catalog[key].trim(), `${language}:${key}`).not.toBe('');
+                expect(placeholders(catalog[key]), `${language}:${key}`).toEqual(
+                    placeholders(videoSubtitleShortcutChineseMessages[key as keyof typeof videoSubtitleShortcutChineseMessages]),
+                );
+            }
+        }
     });
 });

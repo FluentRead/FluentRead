@@ -87,7 +87,7 @@ import {resolveCommandPaletteHotkey} from '@/src/core/config/commandPalette';
 import {resolveSectionTranslationHotkey} from '@/src/core/config/sectionTranslation';
 import {resolveReservedClickSelectionHotkey} from '@/src/core/config/clickSelection';
 import {resolveParagraphCopyHotkey} from '@/src/core/config/paragraphCopy';
-import {resolveVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
+import {resolveReservedVideoSubtitleModeHotkey} from '@/src/core/config/videoSubtitleShortcut';
 import {resolveWritingHotkey} from '@/src/core/config/writing';
 import {
     findEnabledQuickTranslationHotkeyConflict,
@@ -149,9 +149,7 @@ function reservedHotkeyOwners(): {hotkey: string; feature: string}[] {
             feature: t('paragraphCopy.settings.title'),
         },
         {
-            hotkey: props.config.videoSubtitleModeHotkeyEnabled
-                ? resolveVideoSubtitleModeHotkey(props.config.videoSubtitleModeHotkey, props.config.customVideoSubtitleModeHotkey)
-                : '',
+            hotkey: resolveReservedVideoSubtitleModeHotkey(props.config),
             feature: t('video.modeShortcut.title'),
         },
         {

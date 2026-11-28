@@ -10,6 +10,7 @@ export type CommandPaletteCategory = 'recent' | 'translate' | 'workspace' | 'tog
 export type CommandPaletteActionId =
     | 'toggle-full-page'
     | 'switch-display-mode'
+    | 'switch-video-subtitle-mode'
     | 'start-section-translation'
     | 'start-area-translation'
     | 'open-sidepanel'
@@ -58,11 +59,14 @@ export interface CommandCatalogContext {
     readonly canOpenSidepanel: boolean;
     readonly canOpenDocument: boolean;
     readonly canSmartHighlight: boolean;
+    readonly canSwitchVideoSubtitleMode?: boolean;
+    readonly videoSubtitleModeLabel?: string;
     readonly shortcuts?: Partial<{
         readonly fullPage: string;
         readonly section: string;
         readonly area: string;
         readonly smartHighlight: string;
+        readonly videoSubtitleMode: string;
     }>;
 }
 
@@ -256,6 +260,16 @@ export function buildDefaultCommandCatalog(context: CommandCatalogContext): Comm
             description: t('commandPalette.action.switchDisplayModeDesc'),
             keywords: ['双语模式', '仅译文', '显示模式', 'shuangyu', 'jinyiwen', 'bilingual', 'translation only', 'display', 'mode'],
             badge: isBilingual ? t('commandPalette.status.bilingual') : t('commandPalette.status.translationOnly'),
+        },
+        {
+            id: 'switch-video-subtitle-mode',
+            category: 'translate',
+            title: t('commandPalette.action.switchVideoSubtitleMode.title'),
+            description: t('commandPalette.action.switchVideoSubtitleMode.description'),
+            keywords: ['视频字幕', '原始字幕', '仅原文', '双语字幕', '关闭字幕', 'video subtitle', 'original captions', 'bilingual', 'listening', 'zimu'],
+            shortcut: context.shortcuts?.videoSubtitleMode,
+            badge: context.videoSubtitleModeLabel,
+            available: context.canSwitchVideoSubtitleMode === true,
         },
         {
             id: 'start-section-translation',

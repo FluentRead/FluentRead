@@ -31,6 +31,7 @@ import {translationStatsTraditionalChineseMessages} from './translationStats';
 import {localTranslationTraditionalChineseMessages} from './localTranslation';
 import {personalCorrectionMessages} from './personalCorrections';
 import {task7Messages, task7LegacyText} from './task7Features';
+import {toolbarActionMessages} from './toolbarAction';
 import countForms from './count-forms.json';
 
 const onboardingTraditionalChineseMessages = {
@@ -52,6 +53,7 @@ export const zhTWMessages = {
     "toolbar.click.popup": "開啟快捷面板",
     "toolbar.click.translate": "翻譯 / 顯示原文",
     "toolbar.openPopup": "開啟快捷面板",
+    ...toolbarActionMessages['zh-TW'],
     "settings.backup.includeContext": "包含單字上下文",
     "feedback.serviceHint": "檢查所選服務的連接或模型設定後再試。",
     "feedback.retryHint": "稍後重試，原文和當前選區會繼續保留。",

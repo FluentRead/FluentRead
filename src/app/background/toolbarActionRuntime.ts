@@ -1,13 +1,14 @@
 /**
  * @file src/app/background/toolbarActionRuntime.ts
- * 文件职责：把浏览器工具栏图标的点击行为与用户的一键翻译偏好同步，并保留快捷面板入口。
- * 主要内容：同步注册工具栏点击与独立翻译窗口命令；配置就绪后串行更新原生 popup；按标签页排队处理全文翻译、恢复、PDF 与失败反馈，导航和关闭作废旧操作。
+ * 文件职责：把浏览器工具栏图标的点击行为、悬停提示与用户的一键翻译偏好同步，并保留快捷面板入口。
+ * 主要内容：同步注册工具栏点击与独立翻译窗口命令；配置就绪后串行更新原生 popup 与工具栏提示（一键翻译模式下提示右键可打开快捷面板和菜单栏，并随界面语言切换）；按标签页排队处理全文翻译、恢复、PDF 与失败反馈，导航和关闭作废旧操作。
  * 模块边界：只编排浏览器入口和现有全文消息，不实现翻译、不增加权限；快捷面板以固定来源标签页打开，持久化仍由统一配置服务负责。
  */
 import {config, configReady, subscribeConfig} from '@/src/services/config/store';
 import {isExtensionDisabledOnSite} from '@/src/core/site-rules/domain';
 import {getPdfSourceUrl} from '@/src/features/document-translation/core/pdfSource';
-import {translate, type UiLanguage} from '@/src/core/i18n';
+import {normalizeUiLanguage, translate, type UiLanguage} from '@/src/core/i18n';
+import {ensureUiLanguageBundle} from '@/src/platform/i18n/uiLanguageBundles';
 import {runContextMenuAction, type ContextMenuClickTab} from './contextMenuActions';
 import {reportContextMenuFailure} from './contextMenuFeedback';
 import {withContextMenuDeadline} from './contextMenuDelivery';
@@ -60,19 +61,50 @@ export function installToolbarActionRuntime(states: TabTranslationStateStore): v
     const defaultPopup = manifest.action?.default_popup || manifest.browser_action?.default_popup;
     // Thunderbird 邮件按钮已有独立运行时；没有默认快捷面板的宿主不改写其入口。
     if (!defaultPopup) return;
+    const rawDefaultTitle = manifest.action?.default_title || manifest.browser_action?.default_title;
+    const defaultTitle = rawDefaultTitle && !rawDefaultTitle.startsWith('__MSG_') ? rawDefaultTitle : '';
     let popupQueue = Promise.resolve();
     const syncPopup = (): void => {
         const popup = config.toolbarClickAction === 'translate' ? '' : defaultPopup;
         popupQueue = popupQueue.then(() => action.setPopup({popup}))
             .catch(error => console.error('[FluentRead] 工具栏点击设置同步失败', error));
     };
+    let titleQueue = Promise.resolve();
+    let titleVersion = 0;
+    const syncTitle = (): void => {
+        if (typeof action.setTitle !== 'function') return;
+        const version = ++titleVersion;
+        const mode = config.toolbarClickAction;
+        const language = normalizeUiLanguage(config.uiLanguage);
+        titleQueue = titleQueue.then(async () => {
+            if (version !== titleVersion) return;
+            if (mode === 'translate' || !defaultTitle) await ensureUiLanguageBundle(language);
+            if (version !== titleVersion) return;
+            const title = mode === 'translate'
+                ? translate('toolbar.title.translate', language)
+                : (defaultTitle || translate('toolbar.title.default', language));
+            await action.setTitle!({title});
+        }).catch(error => console.error('[FluentRead] 工具栏提示同步失败', error));
+    };
     const ready = configReady.then(() => {
         syncPopup();
-        let previous = config.toolbarClickAction;
+        syncTitle();
+        let previousAction = config.toolbarClickAction;
+        let previousLanguage = normalizeUiLanguage(config.uiLanguage);
         subscribeConfig(() => {
-            if (previous === config.toolbarClickAction) return;
-            previous = config.toolbarClickAction;
-            syncPopup();
+            const nextAction = config.toolbarClickAction;
+            const nextLanguage = normalizeUiLanguage(config.uiLanguage);
+            if (nextAction !== previousAction) {
+                previousAction = nextAction;
+                previousLanguage = nextLanguage;
+                syncPopup();
+                syncTitle();
+                return;
+            }
+            if (nextLanguage !== previousLanguage) {
+                previousLanguage = nextLanguage;
+                if (nextAction === 'translate' || !defaultTitle) syncTitle();
+            }
         });
     });
     const queues = new Map<number, Promise<void>>();

@@ -1,12 +1,17 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {TabTranslationStateStore} from '@/src/app/background/tabTranslationState';
+import {toolbarActionChineseMessages, toolbarActionMessages} from '@/src/core/i18n/messages/toolbarAction';
+import {UI_LANGUAGE_OPTIONS} from '@/src/core/i18n';
+import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 const env = vi.hoisted(() => ({config: {} as Record<string, any>, listeners: [] as Array<() => void>,
-    ready: Promise.resolve(), feedback: vi.fn()}));
+    ready: Promise.resolve(), feedback: vi.fn(), ensureBundle: vi.fn()}));
 vi.mock('@/src/services/config/store', () => ({config: env.config,
     configReady: {then: (fn: () => void) => env.ready.then(fn)},
     subscribeConfig: (fn: () => void) => {env.listeners.push(fn);}}));
 vi.mock('@/src/app/background/contextMenuFeedback', () => ({reportContextMenuFailure: env.feedback}));
+vi.mock('@/src/platform/i18n/uiLanguageBundles', () => ({ensureUiLanguageBundle: env.ensureBundle}));
 import {installToolbarActionRuntime, openToolbarQuickPanel} from '@/src/app/background/toolbarActionRuntime';
+registerAllUiLanguageBundles();
 function event() {const listeners: Function[] = [];return {addListener: (fn: Function) => listeners.push(fn), emit: (...args: unknown[]) => listeners.forEach(fn => fn(...args)), listeners};}
 function deferred<T>() {let resolve!: (value: T) => void;const promise = new Promise<T>(yes => {resolve = yes;});return {promise, resolve};}
 async function settle() {for (let i = 0; i < 100; i++) await Promise.resolve();}
@@ -14,8 +19,9 @@ function change(values: Record<string, unknown>) {Object.assign(env.config, valu
 let api: any, action: any, states: TabTranslationStateStore, pageStates: Map<number, boolean>;
 beforeEach(() => {
     env.listeners.length = 0;env.ready = Promise.resolve();env.feedback.mockReset();
+    env.ensureBundle.mockReset().mockResolvedValue(true);
     for (const key of Object.keys(env.config)) delete env.config[key];
-    Object.assign(env.config, {on: true, toolbarClickAction: 'translate', disabledExtensionDomains: []});
+    Object.assign(env.config, {on: true, toolbarClickAction: 'translate', uiLanguage: 'zh-CN', disabledExtensionDomains: []});
     states = new TabTranslationStateStore();pageStates = new Map();
     action = {setPopup: vi.fn().mockResolvedValue(undefined), onClicked: event()};
     api = {action, runtime: {getManifest: vi.fn(() => ({action: {default_popup: 'popup.html'}})),
@@ -175,5 +181,78 @@ describe('工具栏一键翻译', () => {
     });
     it('面板 URL 绑定原网页而非新标签页', async () => {
         await openToolbarQuickPanel(123);expect(api.tabs.create).toHaveBeenCalledWith({url: 'chrome-extension://fixture/popup.html?sourceTabId=123'});
+    });
+    it('一键翻译模式下同步悬停提示，切回快捷面板恢复默认提示并响应界面语言切换', async () => {
+        action.setTitle = vi.fn().mockResolvedValue(undefined);
+        api.runtime.getManifest.mockReturnValue({action: {default_popup: 'popup.html', default_title: '流畅阅读 · 网页翻译、划词翻译'}});
+        installToolbarActionRuntime(states);await settle();
+        expect(action.setTitle).toHaveBeenLastCalledWith({title: '流畅阅读 · 单击翻译 / 原文，右键可打开快捷面板和菜单栏'});
+        expect(action.setPopup).toHaveBeenCalledTimes(1);
+
+        change({uiLanguage: 'en-US'});await settle();
+        expect(action.setPopup).toHaveBeenCalledTimes(1);
+        expect(action.setTitle).toHaveBeenLastCalledWith({title: 'FluentRead · Click to translate / restore, right-click for quick panel and menu'});
+
+        change({toolbarClickAction: 'popup'});await settle();
+        expect(action.setTitle).toHaveBeenLastCalledWith({title: '流畅阅读 · 网页翻译、划词翻译'});
+
+        const titleCalls = action.setTitle.mock.calls.length;
+        change({uiLanguage: 'ja-JP'});await settle();
+        expect(action.setTitle).toHaveBeenCalledTimes(titleCalls);
+    });
+    it('未解析的 manifest 占位符和 MV2 browser_action 默认提示均可正确回退并响应语言切换', async () => {
+        action.setTitle = vi.fn().mockResolvedValue(undefined);
+        env.config.toolbarClickAction = 'popup';
+        api.runtime.getManifest.mockReturnValue({action: {default_popup: 'popup.html', default_title: '__MSG_extensionToolbarTitle__'}});
+        installToolbarActionRuntime(states);await settle();
+        expect(action.setTitle).toHaveBeenLastCalledWith({title: '流畅阅读 · 网页翻译、划词翻译'});
+
+        change({uiLanguage: 'en-US'});await settle();
+        expect(action.setTitle).toHaveBeenLastCalledWith({title: 'FluentRead · Translate pages and selected text'});
+
+        delete api.action;
+        const legacySetTitle = vi.fn().mockResolvedValue(undefined);
+        api.browserAction = {setPopup: vi.fn().mockResolvedValue(undefined), setTitle: legacySetTitle, onClicked: event()};
+        api.runtime.getManifest.mockReturnValue({browser_action: {default_popup: 'legacy.html', default_title: 'Legacy Title'}});
+        installToolbarActionRuntime(states);await settle();
+        expect(legacySetTitle).toHaveBeenLastCalledWith({title: 'Legacy Title'});
+    });
+    it('悬停提示同步丢弃过期更新，写入失败记录诊断且后续切换仍可恢复', async () => {
+        const firstWrite = deferred<void>();
+        const bundleLoad = deferred<boolean>();
+        action.setTitle = vi.fn().mockReturnValueOnce(firstWrite.promise).mockResolvedValue(undefined);
+        api.runtime.getManifest.mockReturnValue({action: {default_popup: 'popup.html', default_title: 'Default Title'}});
+        installToolbarActionRuntime(states);await settle();
+
+        change({toolbarClickAction: 'popup'});
+        change({toolbarClickAction: 'translate', uiLanguage: 'ja-JP'});
+        env.ensureBundle.mockReturnValueOnce(bundleLoad.promise);
+        firstWrite.resolve();await settle();
+        change({toolbarClickAction: 'popup'});
+        bundleLoad.resolve(true);await settle();
+        expect(action.setTitle.mock.calls).toEqual([
+            [{title: '流畅阅读 · 单击翻译 / 原文，右键可打开快捷面板和菜单栏'}],
+            [{title: 'Default Title'}],
+        ]);
+
+        const error = new Error('native title failed'), log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        action.setTitle.mockRejectedValueOnce(error);
+        change({toolbarClickAction: 'translate', uiLanguage: 'zh-CN'});await settle();
+        expect(log).toHaveBeenCalledExactlyOnceWith('[FluentRead] 工具栏提示同步失败', error);
+
+        change({toolbarClickAction: 'popup'});await settle();
+        expect(action.setTitle).toHaveBeenLastCalledWith({title: 'Default Title'});
+    });
+    it('工具栏提示八语言目录保持键集完整且不包含换行符', () => {
+        expect(toolbarActionMessages['zh-CN']).toBe(toolbarActionChineseMessages);
+        expect(Object.keys(toolbarActionMessages).sort()).toEqual(UI_LANGUAGE_OPTIONS.map(({value}) => value).sort());
+        for (const catalog of Object.values(toolbarActionMessages)) {
+            expect(Object.keys(catalog).sort()).toEqual(['toolbar.title.default', 'toolbar.title.translate']);
+            for (const text of Object.values(catalog)) {
+                expect(text.trim()).toBe(text);
+                expect(text.length).toBeGreaterThan(0);
+                expect(text).not.toMatch(/[\r\n]/u);
+            }
+        }
     });
 });

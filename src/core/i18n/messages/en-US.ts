@@ -34,6 +34,7 @@ import {localTranslationEnglishMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
 import {task7Messages, task7LegacyText} from './task7Features';
+import {toolbarActionMessages} from './toolbarAction';
 
 import countForms from './count-forms.json';
 
@@ -43,6 +44,7 @@ export const enUSMessages = {
     "toolbar.click.popup": "Open quick panel",
     "toolbar.click.translate": "Translate / Restore",
     "toolbar.openPopup": "Open quick panel",
+    ...toolbarActionMessages['en-US'],
     "settings.backup.includeContext": "Include vocabulary context",
     "feedback.serviceHint": "Check the selected service’s connection or model settings, then try again.",
     "feedback.retryHint": "Try again shortly. Your source text and selection will stay available.",

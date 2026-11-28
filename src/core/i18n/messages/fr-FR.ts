@@ -33,6 +33,7 @@ import {localTranslationFrenchMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
 import {task7Messages, task7LegacyText} from './task7Features';
+import {toolbarActionMessages} from './toolbarAction';
 
 import countForms from './count-forms.json';
 
@@ -42,6 +43,7 @@ export const frFRMessages = {
     "toolbar.click.popup": "Ouvrir le panneau rapide",
     "toolbar.click.translate": "Traduire / Restaurer",
     "toolbar.openPopup": "Ouvrir le panneau rapide",
+    ...toolbarActionMessages['fr-FR'],
     "settings.backup.includeContext": "Inclure le contexte du vocabulaire",
     "feedback.serviceHint": "Vérifiez la connexion ou le modèle du service choisi, puis réessayez.",
     "feedback.retryHint": "Réessayez dans un instant. Le texte source et votre sélection restent disponibles.",

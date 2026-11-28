@@ -33,6 +33,7 @@ import {localTranslationRussianMessages} from './localTranslation';
 
 import {personalCorrectionMessages} from './personalCorrections';
 import {task7Messages, task7LegacyText} from './task7Features';
+import {toolbarActionMessages} from './toolbarAction';
 
 import countForms from './count-forms.json';
 
@@ -42,6 +43,7 @@ export const ruRUMessages = {
     "toolbar.click.popup": "Открыть быструю панель",
     "toolbar.click.translate": "Перевести / Оригинал",
     "toolbar.openPopup": "Открыть быструю панель",
+    ...toolbarActionMessages['ru-RU'],
     "settings.backup.includeContext": "Включить контекст слов",
     "feedback.serviceHint": "Проверьте подключение или модель выбранного сервиса и повторите попытку.",
     "feedback.retryHint": "Повторите попытку чуть позже. Исходный текст и выделенная область сохранятся.",

@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/pptxXml.ts
- * 文件职责：为 PowerPoint OOXML 幻灯片与备注 XML 提供无副作用的段落提取、标题角色识别与样式保留回填能力。
- * 主要内容：使用 SaxesParser 解析 DrawingML 段落中的字符运行、换行与域元素，识别标题占位符和大字号标题并跳过纯数字、代码或链接段落，支持双语追加段落与仅译文替换两种导出模式，并解析幻灯片备注关系目标路径。
+ * 文件职责：为 PowerPoint OOXML 演示文稿清单、幻灯片与备注 XML 提供无副作用的顺序发现、段落提取、标题角色识别与样式保留回填能力。
+ * 主要内容：按 presentation.xml 的幻灯片清单与关系解析幻灯片顺序（支持根相对路径与数字回退），使用 SaxesParser 解析 DrawingML 段落中的字符运行、换行与域元素，识别标题占位符和大字号标题并跳过纯数字、代码或链接段落，双语模式将追加段中的项目符号/自动编号替换为无编号避免重复编号，仅译文模式原位替换并保留域元素。
  * 模块边界：仅操作单个 XML 字符串与译文数组，不接触 JSZip、File 或任何浏览器 API；压缩包读写、安全上限和取消控制归 services/binary 管理。
  */
 import {SaxesParser} from 'saxes';
@@ -10,6 +10,7 @@ import {hasDistinctTranslation} from '@/src/core/translation/result';
 const PPTX_PARAGRAPH_PATTERN = /<a:p(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*?(?:\/>|>[\s\S]*?<\/a:p\s*>)/gu;
 const PPTX_SHAPE_PATTERN = /<p:sp(?=[\s>])[\s\S]*?<\/p:sp\s*>/gu;
 const PPTX_TITLE_PLACEHOLDER_PATTERN = /<p:ph\b[^>]*\btype=["'](?:title|ctrTitle|subTitle)["']/iu;
+const PPTX_BULLET_PATTERN = /<a:(?:buAutoNum|buChar|buBlip)\b(?:[^"'<>]|"[^"]*"|'[^']*')*?(?:\/>|>[\s\S]*?<\/a:(?:buAutoNum|buChar|buBlip)\s*>)/gu;
 
 interface XmlNode {
     name: string;
@@ -25,6 +26,11 @@ export interface PptxExtractedParagraph {
     paragraphIndex: number;
     text: string;
     role: 'heading' | 'paragraph';
+}
+
+export interface PptxSlideDescriptor {
+    path: string;
+    slideNumber: number;
 }
 
 interface AnalyzedPptxParagraph {
@@ -48,6 +54,64 @@ function xmlEscape(value: string): string {
         .replace(/>/gu, '&gt;')
         .replace(/"/gu, '&quot;')
         .replace(/'/gu, '&apos;');
+}
+
+/** 规范化 OPC 关系目标路径，兼容以 `/` 开头的包根路径与相对路径。 */
+export function resolveOpcTargetPath(baseFile: string, target: string): string {
+    const clean = target.split(/[?#]/u)[0].replace(/\\/gu, '/');
+    const combined = clean.startsWith('/')
+        ? clean.slice(1)
+        : `${baseFile.includes('/') ? baseFile.slice(0, baseFile.lastIndexOf('/') + 1) : ''}${clean}`;
+    const result: string[] = [];
+    for (const part of combined.split('/')) {
+        if (!part || part === '.') continue;
+        if (part === '..') result.pop();
+        else result.push(part);
+    }
+    return result.join('/');
+}
+
+/** 优先按 presentation.xml 的 sldIdLst 声明顺序排列幻灯片，缺失或损坏时回退按 slideN.xml 数值排序。 */
+export function parsePptxPresentationSlides(
+    presentationXml: string | undefined,
+    relsXml: string | undefined,
+    availablePaths: readonly string[],
+): PptxSlideDescriptor[] {
+    const available = new Set(availablePaths);
+    const rels = new Map<string, string>();
+    if (relsXml) {
+        const relParser = new SaxesParser({xmlns: false as const});
+        relParser.on('opentag', tag => {
+            if (tag.name === 'Relationship' && tag.attributes.Id && tag.attributes.Target) {
+                rels.set(String(tag.attributes.Id), resolveOpcTargetPath('ppt/presentation.xml', String(tag.attributes.Target)));
+            }
+        });
+        try {relParser.write(relsXml).close();} catch {rels.clear();}
+    }
+
+    const slides: PptxSlideDescriptor[] = [];
+    const seen = new Set<string>();
+    if (presentationXml && rels.size > 0) {
+        const presParser = new SaxesParser({xmlns: false as const});
+        presParser.on('opentag', tag => {
+            if (tag.name !== 'p:sldId') return;
+            const relId = String(tag.attributes['r:id'] ?? '');
+            const path = relId ? rels.get(relId) : undefined;
+            if (path && available.has(path) && !seen.has(path)) {
+                seen.add(path);
+                slides.push({path, slideNumber: slides.length + 1});
+            }
+        });
+        try {presParser.write(presentationXml).close();} catch {slides.length = 0;}
+    }
+
+    if (slides.length > 0) return slides;
+
+    return availablePaths
+        .map(path => ({path, match: /^ppt\/slides\/slide(\d+)\.xml$/iu.exec(path)}))
+        .filter((item): item is {path: string; match: RegExpExecArray} => Boolean(item.match))
+        .sort((left, right) => Number(left.match[1]) - Number(right.match[1]))
+        .map(({path, match}) => ({path, slideNumber: Number(match[1])}));
 }
 
 function readXmlRoot(xml: string): XmlNode | undefined {
@@ -173,6 +237,11 @@ function buildPptxRuns(value: string, rPr: string): string {
         .join('<a:br/>');
 }
 
+/** 双语追加段落将原段的项目符号或自动编号替换为无编号，避免列表重复编号。 */
+function bilingualParagraphProperties(pPr: string): string {
+    return pPr ? pPr.replace(PPTX_BULLET_PATTERN, '<a:buNone/>') : '';
+}
+
 export function renderPptxPartXml(
     source: string,
     paragraphSegments: ReadonlyArray<{paragraphIndex: number; segmentIndex: number}>,
@@ -194,13 +263,13 @@ export function renderPptxPartXml(
         if (!analyzed) return paragraph;
         const runs = buildPptxRuns(translation, analyzed.firstRunRPr);
         if (mode === 'bilingual') {
-            return `${paragraph}<a:p>${analyzed.pPr}${runs}${analyzed.endParaRPr}</a:p>`;
+            return `${paragraph}<a:p>${bilingualParagraphProperties(analyzed.pPr)}${runs}${analyzed.endParaRPr}</a:p>`;
         }
         return `${analyzed.openTag}${analyzed.pPr}${runs}${analyzed.fieldsXml}${analyzed.endParaRPr}</a:p>`;
     });
 }
 
-/** 从幻灯片关系 XML 提取关联备注页的相对路径。 */
+/** 从幻灯片关系 XML 提取关联备注页的目标路径。 */
 export function parsePptxSlideNotesTarget(relsXml: string): string | undefined {
     const parser = new SaxesParser({xmlns: false as const});
     let target: string | undefined;

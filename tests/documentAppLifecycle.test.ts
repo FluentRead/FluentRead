@@ -1148,6 +1148,52 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         await state.restoreMaterialDocument('epub-section-material'); await state.applyMaterialResume(); await flush();
         expect(state.epubChapterIndex).toBe(0); expect(state.currentEpubChapter.path).toBe(second.path); expect(state.readerPage).toBe(1);
     });
+    it('switches XLSX worksheets, resets sheet index on task change, and captures/restores XLSX material section positions', async () => {
+        const zip = new JSZip();
+        zip.file('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+        zip.file('xl/workbook.xml', '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Summary" sheetId="1" r:id="rId1"/><sheet name="Details" sheetId="2" r:id="rId2"/></sheets></workbook>');
+        zip.file('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>');
+        zip.file('xl/worksheets/sheet1.xml', '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Summary Heading</t></is></c></row></sheetData></worksheet>');
+        zip.file('xl/worksheets/sheet2.xml', `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${Array.from({length: 85}, (_, index) => `<row r="${index + 1}"><c r="A${index + 1}" t="inlineStr"><is><t>Second sheet cell ${index + 1}.</t></is></c></row>`).join('')}</sheetData></worksheet>`);
+        const bytes = await zip.generateAsync({type: 'uint8array'});
+        const fingerprint = await documentHistoryId(bytes); expect(fingerprint).toMatch(/^[a-f\d]{32}$/u);
+        await state.loadFiles([new File([asArrayBufferBytes(bytes)], 'workbook.xlsx', {type: getDocumentMimeType('xlsx')}), file('other.txt', 'Other file text')]); await flush();
+        state.documentQueue[0].historyId = fingerprint;
+
+        const reader = walkHost(root).find(entry => entry.props['data-document-reader'] === 'xlsx')!;
+        expect(hostText(reader)).toContain('Summary Heading');
+        const toolbar = walkHost(reader).find(entry => entry.props['aria-label'] === 'document.xlsx.sheets')!;
+        toolbar.children.filter(entry => entry.type === 'button')[1].props.onClick(); await flush();
+        expect(state.xlsxSheetIndex).toBe(1);
+        expect(state.currentXlsxSheet.name).toBe('Details');
+        state.readerPage = 2; await flush();
+
+        const position = state.documentMaterialSelection();
+        expect(position.locator).toMatchObject({kind: 'document', fingerprint, section: 'xlsx:1', page: 2, quote: 'Second sheet cell 81.'});
+        expect(walkHost(root).find(entry => entry.props['data-fluentread-material-fingerprint'] === fingerprint)?.props['data-fluentread-material-section']).toBe('xlsx:1');
+
+        ports.sendMessage.mockImplementation(async (message: any) => message.type === 'fluentReadMaterials'
+            ? {success: true, data: message.action === 'generation' ? 3 : {id: 'xlsx-section-material', kind: 'document', ...position}} : undefined);
+        await state.saveDocumentMaterial();
+        expect(ports.sendMessage.mock.calls.find(([message]) => message.type === 'fluentReadMaterials' && message.action === 'capture')?.[0].input.locator)
+            .toMatchObject({section: 'xlsx:1', page: 2, quote: 'Second sheet cell 81.'});
+
+        // Switching to another document resets xlsxSheetIndex to 0
+        state.selectDocument(state.documentQueue[1]); await flush();
+        expect(state.xlsxSheetIndex).toBe(0);
+        state.selectDocument(state.documentQueue[0]); await flush();
+        expect(state.xlsxSheetIndex).toBe(0);
+
+        // Restoring material resumes sheet 1, page 2
+        await state.restoreMaterialDocument('xlsx-section-material'); await state.applyMaterialResume(); await flush();
+        expect(state.xlsxSheetIndex).toBe(1); expect(state.currentXlsxSheet.path).toBe('xl/worksheets/sheet2.xml'); expect(state.readerPage).toBe(2);
+
+        // Reordering sheets still restores the exact sheet by path
+        const parsed = state.parsedDocument;
+        state.parsedDocument = markRaw({...parsed, binary: {...parsed.binary, sheets: [...parsed.binary.sheets].reverse()}}); await flush();
+        await state.restoreMaterialDocument('xlsx-section-material'); await state.applyMaterialResume(); await flush();
+        expect(state.xlsxSheetIndex).toBe(0); expect(state.currentXlsxSheet.path).toBe('xl/worksheets/sheet2.xml'); expect(state.readerPage).toBe(2);
+    });
     it('material resume ownership retains pending position when activation invalidates the early apply', async () => {
         await state.loadFiles([file('first.txt'), file('second.srt', Array.from({length: 81}, (_, index) => `${index + 1}\n00:00:01,000 --> 00:00:02,000\nCaption ${index + 1}.`).join('\n\n'))]); await flush();
         state.documentQueue[0].historyId = 'd'.repeat(32); state.documentQueue[1].historyId = 'e'.repeat(32);

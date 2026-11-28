@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/preview.ts
  * 文件职责：把已解析文档与对应译文转换成安全、可阅读的预览 HTML，统一支持原文、双语和纯译文三种预览模式。
- * 主要内容：包含主动 HTML 剥离、HTML5 阅读器外壳、无原文占位符的 Markdown 渲染、围栏代码块及连续折行段落对齐，以及 HTML、Markdown 和纯文本的原译配对；相同译文保留原文且不重复展示。
+ * 主要内容：包含主动 HTML 剥离、HTML5 阅读器外壳、无原文占位符的 Markdown 渲染、围栏代码块及连续折行段落对齐，以及 HTML、Markdown、纯文本与 LaTeX 的原译配对；相同译文保留原文且不重复展示。
  * 模块边界：本模块只生成展示字符串，不操作真实 DOM、不执行脚本也不修改文档模型；源文件解析由 document.ts 完成，二进制分页预览由 pdfPreview.ts 负责，页面样式由上层 UI 提供。
  * Markdown 表格使用解析器的行范围，对照文字放在各自单元格。
  */

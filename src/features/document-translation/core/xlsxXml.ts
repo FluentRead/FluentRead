@@ -1,12 +1,11 @@
 /**
  * @file src/features/document-translation/core/xlsxXml.ts
  * 文件职责：为 Excel OOXML 工作簿、共享字符串表与工作表提供无副作用的解析与安全回填算法。
- * 主要内容：按工作簿声明顺序解析工作表与关系映射并支持无清单回退，解析共享字符串及富文本运行并忽略日语注音节点，区分共享字符串与行内字符串单元格而严格跳过公式、数字、布尔与日期单元格，导出时以追加去重方式更新共享字符串表并同步维护计数属性。
- * 模块边界：仅操作 SpreadsheetML XML 字符串与单元格坐标，不依赖 JSZip、File 或浏览器环境；复用 delimited 的公式与可译单元格判定，归档读写与取消由 services/binary 承担。
+ * 主要内容：按工作簿声明顺序解析工作表与关系映射并支持无清单回退，解析共享字符串及富文本运行并忽略日语注音节点，区分共享字符串与行内字符串单元格而严格跳过 `<f>` 公式、纯数字、布尔、日期与链接单元格（保留以 `-`、`+`、`@` 开头的合法文本单元格），导出时以追加去重方式更新共享字符串表并准确维护 uniqueCount 与不虚增的 count 属性。
+ * 模块边界：仅操作 SpreadsheetML XML 字符串与单元格坐标，不依赖 JSZip、File 或浏览器环境；归档读写与取消由 services/binary 承担。
  */
 import {SaxesParser} from 'saxes';
 import {hasDistinctTranslation} from '@/src/core/translation/result';
-import {isSpreadsheetFormula, isTranslatableDelimitedCell} from './delimited';
 
 export interface XlsxSheetDescriptor {
     name: string;
@@ -39,6 +38,13 @@ function xmlEscape(value: string): string {
         .replace(/>/gu, '&gt;')
         .replace(/"/gu, '&quot;')
         .replace(/'/gu, '&apos;');
+}
+
+/** Excel 中不含 `<f>` 的字符串单元格不会被当作公式求值，因此保留 `-`、`+`、`@` 开头的普通文本，只跳过非文字与纯链接/邮箱。 */
+export function isTranslatableXlsxText(value: string): boolean {
+    return /\p{L}/u.test(value)
+        && !/^(?:true|false|null|NaN|[\d.]+e[+-]?\d+|\d{4}-\d{2}-\d{2}[Tt]\d.*|[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12})$/iu.test(value)
+        && !/^(?:[a-z][\w+.-]*:\/\/|mailto:|www\.)\S+$|^[^@\s]+@[^@\s]+\.[^@\s]+$/iu.test(value);
 }
 
 export function resolveXlsxTargetPath(baseFile: string, target: string): string {
@@ -175,13 +181,13 @@ export function parseXlsxWorksheetXml(sheetXml: string, sharedStrings: readonly 
                 const rawText = Number.isInteger(sharedIndex) && sharedIndex >= 0 ? sharedStrings[sharedIndex] : undefined;
                 if (rawText !== undefined) {
                     const trimmed = rawText.trim();
-                    if (trimmed && isTranslatableDelimitedCell(trimmed)) {
+                    if (trimmed && isTranslatableXlsxText(trimmed)) {
                         cells.push({cellRef, kind: 'shared', sharedIndex, source: trimmed, rawText});
                     }
                 }
             } else if (cellType === 'inlineStr') {
                 const trimmed = inlineText.trim();
-                if (trimmed && isTranslatableDelimitedCell(trimmed)) {
+                if (trimmed && isTranslatableXlsxText(trimmed)) {
                     cells.push({cellRef, kind: 'inline', source: trimmed, rawText: inlineText});
                 }
             }
@@ -258,18 +264,16 @@ export function renderXlsxWorksheetXml(
                 const rendered = mode === 'bilingual'
                     ? `${rawOriginal}\n${translation}`
                     : translation;
-                if (!isSpreadsheetFormula(rendered)) {
-                    const clean = stripInvalidXmlChars(rendered);
-                    if (activeEntry.kind === 'shared') {
-                        const newIndex = appendSharedString(clean);
-                        replacements.push({start: targetTagStart, end: parser.position, value: `<v>${newIndex}</v>`});
-                    } else {
-                        replacements.push({
-                            start: targetTagStart,
-                            end: parser.position,
-                            value: `<is><t xml:space="preserve">${xmlEscape(clean)}</t></is>`,
-                        });
-                    }
+                const clean = stripInvalidXmlChars(rendered);
+                if (activeEntry.kind === 'shared') {
+                    const newIndex = appendSharedString(clean);
+                    replacements.push({start: targetTagStart, end: parser.position, value: `<v>${newIndex}</v>`});
+                } else {
+                    replacements.push({
+                        start: targetTagStart,
+                        end: parser.position,
+                        value: `<is><t xml:space="preserve">${xmlEscape(clean)}</t></is>`,
+                    });
                 }
             }
             targetTagStart = -1;
@@ -315,9 +319,10 @@ export function appendXlsxSharedStringsXml(
         } else {
             updated = updated.replace(/(\s*\/?>)$/u, ` uniqueCount="${newUniqueCount}"$1`);
         }
+        // 重定向已有单元格索引不改变共享字符串总引用次数，保留原有 count 且仅在小于 uniqueCount 时补齐下限。
         if (/\bcount=["'](\d+)["']/u.test(updated)) {
             updated = updated.replace(/\bcount=["'](\d+)["']/u, (_, prev: string) =>
-                `count="${Math.max(Number(prev), originalUniqueCount) + appendedStrings.length}"`);
+                `count="${Math.max(Number(prev), newUniqueCount)}"`);
         } else {
             updated = updated.replace(/(\s*\/?>)$/u, ` count="${newUniqueCount}"$1`);
         }

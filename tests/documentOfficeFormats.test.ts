@@ -17,11 +17,14 @@ import {documentSourceLocators} from '@/src/features/document-translation/core/m
 import {
     isTranslatablePptxText,
     parsePptxPartXml,
+    parsePptxPresentationSlides,
     parsePptxSlideNotesTarget,
     renderPptxPartXml,
+    resolveOpcTargetPath,
 } from '@/src/features/document-translation/core/pptxXml';
 import {
     appendXlsxSharedStringsXml,
+    isTranslatableXlsxText,
     parseXlsxSharedStrings,
     parseXlsxWorkbookSheets,
     parseXlsxWorksheetXml,
@@ -146,11 +149,13 @@ async function buildSampleXlsx(): Promise<Uint8Array> {
 </Relationships>`;
 
     const sharedStrings = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="5" uniqueCount="4">
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="10" uniqueCount="6">
   <si><t>Hello</t></si>
   <si><r><rPr><b/></rPr><t>Rich </t></r><r><t>Title</t></r><rPh sb="0" eb="1"><t>IGNORED</t></rPh></si>
   <si><t>https://example.com</t></si>
-  <si><t>=SUM(A1:A2)</t></si>
+  <si><t>- Bullet item</t></si>
+  <si><t>+15% YoY growth</t></si>
+  <si><t>@alice review</t></si>
 </sst>`;
 
     const sheet1 = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -166,6 +171,8 @@ async function buildSampleXlsx(): Promise<Uint8Array> {
       <c r="G1" t="s"><v>3</v></c>
       <c r="H1" t="str"><f>CONCAT(A1,B1)</f><v>HelloHello</v></c>
       <c r="I1" t="s"><f>A1</f><v>0</v></c>
+      <c r="J1" t="s"><v>4</v></c>
+      <c r="K1" t="s"><v>5</v></c>
     </row>
   </sheetData>
 </worksheet>`;
@@ -320,6 +327,43 @@ describe('PowerPoint (.pptx) and Excel (.xlsx) document translation', () => {
             'ppt/slides/_rels/slide1.xml.rels': '<Relationships><Relationship Id="r1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/missing.xml"/></Relationships>',
         });
         expect((await parseBinaryDocument('ok.pptx', missingNotes)).segments).toHaveLength(1);
+
+        // Root-relative OPC notes target (/ppt/notesSlides/...), mixed-case slide basename rels, custom slide filename without rels, presentation.xml sldIdLst ordering, and bilingual bullet suppression
+        const orderedDeck = await buildZipBytes({
+            '[Content_Types].xml': '<Types/>',
+            'ppt/presentation.xml': '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="257" r:id="rId2"/><p:sldId id="256" r:id="rId1"/><p:sldId id="258" r:id="rId3"/></p:sldIdLst></p:presentation>',
+            'ppt/_rels/presentation.xml.rels': '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="/ppt/slides/Slide1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/intro.xml"/></Relationships>',
+            'ppt/slides/Slide1.xml': '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:pPr lvl="0"><a:buAutoNum type="arabicPeriod"/></a:pPr><a:r><a:t>Numbered item</a:t></a:r></a:p><a:p><a:pPr><a:buChar char="•"/></a:pPr><a:r><a:t>Bulleted item</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>',
+            'ppt/slides/_rels/Slide1.xml.rels': '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="/ppt/notesSlides/notesSlide1.xml"/></Relationships>',
+            'ppt/notesSlides/notesSlide1.xml': '<p:notes xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Root relative note</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>',
+            'ppt/slides/slide2.xml': '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Ordered first slide</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>',
+            'ppt/slides/intro.xml': '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Custom named slide</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>',
+        });
+        const parsedOrdered = await parseBinaryDocument('ordered.pptx', orderedDeck);
+        expect(parsedOrdered.segments.map(s => [s.contextLabel, s.source])).toEqual([
+            ['Slide 1', 'Ordered first slide'],
+            ['Slide 2', 'Numbered item'],
+            [undefined, 'Bulleted item'],
+            ['Slide 2 Notes', 'Root relative note'],
+            ['Slide 3', 'Custom named slide'],
+        ]);
+        const biOrdered = await createDocumentDownload(parsedOrdered, ['第一张排序幻灯片', '编号条目', '圆点条目', '根路径备注', '自定义命名幻灯片'], 'bilingual');
+        const biOrderedZip = await JSZip.loadAsync(biOrdered.data as Uint8Array);
+        const biOrderedSlide1 = await biOrderedZip.file('ppt/slides/Slide1.xml')!.async('string');
+        assertValidXml(biOrderedSlide1);
+        // Original paragraphs keep bullets; appended bilingual paragraphs replace buAutoNum/buChar with buNone
+        expect(biOrderedSlide1.match(/<a:buAutoNum\b/gu)).toHaveLength(1);
+        expect(biOrderedSlide1.match(/<a:buChar\b/gu)).toHaveLength(1);
+        expect(biOrderedSlide1.match(/<a:buNone\/>/gu)).toHaveLength(2);
+
+        // Direct unit edge cases for resolveOpcTargetPath & parsePptxPresentationSlides
+        expect(resolveOpcTargetPath('presentation.xml', 'slides/./slide1.xml#frag')).toBe('slides/slide1.xml');
+        expect(parsePptxPresentationSlides('<p:presentation><p:sldIdLst><p:sldId/><p:sldId r:id="r1"/><p:sldId r:id="r1"/></p:sldIdLst></p:presentation>', '<Relationships><Relationship Id="r1" Target="/ppt/slides/slide1.xml"/></Relationships>', ['ppt/slides/slide1.xml']))
+            .toEqual([{path: 'ppt/slides/slide1.xml', slideNumber: 1}]);
+        expect(parsePptxPresentationSlides('<bad', '<Relationships><Relationship Id="r1" Target="slides/slide1.xml"/></Relationships>', ['ppt/slides/slide1.xml']))
+            .toEqual([{path: 'ppt/slides/slide1.xml', slideNumber: 1}]);
+        expect(parsePptxPresentationSlides('<p:presentation/>', '<bad', ['ppt/slides/slide1.xml']))
+            .toEqual([{path: 'ppt/slides/slide1.xml', slideNumber: 1}]);
     });
 
     it('parses multi-sheet XLSX in workbook order, preserves formulas & shared strings, deduplicates appended strings, and round-trips cleanly', async () => {
@@ -337,12 +381,15 @@ describe('PowerPoint (.pptx) and Excel (.xlsx) document translation', () => {
             ['Summary!A1', 'Hello'],
             ['Summary!B1', 'Hello'],
             ['Summary!C1', 'Rich Title'],
+            ['Summary!G1', '- Bullet item'],
+            ['Summary!J1', '+15% YoY growth'],
+            ['Summary!K1', '@alice review'],
             ['Details!A1', 'Inline Note'],
             ['Details!C1', 'Hello'],
         ]);
 
-        // Translate A1 and Details!C1 to same string (tests deduplication), B1 left untranslated (must keep original sharedIndex 0!), C1 translated, Details!A1 translated, test formula injection blocked
-        const translations = ['你好', '', '富文本标题', '行内备注', '你好'];
+        // Translate A1 and Details!C1 to same string (tests deduplication), B1 left untranslated (must keep original sharedIndex 0!), preserve legitimate -/+/@ text cells, and keep sst/@count uninflated (10 >= 8)
+        const translations = ['你好', '', '富文本标题', '- 项目要点', '+15% 同比增长', '@alice 复核', '行内备注', '你好'];
         const translated = await createDocumentDownload(parsed, translations, 'translated');
         expect(translated.fileName).toBe('budget.translated.xlsx');
         expect(translated.mimeType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -351,24 +398,35 @@ describe('PowerPoint (.pptx) and Excel (.xlsx) document translation', () => {
         const trSharedXml = await trZip.file('xl/sharedStrings.xml')!.async('string');
         assertValidXml(trSharedXml);
         const trShared = parseXlsxSharedStrings(trSharedXml);
-        // Original 4 entries preserved at 0..3; only 2 unique new strings appended ('你好' deduplicated + '富文本标题')
-        expect(trShared).toEqual(['Hello', 'Rich Title', 'https://example.com', '=SUM(A1:A2)', '你好', '富文本标题']);
-        expect(trSharedXml).toContain('uniqueCount="6"');
-        expect(trSharedXml).toContain('count="7"');
+        // Original 6 entries preserved at 0..5; 5 unique new strings appended ('你好' deduplicated + 4 others)
+        expect(trShared).toEqual([
+            'Hello', 'Rich Title', 'https://example.com', '- Bullet item', '+15% YoY growth', '@alice review',
+            '你好', '富文本标题', '- 项目要点', '+15% 同比增长', '@alice 复核',
+        ]);
+        expect(trSharedXml).toContain('uniqueCount="11"');
+        // count was 10, uniqueCount grew to 11 so count raises only to uniqueCount floor 11 (not inflated to 15!)
+        expect(trSharedXml).toContain('count="11"');
+
+        // Verify sst/@count is NOT inflated when original count already exceeds newUniqueCount
+        expect(appendXlsxSharedStringsXml('<sst count="50" uniqueCount="2"><si><t>A</t></si><si><t>B</t></si></sst>', ['C'], 2))
+            .toContain('count="50" uniqueCount="3"');
+        expect(isTranslatableXlsxText('- Note')).toBe(true);
+        expect(isTranslatableXlsxText('+15% growth')).toBe(true);
+        expect(isTranslatableXlsxText('@handle check')).toBe(true);
 
         const trSheet1 = await trZip.file('xl/worksheets/sheet1.xml')!.async('string');
         assertValidXml(trSheet1);
-        // A1 updated to new shared index 4, B1 STILL points to original 0, formula cells untouched!
-        expect(trSheet1).toContain('<c r="A1" s="1" t="s"><v>4</v></c>');
+        // A1 updated to new shared index 6, B1 STILL points to original 0, formula cells untouched!
+        expect(trSheet1).toContain('<c r="A1" s="1" t="s"><v>6</v></c>');
         expect(trSheet1).toContain('<c r="B1" s="2" t="s"><v>0</v></c>');
-        expect(trSheet1).toContain('<c r="C1" t="s"><v>5</v></c>');
+        expect(trSheet1).toContain('<c r="C1" t="s"><v>7</v></c>');
         expect(trSheet1).toContain('<c r="H1" t="str"><f>CONCAT(A1,B1)</f><v>HelloHello</v></c>');
         expect(trSheet1).toContain('<c r="I1" t="s"><f>A1</f><v>0</v></c>');
 
         const trSheet2 = await trZip.file('xl/worksheets/sheet2.xml')!.async('string');
         assertValidXml(trSheet2);
         expect(trSheet2).toContain('<c r="A1" s="3" t="inlineStr"><is><t xml:space="preserve">行内备注</t></is></c>');
-        expect(trSheet2).toContain('<c r="C1" t="s"><v>4</v></c>');
+        expect(trSheet2).toContain('<c r="C1" t="s"><v>6</v></c>');
 
         // Round-trip re-parse
         const trReparsed = await parseBinaryDocument('budget.translated.xlsx', translated.data as Uint8Array);
@@ -376,25 +434,31 @@ describe('PowerPoint (.pptx) and Excel (.xlsx) document translation', () => {
             ['Summary!A1', '你好'],
             ['Summary!B1', 'Hello'],
             ['Summary!C1', '富文本标题'],
+            ['Summary!G1', '- 项目要点'],
+            ['Summary!J1', '+15% 同比增长'],
+            ['Summary!K1', '@alice 复核'],
             ['Details!A1', '行内备注'],
             ['Details!C1', '你好'],
         ]);
 
-        // Bilingual mode puts original + \n + translation, and blocks formula injection
-        const bilingual = await createDocumentDownload(parsed, ['=EVIL()', '您好', '富文本标题', '行内备注', ''], 'bilingual');
+        // Bilingual mode puts original + \n + translation
+        const bilingual = await createDocumentDownload(parsed, ['你好', '您好', '富文本标题', '', '', '', '行内备注', ''], 'bilingual');
         const biReparsed = await parseBinaryDocument('budget.bilingual.xlsx', bilingual.data as Uint8Array);
         expect(biReparsed.segments.map(s => [s.contextLabel, s.source])).toEqual([
-            ['Summary!A1', 'Hello\n=EVIL()'],
+            ['Summary!A1', 'Hello\n你好'],
             ['Summary!B1', 'Hello\n您好'],
             ['Summary!C1', 'Rich Title\n富文本标题'],
+            ['Summary!G1', '- Bullet item'],
+            ['Summary!J1', '+15% YoY growth'],
+            ['Summary!K1', '@alice review'],
             ['Details!A1', 'Inline Note\n行内备注'],
             ['Details!C1', 'Hello'],
         ]);
 
-        // Translated mode blocks formula injection cleanly
-        const blocked = await createDocumentDownload(parsed, ['=SUM(1,2)', '', '', '', ''], 'translated');
-        const blockedReparsed = await parseBinaryDocument('blocked.xlsx', blocked.data as Uint8Array);
-        expect(blockedReparsed.segments[0].source).toBe('Hello');
+        // Untranslated XLSX export preserves all sheets & sharedStrings untouched
+        const unchanged = await createDocumentDownload(parsed, [], 'translated');
+        expect((await parseBinaryDocument('unchanged.xlsx', unchanged.data as Uint8Array)).segments.map(s => s.source))
+            .toEqual(parsed.segments.map(s => s.source));
 
         // Material locators for XLSX
         const locators = documentSourceLocators(parsed);

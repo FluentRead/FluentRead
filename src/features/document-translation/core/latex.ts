@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/latex.ts
  * 文件职责：为 LaTeX 源文件提供无副作用的解析与译文还原算法，在不破坏可编译语法的前提下提取标题、段落、图注与列表项。
- * 主要内容：区分导言区与正文并仅提取标题类元数据，完整保护数学环境、代码与绘图环境及注释，使用编号占位符保护行内公式、引用、链接地址与格式化命令并在回填时校验嵌套与兜底保留受保护片段，同时支持双语和仅译文两种导出模式。
+ * 主要内容：忽略注释并精确扫描文档起止环境边界，完整保护数学环境、代码与绘图环境及行内 `\verb` 片段，使用编号占位符保护行内公式、引用、链接地址、格式化命令与行尾注释，回填时确保注释后保留换行不吞掉后续闭合花括号并校验嵌套与兜底保留受保护片段。
  * 模块边界：仅操作纯文本字符串与共享编号占位符归一化函数，不读取文件、不依赖 DOM 或压缩包库，文档总调度由 core/document 负责。
  */
 import {normalizeDocumentInlineMarkers} from '@/src/core/translation/public';
@@ -122,6 +122,15 @@ function readCommandName(source: string, slashIndex: number): {name: string; end
     return {name: source.slice(slashIndex + 1, Math.min(source.length, slashIndex + 2)), end: Math.min(source.length, slashIndex + 2)};
 }
 
+function consumeVerbEnd(source: string, nameEnd: number): number {
+    let cursor = nameEnd;
+    if (source[cursor] === '*') cursor += 1;
+    const delimiter = source[cursor];
+    if (!delimiter || delimiter === '\n' || delimiter === '\r') return nameEnd;
+    const close = source.indexOf(delimiter, cursor + 1);
+    return close >= 0 ? close + 1 : nameEnd;
+}
+
 function consumeCommandTail(source: string, start: number, maxBraces: number): number {
     let cursor = start;
     if (source[cursor] === '*') cursor += 1;
@@ -208,11 +217,7 @@ function encodeInlineLatex(input: string, tokens: LatexToken[]): string {
             }
             const {name, end: nameEnd} = readCommandName(input, index);
             if (name === 'verb') {
-                let cursor = nameEnd;
-                if (input[cursor] === '*') cursor += 1;
-                const delimiter = input[cursor];
-                const close = delimiter ? input.indexOf(delimiter, cursor + 1) : -1;
-                const end = close >= 0 ? close + 1 : nameEnd;
+                const end = consumeVerbEnd(input, nameEnd);
                 addAtom(input.slice(index, end));
                 index = end;
                 continue;
@@ -325,6 +330,22 @@ function matchEndEnv(source: string, index: number): {env: string; tagEnd: numbe
     return {env: source.slice(open + 1, close).trim(), tagEnd: close + 1};
 }
 
+function findBeginDocument(source: string): {index: number; end: number} | null {
+    let cursor = 0;
+    while (cursor < source.length) {
+        const ch = source[cursor];
+        if (ch === '%') {cursor = findCommentEnd(source, cursor); continue;}
+        if (ch === '\\') {
+            const env = matchBeginEnv(source, cursor);
+            if (env?.env === 'document') return {index: cursor, end: env.tagEnd};
+            cursor += 2;
+            continue;
+        }
+        cursor += 1;
+    }
+    return null;
+}
+
 function matchTranslatableCommand(
     source: string,
     index: number,
@@ -396,42 +417,39 @@ function parsePreamble(preamble: string, parts: LatexPart[], segments: LatexSegm
 export function parseLatexDocument(content: string): {parts: LatexPart[]; segments: LatexSegment[]} {
     const parts: LatexPart[] = [];
     const segments: LatexSegment[] = [];
-    const beginDoc = content.match(/\\begin\s*\{document\}/u);
+    const beginDoc = findBeginDocument(content);
     let cursor = 0;
-    let bodyEnd = content.length;
 
-    if (beginDoc && beginDoc.index !== undefined) {
+    if (beginDoc) {
         parsePreamble(content.slice(0, beginDoc.index), parts, segments);
-        cursor = beginDoc.index + beginDoc[0].length;
-        addLiteral(parts, beginDoc[0]);
-        const endDoc = content.indexOf('\\end{document}', cursor);
-        if (endDoc >= 0) bodyEnd = endDoc;
+        addLiteral(parts, content.slice(beginDoc.index, beginDoc.end));
+        cursor = beginDoc.end;
     }
 
-    while (cursor < bodyEnd) {
+    while (cursor < content.length) {
         const ch = content[cursor];
         if (/\s/u.test(ch)) {
             let end = cursor + 1;
-            while (end < bodyEnd && /\s/u.test(content[end])) end += 1;
+            while (end < content.length && /\s/u.test(content[end])) end += 1;
             addLiteral(parts, content.slice(cursor, end));
             cursor = end;
             continue;
         }
         if (ch === '%') {
-            const end = Math.min(bodyEnd, findCommentEnd(content, cursor));
+            const end = findCommentEnd(content, cursor);
             addLiteral(parts, content.slice(cursor, end));
             cursor = end;
             continue;
         }
         if (content.startsWith('$$', cursor)) {
             const close = content.indexOf('$$', cursor + 2);
-            const end = close >= 0 && close + 2 <= bodyEnd ? close + 2 : bodyEnd;
+            const end = close >= 0 ? close + 2 : content.length;
             addLiteral(parts, content.slice(cursor, end));
             cursor = end;
             continue;
         }
         if (content.startsWith('\\[', cursor)) {
-            const end = Math.min(bodyEnd, findSequenceEnd(content, cursor + 2, '\\]'));
+            const end = findSequenceEnd(content, cursor + 2, '\\]');
             addLiteral(parts, content.slice(cursor, end));
             cursor = end;
             continue;
@@ -441,7 +459,7 @@ export function parseLatexDocument(content: string): {parts: LatexPart[]; segmen
             if (PROTECTED_ENVS.has(beginEnv.env)) {
                 const endMarker = `\\end{${beginEnv.env}}`;
                 const close = content.indexOf(endMarker, beginEnv.tagEnd);
-                const end = close >= 0 && close + endMarker.length <= bodyEnd ? close + endMarker.length : bodyEnd;
+                const end = close >= 0 ? close + endMarker.length : content.length;
                 addLiteral(parts, content.slice(cursor, end));
                 cursor = end;
                 continue;
@@ -452,12 +470,16 @@ export function parseLatexDocument(content: string): {parts: LatexPart[]; segmen
         }
         const endEnv = matchEndEnv(content, cursor);
         if (endEnv) {
+            if (endEnv.env === 'document') {
+                addLiteral(parts, content.slice(cursor));
+                break;
+            }
             addLiteral(parts, content.slice(cursor, endEnv.tagEnd));
             cursor = endEnv.tagEnd;
             continue;
         }
         const command = matchTranslatableCommand(content, cursor, BODY_TRANSLATABLE_COMMANDS);
-        if (command && command.commandEnd <= bodyEnd) {
+        if (command) {
             const role: LatexSegment['role'] = PREAMBLE_COMMANDS.has(command.name)
                 ? 'title'
                 : HEADING_COMMANDS.has(command.name) ? 'heading' : 'paragraph';
@@ -474,51 +496,55 @@ export function parseLatexDocument(content: string): {parts: LatexPart[]; segmen
                 const opt = skipHorizontalSpaces(content, itemEnd);
                 if (content[opt] === '[') {
                     const close = findMatchingBracket(content, opt);
-                    if (close >= 0 && close < bodyEnd) itemEnd = close + 1;
+                    if (close >= 0) itemEnd = close + 1;
                 }
-                while (itemEnd < bodyEnd && (content[itemEnd] === ' ' || content[itemEnd] === '\t')) itemEnd += 1;
+                while (itemEnd < content.length && (content[itemEnd] === ' ' || content[itemEnd] === '\t')) itemEnd += 1;
                 addLiteral(parts, content.slice(cursor, itemEnd));
                 cursor = itemEnd;
-                const paraEnd = consumeParagraphEnd(content, cursor, bodyEnd);
+                const paraEnd = consumeParagraphEnd(content, cursor);
                 addLatexSegment(parts, segments, content.slice(cursor, paraEnd), 'list-item', 'paragraph');
                 cursor = paraEnd;
                 continue;
             }
             if (BLOCK_LITERAL_COMMANDS.has(name)) {
-                const end = Math.min(bodyEnd, consumeCommandTail(content, nameEnd, 2));
+                const end = consumeCommandTail(content, nameEnd, 2);
                 addLiteral(parts, content.slice(cursor, end));
                 cursor = end;
                 continue;
             }
         }
-        const paraEnd = consumeParagraphEnd(content, cursor, bodyEnd);
+        const paraEnd = consumeParagraphEnd(content, cursor);
         addLatexSegment(parts, segments, content.slice(cursor, paraEnd), 'paragraph', 'paragraph');
         cursor = paraEnd;
     }
 
-    if (bodyEnd < content.length) addLiteral(parts, content.slice(bodyEnd));
     return {parts, segments};
 }
 
-function consumeParagraphEnd(content: string, start: number, limit: number): number {
+function consumeParagraphEnd(content: string, start: number): number {
     let cursor = start;
-    while (cursor < limit) {
+    while (cursor < content.length) {
         const ch = content[cursor];
         if (ch === '\\') {
             if (content.startsWith('\\[', cursor)) break;
             if (cursor > start && (matchBeginEnv(content, cursor) || matchEndEnv(content, cursor))) break;
-            cursor = Math.min(limit, cursor + 2);
+            const {name, end: nameEnd} = readCommandName(content, cursor);
+            if (name === 'verb') {
+                cursor = consumeVerbEnd(content, nameEnd);
+                continue;
+            }
+            cursor = Math.min(content.length, cursor + 2);
             continue;
         }
         if (ch === '$' && content[cursor + 1] === '$') break;
         if (ch === '%') {
-            cursor = Math.min(limit, findCommentEnd(content, cursor));
+            cursor = findCommentEnd(content, cursor);
             continue;
         }
         if (ch === '\n' || ch === '\r') {
             const nextLine = ch === '\r' && content[cursor + 1] === '\n' ? cursor + 2 : cursor + 1;
             const afterSpaces = skipHorizontalSpaces(content, nextLine);
-            if (afterSpaces >= limit || content[afterSpaces] === '\n' || content[afterSpaces] === '\r'
+            if (afterSpaces >= content.length || content[afterSpaces] === '\n' || content[afterSpaces] === '\r'
                 || startsBlockConstruct(content, afterSpaces)) {
                 return cursor;
             }
@@ -530,8 +556,14 @@ function consumeParagraphEnd(content: string, start: number, limit: number): num
     return cursor;
 }
 
+/** 折叠 LaTeX 命令参数中的空行，防止编译期出现 Paragraph ended before \@sect/\@caption 语法错误。 */
+export function sanitizeLatexCommandText(value: string): string {
+    return value.replace(/\r\n?/gu, '\n').replace(/\n(?:[ \t]*\n)+/gu, '\n');
+}
+
 /**
- * 校验并还原 LaTeX 片段中的编号占位符。若翻译服务破坏或遗漏占位符，则剥离残留占位符并把丢失的自闭合公式/引用原样附在末尾。
+ * 校验并还原 LaTeX 片段中的编号占位符。还原 `%` 行内注释时确保其后保留换行，防止吞掉后续正文或命令闭合 `}`；
+ * 若翻译服务破坏或遗漏占位符，则剥离残留占位符并把丢失的自闭合公式/引用/注释安全附在末尾。
  */
 export function renderLatexTranslation(tokens: readonly LatexToken[] | undefined, translation: string): string {
     if (!tokens?.length) return translation;
@@ -542,10 +574,18 @@ export function renderLatexTranslation(tokens: readonly LatexToken[] | undefined
     const open: number[] = [];
     let valid = true;
     const output: string[] = [];
+    let pendingCommentNewline = false;
+
+    const pushChunk = (chunk: string, startsComment = false) => {
+        if (!chunk) return;
+        if (pendingCommentNewline && chunk[0] !== '\n' && chunk[0] !== '\r') output.push('\n');
+        output.push(chunk);
+        pendingCommentNewline = startsComment;
+    };
 
     for (const piece of pieces) {
         const found = marker(piece);
-        if (!found) {output.push(piece); continue;}
+        if (!found) {pushChunk(piece); continue;}
         const id = Number(found[2]);
         const token = tokens[id - 1];
         if (!token) {valid = false; continue;}
@@ -553,22 +593,30 @@ export function renderLatexTranslation(tokens: readonly LatexToken[] | undefined
             if (found[1]) continue;
             if (seen.has(id)) valid = false;
             seen.add(id);
-            output.push(token.open);
+            pushChunk(token.open, token.open.startsWith('%'));
             continue;
         }
         if (!found[1]) {
             if (seen.has(id) || found[3]) valid = false;
             seen.add(id);
             open.push(id);
-            output.push(token.open);
+            pushChunk(token.open);
             continue;
         }
         if (open.pop() !== id) valid = false;
-        output.push(token.close);
+        pushChunk(token.close);
     }
 
+    if (pendingCommentNewline) output.push('\n');
     if (valid && !open.length && seen.size === tokens.length) return output.join('');
+
     const plain = pieces.filter(piece => !marker(piece)).join('').replace(/[ \t]{2,}/gu, ' ').trim();
-    const kept = tokens.filter(token => token.close === undefined && !plain.includes(token.open.trim())).map(token => token.open.trim());
-    return kept.length ? `${plain} ${kept.join(' ')}` : plain;
+    const kept = tokens
+        .filter(token => token.close === undefined && !plain.includes(token.open.trim()))
+        .map(token => {
+            const raw = token.open.trim();
+            return raw.startsWith('%') ? `${raw}\n` : raw;
+        });
+    if (!kept.length) return plain;
+    return kept.reduce((result, item) => result.endsWith('\n') ? `${result}${item}` : `${result} ${item}`, plain);
 }

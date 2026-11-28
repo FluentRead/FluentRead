@@ -1,8 +1,8 @@
 /**
  * @file src/features/document-translation/core/document.ts
- * 文件职责：定义文档翻译的纯领域模型，并负责把多种文本格式解析为可翻译片段，再按双语或纯译文模式无损还原原格式结构。
- * 主要内容：覆盖文本格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体或括号的字幕样式标签按真实闭合名还原（包含 VTT 样式类）、纯文本里按固定宽度折行的段落（含 LF、CRLF、CR）合成一个片段并按完整 Unicode 码点判断中日韩边界、Markdown 可选地把一行或一个普通折行段落作为一个片段整句翻译并以成对占位符保护强调和链接，恢复强调时把服务正文边缘的 CommonMark 空白移到分隔符外而保留内部间隔，仅在标点/符号或 underscore 词内边界要求时补外侧分隔空格，以单占位符保护行内代码与网址、Markdown 标题、列表、容器指令与独立 HTML 标记保留，以及围栏、受控缩进代码与行内位置保护、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
- * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX 二进制，也不发起翻译请求；文件 I/O 与压缩包处理归 services/binary，批处理归 services/translation，展示归 preview/presentation。
+ * 文件职责：定义文档翻译的纯领域模型，并负责把多种文本格式（含 LaTeX `.tex`）解析为可翻译片段，再按双语或纯译文模式无损还原原格式结构，同时承载 PDF/EPUB/DOCX/PPTX/XLSX 二进制文档的类型契约。
+ * 主要内容：覆盖文本与二进制格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体或括号的字幕样式标签按真实闭合名还原（包含 VTT 样式类）、纯文本里按固定宽度折行的段落（含 LF、CRLF、CR）合成一个片段并按完整 Unicode 码点判断中日韩边界、Markdown 可选地把一行或一个普通折行段落作为一个片段整句翻译并以成对占位符保护强调和链接，恢复强调时把服务正文边缘的 CommonMark 空白移到分隔符外而保留内部间隔，仅在标点/符号或 underscore 词内边界要求时补外侧分隔空格，以单占位符保护行内代码与网址、Markdown 标题、列表、容器指令与独立 HTML 标记保留，以及围栏、受控缩进代码与行内位置保护、LaTeX 源码解析与可编译双语/译文回填、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
+ * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX/PPTX/XLSX 二进制，也不发起翻译请求；文件 I/O 与压缩包处理归 services/binary，批处理归 services/translation，展示归 preview/presentation。
  * GFM 表格和 CSV/TSV 在单元格内回填译文，字幕导出保护 cue 边界。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -11,7 +11,7 @@ import {decodeTextareaHtml} from '@/src/shared/text/htmlEntities';
 import {normalizeDocumentInlineMarkers} from '@/src/core/translation/public';
 import {escapeMarkdownTableTranslation, markdownTableAlignments, splitMarkdownTableRow, type MarkdownTable} from './markdownTable';
 import {encodeDelimitedCell, isSpreadsheetFormula, isTranslatableDelimitedCell, readDelimitedCells, type DelimitedColumn} from './delimited';
-import {parseLatexDocument, renderLatexTranslation, type LatexToken} from './latex';
+import {parseLatexDocument, renderLatexTranslation, sanitizeLatexCommandText, type LatexToken} from './latex';
 export type {DelimitedColumn} from './delimited';
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 /** 带插图的论文与扫描件常超过 10 MB；PDF 按页解析、译文量只取决于文字，单独放宽上限。 */
@@ -1595,8 +1595,12 @@ function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart,
     }
     if (document.format === 'tex') {
         const rendered = renderLatexTranslation(part.latexTokens, translation);
-        const separator = part.latexBilingual === 'command' ? '\n' : '\n\n';
-        return `${part.prefix}${source}${part.suffix}${separator}${rendered}`;
+        if (part.latexBilingual === 'command') {
+            const safeSource = sanitizeLatexCommandText(source).replace(/\n+$/u, '');
+            const safeRendered = sanitizeLatexCommandText(rendered).replace(/^\n+/u, '');
+            return `${part.prefix}${safeSource}\n${safeRendered}${part.suffix}`;
+        }
+        return `${part.prefix}${source}\n\n${rendered}${part.suffix}`;
     }
     if (document.format === 'ass') {
         return `${part.prefix}${source}${part.suffix}\\N${formattedTranslation}`;
@@ -1682,7 +1686,9 @@ function renderParts(document: ParsedDocument, translations: readonly string[], 
             continue;
         }
         if (document.format === 'tex') {
-            append(`${part.prefix}${renderLatexTranslation(part.latexTokens, translation)}${part.suffix}`);
+            const rendered = renderLatexTranslation(part.latexTokens, translation);
+            const safeRendered = part.latexBilingual === 'command' ? sanitizeLatexCommandText(rendered) : rendered;
+            append(`${part.prefix}${safeRendered}${part.suffix}`);
             continue;
         }
         const formattedTranslation = ['srt', 'vtt', 'ass'].includes(document.format)

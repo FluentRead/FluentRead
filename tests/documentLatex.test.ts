@@ -253,4 +253,82 @@ describe('LaTeX (.tex) document translation', () => {
         const shortDoc = parseDocument('short.tex', 'Hello $x$ world.');
         expect(createDocumentPreviewHtml(shortDoc, [''], 'bilingual')).toContain('Hello  world.');
     });
+
+    it('guards against comment swallowing closing braces, command blank lines, commented document boundaries, and verb-embedded delimiters', () => {
+        // 1. Inline % comment inside command or moved to end of segment must emit trailing \n so closing } is never commented out
+        const commentedCommand = '\\section{Hello % keep note\nworld}';
+        const parsedCmd = parseDocument('comment-cmd.tex', commentedCommand);
+        expect(parsedCmd.segments[0].source).toBe('Hello <g1/>\nworld');
+        // Translator deletes newline after comment -> restored with newline before following text
+        expect(renderDocument(parsedCmd, ['你好<g1/>世界'], 'translated')).toBe('\\section{你好% keep note\n世界}');
+        // Translator moves comment to end of segment -> restored with newline before closing }
+        expect(renderDocument(parsedCmd, ['你好世界<g1/>'], 'translated')).toBe('\\section{你好世界% keep note\n}');
+        // Translator drops comment marker -> fallback keeps comment WITH trailing newline before closing }
+        expect(renderDocument(parsedCmd, ['你好世界'], 'translated')).toBe('\\section{你好世界 % keep note\n}');
+        // Multiple recovered tokens where a comment precedes another self-closing token
+        expect(renderLatexTranslation([{open: '% note'}, {open: '$x$'}], '译文')).toBe('译文 % note\n$x$');
+        expect(renderLatexTranslation([{open: '$x$'}, {open: '% note'}], '译文')).toBe('译文 $x$ % note\n');
+
+        // 2. Multi-line \caption / \section / \title must never emit blank lines (\n\n) inside {...}
+        const multilineCmd = [
+            '\\begin{document}',
+            '\\caption{',
+            '  System overview.',
+            '}',
+            '\\section{',
+            '  First line',
+            '  Second line',
+            '}',
+            '\\end{document}',
+        ].join('\n');
+        const parsedMulti = parseDocument('multiline.tex', multilineCmd);
+        const biMulti = renderDocument(parsedMulti, ['系统概览。\n\n不应断段', '第一行\n\n第二行'], 'bilingual');
+        expect(biMulti).toBe([
+            '\\begin{document}',
+            '\\caption{',
+            '  System overview.',
+            '系统概览。',
+            '不应断段',
+            '}',
+            '\\section{',
+            '  First line',
+            '  Second line',
+            '第一行',
+            '第二行',
+            '}',
+            '\\end{document}',
+        ].join('\n'));
+        expect(biMulti).not.toContain('\n\n');
+        const trMulti = renderDocument(parsedMulti, ['系统概览。\n\n不应断段', '第一行\n\n第二行'], 'translated');
+        expect(trMulti).not.toContain('\n\n');
+        expect(trMulti).toContain('\\caption{\n  系统概览。\n不应断段\n}');
+
+        // 3. Commented \begin{document} in preamble and \end{document} inside comments / verbatim environments
+        const boundaryDoc = [
+            '\\documentclass{article}',
+            '% \\begin{document} ignored in comment',
+            '\\title{Real Paper}',
+            '\\begin{document}',
+            '% \\end{document} ignored in comment',
+            'First body paragraph with \\verb|$$| and \\verb|\\[| and \\verb|\\end{document}| inside.',
+            '\\begin{verbatim}',
+            '\\end{document}',
+            '\\end{verbatim}',
+            'Second body paragraph after verbatim.',
+            '\\end{document}',
+            'Ignored text after real end.',
+        ].join('\n');
+        const parsedBoundary = parseDocument('boundaries.tex', boundaryDoc);
+        expect(parsedBoundary.segments.map(s => [s.role, s.source])).toEqual([
+            ['title', 'Real Paper'],
+            ['paragraph', 'First body paragraph with <g1/> and <g2/> and <g3/> inside.'],
+            ['paragraph', 'Second body paragraph after verbatim.'],
+        ]);
+        const trBoundary = renderDocument(parsedBoundary, ['真实论文', '第一段包含 <g1/>、<g2/> 与 <g3/>。', 'verbatim 之后的第二段。'], 'translated');
+        expect(trBoundary).toContain('% \\begin{document} ignored in comment');
+        expect(trBoundary).toContain('\\title{真实论文}');
+        expect(trBoundary).toContain('第一段包含 \\verb|$$|、\\verb|\\[| 与 \\verb|\\end{document}|。');
+        expect(trBoundary).toContain('verbatim 之后的第二段。');
+        expect(trBoundary).toContain('Ignored text after real end.');
+    });
 });

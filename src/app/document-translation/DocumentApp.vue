@@ -969,14 +969,15 @@ function documentMaterialSelection(): MaterialSelection | undefined {
   if (!item?.historyId || item.historyReadUnavailable || item.historyConflict || !doc) return;
   const index = isPdfDocument.value ? materialPdfReader.value?.captureMaterialLocation?.()
     : isDocxDocument.value ? currentDocxPart.value?.paragraphSegments[(readerPage.value - 1) * READER_PAGE_SIZE]?.segmentIndex
-      : isEpubDocument.value ? currentEpubChapter.value?.segmentOffset : (readerPage.value - 1) * READER_PAGE_SIZE;
+      : isXlsxDocument.value ? currentXlsxSheet.value?.cellSegments[(readerPage.value - 1) * READER_PAGE_SIZE]?.segmentIndex
+        : isEpubDocument.value ? currentEpubChapter.value?.segmentOffset : (readerPage.value - 1) * READER_PAGE_SIZE;
   // PDF 没有可见段落或完整引用时不生成页首/粗略位置，自动保存也不能覆盖旧精确定位。
   if (isPdfDocument.value && index === undefined) return;
   const exact = index === undefined ? undefined : captureDocumentMaterialLocator(item.historyId, doc, index, READER_PAGE_SIZE);
   if (isPdfDocument.value && !exact?.documentReference) return;
   return {source: {kind: 'document', fingerprint: item.historyId, title: doc.fileName, ...(item.sourceUrl ? {url: item.sourceUrl} : {})},
     locator: exact ?? {kind: 'document', fingerprint: item.historyId, page: isPdfDocument.value ? pdfPage.value : readerPage.value,
-      ...(isEpubDocument.value ? {section: `epub:${epubChapterIndex.value}`} : isDocxDocument.value ? {section: `docx:${docxPartIndex.value}`} : {})}};
+      ...(isEpubDocument.value ? {section: `epub:${epubChapterIndex.value}`} : isDocxDocument.value ? {section: `docx:${docxPartIndex.value}`} : isXlsxDocument.value ? {section: `xlsx:${xlsxSheetIndex.value}`} : {})}};
 }
 async function saveDocumentMaterial(): Promise<void> {
   if (!config.on || materialPrivate || materialSaving.value) return;
@@ -1007,6 +1008,7 @@ async function applyMaterialResume(): Promise<void> {
   const section = position.section; const page = position.page;
   if (section?.startsWith('epub:') || section && /^\d+$/u.test(section)) epubChapterIndex.value = Math.min(Math.max(0, Number(section.replace(/^epub:/u, '')) || 0), Math.max(0, epubChapters.value.length - 1));
   if (section?.startsWith('docx:')) docxPartIndex.value = Math.min(Math.max(0, Number(section.slice(5)) || 0), Math.max(0, docxParts.value.length - 1));
+  if (section?.startsWith('xlsx:')) xlsxSheetIndex.value = Math.min(Math.max(0, Number(section.slice(5)) || 0), Math.max(0, xlsxSheets.value.length - 1));
   await nextTick(); if (disposed || request !== materialResumeRevision || owner !== materialEpoch || doc !== parsedDocument.value || pendingMaterialResume !== record) return;
   // PdfReader 公共出口按需加载独立 chunk；普通 nextTick 不代表异步组件的公开 ref 已就绪。
   const pdfReader = materialPdfReader.value;
@@ -1065,7 +1067,7 @@ function queueMaterialPositionCapture(): void {
   }, 1000);
   materialPositionTimer = timer;
 }
-watch([pdfPage, readerPage, epubChapterIndex, docxPartIndex], queueMaterialPositionCapture);
+watch([pdfPage, readerPage, epubChapterIndex, docxPartIndex, xlsxSheetIndex], queueMaterialPositionCapture);
 let historyTimer: ReturnType<typeof setTimeout> | undefined;
 async function refreshHistory(): Promise<void> {
   const epoch = ++historyRequestEpoch;

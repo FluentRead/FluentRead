@@ -147,6 +147,25 @@ describe('document reference input boundaries and non-PDF migration', () => {
         expect(resolveMaterialDocumentResume({kind: 'document', section: 'docx:0', page: 2}, fingerprint, docx)).toMatchObject({status: 'coarse', page: 2});
         expect(resolveMaterialDocumentResume({kind: 'document', section: 'docx:0', page: 3}, fingerprint, docx)).toMatchObject({status: 'unlocated'});
         expect(resolveMaterialDocumentResume({kind: 'document', section: 'docx:1', page: 1}, fingerprint, docx)).toMatchObject({status: 'unlocated'});
+
+        const xlsxSegments = Array.from({length: 82}, (_, id) => ({id, source: `Cell ${id}`}));
+        const xlsx: ParsedDocument = {
+            fileName: 'sheets.xlsx', format: 'xlsx', label: 'XLSX', parts: [], segments: xlsxSegments,
+            binary: {
+                kind: 'xlsx', bytes: new Uint8Array(),
+                sheets: [
+                    {name: 'First', path: 'xl/worksheets/sheet1.xml', source: '<worksheet/>', cellSegments: [{cellRef: 'A1', kind: 'inline', segmentIndex: 0}]},
+                    {name: 'Second', path: 'xl/worksheets/sheet2.xml', source: '<worksheet/>', cellSegments: xlsxSegments.slice(1).map(({id}, idx) => ({cellRef: `A${idx + 1}`, kind: 'inline' as const, segmentIndex: id}))},
+                ],
+            },
+        };
+        const xlsxLocator = captureDocumentMaterialLocator(fingerprint, xlsx, 81)!;
+        expect(xlsxLocator.documentReference?.locator.position).toBe('cell:A81');
+        expect(resolveMaterialDocumentResume(xlsxLocator, fingerprint, xlsx)).toMatchObject({status: 'exact', section: 'xlsx:1', page: 2});
+        expect(resolveMaterialDocumentResume({kind: 'document', section: 'xlsx:1', page: 2}, fingerprint, xlsx)).toMatchObject({status: 'coarse', section: 'xlsx:1', page: 2});
+        expect(resolveMaterialDocumentResume({kind: 'document', section: 'xlsx:1', page: 3}, fingerprint, xlsx)).toMatchObject({status: 'unlocated'});
+        expect(resolveMaterialDocumentResume({kind: 'document', section: 'xlsx:2', page: 1}, fingerprint, xlsx)).toMatchObject({status: 'unlocated'});
+        expect(resolveMaterialDocumentResume({kind: 'document', section: 'bad', page: 1}, fingerprint, xlsx)).toMatchObject({status: 'unlocated'});
     });
     it('rejects invalid capture indexes, missing model membership and broken exact references without page fallback', () => {
         const doc = pdf([['Original', 1, 40]]);
@@ -175,8 +194,10 @@ it('refuses unassigned chapter/part references and null page hints from malforme
     const base = {fileName: 'broken.epub', format: 'epub', label: 'EPUB', parts: [], segments: [{id: 0, source: 'Unassigned'}]};
     const epub = {...base, binary: {kind: 'epub', chapters: []}} as unknown as ParsedDocument;
     const docx = {...base, format: 'docx', binary: {kind: 'docx', parts: []}} as unknown as ParsedDocument;
+    const xlsx = {...base, format: 'xlsx', binary: {kind: 'xlsx', sheets: []}} as unknown as ParsedDocument;
     expect(captureDocumentMaterialLocator(fingerprint, epub, 0)).toBeUndefined();
     expect(captureDocumentMaterialLocator(fingerprint, docx, 0)).toBeUndefined();
+    expect(captureDocumentMaterialLocator(fingerprint, xlsx, 0)).toBeUndefined();
     expect(resolveMaterialDocumentResume({kind: 'document', page: null as any}, fingerprint, pdf([['Source', 1, 40]]))).toMatchObject({reason: 'invalid-position'});
     const malformed = pdf([['Source', 1, 40]]); (malformed.binary as any).pages[0].blocks.push({segmentIndex: -1, x: 0, y: 0});
     expect(captureDocumentMaterialLocator(fingerprint, malformed, 0)?.documentReference?.locator.source).toBe('Source');

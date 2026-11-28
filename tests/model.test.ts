@@ -108,10 +108,12 @@ describe('AI 模型编号列表', () => {
         expect(models.get(services.claude)).toContain('claude-sonnet-5');
         expect(models.get(services.claude)?.at(-1)).toBe(customModelString);
         expect(models.get(services.tongyi)?.at(0)).toBe('qwen3.8-flash');
-        expect(models.get(services.tongyi)).toContain('qwen3.7-max');
-        expect(models.get(services.tongyi)).toContain('qwen3.7-flash');
+        expect(models.get(services.tongyi)).toContain('qwen3.8-max');
+        expect(models.get(services.tongyi)).toContain('qwen-mt-flash');
         expect(models.get(services.zhipu)?.at(0)).toBe('glm-4.5-flash');
+        expect(models.get(services.zhipu)).toContain('glm-5.3-flash');
         expect(models.get(services.zhipu)).toContain('glm-5.2');
+        expect(servicesType.isUseProxy(services.zhipu)).toBe(true);
         expect(models.get(services.infini)).toContain('glm-5.2');
         expect(models.get(services.infini)).not.toContain('glm-5.3');
         expect(models.get(services.moonshot)).toContain('kimi-k2.7-code');
@@ -124,15 +126,17 @@ describe('AI 模型编号列表', () => {
         ]);
         expect(defaultModelIds[services.cheapaimodel]).toBe('deepseek-v4-1-flash');
         expect(models.get(services.yiyan)).toContain('ernie-5.1');
-        expect(models.get(services.minimax)).toContain('MiniMax-M2.7');
-        expect(models.get(services.minimax)).toContain('MiniMax-M3');
-        expect(models.get(services.minimax)).toContain('MiniMax-M3.1-flash');
+        expect(models.get(services.yiyan)).not.toContain('ernie-speed-128k');
+        expect(models.get(services.minimax)).toEqual(['MiniMax-M3.1-flash', 'MiniMax-M3', customModelString]);
         expect(models.get(services.mimo)).toEqual([
             'mimo-v2.6-flash', 'mimo-v2.6-pro', customModelString,
         ]);
+        expect(models.get(services.jieyue)).toContain('step-3.7-flash');
         expect(models.get(services.jieyue)).toContain('step-3.5-flash');
+        expect(models.get(services.jieyue)).not.toContain('step-2-mini');
         expect(models.get(services.huanYuan)).toEqual(['hy4-flash', 'hy4', 'hy3', customModelString]);
         expect(defaultModelIds[services.huanYuan]).toBe('hy4-flash');
+        expect(models.get(services.grok)).toContain('grok-4.7');
         expect(models.get(services.grok)).toContain('grok-4.5');
         expect(models.get(services.groq)).not.toContain('whisper-large-v3');
         expect(models.get(services.openrouter)?.at(-1)).toBe(customModelString);
@@ -328,8 +332,12 @@ describe('AI 模型编号列表', () => {
             [services.deepseek]: 'deepseek-flash',
             [services.infini]: 'deepseek-v4-flash',
             [services.tongyi]: 'qwen3.8-flash',
-            [services.claude]: 'claude-haiku-4-5',
-            [services.jieyue]: 'step-2-mini',
+            [services.claude]: 'claude-haiku-5-5',
+            [services.jieyue]: 'step-3.7-flash',
+            [services.minimax]: 'MiniMax-M3.1-flash',
+            [services.doubao]: 'doubao-seed-2-1-lite-260915',
+            [services.siliconCloud]: 'deepseek-ai/DeepSeek-V4.1-Flash',
+            [services.yiyan]: 'ernie-5.1',
             [services.openrouter]: 'google/gemini-3.5-flash-lite',
         };
         for (const config of [new Config(), normalizeConfig({}), normalizeConfig({model: {}, documentModel: {}})]) {
@@ -363,7 +371,7 @@ describe('AI 模型编号列表', () => {
             model: {
                 [services.openai]: 'gpt-5.6-luna',
                 [services.gemini]: 'gemini-3.6-flash',
-                [services.tongyi]: 'qwen3.6-flash',
+                [services.tongyi]: 'qwen3.8-max',
                 [services.deepseek]: 'deepseek-v4-flash',
             },
             documentModel: {
@@ -1354,8 +1362,8 @@ describe('旧模型编号兼容迁移', () => {
         ['claude-3-5-sonnet-20241022', 'claude-sonnet-5'],
         ['claude-3-opus', 'claude-opus-5'],
         ['claude-3-opus-20240229', 'claude-opus-5'],
-        ['claude-3-5-haiku', 'claude-haiku-4-5'],
-        ['claude-3-5-haiku-20241022', 'claude-haiku-4-5'],
+        ['claude-3-5-haiku', 'claude-haiku-5-5'],
+        ['claude-3-5-haiku-20241022', 'claude-haiku-5-5'],
     ])('将 Claude 旧模型 %s 迁移到当前同系列模型', (legacyModel, currentModel) => {
         const normalized = normalizeConfig({model: {[services.claude]: legacyModel}});
         expect(normalized.model[services.claude]).toBe(currentModel);
@@ -1432,13 +1440,34 @@ describe('旧模型编号兼容迁移', () => {
 
         expect(normalized.model).toMatchObject({
             [services.yiyan]: 'ernie-5.1',
-            [services.minimax]: 'MiniMax-M2.7',
-            [services.jieyue]: 'step-3.5-flash',
+            [services.minimax]: 'MiniMax-M3',
+            [services.jieyue]: 'step-3.7-flash',
             [services.huanYuan]: 'hy4',
             [services.infini]: 'glm-5.2',
         });
         expect(normalized.documentModel[services.minimax]).toBe('MiniMax-M3.1-flash');
         expect(normalized.modelThinking[services.minimax]).toEqual({'MiniMax-M3.1-flash': true});
+
+        const retired = normalizeConfig({
+            model: {
+                [services.yiyan]: 'ernie-speed-128k',
+                [services.minimax]: 'MiniMax-M2.7-highspeed',
+                [services.jieyue]: 'step-2-mini',
+            },
+            documentModel: {
+                [services.minimax]: 'MiniMax-M2.5',
+                [services.jieyue]: 'step-2',
+            },
+        });
+        expect(retired.model).toMatchObject({
+            [services.yiyan]: 'ernie-5.1',
+            [services.minimax]: 'MiniMax-M3.1-flash',
+            [services.jieyue]: 'step-3.7-flash',
+        });
+        expect(retired.documentModel).toMatchObject({
+            [services.minimax]: 'MiniMax-M3.1-flash',
+            [services.jieyue]: 'step-3.7-flash',
+        });
     });
 
     it('把内置兼容服务的部署别名收敛为可收藏模型，同时保留动态自定义接口的直接模型', () => {

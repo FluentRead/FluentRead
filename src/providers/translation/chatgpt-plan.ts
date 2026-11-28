@@ -17,8 +17,7 @@ import {
     reportTranslationModelUsage,
     createTranslationProviderConfigSnapshot,
 } from '@/src/services/translation/requestSnapshot';
-import type {TranslationProviderRequest} from '@/src/services/translation/types';
-import type {TranslationProviderConfigSnapshot} from '@/src/services/translation/types';
+import type {TranslationProviderConfigSnapshot, TranslationProviderRequest} from '@/src/services/translation/types';
 import {createRuntimeAbortContext, abortErrorFromSignal} from '@/src/platform/http/runtime';
 import {requestChatGPTPlanResponse} from '@/src/platform/chatgpt-plan/bridge';
 import {readChatGPTPlanStream} from '@/src/platform/chatgpt-plan/events';

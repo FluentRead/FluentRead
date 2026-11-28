@@ -9,6 +9,5 @@ export const personalCorrections = createPersonalCorrectionsClient(() => {
     if (typeof browser === 'undefined' || !browser.runtime) throw new Error('个人校订运行时不可用');
     return browser.runtime as unknown as PersonalCorrectionClientRuntime;
 });
-export {createPersonalCorrectionsClient} from './client';
 export {PERSONAL_CORRECTIONS_MESSAGE, PERSONAL_CORRECTIONS_CHANGED} from './protocol';
 export type {CorrectionQuery, PersonalCorrectionInput, PersonalCorrectionLookup, PersonalCorrectionProject, PersonalCorrectionRecord, PersonalCorrectionSaveResult, PersonalCorrectionScope, PersonalCorrectionState} from '@/src/core/personal-corrections/public';

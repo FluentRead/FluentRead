@@ -148,7 +148,7 @@ import { getHarnessSession, listLearningMemories } from '@/src/features/reading-
 import type { HarnessSession } from '@/src/services/harness/sessionTypes';
 import type { VocabularyEntry } from '../learningModel';
 import { VOCABULARY_BOOK_MESSAGE, type VocabularyBookResponse } from '../protocol';
-import type { MaterialPatch, MaterialReference } from '../materialProtocol';
+import type { MaterialImportResult, MaterialPatch, MaterialReference } from '../materialProtocol';
 import { MATERIAL_INLINE_BACKUP_MAX_BYTES, MATERIAL_CHANGED_MESSAGE, MATERIAL_IMPORT_MAX_FRAMES, MATERIAL_IMPORT_MAX_RECORD_BYTES } from '../materialProtocol';
 import { workspaceMaterialCapture, workspaceMaterialUpdate, workspaceMaterialArchive, workspaceMaterialRestore, workspaceMaterialRemoveReference, materialClear, materialImport, materialGeneration } from '../materialClient';
 import {MaterialPageClientError, requestMaterialPage, requestMaterialDetail, requestMaterialTopics} from '../materialPageClient';
@@ -162,7 +162,6 @@ import type {MaterialReadPort} from '../materialReadTransport';
 import {formatMaterialTopics, parseMaterialTopics} from '../materialTopicsInput';
 import {restoreLargeMaterialBackup, queryMaterialBackup, acknowledgeMaterialBackup, discardMaterialBackup} from '../materialBackupRestore';
 import type {Capability} from '../materialImportStage';
-import type {MaterialImportResult} from '../materialProtocol';
 import { materialResumeLink } from '../materialSource';
 import { useRenderDateFormatter } from '@/src/ui/dateFormat';
 const emit = defineEmits<{

@@ -1,11 +1,10 @@
 import {describe,expect,it} from 'vitest';
-import {assertMangaRecognitionInput,optimizeVerifiedMangaRecognition,MANGA_RECOGNITION_SOURCE_SHA,MANGA_RECOGNITION_SHAPES_VERSION,MANGA_RECOGNITION_DERIVED_SHA} from '@/src/features/image-translation/services/mangaRecognitionShapes';
+import {assertMangaRecognitionInput,optimizeVerifiedMangaRecognition,MANGA_RECOGNITION_SOURCE_SHA} from '@/src/features/image-translation/services/mangaRecognitionShapes';
 import {recognitionWireToy} from './helpers/mangaOnnxFixture';
 const asset={bytes:21159378,sha256:MANGA_RECOGNITION_SOURCE_SHA};
 describe('固定来源的私有漫画识别形状配方',()=>{
     it('无来源支持的未来模型原样返回，不推断固定宽度或另取模型',()=>{
         const unknown=new ArrayBuffer(2);expect(optimizeVerifiedMangaRecognition(unknown,{bytes:2,sha256:'new-model'})).toBe(unknown);
-        expect(MANGA_RECOGNITION_SHAPES_VERSION).toBe('ppocrv6-shapes-ab-clean-v1');expect(MANGA_RECOGNITION_DERIVED_SHA).toHaveLength(64);
     });
     it('已声明固定来源却容量/图不匹配，明确失败而不回旧图掩盖告警',()=>{
         expect(()=>optimizeVerifiedMangaRecognition(new ArrayBuffer(1),asset)).toThrow('容量');

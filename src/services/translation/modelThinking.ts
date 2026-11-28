@@ -2,7 +2,7 @@
  * @file src/services/translation/modelThinking.ts
  *
  * 文件职责：把统一的模型级 Thinking 布尔偏好转换为已确认支持的供应商请求字段，避免向未知 OpenAI-compatible 网关猜测参数。
- * 主要内容：覆盖 DeepSeek Chat/Responses、通义混合思考模型、Gemini 各代最低档与动态档、Claude 自适应思考、豆包 2.1、Kimi K2.5/K2.6 以及已确认的 GPT 模型。
+ * 主要内容：覆盖 DeepSeek Chat/Responses、通义混合思考模型、智谱 GLM 4.5–5.3、阶跃 Step 3.7 Flash、Gemini 各代最低档与动态档、Claude 自适应思考、豆包 2.1、Kimi K2.5/K2.6 以及已确认的 GPT 模型。
  * 模块边界：本文件只修改调用方提供的公开请求 payload，不读取全局配置、不发起网络请求；未知服务或模型保持原样，自定义请求体仍由模板层最后合并并拥有覆盖权。
  */
 
@@ -147,7 +147,7 @@ function applyOpenAICompatibleThinking(
         };
     }
     if ((service === services.openai || service === services.azureOpenai)
-        && /^(?:gpt-6-astra|gpt-6\.1-sol)(?:-|$)/iu.test(model)) {
+        && /^(?:gpt-6(?:\.2)?-astra|gpt-6\.1-sol)(?:-|$)/iu.test(model)) {
         return {
             effect: enabled ? 'toggle' : 'minimum',
             payload: {...payload, reasoning_effort: 'low'},
@@ -166,6 +166,22 @@ function applyOpenAICompatibleThinking(
         return {
             effect: enabled ? 'toggle' : 'minimum',
             payload: {...payload, reasoning_effort: enabled ? 'low' : 'minimal'},
+        };
+    }
+    if (service === services.zhipu && /^glm-5\.3(?:-flash)?(?:-|$)/iu.test(model)) {
+        // GLM-5.3 系列强制开启思考，禁用会报错；关闭偏好时改用最低推理档降低翻译延迟。
+        return {
+            effect: enabled ? 'toggle' : 'minimum',
+            payload: {...payload, reasoning_effort: enabled ? 'high' : 'low'},
+        };
+    }
+    if (service === services.zhipu && /^glm-(?:5(?:\.[12]|-turbo)?|4\.(?:5|7))(?:-|$)/iu.test(model)) {
+        return {effect: 'toggle', payload: {...payload, thinking: {type: enabled ? 'enabled' : 'disabled'}}};
+    }
+    if (service === services.jieyue && /^step-3\.7-flash(?:-|$)/iu.test(model)) {
+        return {
+            effect: enabled ? 'toggle' : 'minimum',
+            payload: {...payload, reasoning_effort: enabled ? 'medium' : 'low'},
         };
     }
     if (service === services.moonshot && /^kimi-k2\.(?:5|6)(?:-|$)/iu.test(model)) {

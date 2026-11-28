@@ -345,7 +345,7 @@ export function searchServiceOptions(
 }
 
 /** 常用区的默认容量；用户已配置的服务不受此限制，只限制用来补位的热门服务。 */
-export const COMMON_SERVICE_LIMIT = 8
+const COMMON_SERVICE_LIMIT = 8
 
 // 免费翻译开箱即用，始终排第一；微软、谷歌同样无需密钥，排在用户已配置的服务之后。
 const keylessCommonServices: readonly string[] = [services.microsoft, services.google]

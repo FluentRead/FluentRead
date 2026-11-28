@@ -5,7 +5,7 @@
  * 模块边界：只执行传输；不启动服务或加载模型，不持有字幕会话，不推断字级时间戳或推理设备。
  */
 import {normalizeNativeAsrBaseUrl} from '@/src/core/config/nativeAsr';
-import type {VideoTranscriptionResult} from '@/src/core/messaging/video';
+import {NATIVE_QWEN_ASR_MODEL, type VideoTranscriptionResult} from '@/src/core/messaging/video';
 import {abortErrorFromSignal, cancelResponseReader, cancelUnreadResponseBody, createRuntimeAbortContext} from '@/src/platform/http/runtime';
 
 const SAMPLE_RATE = 16_000;
@@ -17,7 +17,6 @@ const MAX_TRANSIENT_RETRIES = 2;
 const RETRY_BACKOFF_MS = [400, 1_200] as const;
 const MAX_RETRY_AFTER_MS = 10_000;
 const TRANSIENT_HTTP_STATUSES = new Set([429, 502, 503, 504]);
-export const NATIVE_QWEN_ASR_MODEL = 'Qwen/Qwen3-ASR-1.7B';
 
 const BASE64_LOOKUP = (() => {
     const table = new Int8Array(128).fill(-1);

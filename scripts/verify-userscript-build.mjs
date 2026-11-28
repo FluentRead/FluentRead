@@ -153,7 +153,13 @@ const artifactBytes = Buffer.byteLength(source);
 // 按既有 1 KB 步长最小增加 38 KB 至 2,163,100，余 817 字节；保留全部协议、资源、排除项和 VM 断言。
 // 在 db6d05720（#1446）基础上合入多源 TTS 退避熔断、47 音色配置、语速控制、七语本地化与播控 UI 优化（后台与本地 Kokoro 不进入油猴产物），
 // 按既有 1 KB 步长最小增加 25 KB 至 2,188,100；保留全部协议、资源、排除项和 VM 断言。
-const MAX_USERSCRIPT_BYTES = 2_188_100;
+// 合入 PR #1458（12 套 Popup 皮肤及 skinStudio 七语词条）后实测 2,199,535 字节，超出 11,435 字节；
+// 按既有 1 KB 步长最小增加 13 KB 至 2,201,100；保留全部协议、资源、排除项和 VM 断言。
+// 修复 #1424 中文输入法下等号/短横线三连触发（Process/229 过程键、单符号组合提交与全角符号兼容）后实测 2,202,987 字节，
+// 相对基线 37c5afb5b（2,199,535 字节）净增 3,452 字节；利用原余量后按既有 1 KB 步长最小增加 2 KB 至 2,203,100，余 113 字节；保留全部协议、资源、排除项和 VM 断言。
+// 更新主流翻译模型目录与退休迁移，并补齐智谱代理/多 Key JWT 缓存/紧凑批处理、Claude 动态 max_tokens、豆包/混元 429 调度上报与批量修复并发后实测 2,204,493 字节，
+// 相对基线 a21aa294b（2,202,987 字节）净增 1,506 字节（0.0684%）；利用原余量后按既有 1 KB 步长最小增加 2 KB 至 2,205,100，余 607 字节；保留全部协议、资源、排除项和 VM 断言。
+const MAX_USERSCRIPT_BYTES = 2_205_100;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

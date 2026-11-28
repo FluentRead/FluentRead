@@ -5,6 +5,7 @@
  * 模块边界：本文件只编排注入的 sendTabMessage，不读取 sid、不解析邮件正文、不保存会话状态；页面状态快照由 content composition root 管理。
  */
 import type {BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
+import {isBrowserTabId} from '@/src/platform/browser/ids';
 import {
     isQqMailReadmailUrl,
     isQqMailLegacyTopUrl,
@@ -31,10 +32,6 @@ export interface QQMailFrameHandlerDependencies {
     sendTabMessage(tabId: number, message: unknown, options?: {frameId: number}): Promise<unknown>;
 }
 
-function isNonNegativeInteger(value: unknown): value is number {
-    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
-
 function isPositiveInteger(value: unknown): value is number {
     return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }
@@ -42,7 +39,7 @@ function isPositiveInteger(value: unknown): value is number {
 function readSenderTab(context: QQMailFrameBackgroundContext): {tabId: number; sender: QQMailFrameSender} | null {
     const sender = context.sender;
     const tabId = sender?.tab?.id;
-    return sender && isNonNegativeInteger(tabId) ? {tabId, sender} : null;
+    return sender && isBrowserTabId(tabId) ? {tabId, sender} : null;
 }
 
 function isLegacyReadSender(context: QQMailFrameBackgroundContext): {tabId: number} | null {

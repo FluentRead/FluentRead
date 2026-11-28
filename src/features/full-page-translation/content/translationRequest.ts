@@ -227,7 +227,7 @@ export function createSnapshotTranslateOptions(
     };
 }
 
-function createAbortError(): Error {
+export function createAbortError(): Error {
     try {
         return new DOMException('翻译已取消', 'AbortError');
     } catch {
@@ -369,7 +369,7 @@ async function translateSlotsIndividually(
         && (snapshot.service === services.localTranslation || snapshot.service === services.chromeTranslator)
         ? origins.join('\n') : undefined;
     const slotIdentifications = joinedDetectionText !== undefined && origins.length > 1
-        ? origins.map(origin => identifyTextLanguage(origin ?? '')) : undefined;
+        ? origins.map(origin => identifyTextLanguage(origin)) : undefined;
     const hasConflictingSlotLanguages = new Set(
         slotIdentifications?.flatMap(item => item.status === 'identified' && item.languages.length === 1 ? item.languages : []) ?? [],
     ).size > 1;

@@ -86,7 +86,6 @@ const rows: Array<readonly [string, string, string, string, string, string, stri
   ['取消','Cancel','キャンセル','취소','Annuler','Отмена','Cancelar'],
   ['原图','Original','元画像','원본','Original','Оригинал','Original'],
   ['译图','Translated','翻訳画像','번역본','Traduit','Перевод','Traducido'],
-  ['固定英中示例，仅说明原图与译图的对照方式','Fixed English–Chinese sample showing original vs. translated view','英語と中国語の固定サンプルで、元画像と翻訳画像の比較方法を示します','원본과 번역본의 비교 방식을 보여 주는 고정 영중 예시입니다','Exemple fixe anglais-chinois illustrant la comparaison entre l’original et la traduction','Фиксированный англо-китайский пример для показа сравнения оригинала и перевода','Ejemplo fijo inglés-chino que muestra la comparación entre el original y la traducción'],
   ['常用选择器','Common selectors','よく使うセレクター','자주 쓰는 선택자','Sélecteurs courants','Частые селекторы','Selectores comunes'],
   ['暂停并显示原图','Pause and show originals','一時停止して元画像を表示','일시 중지하고 원본 보기','Mettre en pause et afficher les originaux','Приостановить и показать оригиналы','Pausar y mostrar originales'],
   ['部分页面未完成','Some pages are incomplete','一部のページが未完了です','일부 페이지가 완료되지 않았습니다','Certaines pages sont incomplètes','Некоторые страницы не завершены','Algunas páginas están incompletas'],

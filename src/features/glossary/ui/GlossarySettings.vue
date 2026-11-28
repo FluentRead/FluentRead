@@ -162,11 +162,10 @@
 <script setup lang="ts">
 import UiIcon from '@/src/ui/components/UiIcon.vue'
 import ElSelect from '@/src/ui/components/UiSelect.vue';
-import {ElOption} from 'element-plus';
+import {ElMessageBox, ElOption} from 'element-plus';
 import 'element-plus/es/components/select/style/css';
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import {computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch} from 'vue';
-import {ElMessageBox} from 'element-plus';
 import browser from 'webextension-polyfill';
 import {config, configReady, requestConfigPatch, subscribeConfig} from '@/src/services/config/store';
 import {getMultilingualTargetLanguageLabel, options} from '@/src/core/config/catalog';

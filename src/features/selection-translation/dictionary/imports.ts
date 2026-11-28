@@ -11,8 +11,8 @@ import {dictionaryPlainText, normalizeDictionaryWord} from './model';
 import {decodeMdictKeyInfo} from './mdictKeys';
 
 export const DICTIONARY_IMPORT_BYTES = 128 * 1024 * 1024;
-export const DICTIONARY_EXPANDED_BYTES = 256 * 1024 * 1024;
-export const DICTIONARY_ENTRY_LIMIT = 500_000;
+const DICTIONARY_EXPANDED_BYTES = 256 * 1024 * 1024;
+const DICTIONARY_ENTRY_LIMIT = 500_000;
 export interface ImportedDictionaryEntry {key: string; word: string; html: string; definition: string; phonetic: string}
 export interface ImportedDictionaryResource {path: string; bytes: Uint8Array}
 export interface ImportedDictionary {name: string; format: string; entries: ImportedDictionaryEntry[]; resources: ImportedDictionaryResource[]; css: string}

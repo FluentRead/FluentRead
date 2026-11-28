@@ -8,7 +8,8 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {BILIBILI_FREE_TRANSLATION_DOMAIN, FREE_TRANSLATION_PROVIDERS, type FreeTranslationProviderId} from '@/src/core/config/freeTranslation';
-import {FREE_PROVIDER_ORIGINS, FREE_PROVIDER_PERMISSION_QUERY_TIMEOUT_MS, isFreeProviderAllowed, readFreePoolAccess, requestFreeProviderAccess, requireFreeProviderAccess, subscribeFreeProviderAccessChanges} from '@/src/platform/browser/freeProviderPermissions';
+import {FREE_PROVIDER_ORIGINS} from '@/src/core/config/freeProviderOrigins';
+import {FREE_PROVIDER_PERMISSION_QUERY_TIMEOUT_MS, isFreeProviderAllowed, readFreePoolAccess, requestFreeProviderAccess, requireFreeProviderAccess, subscribeFreeProviderAccessChanges} from '@/src/platform/browser/freeProviderPermissions';
 import {serializeTranslationError, unwrapTranslationResponse} from '@/src/services/translation/errors';
 
 afterEach(() => {vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs();});

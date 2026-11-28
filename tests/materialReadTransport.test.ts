@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
-import {MATERIAL_READ_FRAME_BYTES, MATERIAL_READ_MESSAGE_BYTES, addMaterialReadCount, receiveMaterialRead, sendMaterialRead, startMaterialRead, type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
+import {MATERIAL_READ_FRAME_BYTES, MATERIAL_READ_MESSAGE_BYTES, addMaterialReadCount, sendMaterialRead, startMaterialRead, type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
+const receiveMaterialRead = async (...args: Parameters<typeof startMaterialRead>) => startMaterialRead(...args).result;
 
 function pair(synchronous=false) {
   type Listener=(value:unknown)=>void;

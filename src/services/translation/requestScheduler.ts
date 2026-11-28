@@ -13,6 +13,7 @@ import {
 } from '@/src/core/config/scheduling';
 import {normalizeTranslationRequestLimits} from '@/src/core/config/requestLimits';
 import {readRetryAfterMs} from '@/src/platform/http/errors';
+import {createTranslationAbortError as createAbortError} from './errors';
 
 export interface TranslationRequestLimits {
     maxConcurrentTranslations?: unknown;
@@ -131,11 +132,6 @@ export interface TranslationRequestSchedulerDependencies {
     random?: () => number;
 }
 
-function createAbortError(): Error {
-    const error = new Error('翻译已取消');
-    error.name = 'AbortError';
-    return error;
-}
 function finiteNow(now: () => number): number {
     const value = now();
     return Number.isFinite(value) ? value : Date.now();

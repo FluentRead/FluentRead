@@ -4,4 +4,4 @@
  * 主要内容：材料原段落定位、视频恢复及监听资源的统一卸载。
  * 模块边界：由内容 composition root 主动挂载；类型和收藏客户端不导入此浏览器内容运行时。
  */
-export {mountMaterialContent, locateMaterialParagraph} from '../../materialContent';
+export {mountMaterialContent} from '../../materialContent';

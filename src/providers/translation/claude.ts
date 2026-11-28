@@ -21,7 +21,7 @@ import {
     reportTranslationModelUsageFailure,
     getTranslationImageInput,
 } from '@/src/services/translation/requestSnapshot';
-import type {TranslationProviderRequest} from '@/src/services/translation/types';
+import {TRANSLATION_COMPACT_BATCH, type TranslationProviderRequest} from '@/src/services/translation/types';
 import {normalizeClaudeUsage} from './usage';
 
 async function claude(message: TranslationProviderRequest<string>) {
@@ -89,9 +89,14 @@ async function claude(message: TranslationProviderRequest<string>) {
             || (Array.isArray(result?.content) && result.content.some((item: any) =>
                 item?.type === 'refusal' || item?.type === 'error' || item?.type === 'tool_use'));
         if (incompleteMessage) {
-            const error = Object.assign(new Error('Claude 响应未完整完成，已拒绝部分输出'), {
-                kind: 'response', retryable: false, statusCode: resp.status,
-            });
+            const compactTruncated = current[TRANSLATION_COMPACT_BATCH] === true && result?.stop_reason === 'max_tokens';
+            const error = Object.assign(
+                new Error(compactTruncated ? '批量翻译返回格式异常' : 'Claude 响应未完整完成，已拒绝部分输出'),
+                {
+                    kind: 'response', retryable: false, statusCode: resp.status,
+                    ...(compactTruncated ? {code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID'} : {}),
+                },
+            );
             attemptReported = true;
             reportTranslationModelUsage(message, {
                 ...normalizeClaudeUsage(result?.usage, actualModel),

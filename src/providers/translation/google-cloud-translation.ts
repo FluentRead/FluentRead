@@ -9,10 +9,9 @@
 import {services} from '@/src/core/config/catalog';
 import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {method, urls} from '@/src/core/config/constants';
-import {getTranslationProviderLanguages} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderLanguages, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import {createHttpStatusError, createProviderCodeError} from '@/src/platform/http/errors';
 import {abortErrorFromSignal, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
-import {requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderRequest} from '@/src/services/translation/types';
 import {resolveCloudLanguages} from './cloud/languages';
 import {readNativeBatchJson, translateNativeTextBatch} from './native-batch';

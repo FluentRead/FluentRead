@@ -162,6 +162,7 @@ export const servicesType = {
         services.yiyan,
         services.moonshot,
         services.tongyi,
+        services.zhipu,
         services.xiaoniu,
         services.tencent,
         services.infini,

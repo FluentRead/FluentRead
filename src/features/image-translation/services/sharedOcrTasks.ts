@@ -8,7 +8,7 @@ type Outcome<T> = {result: T} | {error: unknown};
 type Subscriber<T> = {finish: (outcome: Outcome<T>) => void; progress?: (percent: number) => void};
 type SharedTask<T> = {controller: AbortController; subscribers: Set<Subscriber<T>>; percent?: number};
 
-function abortError(): Error {
+export function createOcrAbortError(): Error {
     const error = new Error('图片 OCR 请求已取消');
     error.name = 'AbortError';
     return error;
@@ -23,7 +23,7 @@ export function createSharedOcrTasks<T>() {
     return {
         run(key: string, operation: (signal: AbortSignal, progress: (percent: number) => void) => Promise<T>,
             signal?: AbortSignal, progress?: (percent: number) => void): Promise<T> {
-            if (signal?.aborted) return Promise.reject(abortError());
+            if (signal?.aborted) return Promise.reject(createOcrAbortError());
             const existing = tasks.get(key);
             const task = existing ?? {controller: new AbortController(), subscribers: new Set<Subscriber<T>>()};
             tasks.set(key, task);
@@ -37,7 +37,7 @@ export function createSharedOcrTasks<T>() {
                     },
                 };
                 const cancel = () => {
-                    subscriber.finish({error: abortError()});
+                    subscriber.finish({error: createOcrAbortError()});
                     if (task.subscribers.size === 0) {
                         if (tasks.get(key) === task) tasks.delete(key);
                         task.controller.abort();

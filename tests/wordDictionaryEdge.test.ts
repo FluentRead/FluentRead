@@ -12,7 +12,6 @@ import {
     createWordDictionaryLookup,
     lookupWord,
     mergeWordCardData,
-    normalizeEnglishWord,
     parseDatamuseWord,
     parseEcdictEntry,
     parseFreeDictionaryEntry,
@@ -23,6 +22,7 @@ import {
     type WordDictionaryProvider,
     type WordDictionaryProviderId,
 } from '@/src/features/selection-translation/services/wordDictionary';
+import {normalizeEnglishWord} from '@/src/features/selection-translation/services/wordNormalization';
 
 function response(payload: unknown, ok = true, status = ok ? 200 : 503): Response {
     return {ok, status, json: async () => payload} as Response;

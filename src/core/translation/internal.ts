@@ -1,8 +1,8 @@
 /**
  * @file src/core/translation/internal.ts
  *
- * 文件职责：保存候选引擎内部可独立测试的缓存继承、适配裁剪祖先查找与内联分段算法。
- * 主要内容：定义 AncestorAdapterDecision 等内部结构，提供 inheritCachedFlag、readCachedFlagOr、findAdapterPrunedAncestor 和 partitionInlineRunAtBarriers，降低 engine 与 layout 的复杂度。 可核对的公开符号包括 AncestorAdapterDecision、AdapterPrunedAncestorResult、inheritCachedFlag、readCachedFlagOr、findAdapterPrunedAncestor、partitionInlineRunAtBarriers。
+ * 文件职责：保存候选引擎内部可独立测试的缓存继承与适配裁剪祖先查找算法。
+ * 主要内容：定义 AncestorAdapterDecision 与 AdapterPrunedAncestorResult 内部结构，提供 inheritCachedFlag 和 findAdapterPrunedAncestor，降低 engine 的祖先遍历复杂度。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
@@ -27,17 +27,6 @@ export function inheritCachedFlag<T extends object>(
 ): boolean {
     if (current === null) return false;
     return flags.get(current) === true;
-}
-
-/** 优先读取本轮缓存，缺失时才执行后备计算。 */
-export function readCachedFlagOr<T extends object>(
-    flags: WeakMap<T, boolean>,
-    key: T,
-    fallback: () => boolean,
-): boolean {
-    const cached = flags.get(key);
-    if (cached !== undefined) return cached;
-    return fallback();
 }
 
 /**
@@ -71,29 +60,4 @@ export function findAdapterPrunedAncestor<T>(
     }
 
     return {result: null, inspected};
-}
-
-/**
- * 按不可移动的子树边界切分一个直接行内节点序列；边界节点本身由独立候选负责。
- */
-export function partitionInlineRunAtBarriers<T>(
-    nodes: readonly T[],
-    isBarrier: (node: T) => boolean,
-): T[][] {
-    const partitions: T[][] = [];
-    let current: T[] = [];
-    const flush = () => {
-        if (current.length > 0) partitions.push(current);
-        current = [];
-    };
-
-    for (const node of nodes) {
-        if (isBarrier(node)) {
-            flush();
-            continue;
-        }
-        current.push(node);
-    }
-    flush();
-    return partitions;
 }

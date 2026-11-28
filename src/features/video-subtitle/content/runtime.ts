@@ -53,7 +53,14 @@ import {
   removeTranslationOverlay, clearRenderedVideoTranslation, deactivateNormalizedVideoCaption, readVideoPlaybackTimeMs,
   syncTranslationOverlayPosition,
   applyVideoDisplayState,
-  installVideoSubtitleStyle
+  installVideoSubtitleStyle,
+  getVideoUiLanguage,
+  localizeVideoUiText,
+  refreshVideoUiAccessibility,
+  refreshVideoUiText,
+  getVideoSubtitleDownloadErrorMessage,
+  writeVideoCaptionText,
+  createVideoSubtitleKaraoke,
 } from './ui';
 import {XCaptionSource, isXNativeCaptionControl} from './xCaptionSource';
 import {XHlsAudioReader} from './hlsAudioRuntime';
@@ -63,7 +70,6 @@ import {createVideoReadingPlayer} from './readingAnnotationPlayer';
 import {VideoPretranslationController} from './pretranslationController';
 import {getVideoTranslationConfigFingerprint, normalizeVideoCaptionText, revealVideoSubtitleTranslation, selectYoutubeCaptionCue, selectVideoSubtitleCueAtOffset, findProgressiveVideoCaptionCue, findActiveVideoCaptionCue, selectProgressiveVideoCaptionCue, type YoutubeCueSelection} from './subtitleLogic';
 import { config, requestConfigPatch, subscribeConfig } from '@/src/services/config/store';
-import {getVideoUiLanguage, localizeVideoUiText, refreshVideoUiAccessibility, refreshVideoUiText, getVideoSubtitleDownloadErrorMessage, writeVideoCaptionText, createVideoSubtitleKaraoke} from './ui';
 import {
   type Config,
   normalizeVideoSubtitleOffsetMs,
@@ -114,12 +120,11 @@ import {createVideoPlayerBinding, type VideoPlayerBinding} from './videoPlayerBi
 import {getVideoTranscriptionCacheRequest, getVideoTranscriptionMediaTransition, VideoTranscriptionCacheClient} from './transcriptionCacheClient';
 import type {VideoAiSubtitleCacheSource} from '../transcriptionCache';
 import {getCaptionPlatform} from './platforms';
-import {getCourseCaptionRequest} from './courseCaptionData';
+import {getBilibiliPart, getCourseCaptionRequest} from './courseCaptionData';
 import {mountPlatformCaptions} from './platformRuntime';
 import {createYoutubeNativeCaptionVisibility} from './youtubeNativeCaptionVisibility';
 import {BilibiliAiSource} from './bilibiliAiSource';
 import {readBilibiliAudio} from './bilibiliAudio';
-import {getBilibiliPart} from './courseCaptionData';
 import {requestBilibiliCaptionManifest} from './bilibiliCaptionBridge';
 import {YoutubeHumanCaptions} from './youtubeHumanCaptions';
 import {readVideoCaptionText} from './subtitleTransport';

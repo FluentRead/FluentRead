@@ -25,5 +25,4 @@ export function getInformationHighlightArtifactStore(modelId: InformationHighlig
     stores.set(model.id, store);
     return store;
 }
-export const informationHighlightArtifacts = getInformationHighlightArtifacts();
 export const informationHighlightArtifactStore = getInformationHighlightArtifactStore();

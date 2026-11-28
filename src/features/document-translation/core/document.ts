@@ -316,6 +316,15 @@ export function getDocumentFormatLabel(format: DocumentFormat): string {
     return FORMAT_LABELS[format];
 }
 
+export function getDocxPartLabel(path: string): string {
+    if (path === 'word/document.xml') return '正文';
+    if (/header/iu.test(path)) return '页眉';
+    if (/footer/iu.test(path)) return '页脚';
+    if (/footnotes/iu.test(path)) return '脚注';
+    if (/endnotes/iu.test(path)) return '尾注';
+    return '文档内容';
+}
+
 export function getDocumentMimeType(format: DocumentFormat): string {
     if (format === 'pdf') return 'application/pdf';
     if (format === 'epub') return 'application/epub+zip';

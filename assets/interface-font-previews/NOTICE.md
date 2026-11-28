@@ -14,7 +14,7 @@ The generator verifies every source's existing SHA-256 before processing it.
 No network download is used during regeneration.
 
 Each weight-700 face contains only the source glyphs needed by that font option's
-own title in zh-CN, en-US, ja-JP, ko-KR, fr-FR, es-ES and ru-RU. Each weight-400
+own title in zh-CN, zh-TW, en-US, ja-JP, ko-KR, fr-FR, es-ES and ru-RU. Each weight-400
 face contains its own descriptions, the localized bottom preview and
 `Aa Bb Cc · 0123456789`. Noto Sans SC additionally supplies source-supported
 characters missing from the other fonts' titles/descriptions at the same weight.
@@ -51,13 +51,13 @@ it never relies on previously generated preview subsets.
 
 Run `python3 scripts/fonts/build-interface-font-previews.py` from the repository,
 or append `--check` to reproduce and compare without changing any file.
-The maintenance script uses Python, fontTools 4.38.0 and Node 20+
+The maintenance script uses Python, fontTools 4.60.2 and Node 20+
 with built-in Brotli. These are not extension build or runtime dependencies.
 The script keeps original font timestamps so regenerated WOFF2 bytes are stable.
 When card copy or its 400/700 rendering roles change, regenerate and review the
 new coverage and hashes.
 
-The 18 checked-in WOFF2 faces total 197,480 bytes. Requests
-are drawn from a corpus of 383 distinct Unicode
+The 18 checked-in WOFF2 faces total 209,020 bytes. Requests
+are drawn from a corpus of 423 distinct Unicode
 characters and trimmed by font option and weight, retaining each source font's
 real outlines and supported mappings.

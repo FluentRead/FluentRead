@@ -169,7 +169,8 @@ describe('self help diagnosis', () => {
     for (const action of ['retry', 'services', 'site-settings', 'refresh', 'dismiss'] as const) {
       expect(translate(`diagnostics.action.${action}`, resolveUiLanguageFromLocale('zh-CN'))).not.toBe(translate(`diagnostics.action.${action}`, resolveUiLanguageFromLocale('en')));
     }
-    expect(getDiagnosticText({code: 'cancelled'}, 'zh-HK')).toEqual(getDiagnosticText({code: 'cancelled'}));
+    expect(getDiagnosticText({code: 'cancelled'}, 'zh-HK')).toEqual(getDiagnosticText({code: 'cancelled'}, 'zh-TW'));
+    expect(getDiagnosticText({code: 'cancelled'}, 'zh-SG')).toEqual(getDiagnosticText({code: 'cancelled'}));
     expect(translate(`diagnostics.action.${'retry'}`, resolveUiLanguageFromLocale('zh-CN'))).toBe('重试');
     const copy = getDiagnosticText({code: 'unknown'});
     copy.title = 'changed';
@@ -204,7 +205,7 @@ describe('self help diagnosis', () => {
   });
 
   it('routes supported language variants and uses the shared default for unsupported or empty locales', () => {
-    for (const [variant, canonical] of [['zh-TW', 'zh-CN'], ['EN-gb', 'en-US'], ['ja_JP', 'ja-JP'], ['ko', 'ko-KR'], ['fr-CA', 'fr-FR'], ['ru', 'ru-RU'], ['es-MX', 'es-ES']]) {
+    for (const [variant, canonical] of [['zh-HK', 'zh-TW'], ['zh-SG', 'zh-CN'], ['EN-gb', 'en-US'], ['ja_JP', 'ja-JP'], ['ko', 'ko-KR'], ['fr-CA', 'fr-FR'], ['ru', 'ru-RU'], ['es-MX', 'es-ES']]) {
       expect(getDiagnosticText({code: 'authentication'}, variant)).toEqual(getDiagnosticText({code: 'authentication'}, canonical));
       expect(translate(`diagnostics.${({code: 'authentication'}).code}.summary`, resolveUiLanguageFromLocale(variant))).toBe(translate(`diagnostics.${({code: 'authentication'}).code}.summary`, resolveUiLanguageFromLocale(canonical)));
       expect(translate(`diagnostics.action.${'retry'}`, resolveUiLanguageFromLocale(variant))).toBe(translate(`diagnostics.action.${'retry'}`, resolveUiLanguageFromLocale(canonical)));

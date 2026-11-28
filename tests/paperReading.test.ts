@@ -76,11 +76,13 @@ describe('arXiv paper reading entry', () => {
         const labels = UI_LANGUAGE_OPTIONS.map(({value}) => translate('document.paperReading.bilingual', value));
         expect(new Set(labels).size).toBe(UI_LANGUAGE_OPTIONS.length);
         expect(translate('document.paperReading.bilingual', 'zh-CN')).toBe('双语翻译（流畅阅读）');
+        expect(translate('document.paperReading.bilingual', 'zh-TW')).toBe('雙語翻譯（流暢閱讀）');
         expect(translate('document.paperReading.bilingual', 'en-US')).toBe('Bilingual translation (FluentRead)');
-        expect(labels.filter(label => /[（(]FluentRead[）)]$/u.test(label))).toHaveLength(UI_LANGUAGE_OPTIONS.length - 1);
+        expect(labels.filter(label => /[（(]FluentRead[）)]$/u.test(label))).toHaveLength(UI_LANGUAGE_OPTIONS.length - 2);
         const pdfLabels = UI_LANGUAGE_OPTIONS.map(({value}) => translate('document.paperReading.pdf', value));
         expect(translate('document.paperReading.pdf', 'zh-CN')).toBe('PDF 阅读（流畅阅读）');
-        expect(pdfLabels.filter(label => /[（(]FluentRead[）)]$/u.test(label))).toHaveLength(UI_LANGUAGE_OPTIONS.length - 1);
+        expect(translate('document.paperReading.pdf', 'zh-TW')).toBe('PDF 閱讀（流暢閱讀）');
+        expect(pdfLabels.filter(label => /[（(]FluentRead[）)]$/u.test(label))).toHaveLength(UI_LANGUAGE_OPTIONS.length - 2);
     });
 
     it('uses the original HTML version in both responsive locations and removes the entries on cleanup', () => {

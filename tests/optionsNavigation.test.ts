@@ -131,16 +131,16 @@ describe('options navigation view-model', () => {
     expect(filterNavigationItems('AI 智能上下文')).toEqual([
       expect.objectContaining({ id: 'settings-translation' }),
     ])
-    expect(filterNavigationItems('简约风格')).toEqual([
+    expect(filterNavigationItems('液态玻璃')).toEqual([
       expect.objectContaining({ id: 'settings-interface' }),
     ])
-    expect(filterNavigationItems('青花')).toEqual([
+    expect(filterNavigationItems('极光幻彩')).toEqual([
       expect.objectContaining({ id: 'settings-interface' }),
     ])
     expect(filterNavigationItems('菜单栏布局')).toEqual([
       expect.objectContaining({ id: 'settings-interface' }),
     ])
-    expect(filterNavigationItems('传统色')).toEqual([
+    expect(filterNavigationItems('典藏画报')).toEqual([
       expect.objectContaining({ id: 'settings-interface' }),
     ])
     // 译文样式与颜色都集中在外观与界面页，不再同时命中通用设置。

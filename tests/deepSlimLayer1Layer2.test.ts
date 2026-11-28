@@ -214,14 +214,14 @@ describe('PDF.js pinned binary data factory', () => {
 });
 
 describe('delta UI language packs', () => {
-    it('keeps en-US full locally and reconstructs all 5 remote-base languages identically to full bundles', () => {
+    it('keeps en-US and zh-TW full locally and reconstructs all 5 remote-base languages identically to full bundles', () => {
         const fullFiles = new Map(createUiLanguageBundleFiles().map(item => [item.relativeDest, JSON.parse(item.contents)]));
         const extFiles = createExtensionUiLanguageBundleFiles(PROJECT_ROOT);
-        expect(extFiles).toHaveLength(6);
+        expect(extFiles).toHaveLength(7);
 
         for (const {relativeDest, contents} of extFiles) {
             const parsed = JSON.parse(contents);
-            if (relativeDest === 'i18n/en-US.json') {
+            if (relativeDest === 'i18n/en-US.json' || relativeDest === 'i18n/zh-TW.json') {
                 expect(isDeltaUiLanguageBundle(parsed)).toBe(false);
                 expect(parsed).toEqual(fullFiles.get(relativeDest));
                 continue;

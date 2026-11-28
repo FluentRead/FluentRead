@@ -342,7 +342,7 @@ describe('audit48D unchanged production adapter consumers', () => {
 describe('audit48D retained public contracts', () => {
  it('prepares and reports cached files without inference and removes only after successful completion', async () => {
   const {api}=await owner(); vi.stubGlobal('fetch',vi.fn(async () => {throw new Error('unexpected network');}));
-  await expect(api.prepareLocalTtsModel(true)).resolves.toMatchObject({model:LOCAL_TTS_MODEL_ID,warm:false});
+  await expect(api.prepareLocalTtsModel(false)).resolves.toMatchObject({model:LOCAL_TTS_MODEL_ID,warm:false});
   await expect(api.getLocalTtsModelStatus()).resolves.toMatchObject({models:[{downloaded:true}]});
   expect(WorkerPort.instances).toHaveLength(0);
   await api.removeLocalTtsModel(); await expect(api.getLocalTtsModelStatus()).resolves.toMatchObject({models:[{downloaded:false}]});

@@ -472,9 +472,10 @@ describe('编辑宿主原生写回', () => {
         expect(page.execCommand).not.toHaveBeenCalled();
     });
 
-    it.each([['=', '===', '='], [' ', ' \u00a0\u00a0', ' ']])('清理本次光标前的两个触发符 %s，不删除原文已有符号和格式', async (symbol, suffix, retained) => {
+    it.each([['=', '===', '='], [' ', ' \u00a0\u00a0', ' '], ['===', '====', '='], ['＝＝＝', '＝＝＝＝', '＝'], ['－－－', '－－－－', '－']])('清理本次光标前的触发符 %s，不删除原文已有符号和格式', async (symbol, suffix, retained) => {
         const page = editorPage(`<div contenteditable="true"><b>原文${suffix}</b></div>`);
         const text = page.element.querySelector('b')!.firstChild! as Text;
+        const expectedLen = symbol.length === 1 ? 2 : symbol.length;
         const caret = new FakeRange();
         caret.selectNodeContents(page.element);
         caret.setEnd(text, text.data.length);
@@ -482,9 +483,9 @@ describe('编辑宿主原生写回', () => {
         page.selection.ranges = [caret];
         page.execCommand.mockReturnValue(false);
         page.element.addEventListener('paste', event => {
-            expect(page.selection.toString()).toBe(suffix.slice(-2));
+            expect(page.selection.toString()).toBe(suffix.slice(-expectedLen));
             event.preventDefault();
-            text.data = text.data.slice(0, -2);
+            text.data = text.data.slice(0, -expectedLen);
         });
         await expect(settle(replaceEditableText(page.element, '', () => true, 'trigger', symbol))).resolves.toBe('replaced');
         expect(page.element.innerHTML).toBe(`<b>原文${retained}</b>`);
@@ -629,6 +630,7 @@ describe('编辑宿主原生写回', () => {
         caret.collapse(false);
         page.selection.ranges = [caret];
         await expect(replaceEditableText(page.element, '', () => true, 'trigger', '=')).resolves.toBe('unsupported');
+        await expect(replaceEditableText(page.element, '', () => true, 'trigger', '===')).resolves.toBe('unsupported');
         await expect(replaceEditableText(page.element, '', () => true, 'trigger', '')).resolves.toBe('unsupported');
         Object.defineProperty(page.element.firstChild!, 'textContent', {value: null});
         await expect(replaceEditableText(page.element, '', () => true, 'trigger', '=')).resolves.toBe('unsupported');

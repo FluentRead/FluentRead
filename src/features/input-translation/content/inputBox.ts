@@ -1,7 +1,7 @@
 /**
  * @file src/features/input-translation/content/inputBox.ts
  * 文件职责：提供输入框快捷翻译使用的纯 DOM 判定与提交守卫，统一处理非敏感 input、textarea、contenteditable 编辑宿主（含富文本编辑器）和 Shadow DOM 深层焦点。
- * 主要内容：定义三连空格/等号/减号触发类型，包含活动元素查找、原生控件与编辑宿主识别（含 fieldset 与跨 Shadow DOM 的 ARIA 继承禁用）、文本与值快照读取、原生控件选区读取、请求提交有效性判断、键盘匹配，以及本次实际插入字符区间的清理。
+ * 主要内容：定义三连空格/等号/减号触发类型与半角/全角符号集，包含活动元素查找、原生控件与编辑宿主识别（含 fieldset 与跨 Shadow DOM 的 ARIA 继承禁用）、文本与值快照读取、原生控件选区读取、请求提交有效性判断、键盘与 IME 过程键匹配、IME 实际插入触发符识别，以及本次实际插入字符区间的清理。
  * 模块边界：该模块不注册事件、不发送翻译请求也不改变控件值；编辑宿主的光标度量与原生编辑写回位于 editableHost.ts，content/index.ts 负责生命周期与写回编排，后台 handler 负责翻译，函数保持可单测且不持有全局状态。
  */
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'url', 'email', 'tel']);
@@ -11,6 +11,11 @@ const CODE_EDITOR_SELECTOR = '.cm-content, .cm-editor, .monaco-editor, .ace_edit
 // Slate 在空编辑器内渲染可见占位文本；占位存在时编辑内容为空，不能把提示语当作原文。
 const EDITOR_PLACEHOLDER_SELECTOR = '[data-slate-placeholder]';
 const IGNORED_EDITABLE_CHARACTERS = /[\u200B\uFEFF]/g;
+const TRIGGER_SYMBOLS: Readonly<Record<InputBoxTrigger, readonly string[]>> = {
+    triple_space: [' ', '\u3000'],
+    triple_equal: ['=', '＝'],
+    triple_dash: ['-', '－'],
+};
 
 export {
     normalizeInputBoxTranslationInterval,
@@ -123,25 +128,21 @@ export function getInputBoxValueAfterInsertion(
     };
 }
 
-/** 只移除本次触发实际插入的字符区间，保留用户原有的同类符号。 */
+/** 只移除本次触发实际插入的字符区间，兼容半角与全角触发符并保留用户原有的同类符号。 */
 export function removeInsertedTriggerSymbols(
     value: string,
     trigger: string,
     start: number,
     count = 2,
 ): string {
-    const triggerSymbol = trigger === 'triple_space'
-        ? ' '
-        : trigger === 'triple_equal'
-            ? '='
-            : trigger === 'triple_dash'
-                ? '-'
-                : '';
-    if (!triggerSymbol || count <= 0) return value;
+    const symbols = Object.hasOwn(TRIGGER_SYMBOLS, trigger)
+        ? TRIGGER_SYMBOLS[trigger as InputBoxTrigger]
+        : null;
+    if (!symbols || count <= 0) return value;
     const safeStart = Math.max(0, Math.min(start, value.length));
-    const end = safeStart + (triggerSymbol.length * count);
+    const end = safeStart + count;
     const inserted = value.slice(safeStart, end);
-    if (inserted !== triggerSymbol.repeat(count)) return value;
+    if (inserted.length !== count || ![...inserted].every(char => symbols.includes(char))) return value;
     return `${value.slice(0, safeStart)}${value.slice(end)}`;
 }
 
@@ -182,15 +183,64 @@ export function canCommitInputBoxTranslation(state: InputBoxTranslationCommitSta
         && state.currentValue === state.expectedValue;
 }
 
-/** 判断一次键盘事件是否匹配当前的三连击触发方式。 */
+/** 判断键盘事件是否经过 IME 过程键管线（如 Windows/Linux 中文输入法下的 Process/229）。 */
+export function isImeProcessedKeyEvent(event: Pick<KeyboardEvent, 'key' | 'keyCode'>): boolean {
+    return event.keyCode === 229 || event.key === 'Process' || event.key === 'Unidentified';
+}
+
+/** 为直接非 IME 按键确定预期插入的触发符号，保留全角等号/减号/空格。 */
+export function resolveInputBoxTriggerSymbol(event: Pick<KeyboardEvent, 'key'>, trigger: InputBoxTrigger): string {
+    const symbols = TRIGGER_SYMBOLS[trigger];
+    return symbols.includes(event.key) ? event.key : symbols[0];
+}
+
+/** 校验原生控件在 IME 提交后是否恰好在原选区插入了单个有效触发符。 */
+export function matchInsertedControlTriggerSymbol(
+    beforeValue: string,
+    beforeSelection: InputBoxSelection,
+    afterValue: string,
+    afterSelection: InputBoxSelection | null,
+    trigger: InputBoxTrigger,
+): string | null {
+    if (!afterSelection) return null;
+    for (const symbol of TRIGGER_SYMBOLS[trigger]) {
+        const expected = getInputBoxValueAfterInsertion(beforeValue, beforeSelection, symbol);
+        if (afterValue === expected.value
+            && afterSelection.start === expected.selection.start
+            && afterSelection.end === expected.selection.end) {
+            return symbol;
+        }
+    }
+    return null;
+}
+
+/** 校验编辑宿主在 IME 提交后是否恰好在原折叠光标处插入了单个有效触发符。 */
+export function matchInsertedEditableTriggerSymbol(
+    before: {text: string; caret: number},
+    after: {text: string; caret: number} | null,
+    trigger: InputBoxTrigger,
+): string | null {
+    if (!after) return null;
+    for (const symbol of TRIGGER_SYMBOLS[trigger]) {
+        const expectedText = `${before.text.slice(0, before.caret)}${symbol}${before.text.slice(before.caret)}`;
+        if (after.text === expectedText && after.caret === before.caret + symbol.length) {
+            return symbol;
+        }
+    }
+    return null;
+}
+
+/** 判断一次键盘事件是否匹配当前的三连击触发方式（兼容全角符号与数字小键盘）。 */
 export function matchesInputBoxTrigger(event: KeyboardEvent, trigger: InputBoxTrigger): boolean {
     switch (trigger) {
         case 'triple_space':
-            return event.key === ' ' || event.code === 'Space';
+            return event.key === ' ' || event.key === '\u3000' || event.code === 'Space';
         case 'triple_equal':
-            return event.key === '=' || (event.code === 'Equal' && !event.shiftKey);
+            return event.key === '=' || event.key === '＝'
+                || ((event.code === 'Equal' || event.code === 'NumpadEqual') && !event.shiftKey);
         case 'triple_dash':
-            return event.key === '-' || (event.code === 'Minus' && !event.shiftKey);
+            return event.key === '-' || event.key === '－'
+                || ((event.code === 'Minus' || event.code === 'NumpadSubtract') && !event.shiftKey);
         default:
             return false;
     }

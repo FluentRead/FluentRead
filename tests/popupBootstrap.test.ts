@@ -7,6 +7,7 @@ const ports = vi.hoisted(() => ({
     mainGate: undefined as Promise<void> | undefined, onboardingGate: undefined as Promise<void> | undefined,
     mainLoaded: vi.fn(), onboardingLoaded: vi.fn(), ensureBundle: vi.fn(async (_language: unknown) => {}), font: vi.fn(async (_font: unknown) => {}),
     skin: vi.fn((_skin: unknown) => 'default'), theme: vi.fn((_dark: unknown) => {}), persistStartupAppearance: vi.fn((_skin: unknown, _theme: unknown) => {}),
+    subscribe: vi.fn((listener: (next: typeof ports.config) => void) => {listener(ports.config); return () => {};}),
     browser: 'chrome', platform: vi.fn(), currentTab: vi.fn(), tabViews: vi.fn(), tabApi: 'present' as 'present' | 'missing-tabs' | 'missing-method', unmountCallbacks: [] as Array<()=>void>,
     createApp: vi.fn(), plugin: vi.fn(() => ({kind: 'i18n'})), use: vi.fn(), component: vi.fn(), mount: vi.fn(), anonymousElement: false,
 }));
@@ -28,7 +29,7 @@ vi.mock('element-plus', () => Object.fromEntries(
 ));
 vi.mock('../src/app/options/OptionsApp.vue', () => ({default: {kind: 'options'}}));
 vi.mock('../src/ui/components/UiSelect.vue', () => ({default: {kind: 'ui-select'}}));
-vi.mock('../src/services/config/store', () => ({config: ports.config, get configReady() {return ports.ready;}, getConfigHydrationStatus: () => ports.hydration}));
+vi.mock('../src/services/config/store', () => ({config: ports.config, get configReady() {return ports.ready;}, getConfigHydrationStatus: () => ports.hydration, subscribeConfig: ports.subscribe}));
 vi.mock('../src/ui/i18n', () => ({createUiI18nPlugin: ports.plugin}));
 vi.mock('../src/platform/i18n/uiLanguageBundles', () => ({ensureUiLanguageBundle: ports.ensureBundle}));
 vi.mock('../src/ui/interfaceAppearance', () => ({prepareInterfaceFont: ports.font, applyInterfaceSkin: ports.skin, applyInterfaceTheme: ports.theme, persistPopupStartupAppearance: ports.persistStartupAppearance}));
@@ -43,6 +44,7 @@ beforeEach(async () => {
     Object.assign(ports.config, {uiLanguageSetupCompleted: false, uiLanguage: 'en-US', interfaceFont: 'system', interfaceSkin: 'default', theme: 'auto'});
     ports.font.mockReset().mockResolvedValue(undefined); ports.ensureBundle.mockReset().mockResolvedValue(undefined);
     ports.skin.mockReset(); ports.theme.mockReset(); ports.persistStartupAppearance.mockReset();
+    ports.subscribe.mockReset().mockImplementation((listener: (next: typeof ports.config) => void) => {listener(ports.config); return () => {};});
     ports.browser='chrome';ports.platform.mockReset().mockResolvedValue({os:'mac'});ports.unmountCallbacks=[];ports.anonymousElement=false;
     ports.tabApi='present';ports.currentTab.mockReset().mockResolvedValue(undefined);ports.tabViews.mockReset().mockReturnValue([]);
     ports.mount.mockReset();ports.createApp.mockReturnValue({use: ports.use, component: ports.component, mount: ports.mount,onUnmount: (fn:()=>void)=>ports.unmountCallbacks.push(fn)});

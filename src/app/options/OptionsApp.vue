@@ -214,7 +214,7 @@ import {
   configReady,
   subscribeConfig,
 } from '@/src/services/config/store'
-import {applyInterfaceFont, applyInterfaceTheme, persistPopupStartupAppearance, registerInterfaceAppearanceRoot} from '@/src/ui/interfaceAppearance'
+import {applyInterfaceFont, applyInterfaceTheme, registerInterfaceAppearanceRoot} from '@/src/ui/interfaceAppearance'
 import {browserCapabilities} from '@/src/platform/browser/capabilities'
 
 const props = defineProps<{
@@ -385,7 +385,6 @@ const unsubscribeInterfaceConfig = subscribeConfig((nextConfig) => {
   if (disposed) return
   syncInterfaceTheme(nextConfig.theme)
   applyInterfaceFont(nextConfig.interfaceFont, props.appearanceRoot)
-  if (!props.appearanceRoot) persistPopupStartupAppearance(nextConfig.interfaceSkin, nextConfig.theme)
 })
 
 void configReady
@@ -393,7 +392,6 @@ void configReady
     if (disposed) return
     syncInterfaceTheme(runtimeConfig.theme)
     applyInterfaceFont(runtimeConfig.interfaceFont, props.appearanceRoot)
-    if (!props.appearanceRoot) persistPopupStartupAppearance(runtimeConfig.interfaceSkin, runtimeConfig.theme)
   })
   .catch(() => {
     if (disposed) return

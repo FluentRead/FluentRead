@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaOcrTiles.ts
  * 文件职责：为本地图片与漫画 OCR 规划原像素重叠瓦片，并把识别结果安全映回整图。
- * 主要内容：沿两轴均匀分配最长边 1536、至少 512 像素重叠的识别窗口；限制 8192 边长与 16MP 输入；合并重叠窗口中的同一物理行时优先保留未被内部边界裁切的完整结果，保留相邻独立文字。
+ * 主要内容：单边不超 1728 像素保持单瓦片以消除 Retina 截屏的四分悬崖；超界大图沿两轴均匀分配最长边 1536、至少 256 像素重叠的识别窗口；限制 8192 边长与 16MP 输入；合并重叠窗口中的同一物理行时优先保留未被内部边界裁切的完整结果，保留相邻独立文字。
  * 模块边界：纯几何与数据算法，不读取像素、不创建 Canvas、不运行模型，不推测或拼接未识别出的文字。
  */
 import type {MangaOcrItem} from './mangaRegions';
@@ -10,7 +10,8 @@ import {numericEvidenceKey,numericProtection} from './mangaNumeric';
 export interface MangaOcrTile {x: number; y: number; width: number; height: number}
 export interface MangaOcrTileResult {tile: MangaOcrTile; results: MangaOcrItem[]; numericEvidence?: MangaOcrItem[]}
 const TILE_SIDE = 1536;
-const TILE_STRIDE = 1024;
+export const SINGLE_TILE_MAX_SIDE = 1728;
+const TILE_STRIDE = 1280;
 
 /** 去重前收集数值物理证据，按瓦片可见边界映回整图；每框保留首项、最低置信项和异值项，不改变正常识别结果的去重。 */
 export function collectMangaOcrTileNumericEvidence(pages:MangaOcrTileResult[],width:number,height:number):MangaOcrItem[] {
@@ -62,17 +63,22 @@ function matchesVisibleSlice(candidate: {item: MangaOcrItem; tile: MangaOcrTile}
     return overlap >= Math.max(box.width * box.height, visibleArea) * 0.65;
 }
 
-/** 小图复用整图；大图各窗口保持原像素，避免最长边缩放让整条长图的小字消失。 */
+/** 小图与轻微超界（<=1728px）复用整图；大图各窗口保持原像素，避免最长边缩放让整条长图的小字消失。 */
 export function planMangaOcrTiles(width: number, height: number): MangaOcrTile[] {
     if (![width, height].every(value => Number.isSafeInteger(value) && value > 0 && value <= 8192)
         || width * height > 16_777_216) throw new Error('图片尺寸超出本地识别范围');
-    const positions = (length: number) => {
-        const distance = Math.max(0, length - TILE_SIDE);
+    const axis = (length: number) => {
+        if (length <= SINGLE_TILE_MAX_SIDE) return {starts: [0], size: length};
+        const distance = length - TILE_SIDE;
         const steps = Math.ceil(distance / TILE_STRIDE);
-        return steps ? Array.from({length: steps + 1}, (_, index) => Math.round(index * distance / steps)) : [0];
+        return {
+            starts: Array.from({length: steps + 1}, (_, index) => Math.round(index * distance / steps)),
+            size: TILE_SIDE,
+        };
     };
-    return positions(height).flatMap(y => positions(width).map(x => ({
-        x, y, width: Math.min(width, TILE_SIDE), height: Math.min(height, TILE_SIDE),
+    const cols = axis(width), rows = axis(height);
+    return rows.starts.flatMap(y => cols.starts.map(x => ({
+        x, y, width: cols.size, height: rows.size,
     })));
 }
 

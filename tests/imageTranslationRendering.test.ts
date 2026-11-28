@@ -13,6 +13,9 @@ import {
     getImageSourceTypographyStyle,
     getImageSingleLineHeight,
     getImageRgbContrast,
+    getImageRgbLuminanceValues,
+    harmonizeImageSiblingFontSizes,
+    isAcceptableImageSourceInk,
     layoutImageTranslationText,
 } from '@/src/features/image-translation/services/rendering';
 
@@ -844,5 +847,44 @@ describe('完整译文字形使用实际绘制路径预检',()=>{
         expect(canDrawTranslatedImageText({remaining:100,characters:2},c as never,'TEXT',0,0,100,50,'black')).toBe(false);
         expect(canDrawTranslatedImageText({remaining:1,characters:100},c as never,'TEXT',0,0,100,50,'black')).toBe(false);
         const failure=new Error('native metrics');c.measureText.mockImplementation(()=>{throw failure;});expect(()=>canDrawTranslatedImageText(budget(),c as never,'TEXT',0,0,100,50,'black')).toThrow(failure);expect(c.restore).toHaveBeenCalledTimes(2);
+    });
+    it('标量线性亮度查找表、饱和控件白字对比度、兄弟字号协调与排版约束边界覆盖完整', () => {
+        // 小数低亮与高亮分支
+        expect(getImageRgbLuminanceValues(5.5, 120.5, 200)).toBeGreaterThan(0);
+        expect(isAcceptableImageSourceInk([255, 255, 255], [0, 174, 66])).toBe(true);
+        expect(isAcceptableImageSourceInk([255, 255, 255], [200, 245, 215])).toBe(false);
+        expect(isAcceptableImageSourceInk([10, 10, 10], [255, 255, 255])).toBe(true);
+
+        // 兄弟 UI 字号协调：同行、右对齐、居中列、缺省 effectiveFontSize、单健康项不压缩、无效/禁用项忽略
+        expect(harmonizeImageSiblingFontSizes([{bbox: {x0: 0, y0: 0, x1: 40, y1: 18}, fontSize: 18}])).toEqual([18]);
+        const rowAndCol = harmonizeImageSiblingFontSizes([
+            {bbox: {x0: 20, y0: 40, x1: 90, y1: 58}, fontSize: 22}, // 同行 Cancel (no effectiveFontSize)
+            {bbox: {x0: 110, y0: 40, x1: 160, y1: 58}, fontSize: 14, effectiveFontSize: 14}, // 同行 OK
+            {bbox: {x0: 20, y0: 80, x1: 160, y1: 98}, fontSize: 22, effectiveFontSize: 22}, // 同栏右对齐
+            {bbox: {x0: 70, y0: 120, x1: 110, y1: 138}, fontSize: 22, effectiveFontSize: 22}, // 同栏居中对齐
+            {bbox: {x0: 300, y0: 200, x1: 350, y1: 218}, fontSize: 20, effectiveFontSize: 20}, // 孤立项
+            {bbox: {x0: 300, y0: 240, x1: 350, y1: 258}, fontSize: 20, effectiveFontSize: 6}, // 过度压缩项（healthy < 2）
+            {bbox: {x0: 0, y0: 0, x1: 0, y1: 10}, fontSize: 18}, // 无效框
+            {bbox: {x0: 20, y0: 40, x1: 90, y1: 58}, fontSize: 18, eligible: false}, // 不参与
+        ]);
+        expect(rowAndCol[0]).toBeCloseTo(14 * 1.12, 4);
+        expect(rowAndCol[1]).toBe(14);
+        expect(rowAndCol[4]).toBe(20);
+        expect(rowAndCol[5]).toBe(20);
+
+        // 含组合空格的长词拆分、源行距约束与平衡回退边界
+        const spacedSplit = layoutImageTranslationText('a \u0301b \u0301c', 1, 40, measure, 1);
+        expect(spacedSplit.lines.join('')).toBe('a \u0301b \u0301c');
+        const pitched = layoutImageTranslationText('AA\nBB', 100, 80, (t, s) => t.length * s * 0.5, 16,
+            (_t, s) => ({ascent: s * 0.7, descent: s * 0.2}), {sourceLineCount: 2, sourceLinePitch: 30});
+        expect(pitched.lineHeight).toBe(30);
+        // 词合并后超宽（words.some > width）退出平衡
+        const wideWord = layoutImageTranslationText('测试一下吧。短', 5, 40, (t, s) => (t === '测试' ? 6 : t.length) * s, 1);
+        expect(wideWord.lines.join('')).toBe('测试一下吧。短');
+        // 平衡候选中 ink 缺失（layout.ink && !candidate.ink）跳过该候选
+        let inkCalls = 0;
+        const flakyInk = layoutImageTranslationText('one two three four five six', 8, 40, (t, s) => t.length * s, 1,
+            () => (++inkCalls <= 4 ? {ascent: 0.7, descent: 0.2} : {ascent: NaN, descent: NaN}));
+        expect(flakyInk.lines.join(' ')).toBe('one two three four five six');
     });
 });

@@ -2208,5 +2208,50 @@ describe('漫画原文冲突后的纯白空处补绘',()=>{
         expect(mocks.repair).toHaveBeenCalledOnce();expect(mocks.repair.mock.calls[0][3]).toMatchObject([{text:'正常译文',bbox:other.bbox}]);
         expect(mocks.mangaDraw).toHaveBeenCalledOnce();expect(mocks.mangaDraw.mock.calls[0][4]).toMatchObject([{text:'正常译文'}]);
     });
+});
 
+describe('普通图 guardOnly 非破坏性夹紧与多方向保护边界',()=>{
+    it('原框不重叠时按左/右/上/下四个方向夹紧相邻 guardOnly 扩边，多源框与连续夹紧均生效',async()=>{
+        imageOptions.push({width:200,height:160});
+        // 中心标签 [50..90, 50..90)（高度 40 -> 掩码扩边 4px > 绘字横扩 2px），四面分离 guardOnly 触发全方向夹紧与已夹紧掩码复核
+        const center={text:'Layer',bbox:{x0:50,y0:50,x1:90,y1:90},fontSize:40,sourceBoxes:[{x0:50,y0:50,x1:90,y1:90}]};
+        const leftGuard={text:'',bbox:{x0:35,y0:50,x1:47,y1:90},guardOnly:true as const};
+        const topGuard={text:'',bbox:{x0:50,y0:30,x1:90,y1:45},guardOnly:true as const};
+        const bottomGuard={text:'',bbox:{x0:95,y0:95,x1:105,y1:105},guardOnly:true as const};
+        // 右侧距原框 5px（drawBox x1=92 不碰 protectedBox x0=93，但 4px 掩码 x1=94 碰撞，触发 currentMaskClamp 分支）
+        const rightMaskGuard={text:'',bbox:{x0:95,y0:50,x1:105,y1:90},guardOnly:true as const};
+        const belowGuard={text:'',bbox:{x0:50,y0:94,x1:90,y1:106},guardOnly:true as const};
+        const farGuard={text:'',bbox:{x0:160,y0:10,x1:175,y1:20},guardOnly:true as const};
+        const far={text:'Done',bbox:{x0:140,y0:120,x1:175,y1:136},fontSize:16};
+        mocks.mangaRecognize.mockResolvedValueOnce([center,leftGuard,topGuard,rightMaskGuard,belowGuard,bottomGuard,farGuard,far]);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['图层','完成']}:undefined));
+        const result=await translateImageInOffscreen('guard-clamp-4sides','en','Page',undefined,'guard-clamp-4sides',false,'paddle');
+        expect(result.lines.map(line=>[line.text,line.renderSkipped])).toEqual([['图层',undefined],['完成',undefined]]);
+        const drawCall=mocks.draw.mock.calls.find(call=>call[1]==='图层')!;
+        expect(drawCall[2]).toBeGreaterThanOrEqual(50);
+        expect(drawCall[2]+drawCall[4]).toBeLessThanOrEqual(92);
+        expect(drawCall[3]).toBeGreaterThanOrEqual(48);
+        expect(drawCall[3]+drawCall[5]).toBeLessThanOrEqual(91);
+    });
+
+    it('同框既含 guardOnly 又含保留原文时按严格保护跳过，多源框含无效子框不夹紧放行',async()=>{
+        imageOptions.push({width:200,height:120});
+        // 1. 同一保护框同时出现 guardOnly 和保留品牌 KEEP -> 升级为非 guardOnly，触发跳过
+        const target={text:'Layer',bbox:{x0:20,y0:40,x1:54,y1:56},fontSize:16};
+        const sameBox={x0:57,y0:40,x1:75,y1:56};
+        const guard={text:'',bbox:sameBox,guardOnly:true as const};
+        const kept={text:'KEEP',bbox:sameBox,fontSize:16};
+        mocks.mangaRecognize.mockResolvedValueOnce([target,guard,kept]);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['图层','KEEP']}:undefined));
+        const strict=await translateImageInOffscreen('guard-upgrade-kept','en','Page',undefined,'guard-upgrade-kept',false,'paddle');
+        expect(strict.lines.find(line=>line.sourceText==='Layer')).toMatchObject({renderSkipped:true});
+
+        // 2. 候选含无效 sourceBox 且 drawBox 碰撞 guardOnly -> 拒绝夹紧并保守跳过
+        imageOptions.push({width:200,height:120});
+        const badSource={text:'Broken',bbox:{x0:20,y0:40,x1:54,y1:56},fontSize:16,sourceBoxes:[{x0:NaN,y0:40,x1:54,y1:56}]};
+        mocks.mangaRecognize.mockResolvedValueOnce([badSource,guard]);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['损坏']}:undefined));
+        const rejected=await translateImageInOffscreen('guard-invalid-source','en','Page',undefined,'guard-invalid-source',false,'paddle');
+        expect(rejected.lines[0]).toMatchObject({renderSkipped:true});
+    });
 });

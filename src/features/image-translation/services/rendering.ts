@@ -1,14 +1,14 @@
 /**
  * @file src/features/image-translation/services/rendering.ts
  * 文件职责：采样 OCR 框周边背景并在有限图片区域中排版、绘制完整译文，避免混合语言空格损坏、强制横向压缩和行数截断。
- * 主要内容：按周长用量化色阶聚类主色，但返回桶内真实颜色均值，避免纯色修补的固定色差；依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，单个源行按参考字体的宽度与墨迹高度一致性估计尺度，估计不可靠时沿用原上限；按实际回退字体的墨迹、描边和基线适配上下边界，单行不重复扣除完整行高，保留正文对齐及字号上限并隔离 Canvas 状态。
+ * 主要内容：按周长用 12 位量化整数色阶聚类主色，但返回桶内真实颜色均值，避免纯色修补的固定色差与字符串分配；使用 256 项 sRGB 线性查找表计算亮度并接受高饱和 UI 按钮上的合法白字，依据对比度选择文字颜色；按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，单个源行按参考字体的宽度与墨迹高度一致性估计尺度，单行放宽非 Arial UI 字体宽比悬崖并按实测墨高估计，多行仍保持严格一致；提供普通图同栏/同行兄弟 UI 行的字号协调以抑制短词放大并保留标题层级；按实际回退字体的墨迹、描边和基线适配上下边界，单行不重复扣除完整行高，保留正文对齐及字号上限并隔离 Canvas 状态。
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
- * 原色与余量：接收调用方已验证的前景色与可选细对比描边，并提供局部RGB对比度与单行实际高度度量；描边仍在原布局留量之内，这些度量本身不授予新增像素或清字权限。
+ * 原色与余量：接收调用方已验证的前景色与可选细对比描边，并提供局部RGB对比度、合法源字色核验与单行实际高度度量；描边仍在原布局留量之内，这些度量本身不授予新增像素或清字权限。
  * 行缘标点：在既有词界及可证明的字素边界上绑定开闭标点与日文行首禁排字符；长词拆分后重新绑定，保留显式换行和完整正文，不以删字或越框解决孤立标点。
  * 短末行：仅对有界短段落进行五次以内的行宽平衡，使用浏览器词边界与原字素/标点边界的交集，保留字号、行数和完整词；候选须重新通过实际墨迹高度及宽度检查，不扩大清字或绘字范围。
  * 原字尺度与位置：优先使用同帧观察到的逐行墨迹，独立核对原文字的参考宽度与字高；多行要求独立上下排列、相近字高及宽度区间同时吻合，未知断行空格不能人为提高字号。采用实测尺度时也保留墨迹位置，按源边线和垂直中心放置完整译文并夹紧到原绘字框；不改源框、字体族、字重、裁剪或修补范围。透视和混合字号无法一致解释时沿用原路径。
  * 倾斜译文：源方向须与原文字尺度分别核对；真实回退字形和描边旋转后仍须完整位于原框内，同行数参考源行距，只作最小整体平移。既有透明避让计划或缺失指标保持原布局，不新增清字权限。
- * 完整字形预检：复用绘字的实际字体、对齐、源墨迹锚点及倾角变换，在共享度量预算内检查描边与抗锯齿足迹；不绘字、不授权原图修补。
+ * 完整字形预检：复用绘字的实际字体、对齐、源墨迹锚点及倾角变换，在共享度量预算内检查描边与抗锯齿足迹，并可返回水平排版结果供紧邻的同步绘字直接复用；不绘字、不授权原图修补。
  * 照片选色：根据排版完成后的逐行字形落点采样已修补像素。样点透明、指标不可靠或预算用尽时采用既有字色和描边。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -39,17 +39,21 @@ export function getImageTextBackgroundColor(
     const y0 = Math.max(0, Math.min(imageHeight, Math.floor(bbox.y0)));
     const x1 = Math.max(x0, Math.min(imageWidth, Math.ceil(bbox.x1)));
     const y1 = Math.max(y0, Math.min(imageHeight, Math.ceil(bbox.y1)));
-    const colors = new Map<string, number[]>();
+    const colors = new Map<number, [number, number, number, number]>();
     const sample = (x: number, y: number) => {
         const offset = (y * imageWidth + x) * 4;
         if (pixels[offset + 3] < 128) return;
-        const red = Math.min(255, Math.round(pixels[offset] / 16) * 16);
-        const green = Math.min(255, Math.round(pixels[offset + 1] / 16) * 16);
-        const blue = Math.min(255, Math.round(pixels[offset + 2] / 16) * 16);
-        const key = `${red},${green},${blue}`;
-        const group = colors.get(key) ?? [0,0,0,0];
-        for (let channel = 0; channel < 3; channel++) group[channel] += pixels[offset + channel];
-        group[3]++; colors.set(key, group);
+        const r = pixels[offset], g = pixels[offset + 1], b = pixels[offset + 2];
+        const key = ((r & 0xf0) << 4) | (g & 0xf0) | (b >>> 4);
+        let group = colors.get(key);
+        if (!group) {
+            group = [0, 0, 0, 0];
+            colors.set(key, group);
+        }
+        group[0] += r;
+        group[1] += g;
+        group[2] += b;
+        group[3]++;
     };
     const left = Math.max(0, x0 - 4);
     const right = Math.min(imageWidth, x1 + 4);
@@ -63,24 +67,41 @@ export function getImageTextBackgroundColor(
             for (let x = x1; x < right; x += 1) sample(x, y);
         }
     }
-    let best = '255,255,255';
+    let bestR = 255, bestG = 255, bestB = 255;
     let bestCount = 0;
     colors.forEach(group => {
         if (group[3] > bestCount) {
             // 色阶只负责聚类；用实际样本均值填色，纯色图片不能凭空出现 8 级色差。
-            best = group.slice(0,3).map(value => Math.round(value / group[3])).join(',');
+            bestR = Math.round(group[0] / group[3]);
+            bestG = Math.round(group[1] / group[3]);
+            bestB = Math.round(group[2] / group[3]);
             bestCount = group[3];
         }
     });
-    return `rgb(${best})`;
+    return `rgb(${bestR},${bestG},${bestB})`;
+}
+
+const SRGB_LINEAR_LUT = new Float64Array(256);
+for (let channel = 0; channel < 256; channel++) {
+    const value = channel / 255;
+    SRGB_LINEAR_LUT[channel] = value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+function srgbToLinear(channel: number): number {
+    const clamped = Math.max(0, Math.min(255, channel));
+    const rounded = Math.round(clamped);
+    if (clamped === rounded) return SRGB_LINEAR_LUT[rounded];
+    const value = clamped / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+/** 标量 RGB 相对亮度计算，整数通道零分配直查 256 项线性表。 */
+export function getImageRgbLuminanceValues(red: number, green: number, blue: number): number {
+    return srgbToLinear(red) * 0.2126 + srgbToLinear(green) * 0.7152 + srgbToLinear(blue) * 0.0722;
 }
 
 function relativeLuminance(channels: readonly number[]): number {
-    const linear = channels.map(channel => {
-        const value = Math.max(0, Math.min(255, channel)) / 255;
-        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-    });
-    return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+    return getImageRgbLuminanceValues(channels[0], channels[1], channels[2]);
 }
 
 /** 同一源色可预先计算亮度，避免渐变观察重复对前景执行幂运算。 */
@@ -92,15 +113,28 @@ export function getImageRgbContrast(foreground:readonly number[],background:read
     return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
 }
 
+/** 校验源字色与底色对比度；饱和彩色 UI 按钮上的高亮浅字允许按大字/控件 2.6:1 保留原白字。 */
+export function isAcceptableImageSourceInk(ink: readonly number[], background: readonly number[]): boolean {
+    const inkLuminance = relativeLuminance(ink), bgLuminance = relativeLuminance(background);
+    const contrast = (Math.max(inkLuminance, bgLuminance) + 0.05) / (Math.min(inkLuminance, bgLuminance) + 0.05);
+    if (contrast >= 4.5) return true;
+    const chroma = Math.max(background[0], background[1], background[2])
+        - Math.min(background[0], background[1], background[2]);
+    return inkLuminance >= 0.72 && chroma >= 45 && contrast >= 2.6;
+}
+
 const DARK_TEXT = '#111827', LIGHT_TEXT = '#ffffff';
 const DARK_TEXT_LUMINANCE = relativeLuminance([17, 24, 39]);
 
-/** 选择与背景对比度较高的深色或白色，避免饱和色被简单灰度阈值误判。 */
+/** 选择与背景对比度较高的深色或白色；饱和彩色控件底色满足 2.8:1 时保留浅色字。 */
 export function getImageTextColor(backgroundColor: string): string {
     const channels = backgroundColor.match(/\d+(?:\.\d+)?/g)?.map(Number);
-    const luminance = relativeLuminance(channels && channels.length >= 3 ? channels.slice(0, 3) : [255, 255, 255]);
+    const rgb = channels && channels.length >= 3 ? channels : [255, 255, 255];
+    const luminance = getImageRgbLuminanceValues(rgb[0], rgb[1], rgb[2]);
     const darkContrast = (Math.max(luminance, DARK_TEXT_LUMINANCE) + 0.05) / (Math.min(luminance, DARK_TEXT_LUMINANCE) + 0.05);
     const lightContrast = 1.05 / (luminance + 0.05);
+    const chroma = Math.max(rgb[0], rgb[1], rgb[2]) - Math.min(rgb[0], rgb[1], rgb[2]);
+    if (chroma >= 80 && lightContrast >= 2.8) return LIGHT_TEXT;
     return darkContrast >= lightContrast ? DARK_TEXT : LIGHT_TEXT;
 }
 
@@ -113,6 +147,7 @@ export interface ImageTextBackground {
 
 const DARK_TEXT_LIMIT = (DARK_TEXT_LUMINANCE + .05) * 3 - .05;
 const LIGHT_TEXT_LIMIT = 1.05 / 3 - .05;
+const SATURATED_LIGHT_TEXT_LIMIT = 1.05 / 2.8 - .05;
 const TEXT_COLOR_COLUMNS = 8, TEXT_COLOR_ROWS = 4;
 const TEXT_COLOR_SAMPLES = TEXT_COLOR_COLUMNS * TEXT_COLOR_ROWS;
 
@@ -132,9 +167,11 @@ function sampleImageTextStyle(image: ImageTextBackground, ink: OcrLine['bbox'], 
             if (px < left || px >= right || py < top || py >= bottom) return;
             const offset = (Math.floor(py) * image.width + Math.floor(px)) * 4;
             if (image.pixels[offset + 3] !== 255) return;
-            const value = relativeLuminance([image.pixels[offset], image.pixels[offset + 1], image.pixels[offset + 2]]);
+            const r = image.pixels[offset], g = image.pixels[offset + 1], b = image.pixels[offset + 2];
+            const value = getImageRgbLuminanceValues(r, g, b);
+            const chroma = Math.max(r, g, b) - Math.min(r, g, b);
             if (value < DARK_TEXT_LIMIT) darkFailures++;
-            if (value > LIGHT_TEXT_LIMIT) lightFailures++;
+            if (value > (chroma >= 80 ? SATURATED_LIGHT_TEXT_LIMIT : LIGHT_TEXT_LIMIT)) lightFailures++;
         }
     }
     // 少量明暗像素不触发换色；横跨不同底色时整行仍使用统一字色。
@@ -181,7 +218,10 @@ function estimateImageInkFontSize({width,height,count}:ImageSourceInkGeometry,me
     const minimumWidth=inkWidth-space*(count-1);if(minimumWidth<=0)return;
     // 原合段可能插入空格或直接连接CJK；两种宽度边界都须支持同一尺度，不猜断行位置。
     const low=width/inkWidth*100,high=width/minimumWidth*100,byHeight=height/inkHeight*100,estimate=(low+high+byHeight*2)/4;
-    if(Math.max(low,high,byHeight)<=Math.min(low,high,byHeight)*1.12&&estimate>=height*.8&&estimate<=height*2.5)return estimate;
+    const ratio=Math.max(low,high,byHeight)/Math.min(low,high,byHeight);
+    if(ratio<=1.12&&estimate>=height*.8&&estimate<=height*2.5)return estimate;
+    // 单行非 Arial UI 字体宽比常与参考字体相差 12%~28%；此时采用实测墨高避免跳回 1.2x 膨胀上限。
+    if(count===1&&ratio<=1.28&&byHeight>=height*.8&&byHeight<=height*2.5)return byHeight;
 }
 /** 已验证源像素的字形尺度；参考字体须同时解释完整原文字的宽度和字高，不能只按空框缩放。 */
 export function getImageSourceInkFontSize(context:CanvasRenderingContext2D,line:ImageTextRegion,inkBoxes:readonly OcrLine['bbox'][]|undefined):number|undefined {
@@ -250,6 +290,88 @@ export function getImageSourceTextStyle(context:CanvasRenderingContext2D,line:Im
         return Math.max(byWidth,byHeight)<=Math.min(byWidth,byHeight)*1.12&&estimate>=height*.8&&estimate<=height*2.5?estimate:undefined;
     })??fallback;
     return {fontSize,...(inkBounds?{inkBounds}:{})};
+}
+
+export interface ImageSiblingFontCandidate {
+    bbox: OcrLine['bbox'];
+    fontSize: number;
+    effectiveFontSize?: number;
+    eligible?: boolean;
+}
+
+/** 协调普通网页图中同栏/同行且组内原框高度跨度不超过 1.2x 的兄弟行字号上限，防止传递链漂移并保留标题层级。 */
+export function harmonizeImageSiblingFontSizes(items: readonly ImageSiblingFontCandidate[]): number[] {
+    const result = items.map(item => item.fontSize);
+    const indices: number[] = [];
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i], b = item.bbox;
+        if (item.eligible === false || !Number.isFinite(item.fontSize) || item.fontSize <= 0
+            || !b || ![b.x0, b.y0, b.x1, b.y1].every(Number.isFinite) || b.x1 <= b.x0 || b.y1 <= b.y0) continue;
+        indices.push(i);
+    }
+    if (indices.length < 2 || indices.length > 512) return result;
+    const parent = indices.map((_, idx) => idx);
+    const compMinH = indices.map(i => items[i].bbox.y1 - items[i].bbox.y0);
+    const compMaxH = [...compMinH];
+    const find = (x: number): number => {
+        while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+        return x;
+    };
+    let comparisons = 0;
+    for (let a = 0; a < indices.length; a++) {
+        const ba = items[indices[a]].bbox, ha = ba.y1 - ba.y0, cxa = (ba.x0 + ba.x1) / 2;
+        for (let b = a + 1; b < indices.length; b++) {
+            if (++comparisons > 65_536) return result;
+            const bb = items[indices[b]].bbox, hb = bb.y1 - bb.y0;
+            const minH = Math.min(ha, hb), maxH = Math.max(ha, hb);
+            if (maxH > minH * 1.2) continue;
+            const vOverlap = Math.min(ba.y1, bb.y1) - Math.max(ba.y0, bb.y0);
+            const vGap = Math.max(ba.y0, bb.y0) - Math.min(ba.y1, bb.y1);
+            const hGap = Math.max(ba.x0, bb.x0) - Math.min(ba.x1, bb.x1);
+            const alignTol = Math.max(16, minH * 1.5);
+            const sameColumn = vGap >= -minH * 0.25 && vGap <= Math.max(120, minH * 8)
+                && (Math.abs(ba.x0 - bb.x0) <= alignTol || Math.abs(ba.x1 - bb.x1) <= alignTol
+                    || Math.abs(cxa - (bb.x0 + bb.x1) / 2) <= alignTol);
+            const sameRow = vOverlap >= minH * 0.5 && hGap >= -minH * 0.25 && hGap <= Math.max(160, minH * 10);
+            if (sameColumn || sameRow) {
+                const ra = find(a), rb = find(b);
+                if (ra !== rb) {
+                    const nextMin = Math.min(compMinH[ra], compMinH[rb]);
+                    const nextMax = Math.max(compMaxH[ra], compMaxH[rb]);
+                    if (nextMax <= nextMin * 1.2) {
+                        parent[rb] = ra;
+                        compMinH[ra] = nextMin;
+                        compMaxH[ra] = nextMax;
+                    }
+                }
+            }
+        }
+    }
+    const groups = new Map<number, number[]>();
+    for (let idx = 0; idx < indices.length; idx++) {
+        const root = find(idx);
+        let members = groups.get(root);
+        if (!members) { members = []; groups.set(root, members); }
+        members.push(indices[idx]);
+    }
+    for (const members of groups.values()) {
+        if (members.length < 2) continue;
+        const healthy: number[] = [];
+        for (const index of members) {
+            const item = items[index];
+            const ref = item.effectiveFontSize !== undefined && Number.isFinite(item.effectiveFontSize) && item.effectiveFontSize > 0
+                ? item.effectiveFontSize : item.fontSize;
+            const boxH = item.bbox.y1 - item.bbox.y0;
+            if (ref >= Math.max(9, boxH * 0.55)) healthy.push(ref);
+        }
+        if (healthy.length < 2) continue;
+        healthy.sort((x, y) => x - y);
+        const cap = healthy[Math.floor((healthy.length - 1) * 0.25)] * 1.12;
+        for (const index of members) {
+            if (result[index] > cap) result[index] = cap;
+        }
+    }
+    return result;
 }
 
 /** 只有整段可在当前宽度以源字号保持一行时，返回实际墨迹与描边所需的高度。 */
@@ -525,11 +647,12 @@ export function drawTranslatedImageText(
 }
 
 type ImageTextDrawing=Parameters<typeof drawTranslatedImageText>;
-export interface ImageTextMeasureBudget {remaining:number;characters:number}
+export interface ImageTextMeasureBudget {remaining:number;characters:number;layout?:ImageTranslationTextLayout}
 const IMAGE_TEXT_PREFLIGHT_LIMIT=Symbol('image-text-preflight-limit');
 
-/** 复用实际排版、描边和倾角坐标；只度量，不裁剪或绘字。共享预算不能被多段译文重置。 */
+/** 复用实际排版、描边和倾角坐标；只度量，不裁剪或绘字，并在共享预算上记录水平排版结果供后续同步绘字复用。 */
 export function canDrawTranslatedImageText(budget:ImageTextMeasureBudget,...args:ImageTextDrawing):boolean {
+    budget.layout=undefined;
     try {return renderTranslatedImageText(args,budget);}
     catch(error){if(error===IMAGE_TEXT_PREFLIGHT_LIMIT)return false;throw error;}
 }
@@ -656,7 +779,7 @@ function renderTranslatedImageText(args:ImageTextDrawing,preflight?:ImageTextMea
         const inkTop=layout.ink?(anchor
             ?Math.max(top+paddingY,Math.min(top+height-paddingY-layout.ink.height,(anchor.y0+anchor.y1-layout.ink.height)/2))
             :top+(textAlign==='center'?(height-layout.ink.height)/2:paddingY)):0;
-        return layout.lines.every((line, index) => {
+        const ok = layout.lines.every((line, index) => {
             const y = layout.ink
                 ? inkTop + layout.ink.baselines[index]
                 : firstLine + index * layout.lineHeight;
@@ -675,6 +798,8 @@ function renderTranslatedImageText(args:ImageTextDrawing,preflight?:ImageTextMea
             }
             return paint(line,inkX,y);
         });
+        if (ok && preflight) preflight.layout = layout;
+        return ok;
     } finally {
         context.restore();
     }

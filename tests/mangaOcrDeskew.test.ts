@@ -103,4 +103,24 @@ describe('纯像素漫画斜行几何',()=>{
         // 原来只看到窄黑前缀会跳过裁切；完整浅色支撑可使同一行满足既有最小宽度。
         expect(trimMangaOcrDeskew(image.data,400,100,100)).toEqual({x:18,y:43,width:364,height:12});
     });
+    it('支持直接从整图 RGBA 缓冲按 (pageWidth, x0, y0, width, height) 零画布估角',()=>{
+        const pageWidth=600,pageHeight=240,page=pixels(pageWidth,pageHeight,[30,30,30]);
+        const sub=line(10,8,400,100);
+        const ox=80,oy=60;
+        for(let y=0;y<sub.height;y++)for(let x=0;x<sub.width;x++){
+            const src=(y*sub.width+x)*4,dst=((oy+y)*pageWidth+ox+x)*4;
+            page.data[dst]=sub.data[src];page.data[dst+1]=sub.data[src+1];page.data[dst+2]=sub.data[src+2];page.data[dst+3]=sub.data[src+3];
+        }
+        const direct=planMangaOcrDeskew(sub.data,sub.width,sub.height);
+        const fromPage=planMangaOcrDeskew(page.data,pageWidth,ox,oy,sub.width,sub.height);
+        expect(fromPage).toEqual(direct);
+        // 越界、负偏移、非整行缓冲长度及非整数参数均拒绝
+        expect(planMangaOcrDeskew(page.data,pageWidth,-1,oy,400,100)).toBeUndefined();
+        expect(planMangaOcrDeskew(page.data,pageWidth,ox,-1,400,100)).toBeUndefined();
+        expect(planMangaOcrDeskew(page.data,pageWidth,201,oy,400,100)).toBeUndefined();
+        expect(planMangaOcrDeskew(page.data,pageWidth,ox,141,400,100)).toBeUndefined();
+        expect(planMangaOcrDeskew(page.data.subarray(0,page.data.length-4),pageWidth,ox,oy,400,100)).toBeUndefined();
+        expect(planMangaOcrDeskew(page.data,0,0,0,400,100)).toBeUndefined();
+        expect(planMangaOcrDeskew(page.data,pageWidth,ox,oy,400,undefined as unknown as number)).toBeUndefined();
+    });
 });

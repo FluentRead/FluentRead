@@ -207,8 +207,9 @@ describe('漫画独立 Worker 客户端', () => {
         worker.emit();
         await painter;
         const page = {results: []};
-        const recognized = client.request({type: 'recognize', image: 'page'}, undefined, progress);
+        const recognized = client.request({type: 'recognize', image: 'page', profile: 'image'}, undefined, progress);
         await flush();
+        expect(worker.latest).toMatchObject({type: 'recognize', image: 'page', profile: 'image', requestId: 3});
         worker.emit({stage: 'recognizing'});
         worker.emit({success: true, result: page});
         await expect(recognized).resolves.toBe(page);
